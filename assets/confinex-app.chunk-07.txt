@@ -1,0 +1,1 @@
+esultados:a})]})]})}import{jsx as ya}from"react/jsx-runtime";Ca(document.getElementById("root")).render(ya(xe,{}));
