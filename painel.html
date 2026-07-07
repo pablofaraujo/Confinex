@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CFAgro — Pablo Ferreira</title>
+<link rel="icon" type="image/png" href="./confinex-logo.jpg">
+<link rel="apple-touch-icon" href="./confinex-logo.jpg">
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{--bg:#f5f7f6;--card:#fff;--border:#e3e9e5;--text:#182b21;--muted:#6b7f74;--green:#059669;--greenbg:#d1fae5;--red:#dc2626;--redbg:#fee2e2;--amber:#b45309;--amberbg:#fef3c7;--blue:#2563eb;--bluebg:#dbeafe}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,'Segoe UI',Roboto,sans-serif;padding:22px;max-width:1280px;margin:0 auto}
+h1{font-size:22px;font-weight:700}
+h2{font-size:14px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:28px 0 12px}
+.sub{color:var(--muted);font-size:13px;margin-top:4px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 1px 2px rgba(16,42,30,.05)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:16px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.kpi .l{font-size:11px;color:var(--muted);text-transform:uppercase}
+.kpi .v{font-size:20px;font-weight:700;margin-top:5px}
+.kpi .d{font-size:12px;color:var(--muted);margin-top:3px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;color:var(--muted);font-weight:600;padding:7px 8px;border-bottom:2px solid var(--border);font-size:11px;text-transform:uppercase;white-space:nowrap}
+td{padding:7px 8px;border-bottom:1px solid #eef2ef;white-space:nowrap}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.pos{color:var(--green);font-weight:600}.neg{color:var(--red);font-weight:600}
+.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600}
+.b-green{background:var(--greenbg);color:#065f46}.b-amber{background:var(--amberbg);color:#92400e}.b-red{background:var(--redbg);color:#991b1b}.b-blue{background:var(--bluebg);color:#1e40af}
+.btn{background:var(--green);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer}
+.btn.sec{background:#fff;color:var(--text);border:1px solid var(--border)}
+input{width:100%;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:14px;margin-bottom:10px;background:#fbfdfc}
+.login-box{max-width:360px;margin:80px auto;text-align:center}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+.scroll{overflow-x:auto}
+canvas{max-height:300px}
+#app{display:none}
+.topbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.err{color:var(--red);font-size:13px;margin-top:8px}
+.footer{color:var(--muted);font-size:11px;margin:26px 0 8px;text-align:center}
+</style>
+</head>
+<body>
+
+<div id="login" class="login-box card">
+  <img src="./confinex-logo.jpg" alt="Logo" style="width:72px;height:72px;border-radius:50%;object-fit:cover;margin-bottom:10px">
+  <h1 style="margin-bottom:2px">CFAgro <span style="font-weight:400;color:#6b7f74;font-size:16px">— PABLO FERREIRA</span></h1>
+  <div class="sub" style="margin-bottom:18px;letter-spacing:2px;text-transform:uppercase;font-size:10px">Painel Vivo do Confinamento</div>
+  <input type="email" id="email" placeholder="seu email" autocomplete="username">
+  <input type="password" id="senha" placeholder="senha" autocomplete="current-password">
+  <button class="btn" style="width:100%" onclick="entrar()">Entrar</button>
+  <div class="err" id="loginErr"></div>
+</div>
+
+<div id="app">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:12px">
+      <img src="./confinex-logo.jpg" alt="Logo" style="width:48px;height:48px;border-radius:50%;object-fit:cover;flex-shrink:0">
+      <div>
+        <h1>CFAgro <span style="font-weight:400;color:#6b7f74;font-size:16px">— PABLO FERREIRA</span></h1>
+        <div class="sub" id="subtitle"></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn sec" onclick="carregar()">↻ Atualizar</button>
+      <button class="btn sec" onclick="sair()">Sair</button>
+    </div>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <h2>Exposição BGI por lote (view ao vivo)</h2>
+  <div class="card scroll"><table id="tbExpo"></table></div>
+
+  <h2>Estoque em confinamento (view ao vivo)</h2>
+  <div class="card scroll"><table id="tbEstoque"></table></div>
+
+  <h2>Pendências de documentos — quem deve GTA/NF</h2>
+  <div class="card scroll"><table id="tbPend"></table></div>
+
+  <h2>Acertos dos confinamentos</h2>
+  <div class="card scroll"><table id="tbAcertos"></table></div>
+
+  <div class="grid2" style="margin-top:14px">
+    <div class="card"><h2 style="margin-top:0">Fluxo de caixa acumulado</h2><canvas id="chFluxo"></canvas></div>
+    <div class="card"><h2 style="margin-top:0">Próximos eventos (90 dias)</h2><div class="scroll"><table id="tbProx"></table></div></div>
+  </div>
+
+  <div class="footer">Lendo ao vivo de fkmdzwjmjlmxqotznvgq.supabase.co · RLS ativo · CFAgro/Confinex</div>
+</div>
+
+<script>
+const SUPA_URL = 'https://fkmdzwjmjlmxqotznvgq.supabase.co';
+const SUPA_KEY = 'sb_publishable_mNwlWLAaJOVoXpmlD7ShYg_-Nqyy0bT'; // chave pública (RLS protege)
+const db = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+
+const fmtR$ = v => v==null?'—':Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0});
+const fmtN = (v,d=0) => v==null?'—':Number(v).toLocaleString('pt-BR',{maximumFractionDigits:d,minimumFractionDigits:d});
+const fmtD = s => {if(!s)return '—';const [y,m,d]=String(s).slice(0,10).split('-');return `${d}/${m}/${y.slice(2)}`};
+const cls = v => v>0?'pos':(v<0?'neg':'');
+
+async function entrar(){
+  const {error} = await db.auth.signInWithPassword({
+    email: document.getElementById('email').value.trim(),
+    password: document.getElementById('senha').value
+  });
+  if(error){ document.getElementById('loginErr').textContent = 'Falha no login: '+error.message; return; }
+  iniciar();
+}
+async function sair(){ await db.auth.signOut(); location.reload(); }
+
+async function iniciar(){
+  document.getElementById('login').style.display='none';
+  document.getElementById('app').style.display='block';
+  carregar();
+}
+
+let chart;
+async function carregar(){
+  document.getElementById('subtitle').textContent = 'Carregando...';
+  const [ops, expo, estoque, pend, acertos, fluxo] = await Promise.all([
+    db.from('operacoes').select('id,codigo,status,sexo,modalidade,confinamentos(nome)'),
+    db.from('v_exposicao_hedge').select('*'),
+    db.from('v_estoque_atual').select('*'),
+    db.from('pendencias_documentos').select('id,tipo,status,cobrancas,created_at,operacoes(codigo),contatos(nome),compras(quantidade,data)').neq('status','validado'),
+    db.from('acertos').select('*,operacoes(codigo),confinamentos(nome)').order('created_at'),
+    db.from('fluxo_caixa').select('data,descricao,tipo,valor,realizado,categoria').order('data')
+  ]);
+  const errs=[ops,expo,estoque,pend,acertos,fluxo].filter(r=>r.error);
+  if(errs.length){ document.getElementById('subtitle').textContent='Erro: '+errs[0].error.message; return; }
+
+  document.getElementById('subtitle').textContent =
+    `Atualizado ${new Date().toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})} · ${ops.data.length} operações no banco`;
+
+  // ---- KPIs
+  const cab = estoque.data.reduce((s,e)=>s+Number(e.cabecas||0),0);
+  const ativos = ops.data.filter(o=>['comprada','em_confinamento'].includes(o.status));
+  const descob = expo.data.reduce((s,e)=>s+Math.max(Number(e.cts_descobertos||0),0),0);
+  const credit = expo.data.reduce((s,e)=>s+Number(e.hedge_realizado_creditado||0),0);
+  const pendAbertas = pend.data.filter(p=>p.status==='aguardando_vendedor');
+  const acAguard = acertos.data.filter(a=>['aguardando','divergente'].includes(a.status));
+  const fluxoReal = fluxo.data.filter(f=>f.realizado);
+  const saldoReal = fluxoReal.reduce((s,f)=>s+(f.tipo==='entrada'?1:-1)*Number(f.valor),0);
+  document.getElementById('kpis').innerHTML = [
+    ['Cabeças no cocho', fmtN(cab), estoque.data.length+' currais · '+ativos.length+' lotes ativos'],
+    ['Hedge descoberto', fmtN(descob,1)+' cts', '≈ '+fmtN(descob*330)+' @ expostas'],
+    ['Hedge já creditado', fmtR$(credit), 'lucro realizado nos lotes'],
+    ['Pendências GTA/NF', pendAbertas.length, 'aguardando vendedor'],
+    ['Acertos em aberto', acAguard.length, 'aguardando ou divergentes'],
+    ['Caixa (a conciliar)', fmtR$(saldoReal), fluxoReal.length+' lançamentos realizados'],
+  ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="d">${k[2]}</div></div>`).join('');
+
+  // ---- Exposição
+  document.getElementById('tbExpo').innerHTML =
+   '<tr><th>Lote</th><th class="num">@ previstas</th><th class="num">Cts necessários</th><th class="num">Cts abertos</th><th class="num">Descoberto</th><th class="num">Creditado (realizado)</th><th>Status</th></tr>'+
+   expo.data.sort((a,b)=>a.codigo.localeCompare(b.codigo)).map(e=>{
+     const d=Number(e.cts_descobertos||0);
+     return `<tr><td><b>${e.codigo}</b></td><td class="num">${fmtN(e.arrobas_previstas)}</td>
+      <td class="num">${fmtN(e.cts_necessarios,2)}</td><td class="num">${fmtN(e.cts_abertos,2)}</td>
+      <td class="num ${d>0.1?'neg':'pos'}">${fmtN(d,2)}</td>
+      <td class="num ${cls(e.hedge_realizado_creditado)}">${fmtR$(e.hedge_realizado_creditado)}</td>
+      <td>${d>0.1?'<span class="badge b-red">Descoberto</span>':'<span class="badge b-green">Coberto</span>'}</td></tr>`;
+   }).join('');
+
+  // ---- Estoque
+  document.getElementById('tbEstoque').innerHTML =
+   '<tr><th>Lote</th><th>Confinamento</th><th>Curral</th><th class="num">Cabeças</th><th>Desde</th><th class="num">Dias</th></tr>'+
+   estoque.data.sort((a,b)=>a.codigo.localeCompare(b.codigo)).map(e=>{
+     const dias = e.desde?Math.round((Date.now()-new Date(e.desde))/864e5):null;
+     return `<tr><td><b>${e.codigo}</b></td><td>${e.confinamento||'—'}</td><td>${e.curral||'—'}</td>
+      <td class="num">${fmtN(e.cabecas)}</td><td>${fmtD(e.desde)}</td><td class="num">${dias??'—'}</td></tr>`;
+   }).join('');
+
+  // ---- Pendências
+  document.getElementById('tbPend').innerHTML =
+   '<tr><th>Lote</th><th>Vendedor</th><th>Documento</th><th>Compra</th><th class="num">Cab</th><th class="num">Dias em aberto</th><th>Status</th></tr>'+
+   pend.data.sort((a,b)=>(a.operacoes?.codigo||'').localeCompare(b.operacoes?.codigo||'')).map(p=>{
+     const dias=Math.round((Date.now()-new Date(p.created_at))/864e5);
+     const compData = p.compras?.data;
+     return `<tr><td><b>${p.operacoes?.codigo||'—'}</b></td><td>${p.contatos?.nome||'<span class="badge b-amber">sem vendedor vinculado</span>'}</td>
+      <td>${p.tipo==='gta'?'GTA':'NF entrada'}</td><td>${fmtD(compData)}</td><td class="num">${p.compras?.quantidade??'—'}</td>
+      <td class="num">${dias}</td>
+      <td>${p.status==='aguardando_vendedor'?'<span class="badge b-red">Aguardando</span>':'<span class="badge b-green">'+p.status+'</span>'}</td></tr>`;
+   }).join('') || '<tr><td colspan="7">Nenhuma pendência 🎉</td></tr>';
+
+  // ---- Acertos
+  document.getElementById('tbAcertos').innerHTML =
+   '<tr><th>Lote</th><th>Confinamento</th><th class="num">Esperado</th><th class="num">Recebido</th><th class="num">Divergência</th><th>Status</th></tr>'+
+   acertos.data.sort((a,b)=>(a.operacoes?.codigo||'').localeCompare(b.operacoes?.codigo||'')).map(a=>`
+    <tr><td><b>${a.operacoes?.codigo||'—'}</b></td><td>${a.confinamentos?.nome||'—'}</td>
+     <td class="num">${fmtR$(a.esperado_calculado)}</td><td class="num">${fmtR$(a.valor_recebido)}</td>
+     <td class="num ${cls(a.divergencia)}">${a.valor_liquido!=null?fmtR$(a.divergencia):'—'}</td>
+     <td>${a.status==='aguardando'?'<span class="badge b-amber">Aguardando</span>':a.status==='divergente'?'<span class="badge b-red">Divergente</span>':'<span class="badge b-green">'+a.status+'</span>'}</td></tr>`).join('');
+
+  // ---- Fluxo
+  const fl = fluxo.data;
+  let acc=0; const serie = fl.map(f=>{acc+=(f.tipo==='entrada'?1:-1)*Number(f.valor);return {d:f.data,v:acc,real:f.realizado,desc:f.descricao}});
+  const cut = serie.findIndex(s=>!s.real);
+  if(chart) chart.destroy();
+  Chart.defaults.color='#6b7f74';Chart.defaults.borderColor='#e3e9e5';
+  chart = new Chart(document.getElementById('chFluxo'),{type:'line',data:{
+    labels:serie.map(s=>fmtD(s.d)),
+    datasets:[
+     {label:'Realizado',data:serie.map((s,i)=>(cut<0||i<cut)?s.v:null),borderColor:'#059669',backgroundColor:'rgba(5,150,105,.07)',fill:true,pointRadius:0,borderWidth:2,tension:.2},
+     {label:'Projetado',data:serie.map((s,i)=>(cut>=0&&i>=cut-1)?s.v:null),borderColor:'#2563eb',borderDash:[6,4],pointRadius:0,borderWidth:2,tension:.2}]},
+    options:{interaction:{mode:'index',intersect:false},
+     plugins:{tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmtR$(c.raw),afterTitle:it=>serie[it[0].dataIndex]?.desc||''}}},
+     scales:{y:{ticks:{callback:v=>'R$'+(v/1e6).toFixed(1)+'M'}},x:{ticks:{maxTicksLimit:12}}}}});
+
+  const hoje=new Date().toISOString().slice(0,10);
+  const lim=new Date(Date.now()+90*864e5).toISOString().slice(0,10);
+  const prox=fl.filter(f=>!f.realizado&&f.data>=hoje&&f.data<=lim);
+  document.getElementById('tbProx').innerHTML='<tr><th>Data</th><th>Descrição</th><th class="num">Valor</th></tr>'+
+   prox.map(f=>`<tr><td>${fmtD(f.data)}</td><td style="white-space:normal">${f.descricao||''}</td>
+    <td class="num ${f.tipo==='entrada'?'pos':'neg'}">${f.tipo==='entrada'?'+':'−'}${fmtR$(f.valor)}</td></tr>`).join('')
+   || '<tr><td colspan="3">Sem eventos projetados nos próximos 90 dias</td></tr>';
+}
+
+// sessão persistida: entra direto se já logado
+db.auth.getSession().then(({data})=>{ if(data.session) iniciar(); });
+</script>
+</body>
+</html>

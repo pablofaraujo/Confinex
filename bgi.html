@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CFAgro — BGI · Posições</title>
+<link rel="icon" type="image/png" href="./confinex-logo.jpg">
+<link rel="apple-touch-icon" href="./confinex-logo.jpg">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+:root{--bg:#f5f7f6;--card:#fff;--border:#e3e9e5;--text:#182b21;--muted:#6b7f74;--green:#059669;--greenbg:#d1fae5;--red:#dc2626;--redbg:#fee2e2;--amber:#b45309;--amberbg:#fef3c7;--blue:#2563eb;--bluebg:#dbeafe}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,'Segoe UI',Roboto,sans-serif;padding:22px;max-width:1100px;margin:0 auto}
+h1{font-size:21px;font-weight:700}
+h2{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:26px 0 10px}
+.sub{color:var(--muted);font-size:12px;margin-top:3px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 1px 2px rgba(16,42,30,.05)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:14px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+.kpi .l{font-size:10px;color:var(--muted);text-transform:uppercase}
+.kpi .v{font-size:19px;font-weight:700;margin-top:4px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;color:var(--muted);font-weight:600;padding:7px 8px;border-bottom:2px solid var(--border);font-size:10.5px;text-transform:uppercase;white-space:nowrap}
+td{padding:7px 8px;border-bottom:1px solid #eef2ef;white-space:nowrap}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.pos{color:var(--green);font-weight:600}.neg{color:var(--red);font-weight:600}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:600}
+.b-green{background:var(--greenbg);color:#065f46}.b-amber{background:var(--amberbg);color:#92400e}.b-red{background:var(--redbg);color:#991b1b}.b-blue{background:var(--bluebg);color:#1e40af}
+.btn{background:var(--green);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer}
+.btn.sec{background:#fff;color:var(--text);border:1px solid var(--border)}
+.btn.mini{padding:4px 10px;font-size:11px}
+.btn.warn{background:var(--amber)}
+input,select{border:1px solid var(--border);border-radius:8px;padding:9px;font-size:13px;background:#fbfdfc;color:var(--text);width:100%}
+.login-box{max-width:360px;margin:80px auto;text-align:center}
+.login-box input{margin-bottom:10px}
+.grid{display:grid;gap:10px}
+.g6{grid-template-columns:repeat(6,1fr)}
+@media(max-width:800px){.g6{grid-template-columns:repeat(2,1fr)}}
+.fld label{font-size:10px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px}
+.scroll{overflow-x:auto}
+#app{display:none}
+.topbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.err{color:var(--red);font-size:13px;margin-top:8px}
+.msg{font-size:12.5px;margin-top:8px;color:var(--green);font-weight:600}
+.foot{color:var(--muted);font-size:11px;text-align:center;margin:26px 0 8px}
+a.voltar{color:var(--muted);text-decoration:none;font-size:13px}
+</style>
+</head>
+<body>
+
+<div id="login" class="login-box card">
+  <img src="./confinex-logo.jpg" alt="Logo" style="width:72px;height:72px;border-radius:50%;object-fit:cover;margin-bottom:10px">
+  <h1 style="margin-bottom:2px">BGI <span style="font-weight:400;color:#6b7f74;font-size:15px">— PABLO FERREIRA</span></h1>
+  <div class="sub" style="margin-bottom:18px;letter-spacing:2px;text-transform:uppercase;font-size:10px">Gerenciamento de Posições</div>
+  <input type="email" id="email" placeholder="seu email" autocomplete="username">
+  <input type="password" id="senha" placeholder="senha" autocomplete="current-password">
+  <button class="btn" style="width:100%" onclick="entrar()">Entrar</button>
+  <div class="err" id="loginErr"></div>
+</div>
+
+<div id="app">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:12px">
+      <img src="./confinex-logo.jpg" style="width:44px;height:44px;border-radius:50%;object-fit:cover">
+      <div>
+        <h1>BGI <span style="font-weight:400;color:#6b7f74;font-size:15px">— Gerenciamento de Posições</span></h1>
+        <div class="sub" id="subtitle"></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <a class="btn sec" style="text-decoration:none" href="./central.html">⌂ Central</a>
+      <button class="btn sec" onclick="carregar()">↻ Atualizar</button>
+    </div>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <h2>Exposição por lote</h2>
+  <div class="card scroll"><table id="tbExpo"></table></div>
+
+  <h2>Nova trava</h2>
+  <div class="card">
+    <div class="grid g6">
+      <div class="fld"><label>Contrato</label><input id="fContrato" placeholder="BGIQ26"></div>
+      <div class="fld"><label>Direção</label><select id="fDirecao"><option value="vendido">Vendido</option><option value="comprado">Comprado</option></select></div>
+      <div class="fld"><label>Contratos (cts)</label><input id="fCts" type="number" step="0.01" placeholder="5.00"></div>
+      <div class="fld"><label>Preço (R$/@)</label><input id="fPreco" type="number" step="0.01" placeholder="346.00"></div>
+      <div class="fld"><label>Data</label><input id="fData" type="date"></div>
+      <div class="fld"><label>Alocar ao lote</label><select id="fLote"></select></div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;margin-top:12px">
+      <button class="btn" onclick="novaTrava()">＋ Registrar trava</button>
+      <input id="fObs" placeholder="observações (corretora, termo...)" style="flex:1">
+    </div>
+    <div class="msg" id="msgTrava"></div>
+  </div>
+
+  <h2>Posições</h2>
+  <div class="card scroll"><table id="tbPos"></table></div>
+
+  <h2>Cotações BGI</h2>
+  <div class="card">
+    <div class="scroll"><table id="tbCot"></table></div>
+    <div class="grid g6" style="margin-top:12px">
+      <div class="fld"><label>Contrato</label><input id="cContrato" placeholder="BGIQ26 ou FISICO"></div>
+      <div class="fld"><label>Preço (R$/@)</label><input id="cPreco" type="number" step="0.01"></div>
+      <div class="fld"><label>Fonte</label><select id="cFonte"><option>manual</option><option>b3</option><option>cepea</option><option>wey</option></select></div>
+      <div class="fld"><label>Ref. física?</label><select id="cFisica"><option value="false">Não (futuro)</option><option value="true">Sim (física)</option></select></div>
+      <div class="fld" style="grid-column:span 2;display:flex;align-items:end"><button class="btn sec" style="width:100%" onclick="novaCotacao()">＋ Registrar cotação</button></div>
+    </div>
+    <div class="msg" id="msgCot"></div>
+  </div>
+
+  <div class="foot">Grava direto no banco Confinex — o Dashboard e o Juan enxergam na hora · CFAgro</div>
+</div>
+
+<script>
+const db = window.supabase.createClient('https://fkmdzwjmjlmxqotznvgq.supabase.co','sb_publishable_mNwlWLAaJOVoXpmlD7ShYg_-Nqyy0bT');
+const fmtR$ = v => v==null?'—':Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0});
+const fmtN = (v,d=2) => v==null?'—':Number(v).toLocaleString('pt-BR',{maximumFractionDigits:d,minimumFractionDigits:d});
+const fmtD = s => {if(!s)return '—';const [y,m,d]=String(s).slice(0,10).split('-');return `${d}/${m}/${y.slice(2)}`};
+const cls = v => v>0?'pos':(v<0?'neg':'');
+
+async function entrar(){
+  const {error} = await db.auth.signInWithPassword({email:document.getElementById('email').value.trim(),password:document.getElementById('senha').value});
+  if(error){document.getElementById('loginErr').textContent='Falha: '+error.message;return;}
+  iniciar();
+}
+function iniciar(){document.getElementById('login').style.display='none';document.getElementById('app').style.display='block';carregar();}
+
+let LOTES=[], POS=[];
+async function carregar(){
+  document.getElementById('subtitle').textContent='Carregando...';
+  const [expo, pos, cot, ops] = await Promise.all([
+    db.from('v_exposicao_hedge').select('*'),
+    db.from('posicoes_hedge').select('*, alocacoes_hedge(contratos_qtd, resultado_creditado, operacoes(codigo))').order('created_at',{ascending:false}),
+    db.from('cotacoes_bgi').select('*').order('data',{ascending:false}).order('created_at',{ascending:false}).limit(30),
+    db.from('operacoes').select('id,codigo').in('status',['comprada','em_confinamento']).order('codigo')
+  ]);
+  const err=[expo,pos,cot,ops].find(r=>r.error);
+  if(err){document.getElementById('subtitle').textContent='Erro: '+err.error.message;return;}
+  LOTES=ops.data; POS=pos.data;
+  document.getElementById('subtitle').textContent=`Atualizado ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`;
+  document.getElementById('fLote').innerHTML='<option value="">(sem alocação)</option>'+LOTES.map(l=>`<option value="${l.id}">${l.codigo}</option>`).join('');
+
+  // KPIs
+  const nec=expo.data.reduce((a,e)=>a+Number(e.cts_necessarios||0),0);
+  const ab=expo.data.reduce((a,e)=>a+Number(e.cts_abertos||0),0);
+  const desc=expo.data.reduce((a,e)=>a+Math.max(Number(e.cts_descobertos||0),0),0);
+  const cred=expo.data.reduce((a,e)=>a+Number(e.hedge_realizado_creditado||0),0);
+  document.getElementById('kpis').innerHTML=[
+    ['Necessário',fmtN(nec)+' cts'],['Aberto',fmtN(ab)+' cts'],
+    ['Descoberto',`<span class="${desc>0.5?'neg':'pos'}">${fmtN(desc)} cts</span>`],
+    ['Exposição',fmtN(desc*330,0)+' @'],['Realizado creditado',fmtR$(cred)]
+  ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div></div>`).join('');
+
+  // Exposição
+  document.getElementById('tbExpo').innerHTML='<tr><th>Lote</th><th class="num">@ previstas</th><th class="num">Necessário</th><th class="num">Aberto</th><th class="num">Descoberto</th><th class="num">Creditado</th></tr>'+
+   expo.data.sort((a,b)=>a.codigo.localeCompare(b.codigo)).map(e=>{
+     const d=Number(e.cts_descobertos||0);
+     return `<tr><td><b>${e.codigo}</b></td><td class="num">${fmtN(e.arrobas_previstas,1)}</td><td class="num">${fmtN(e.cts_necessarios)}</td><td class="num">${fmtN(e.cts_abertos)}</td><td class="num ${d>0.1?'neg':'pos'}">${fmtN(d)}</td><td class="num ${cls(e.hedge_realizado_creditado)}">${fmtR$(e.hedge_realizado_creditado)}</td></tr>`}).join('');
+
+  // Posições
+  document.getElementById('tbPos').innerHTML='<tr><th>Contrato</th><th>Dir.</th><th class="num">Cts</th><th class="num">Entrada</th><th class="num">Saída</th><th class="num">Resultado</th><th>Lotes</th><th>Status</th><th>Ações</th></tr>'+
+   POS.map(p=>{
+     const lotes=(p.alocacoes_hedge||[]).map(a=>a.operacoes?.codigo).filter(Boolean).join(', ')||'—';
+     const st=p.status==='aberta'?'<span class="badge b-green">Aberta</span>':p.status==='rolada'?'<span class="badge b-blue">Rolada</span>':'<span class="badge b-amber">Encerrada</span>';
+     const acoes=p.status==='aberta'?`<button class="btn mini warn" onclick="encerrar('${p.id}')">Encerrar</button> <button class="btn mini sec" onclick="rolar('${p.id}')">Rolar</button>`:'';
+     return `<tr><td><b>${p.contrato}</b></td><td>${p.direcao}</td><td class="num">${fmtN(p.contratos_qtd)}</td><td class="num">${fmtN(p.preco_entrada)}</td><td class="num">${p.preco_saida?fmtN(p.preco_saida):'—'}</td><td class="num ${cls(p.resultado_realizado)}">${p.resultado_realizado!=null?fmtR$(p.resultado_realizado):'—'}</td><td>${lotes}</td><td>${st}</td><td>${acoes}</td></tr>`}).join('');
+
+  // Cotações + basis
+  const ultimas={};
+  cot.data.forEach(c=>{const k=c.referencia_fisica?'FISICO':c.contrato; if(!ultimas[k])ultimas[k]=c;});
+  const fisica=ultimas['FISICO'];
+  document.getElementById('tbCot').innerHTML='<tr><th>Contrato</th><th class="num">Preço</th><th>Data</th><th>Fonte</th><th class="num">Basis vs física</th></tr>'+
+   Object.entries(ultimas).map(([k,c])=>{
+     const basis=(fisica&&!c.referencia_fisica)?Number(fisica.preco)-Number(c.preco):null;
+     return `<tr><td><b>${k}</b>${c.referencia_fisica?' <span class="badge b-blue">física</span>':''}</td><td class="num">R$ ${fmtN(c.preco)}</td><td>${fmtD(c.data)}</td><td>${c.fonte}</td><td class="num ${basis!=null?(basis>10?'pos':basis<-5?'neg':''):''}">${basis!=null?fmtN(basis):'—'}</td></tr>`}).join('')
+   || '<tr><td colspan="5">Nenhuma cotação registrada — registre a primeira abaixo.</td></tr>';
+}
+
+async function novaTrava(){
+  const contrato=document.getElementById('fContrato').value.trim().toUpperCase();
+  const cts=parseFloat(document.getElementById('fCts').value);
+  const preco=parseFloat(document.getElementById('fPreco').value);
+  const data=document.getElementById('fData').value||new Date().toISOString().slice(0,10);
+  const loteId=document.getElementById('fLote').value;
+  if(!contrato||!cts||!preco){document.getElementById('msgTrava').textContent='Preencha contrato, cts e preço.';return;}
+  if(!confirm(`Registrar trava: ${document.getElementById('fDirecao').value} ${cts} cts ${contrato} @ R$${preco}?`))return;
+  const {data:ins,error}=await db.from('posicoes_hedge').insert({contrato,direcao:document.getElementById('fDirecao').value,contratos_qtd:cts,preco_entrada:preco,data_entrada:data,status:'aberta',obs:document.getElementById('fObs').value||null}).select().single();
+  if(error){document.getElementById('msgTrava').textContent='Erro: '+error.message;return;}
+  if(loteId){await db.from('alocacoes_hedge').insert({posicao_id:ins.id,operacao_id:loteId,contratos_qtd:cts});}
+  document.getElementById('msgTrava').textContent=`✓ Trava registrada (${contrato}, ${cts} cts).`;
+  carregar();
+}
+
+async function encerrar(id){
+  const p=POS.find(x=>x.id===id);
+  const saida=parseFloat(prompt(`Encerrar ${p.contrato} (${fmtN(p.contratos_qtd)} cts ${p.direcao} @ ${fmtN(p.preco_entrada)}).\nPreço de saída (R$/@):`));
+  if(!saida)return;
+  const mult=p.direcao==='vendido'?1:-1;
+  const resultado=Math.round(mult*(Number(p.preco_entrada)-saida)*Number(p.contratos_qtd)*330*100)/100;
+  if(!confirm(`Resultado: ${fmtR$(resultado)}.\nSerá CREDITADO aos lotes alocados e a exposição deles volta a aberta. Confirmar?`))return;
+  await db.from('posicoes_hedge').update({status:'encerrada',preco_saida:saida,data_saida:new Date().toISOString().slice(0,10),resultado_realizado:resultado}).eq('id',id);
+  const {data:alocRows}=await db.from('alocacoes_hedge').select('id,contratos_qtd').eq('posicao_id',id);
+  const tot=(alocRows||[]).reduce((a,x)=>a+Number(x.contratos_qtd),0)||1;
+  for(const a of (alocRows||[])){
+    await db.from('alocacoes_hedge').update({resultado_creditado:Math.round(resultado*Number(a.contratos_qtd)/tot*100)/100}).eq('id',a.id);
+  }
+  carregar();
+}
+
+async function rolar(id){
+  const p=POS.find(x=>x.id===id);
+  const novoContrato=prompt(`Rolar ${p.contrato} → novo contrato (ex.: BGIV26):`);
+  if(!novoContrato)return;
+  const saida=parseFloat(prompt('Preço de saída do contrato atual (R$/@):'));
+  const entrada=parseFloat(prompt('Preço de entrada do novo contrato (R$/@):'));
+  if(!saida||!entrada)return;
+  const mult=p.direcao==='vendido'?1:-1;
+  const resultado=Math.round(mult*(Number(p.preco_entrada)-saida)*Number(p.contratos_qtd)*330*100)/100;
+  if(!confirm(`Rolagem: encerra ${p.contrato} com ${fmtR$(resultado)} e abre ${p.contratos_qtd} cts em ${novoContrato.toUpperCase()} @ ${entrada}. Confirmar?`))return;
+  const {data:nova}=await db.from('posicoes_hedge').insert({contrato:novoContrato.toUpperCase(),direcao:p.direcao,contratos_qtd:p.contratos_qtd,preco_entrada:entrada,data_entrada:new Date().toISOString().slice(0,10),status:'aberta',obs:'rolagem de '+p.contrato}).select().single();
+  await db.from('posicoes_hedge').update({status:'rolada',preco_saida:saida,data_saida:new Date().toISOString().slice(0,10),resultado_realizado:resultado,rolada_para:nova.id}).eq('id',id);
+  const alocs=(p.alocacoes_hedge||[]);
+  const tot=alocs.reduce((a,x)=>a+Number(x.contratos_qtd),0)||1;
+  const {data:alocRows}=await db.from('alocacoes_hedge').select('id,operacao_id,contratos_qtd').eq('posicao_id',id);
+  for(const a of (alocRows||[])){
+    await db.from('alocacoes_hedge').update({resultado_creditado:Math.round(resultado*Number(a.contratos_qtd)/tot*100)/100}).eq('id',a.id);
+    await db.from('alocacoes_hedge').insert({posicao_id:nova.id,operacao_id:a.operacao_id,contratos_qtd:a.contratos_qtd});
+  }
+  carregar();
+}
+
+async function novaCotacao(){
+  const contrato=document.getElementById('cContrato').value.trim().toUpperCase();
+  const preco=parseFloat(document.getElementById('cPreco').value);
+  if(!contrato||!preco){document.getElementById('msgCot').textContent='Preencha contrato e preço.';return;}
+  const fisica=document.getElementById('cFisica').value==='true';
+  const {error}=await db.from('cotacoes_bgi').insert({contrato:fisica?'FISICO':contrato,data:new Date().toISOString().slice(0,10),preco,fonte:document.getElementById('cFonte').value,referencia_fisica:fisica});
+  document.getElementById('msgCot').textContent=error?'Erro: '+error.message:'✓ Cotação registrada.';
+  if(!error)carregar();
+}
+
+db.auth.getSession().then(({data})=>{if(data.session)iniciar();});
+</script>
+</body>
+</html>
