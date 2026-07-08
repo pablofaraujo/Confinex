@@ -847,6 +847,11 @@ function ScPanel({ sc, upd, sexo, confinamentos, modeloSelecionado, setModeloSel
   const isParceria = sc.modalidade === "parceria";
   const dataSaida = addDiasISO(sc.dataEntrada, parseFloat(sc.diasCiclo) || 0);
   const contratoSugerido = contratoB3PorData(dataSaida);
+  useEffect(() => {
+    if (contratoSugerido && sc.contratoB3 && sc.contratoB3 !== contratoSugerido) {
+      upd("contratoB3", contratoSugerido);
+    }
+  }, [contratoSugerido]);
   return /* @__PURE__ */ jsxs("div", { children: [
     !isRev && /* @__PURE__ */ jsxs(Fragment, { children: [
       /* @__PURE__ */ jsx("div", { className: "sec-t nm", children: "Base Salva do Confinamento" }),

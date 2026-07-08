@@ -75,6 +75,9 @@ canvas{max-height:300px}
   <h2>Exposição BGI por lote (view ao vivo)</h2>
   <div class="card scroll"><table id="tbExpo"></table></div>
 
+  <h2>Posições na B3 — hedge × especulação</h2>
+  <div class="card scroll"><table id="tbPos"></table></div>
+
   <h2>Estoque em confinamento (view ao vivo)</h2>
   <div class="card scroll"><table id="tbEstoque"></table></div>
 
@@ -121,15 +124,16 @@ async function iniciar(){
 let chart;
 async function carregar(){
   document.getElementById('subtitle').textContent = 'Carregando...';
-  const [ops, expo, estoque, pend, acertos, fluxo] = await Promise.all([
+  const [ops, expo, posicoes, estoque, pend, acertos, fluxo] = await Promise.all([
     db.from('operacoes').select('id,codigo,status,sexo,modalidade,confinamentos(nome)'),
     db.from('v_exposicao_hedge').select('*'),
+    db.from('posicoes_hedge').select('contrato,direcao,contratos_qtd,preco_entrada,preco_saida,data_saida,status,resultado_realizado,categoria,negocio_rateio').or('status.in.(aberta,rolada),origem.eq.bgi-portfolio').order('status').order('contrato'),
     db.from('v_estoque_atual').select('*'),
     db.from('pendencias_documentos').select('id,tipo,status,cobrancas,created_at,operacoes(codigo),contatos(nome),compras(quantidade,data)').neq('status','validado'),
     db.from('acertos').select('*,operacoes(codigo),confinamentos(nome)').order('created_at'),
     db.from('fluxo_caixa').select('data,descricao,tipo,valor,realizado,categoria').order('data')
   ]);
-  const errs=[ops,expo,estoque,pend,acertos,fluxo].filter(r=>r.error);
+  const errs=[ops,expo,posicoes,estoque,pend,acertos,fluxo].filter(r=>r.error);
   if(errs.length){ document.getElementById('subtitle').textContent='Erro: '+errs[0].error.message; return; }
 
   document.getElementById('subtitle').textContent =
@@ -164,6 +168,19 @@ async function carregar(){
       <td class="num ${cls(e.hedge_realizado_creditado)}">${fmtR$(e.hedge_realizado_creditado)}</td>
       <td>${d>0.1?'<span class="badge b-red">Descoberto</span>':'<span class="badge b-green">Coberto</span>'}</td></tr>`;
    }).join('');
+
+  // ---- Posições B3 (hedge × especulação)
+  const abertaEspec = posicoes.data.filter(p=>p.categoria==='especulacao'&&['aberta','rolada'].includes(p.status));
+  document.getElementById('tbPos').innerHTML =
+   '<tr><th>Contrato</th><th>Lado</th><th class="num">Cts</th><th class="num">Entrada</th><th class="num">Saída</th><th>Status</th><th class="num">Resultado líq.</th><th>Tipo</th><th>Negócio/Rateio</th></tr>'+
+   posicoes.data.map(p=>`<tr><td><b>${p.contrato}</b></td><td>${p.direcao==='comprado'?'Comprado':'Vendido'}</td>
+    <td class="num">${fmtN(p.contratos_qtd,2)}</td><td class="num">${fmtN(p.preco_entrada,2)}</td>
+    <td class="num">${p.preco_saida!=null?fmtN(p.preco_saida,2):'—'}</td>
+    <td>${['aberta','rolada'].includes(p.status)?'<span class="badge b-amber">Aberta</span>':'<span class="badge b-green">Encerrada</span>'}</td>
+    <td class="num ${cls(p.resultado_realizado)}">${fmtR$(p.resultado_realizado)}</td>
+    <td>${p.categoria==='especulacao'?'<span class="badge b-red">Especulação</span>':'<span class="badge b-green">Hedge</span>'}</td>
+    <td>${p.negocio_rateio&&p.negocio_rateio!=='ESPEC'?p.negocio_rateio:'—'}</td></tr>`).join('')
+   || '<tr><td colspan="9">Nenhuma posição</td></tr>';
 
   // ---- Estoque
   document.getElementById('tbEstoque').innerHTML =
