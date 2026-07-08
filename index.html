@@ -1,27 +1,88 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="theme-color" content="#F5F6F8" />
-    <title>Confinex - Pablo Ferreira</title>
-    <script type="importmap">
-      {
-        "imports": {
-          "react": "https://esm.sh/react@19.2.6",
-          "react-dom/client": "https://esm.sh/react-dom@19.2.6/client",
-          "react/jsx-runtime": "https://esm.sh/react@19.2.6/jsx-runtime"
-        }
-      }
-    </script>
-    <script>
-      window.CONFINEX_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbz3FgKsNmGBaoo2A2IeuBiSTbG0w1apwugKYQeJvPfv-o7taxJJHi6IhJOxy_F2vIrL/exec";
-    </script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="./confinex-app.latest.js?v=fase0-patch-2026-07-08"></script>
-  </body>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CFAgro — Central</title>
+<link rel="icon" type="image/png" href="./confinex-logo.jpg">
+<link rel="apple-touch-icon" href="./confinex-logo.jpg">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+:root{--bg:#f5f7f6;--card:#fff;--border:#e3e9e5;--text:#182b21;--muted:#6b7f74;--green:#059669;--amber:#b45309;--amberbg:#fef3c7;--red:#dc2626;--redbg:#fee2e2}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,'Segoe UI',Roboto,sans-serif;padding:24px;max-width:640px;margin:0 auto;min-height:100vh}
+.head{display:flex;align-items:center;gap:14px;margin:18px 0 6px}
+.head img{width:64px;height:64px;border-radius:50%;object-fit:cover}
+h1{font-size:26px;font-weight:700}
+h1 span{font-weight:400;color:var(--muted);font-size:17px}
+.sub{color:var(--muted);font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-bottom:22px}
+.apps{display:grid;gap:14px;margin-top:10px}
+.app{display:flex;align-items:center;gap:16px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;text-decoration:none;color:var(--text);box-shadow:0 1px 3px rgba(16,42,30,.06);transition:transform .1s}
+.app:active{transform:scale(.98)}
+.app .ico{font-size:34px;width:56px;height:56px;display:flex;align-items:center;justify-content:center;border-radius:14px;flex-shrink:0}
+.app .t{font-size:18px;font-weight:700}
+.app .d{font-size:13px;color:var(--muted);margin-top:3px}
+.app .arrow{margin-left:auto;color:var(--muted);font-size:20px}
+.status{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:24px}
+.st{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center}
+.st .v{font-size:19px;font-weight:700}
+.st .l{font-size:10px;color:var(--muted);text-transform:uppercase;margin-top:3px}
+.foot{color:var(--muted);font-size:11px;text-align:center;margin-top:30px}
+.aviso{background:var(--amberbg);border-radius:10px;padding:8px 12px;font-size:12px;color:#78350f;margin-top:14px;display:none;text-align:center}
+</style>
+</head>
+<body>
+<div class="head">
+  <img src="./confinex-logo.jpg" alt="Logo">
+  <div>
+    <h1>CFAgro <span>— PABLO FERREIRA</span></h1>
+    <div class="sub">Central de Operações</div>
+  </div>
+</div>
+
+<div class="apps">
+  <a class="app" href="./confinex.html">
+    <div class="ico" style="background:#e8f5ee">🧮</div>
+    <div><div class="t">Confinex</div><div class="d">Simulador — compra, revenda e confinamento</div></div>
+    <div class="arrow">›</div>
+  </a>
+  <a class="app" href="https://pablofaraujo.github.io/boi-gordo-portfolio/">
+    <div class="ico" style="background:#fef3c7">📈</div>
+    <div><div class="t">BGI</div><div class="d">Gerenciamento de posições — travas, rolagens e exposição</div></div>
+    <div class="arrow">›</div>
+  </a>
+  <a class="app" href="./painel.html">
+    <div class="ico" style="background:#dbeafe">📊</div>
+    <div><div class="t">Dashboard</div><div class="d">Painel Vivo — lotes, pendências, acertos e caixa</div></div>
+    <div class="arrow">›</div>
+  </a>
+</div>
+
+<div class="status" id="status" style="display:none">
+  <div class="st"><div class="v" id="stCab">—</div><div class="l">Cabeças</div></div>
+  <div class="st"><div class="v" id="stDescob">—</div><div class="l">Cts descobertos</div></div>
+  <div class="st"><div class="v" id="stPend">—</div><div class="l">Pendências</div></div>
+</div>
+<div class="aviso" id="aviso">Faça login no Dashboard uma vez para ver o resumo aqui.</div>
+
+<div class="foot">Confinex · BGI · Dashboard — uma só fonte de verdade (Supabase) · CFAgro</div>
+
+<script>
+const db = window.supabase.createClient('https://fkmdzwjmjlmxqotznvgq.supabase.co','sb_publishable_mNwlWLAaJOVoXpmlD7ShYg_-Nqyy0bT');
+(async()=>{
+  const {data:s} = await db.auth.getSession();
+  if(!s.session){ document.getElementById('aviso').style.display='block'; return; }
+  const [est, expo, pend] = await Promise.all([
+    db.from('v_estoque_atual').select('cabecas'),
+    db.from('v_exposicao_hedge').select('cts_descobertos'),
+    db.from('pendencias_documentos').select('id',{count:'exact',head:true}).eq('status','aguardando_vendedor')
+  ]);
+  if(est.error) return;
+  document.getElementById('status').style.display='grid';
+  document.getElementById('stCab').textContent = est.data.reduce((a,e)=>a+Number(e.cabecas||0),0).toLocaleString('pt-BR');
+  document.getElementById('stDescob').textContent = expo.data.reduce((a,e)=>a+Math.max(Number(e.cts_descobertos||0),0),0).toFixed(1);
+  document.getElementById('stPend').textContent = pend.count ?? '—';
+})();
+</script>
+</body>
 </html>
