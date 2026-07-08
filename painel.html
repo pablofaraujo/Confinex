@@ -129,7 +129,7 @@ async function carregar(){
     db.from('v_exposicao_hedge').select('*'),
     db.from('posicoes_hedge').select('contrato,direcao,contratos_qtd,preco_entrada,preco_saida,data_saida,status,resultado_realizado,categoria,negocio_rateio').or('status.in.(aberta,rolada),origem.eq.bgi-portfolio').order('status').order('contrato'),
     db.from('v_estoque_atual').select('*'),
-    db.from('pendencias_documentos').select('id,tipo,status,cobrancas,created_at,operacoes(codigo),contatos(nome),compras(quantidade,data)').neq('status','validado'),
+    db.from('pendencias_documentos').select('id,tipo,status,cobrancas,created_at,operacoes(codigo),contatos(nome),compras(quantidade,data)').not('status','in','("validado","cancelado")'),
     db.from('acertos').select('*,operacoes(codigo),confinamentos(nome)').order('created_at'),
     db.from('fluxo_caixa').select('data,descricao,tipo,valor,realizado,categoria').order('data')
   ]);

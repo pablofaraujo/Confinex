@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Boi Balança — Pablo Ferreira</title>
+<link rel="icon" type="image/png" href="./confinex-logo.jpg">
+<link rel="apple-touch-icon" href="./confinex-logo.jpg">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+:root{--bg:#f5f7f6;--card:#fff;--border:#e3e9e5;--text:#182b21;--muted:#6b7f74;--green:#059669;--greenbg:#d1fae5;--red:#dc2626;--redbg:#fee2e2;--amber:#b45309;--amberbg:#fef3c7;--blue:#2563eb;--bluebg:#dbeafe}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,'Segoe UI',Roboto,sans-serif;padding:22px;max-width:1280px;margin:0 auto}
+h1{font-size:22px;font-weight:700}
+h2{font-size:14px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:28px 0 12px}
+.sub{color:var(--muted);font-size:13px;margin-top:4px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 1px 2px rgba(16,42,30,.05)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:16px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.kpi .l{font-size:11px;color:var(--muted);text-transform:uppercase}
+.kpi .v{font-size:20px;font-weight:700;margin-top:5px}
+.kpi .d{font-size:12px;color:var(--muted);margin-top:3px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;color:var(--muted);font-weight:600;padding:7px 8px;border-bottom:2px solid var(--border);font-size:11px;text-transform:uppercase;white-space:nowrap}
+td{padding:7px 8px;border-bottom:1px solid #eef2ef;white-space:nowrap}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.pos{color:var(--green);font-weight:600}.neg{color:var(--red);font-weight:600}
+.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600}
+.b-green{background:var(--greenbg);color:#065f46}.b-amber{background:var(--amberbg);color:#92400e}.b-red{background:var(--redbg);color:#991b1b}.b-blue{background:var(--bluebg);color:#1e40af}
+.btn{background:var(--green);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer}
+.btn.sec{background:#fff;color:var(--text);border:1px solid var(--border)}
+.btn.mini{padding:4px 10px;font-size:11px;border-radius:6px}
+input,select{width:100%;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:14px;background:#fbfdfc}
+.login-box{max-width:360px;margin:80px auto;text-align:center}
+.login-box input{margin-bottom:10px}
+.simgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.f label{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:4px;font-weight:600}
+.res{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:14px}
+.res .r{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+.res .r .l{font-size:10px;color:var(--muted);text-transform:uppercase}
+.res .r .v{font-size:17px;font-weight:700;margin-top:3px}
+.scroll{overflow-x:auto}
+#app{display:none}
+.topbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.err{color:var(--red);font-size:13px;margin-top:8px}
+.footer{color:var(--muted);font-size:11px;margin:26px 0 8px;text-align:center}
+</style>
+</head>
+<body>
+
+<div id="login" class="login-box card">
+  <img src="./confinex-logo.jpg" alt="Logo" style="width:72px;height:72px;border-radius:50%;object-fit:cover;margin-bottom:10px">
+  <h1 style="margin-bottom:2px">Boi Balança <span style="font-weight:400;color:#6b7f74;font-size:16px">— PABLO FERREIRA</span></h1>
+  <div class="sub" style="margin-bottom:18px;letter-spacing:2px;text-transform:uppercase;font-size:10px">Balança → Gancho · giro de frigorífico</div>
+  <input type="email" id="email" placeholder="seu email" autocomplete="username">
+  <input type="password" id="senha" placeholder="senha" autocomplete="current-password">
+  <button class="btn" style="width:100%" onclick="entrar()">Entrar</button>
+  <div class="err" id="loginErr"></div>
+</div>
+
+<div id="app">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:12px">
+      <img src="./confinex-logo.jpg" alt="Logo" style="width:48px;height:48px;border-radius:50%;object-fit:cover;flex-shrink:0">
+      <div>
+        <h1>Boi Balança <span style="font-weight:400;color:#6b7f74;font-size:16px">— PABLO FERREIRA</span></h1>
+        <div class="sub" id="subtitle"></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn sec" onclick="carregar()">↻ Atualizar</button>
+      <button class="btn sec" onclick="sair()">Sair</button>
+    </div>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <h2>Simulador — fecha o negócio antes de comprar</h2>
+  <div class="card">
+    <div class="simgrid">
+      <div class="f"><label>Cabeças</label><input type="number" id="sQtd" value="50"></div>
+      <div class="f"><label>Peso vivo médio (kg)</label><input type="number" id="sPeso" value="510"></div>
+      <div class="f"><label>Compra por</label><select id="sModo" onchange="simular()"><option value="kg">R$/kg vivo</option><option value="arroba" selected>R$/@ (rend. combinado)</option></select></div>
+      <div class="f" id="fRend"><label>Rend. combinado (%)</label><input type="number" id="sRendC" value="50" step=".5"></div>
+      <div class="f"><label>Preço compra</label><input type="number" id="sPrecoC" value="300" step=".5"></div>
+      <div class="f"><label>RC estimado no gancho (%)</label><input type="number" id="sRC" value="52" step=".5"></div>
+      <div class="f"><label>Preço gancho (R$/@)</label><input type="number" id="sPrecoV" value="330" step=".5"></div>
+      <div class="f"><label>Funrural na venda (%)</label><input type="number" id="sFun" value="1.5" step=".1"></div>
+      <div class="f"><label>Frete total (R$)</label><input type="number" id="sFrete" value="0"></div>
+      <div class="f"><label>Outros custos (R$)</label><input type="number" id="sOutros" value="0"></div>
+      <div class="f"><label>Prazo pagamento (dias)</label><input type="number" id="sPrazoP" value="0"></div>
+      <div class="f"><label>Prazo recebimento (dias)</label><input type="number" id="sPrazoR" value="30"></div>
+    </div>
+    <div class="res" id="simRes"></div>
+  </div>
+
+  <h2>Lotes — balança → gancho</h2>
+  <div class="card scroll"><table id="tbLotes"></table></div>
+
+  <h2>Contas a pagar (compras) e a receber (frigoríficos)</h2>
+  <div class="card scroll" style="margin-bottom:14px"><table id="tbPagar"></table></div>
+  <div class="card scroll"><table id="tbReceber"></table></div>
+
+  <h2>Pendências GTA / NF</h2>
+  <div class="card scroll"><table id="tbPend"></table></div>
+
+  <div class="footer">Boi Balança · dados ao vivo da base CFAgro · acesso protegido por login</div>
+</div>
+
+<a href="./" style="position:fixed;bottom:18px;right:18px;z-index:9999;background:#fff;border:1px solid #e3e9e5;border-radius:999px;padding:10px 16px;font-size:13px;font-weight:600;color:#182b21;text-decoration:none;box-shadow:0 2px 10px rgba(15,23,42,.15)">⌂ Central</a>
+
+<script>
+const SUPA_URL = 'https://fkmdzwjmjlmxqotznvgq.supabase.co';
+const SUPA_KEY = 'sb_publishable_mNwlWLAaJOVoXpmlD7ShYg_-Nqyy0bT'; // chave pública (RLS protege)
+const db = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+
+const fmtR$ = v => v==null?'—':Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0});
+const fmtR$2 = v => v==null?'—':Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL',minimumFractionDigits:2});
+const fmtN = (v,d=0) => v==null?'—':Number(v).toLocaleString('pt-BR',{maximumFractionDigits:d,minimumFractionDigits:d});
+const fmtD = s => {if(!s)return '—';const [y,m,d]=String(s).slice(0,10).split('-');return `${d}/${m}/${y.slice(2)}`};
+const addDias = (iso,dias) => {if(!iso)return null;const d=new Date(iso+'T12:00:00');d.setDate(d.getDate()+(Number(dias)||0));return d.toISOString().slice(0,10)};
+const cls = v => v>0?'pos':(v<0?'neg':'');
+
+async function entrar(){
+  const {error} = await db.auth.signInWithPassword({
+    email: document.getElementById('email').value.trim(),
+    password: document.getElementById('senha').value
+  });
+  if(error){ document.getElementById('loginErr').textContent = 'Falha no login: '+error.message; return; }
+  iniciar();
+}
+async function sair(){ await db.auth.signOut(); location.reload(); }
+async function iniciar(){
+  document.getElementById('login').style.display='none';
+  document.getElementById('app').style.display='block';
+  carregar();
+}
+
+// ---------- SIMULADOR ----------
+function simular(){
+  const g = id => Number(document.getElementById(id).value)||0;
+  const qtd=g('sQtd'), peso=g('sPeso'), modo=document.getElementById('sModo').value;
+  const rendC=g('sRendC'), precoC=g('sPrecoC'), rc=g('sRC'), precoV=g('sPrecoV');
+  const fun=g('sFun'), frete=g('sFrete'), outros=g('sOutros'), prazoP=g('sPrazoP'), prazoR=g('sPrazoR');
+  document.getElementById('fRend').style.display = modo==='arroba'?'block':'none';
+  if(!qtd||!peso||!precoC||!precoV){document.getElementById('simRes').innerHTML='';return;}
+  const custoCab = modo==='kg' ? peso*precoC : peso*(rendC/100)/15*precoC;
+  const arrCarc = peso*(rc/100)/15;                       // @ de carcaça por cabeça
+  const receitaCab = arrCarc*precoV;
+  const funCab = receitaCab*fun/100;
+  const custosCab = custoCab + frete/qtd + outros/qtd;
+  const margemCab = receitaCab - funCab - custosCab;
+  const margemTotal = margemCab*qtd;
+  const margemPct = custosCab? margemCab/custosCab*100 : 0;
+  const rcBE = (peso/15*precoV*(1-fun/100))>0 ? custosCab/(peso/15*precoV*(1-fun/100))*100 : 0;
+  const giroCaixa = prazoR - prazoP;
+  document.getElementById('simRes').innerHTML = [
+    ['Custo compra/cab', fmtR$2(custoCab)],
+    ['@ carcaça/cab', fmtN(arrCarc,2)+' @'],
+    ['Receita líq./cab', fmtR$2(receitaCab-funCab)],
+    ['Margem/cab', `<span class="${cls(margemCab)}">${fmtR$2(margemCab)}</span>`],
+    ['Margem total', `<span class="${cls(margemTotal)}">${fmtR$(margemTotal)}</span>`],
+    ['Margem s/ custo', `<span class="${cls(margemPct)}">${fmtN(margemPct,1)}%</span>`],
+    ['RC de equilíbrio', fmtN(rcBE,2)+'%'],
+    ['Descasamento caixa', giroCaixa+' dias'],
+  ].map(r=>`<div class="r"><div class="l">${r[0]}</div><div class="v">${r[1]}</div></div>`).join('');
+}
+document.querySelectorAll('#sQtd,#sPeso,#sRendC,#sPrecoC,#sRC,#sPrecoV,#sFun,#sFrete,#sOutros,#sPrazoP,#sPrazoR').forEach(()=>{});
+['sQtd','sPeso','sRendC','sPrecoC','sRC','sPrecoV','sFun','sFrete','sOutros','sPrazoP','sPrazoR'].forEach(id=>document.getElementById(id).addEventListener('input',simular));
+
+// ---------- DADOS ----------
+async function carregar(){
+  document.getElementById('subtitle').textContent='Carregando...';
+  const [ops, compras, vendas, pend, contatos] = await Promise.all([
+    db.from('operacoes').select('id,codigo,status,obs').eq('tipo_negocio','boi_balanca'),
+    db.from('compras').select('*'),
+    db.from('vendas').select('*'),
+    db.from('pendencias_documentos').select('id,tipo,status,operacao_id,created_at'),
+    db.from('contatos').select('id,nome')
+  ]);
+  const errs=[ops,compras,vendas,pend,contatos].filter(r=>r.error);
+  if(errs.length){ document.getElementById('subtitle').textContent='Erro: '+errs[0].error.message; return; }
+  const nome = Object.fromEntries(contatos.data.map(c=>[c.id,c.nome]));
+  const bbIds = new Set(ops.data.map(o=>o.id));
+  const cs = compras.data.filter(c=>bbIds.has(c.operacao_id));
+  const vs = vendas.data.filter(v=>bbIds.has(v.operacao_id));
+  const ps = pend.data.filter(p=>bbIds.has(p.operacao_id) && !['validado','cancelado'].includes(p.status));
+  const ativos = ops.data.filter(o=>o.status!=='cancelada');
+
+  document.getElementById('subtitle').textContent =
+    `Atualizado ${new Date().toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})} · ${ativos.length} lotes`;
+
+  // KPIs
+  const emAndamento = ativos.filter(o=>!vs.some(v=>v.operacao_id===o.id));
+  const cab = cs.filter(c=>emAndamento.some(o=>o.id===c.operacao_id)).reduce((s,c)=>s+Number(c.quantidade||0),0);
+  const aPagar = cs.filter(c=>!c.pago && ativos.some(o=>o.id===c.operacao_id)).reduce((s,c)=>s+Number(c.valor_total||0),0);
+  const aReceber = vs.filter(v=>!v.recebido).reduce((s,v)=>s+Number(v.valor_bruto||0)-Number(v.funrural||0),0);
+  const margemReal = ativos.reduce((s,o)=>{
+    const c=cs.find(x=>x.operacao_id===o.id), v=vs.find(x=>x.operacao_id===o.id);
+    if(!c||!v)return s;
+    return s + (Number(v.valor_bruto||0)-Number(v.funrural||0)-Number(c.valor_total||0));
+  },0);
+  document.getElementById('kpis').innerHTML = [
+    ['Lotes em andamento', emAndamento.length, cab+' cabeças aguardando abate'],
+    ['A pagar', fmtR$(aPagar), 'compras em aberto'],
+    ['A receber', fmtR$(aReceber), 'frigoríficos'],
+    ['Margem realizada', fmtR$(margemReal), 'lotes com venda fechada'],
+    ['Pendências GTA/NF', ps.length, 'documentos em aberto'],
+  ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="d">${k[2]}</div></div>`).join('');
+
+  // Lotes
+  document.getElementById('tbLotes').innerHTML =
+   '<tr><th>Lote</th><th>Compra</th><th>Vendedor</th><th class="num">Cab</th><th class="num">Peso vivo (kg)</th><th class="num">R$/@ compra</th><th class="num">Valor compra</th><th>Abate</th><th>Frigorífico</th><th class="num">Carcaça (kg)</th><th class="num">RC real</th><th class="num">R$/@ gancho</th><th class="num">Margem</th><th>Status</th></tr>'+
+   ativos.sort((a,b)=>b.codigo.localeCompare(a.codigo)).map(o=>{
+     const c=cs.find(x=>x.operacao_id===o.id)||{};
+     const v=vs.find(x=>x.operacao_id===o.id);
+     const rc = v&&c.peso_total_kg? v.peso_carcaca_total/c.peso_total_kg*100 : null;
+     const margem = v? Number(v.valor_bruto||0)-Number(v.funrural||0)-Number(c.valor_total||0) : null;
+     return `<tr><td><b>${o.codigo}</b></td><td>${fmtD(c.data)}</td><td>${nome[c.vendedor_id]||'—'}</td>
+      <td class="num">${fmtN(c.quantidade)}</td><td class="num">${fmtN(c.peso_total_kg)}</td>
+      <td class="num">${fmtN(c.preco_arroba,2)}</td><td class="num">${fmtR$(c.valor_total)}</td>
+      <td>${v?fmtD(v.data_abate):'—'}</td><td>${v?(nome[v.comprador_id]||'—'):'—'}</td>
+      <td class="num">${v?fmtN(v.peso_carcaca_total):'—'}</td>
+      <td class="num">${rc?fmtN(rc,2)+'%':'—'}</td>
+      <td class="num">${v?fmtN(v.preco_arroba,2):'—'}</td>
+      <td class="num ${cls(margem)}">${margem!=null?fmtR$(margem):'—'}</td>
+      <td>${v?'<span class="badge b-green">Abatido</span>':'<span class="badge b-amber">Aguardando abate</span>'}</td></tr>`;
+   }).join('') || '<tr><td colspan="14">Nenhum lote ainda — registre a primeira compra pelo Juan no grupo Boi Balança</td></tr>';
+
+  // A pagar
+  const pagarRows = cs.filter(c=>ativos.some(o=>o.id===c.operacao_id));
+  document.getElementById('tbPagar').innerHTML =
+   '<tr><th>A pagar</th><th>Vendedor</th><th class="num">Valor</th><th>Vencimento</th><th>Situação</th><th></th></tr>'+
+   pagarRows.sort((a,b)=>String(addDias(a.data,a.prazo_dias)).localeCompare(String(addDias(b.data,b.prazo_dias)))).map(c=>{
+     const o=ativos.find(x=>x.id===c.operacao_id)||{};
+     const venc=c.data_pagamento||addDias(c.data,c.prazo_dias);
+     const atrasado=!c.pago && venc && venc<new Date().toISOString().slice(0,10);
+     return `<tr><td><b>${o.codigo||'—'}</b></td><td>${nome[c.vendedor_id]||'—'}</td>
+      <td class="num">${fmtR$(c.valor_total)}</td><td>${fmtD(venc)}</td>
+      <td>${c.pago?'<span class="badge b-green">Pago</span>':(atrasado?'<span class="badge b-red">Vencido</span>':'<span class="badge b-amber">Em aberto</span>')}</td>
+      <td>${c.pago?'':`<button class="btn mini" onclick="marcarPago('${c.id}')">marcar pago</button>`}</td></tr>`;
+   }).join('') || '<tr><td colspan="6">Nada a pagar</td></tr>';
+
+  // A receber
+  document.getElementById('tbReceber').innerHTML =
+   '<tr><th>A receber</th><th>Frigorífico</th><th class="num">Valor líq.</th><th>Previsão</th><th>Situação</th><th></th></tr>'+
+   vs.map(v=>{
+     const o=ativos.find(x=>x.id===v.operacao_id)||{};
+     const prev=addDias(v.data_abate,v.prazo_recebimento);
+     const atrasado=!v.recebido && prev && prev<new Date().toISOString().slice(0,10);
+     return `<tr><td><b>${o.codigo||'—'}</b></td><td>${nome[v.comprador_id]||'—'}</td>
+      <td class="num">${fmtR$(Number(v.valor_bruto||0)-Number(v.funrural||0))}</td><td>${fmtD(prev)}</td>
+      <td>${v.recebido?'<span class="badge b-green">Recebido</span>':(atrasado?'<span class="badge b-red">Atrasado</span>':'<span class="badge b-blue">A receber</span>')}</td>
+      <td>${v.recebido?'':`<button class="btn mini" onclick="marcarRecebido('${v.id}')">marcar recebido</button>`}</td></tr>`;
+   }).join('') || '<tr><td colspan="6">Nenhuma venda registrada</td></tr>';
+
+  // Pendências
+  document.getElementById('tbPend').innerHTML =
+   '<tr><th>Lote</th><th>Documento</th><th class="num">Dias em aberto</th><th>Status</th></tr>'+
+   ps.map(p=>{
+     const o=ops.data.find(x=>x.id===p.operacao_id)||{};
+     const dias=Math.round((Date.now()-new Date(p.created_at))/864e5);
+     return `<tr><td><b>${o.codigo||'—'}</b></td><td>${p.tipo==='gta'?'GTA':'NF entrada'}</td>
+      <td class="num">${dias}</td><td><span class="badge b-red">Aguardando</span></td></tr>`;
+   }).join('') || '<tr><td colspan="4">Nenhuma pendência 🎉</td></tr>';
+}
+
+async function marcarPago(id){
+  if(!confirm('Confirmar: marcar esta compra como PAGA?'))return;
+  const {error}=await db.from('compras').update({pago:true}).eq('id',id);
+  if(error)alert('Erro: '+error.message); else carregar();
+}
+async function marcarRecebido(id){
+  if(!confirm('Confirmar: marcar este recebimento do frigorífico como RECEBIDO?'))return;
+  const {error}=await db.from('vendas').update({recebido:true}).eq('id',id);
+  if(error)alert('Erro: '+error.message); else carregar();
+}
+
+(async()=>{
+  const {data} = await db.auth.getSession();
+  if(data.session) iniciar();
+  simular();
+})();
+</script>
+</body>
+</html>
