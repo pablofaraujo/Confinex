@@ -246,7 +246,7 @@ async function carregar(){
    '<tr><th>A receber</th><th>Frigorífico</th><th class="num">Valor líq.</th><th>Previsão</th><th>Situação</th><th></th></tr>'+
    vs.map(v=>{
      const o=ativos.find(x=>x.id===v.operacao_id)||{};
-     const prev=addDias(v.data_abate,v.prazo_recebimento);
+     const prev=v.prazo_recebimento||v.data_abate; // prazo_recebimento é a DATA prevista
      const atrasado=!v.recebido && prev && prev<new Date().toISOString().slice(0,10);
      return `<tr><td><b>${o.codigo||'—'}</b></td><td>${nome[v.comprador_id]||'—'}</td>
       <td class="num">${fmtR$(Number(v.valor_bruto||0)-Number(v.funrural||0))}</td><td>${fmtD(prev)}</td>
