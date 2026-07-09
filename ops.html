@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ops — Ecossistema CFAgro</title>
+<link rel="icon" type="image/png" href="./confinex-logo.jpg">
+<link rel="apple-touch-icon" href="./confinex-logo.jpg">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+:root{--bg:#f5f7f6;--card:#fff;--border:#e3e9e5;--text:#182b21;--muted:#6b7f74;--green:#059669;--greenbg:#d1fae5;--red:#dc2626;--redbg:#fee2e2;--amber:#b45309;--amberbg:#fef3c7;--blue:#2563eb;--bluebg:#dbeafe}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,'Segoe UI',Roboto,sans-serif;padding:22px;max-width:1280px;margin:0 auto}
+h1{font-size:22px;font-weight:700}
+h2{font-size:14px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:28px 0 12px}
+.sub{color:var(--muted);font-size:13px;margin-top:4px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 1px 2px rgba(16,42,30,.05)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:16px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.kpi .l{font-size:11px;color:var(--muted);text-transform:uppercase}
+.kpi .v{font-size:20px;font-weight:700;margin-top:5px}
+.kpi .d{font-size:12px;color:var(--muted);margin-top:3px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;color:var(--muted);font-weight:600;padding:7px 8px;border-bottom:2px solid var(--border);font-size:11px;text-transform:uppercase;white-space:nowrap}
+td{padding:7px 8px;border-bottom:1px solid #eef2ef;vertical-align:top}
+.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.b-green{background:var(--greenbg);color:#065f46}.b-amber{background:var(--amberbg);color:#92400e}.b-red{background:var(--redbg);color:#991b1b}.b-blue{background:var(--bluebg);color:#1e40af}
+.btn{background:var(--green);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer}
+.btn.sec{background:#fff;color:var(--text);border:1px solid var(--border)}
+input,textarea{width:100%;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:14px;background:#fbfdfc;font-family:inherit}
+.login-box{max-width:360px;margin:80px auto;text-align:center}
+.login-box input{margin-bottom:10px}
+.scroll{overflow-x:auto}
+#app{display:none}
+.topbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.err{color:var(--red);font-size:13px;margin-top:8px}
+.footer{color:var(--muted);font-size:11px;margin:26px 0 8px;text-align:center}
+details{margin-top:6px}
+summary{cursor:pointer;font-size:12px;color:var(--blue);font-weight:600}
+pre{white-space:pre-wrap;font-size:12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;margin-top:6px;max-height:400px;overflow:auto}
+.fluxo{font-size:13px;line-height:2;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px}
+</style>
+</head>
+<body>
+
+<div id="login" class="login-box card">
+  <img src="./confinex-logo.jpg" alt="Logo" style="width:72px;height:72px;border-radius:50%;object-fit:cover;margin-bottom:10px">
+  <h1 style="margin-bottom:2px">Ops <span style="font-weight:400;color:#6b7f74;font-size:16px">— ECOSSISTEMA</span></h1>
+  <div class="sub" style="margin-bottom:18px;letter-spacing:2px;text-transform:uppercase;font-size:10px">Agentes · automações · segurança</div>
+  <input type="email" id="email" placeholder="seu email" autocomplete="username">
+  <input type="password" id="senha" placeholder="senha" autocomplete="current-password">
+  <button class="btn" style="width:100%" onclick="entrar()">Entrar</button>
+  <div class="err" id="loginErr"></div>
+</div>
+
+<div id="app">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:12px">
+      <img src="./confinex-logo.jpg" alt="Logo" style="width:48px;height:48px;border-radius:50%;object-fit:cover">
+      <div>
+        <h1>Ops <span style="font-weight:400;color:#6b7f74;font-size:16px">— ECOSSISTEMA CFAGRO</span></h1>
+        <div class="sub" id="subtitle"></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn sec" onclick="carregar()">↻ Atualizar</button>
+      <button class="btn sec" onclick="sair()">Sair</button>
+    </div>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <h2>Heartbeats — quem está vivo</h2>
+  <div class="card scroll"><table id="tbHeart"></table></div>
+
+  <h2>Ponte VPS — fila de missões</h2>
+  <div class="card">
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <button class="btn" onclick="novaMissao()">+ Nova missão para o Claude Code da VPS</button>
+      <button class="btn sec" onclick="missaoPronta('Auditar segurança da VPS: ufw, sshd, fail2ban, portas abertas, permissões de configs, chaves em logs (contar, nunca imprimir). Gravar resultado como item categoria=seguranca em ecossistema_inventario e resumir no relatório.','Auditoria de segurança')">🛡 Auditar segurança</button>
+      <button class="btn sec" onclick="missaoPronta('Verificar se o OpenClaw está na última versão; se não, listar o changelog entre a instalada e a última e APENAS RELATAR (não atualizar sem ordem).','Checar versão OpenClaw')">⬆ Checar versão OpenClaw</button>
+    </div>
+    <div class="scroll"><table id="tbPonte"></table></div>
+  </div>
+
+  <h2>Inventário — tudo que existe no ecossistema</h2>
+  <div class="card scroll"><table id="tbInv"></table></div>
+
+  <h2>Fluxo de informação</h2>
+  <div class="card fluxo">
+    📱 <b>Telegram</b> (grupos: Confinamento · Boi Balanca · …) → 🤖 <b>Juan</b> (OpenClaw/VPS) → 🗄 <b>Base CFAgro</b> (Supabase)<br>
+    🗄 <b>Base</b> → 📊 Painel · ⚖️ Boi Balança · 📈 BGI (sync nativo) · 🧮 Confinex<br>
+    💻 <b>Claude (Cowork)</b> → 🐙 GitHub (deploy das páginas) · 🗄 Base (SQL) · 📥 fila <b>vps_briefings</b> → 🤖 <b>Claude Code</b> (VPS, cron) → relatório na base<br>
+    ⏰ <b>Automações Cowork</b>: CSAP→Google Drive (01:04) · agenda GEV→GoodNotes (22:08) · memória GSI (seg 08:05)
+  </div>
+
+  <div class="footer">Ops · dados ao vivo da base CFAgro · acesso protegido por login</div>
+</div>
+
+<a href="./" style="position:fixed;bottom:18px;right:18px;z-index:9999;background:#fff;border:1px solid #e3e9e5;border-radius:999px;padding:10px 16px;font-size:13px;font-weight:600;color:#182b21;text-decoration:none;box-shadow:0 2px 10px rgba(15,23,42,.15)">⌂ Central</a>
+
+<script>
+const SUPA_URL = 'https://fkmdzwjmjlmxqotznvgq.supabase.co';
+const SUPA_KEY = 'sb_publishable_mNwlWLAaJOVoXpmlD7ShYg_-Nqyy0bT'; // chave pública (RLS protege)
+const db = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+const fmtDT = s => s? new Date(s).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}) : '—';
+const minAtras = s => s? Math.round((Date.now()-new Date(s))/60000) : null;
+const esc = t => String(t??'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+
+async function entrar(){
+  const {error} = await db.auth.signInWithPassword({email:document.getElementById('email').value.trim(),password:document.getElementById('senha').value});
+  if(error){document.getElementById('loginErr').textContent='Falha no login: '+error.message;return;}
+  iniciar();
+}
+async function sair(){await db.auth.signOut();location.reload();}
+async function iniciar(){document.getElementById('login').style.display='none';document.getElementById('app').style.display='block';carregar();}
+
+async function carregar(){
+  document.getElementById('subtitle').textContent='Carregando...';
+  const [inv, sts, ponte] = await Promise.all([
+    db.from('ecossistema_inventario').select('*').order('origem').order('categoria').order('nome'),
+    db.from('ecossistema_status').select('*'),
+    db.from('vps_briefings').select('*').order('criado_em',{ascending:false}).limit(15)
+  ]);
+  const errs=[inv,sts,ponte].filter(r=>r.error);
+  if(errs.length){document.getElementById('subtitle').textContent='Erro: '+errs[0].error.message;return;}
+  document.getElementById('subtitle').textContent=`Atualizado ${fmtDT(new Date().toISOString())} · ${inv.data.length} itens no inventário`;
+
+  // KPIs
+  const orfaos=inv.data.filter(i=>i.status==='orfao');
+  const desat=inv.data.filter(i=>i.status==='desatualizado');
+  const pend=ponte.data.filter(b=>b.status==='pendente'||b.status==='em_andamento');
+  const vps=sts.data.find(s=>s.fonte==='vps-coletor');
+  const vpsMin=vps?minAtras(vps.heartbeat):null;
+  document.getElementById('kpis').innerHTML=[
+    ['VPS / coletor', vps?(vpsMin<=10?'🟢 vivo':'🔴 parado'):'⚪ sem coletor', vps?('há '+vpsMin+' min'):'aguardando instalação'],
+    ['Itens no inventário', inv.data.length, inv.data.filter(i=>i.origem==='vps-openclaw').length+' na VPS'],
+    ['Órfãos / a revisar', orfaos.length, 'candidatos a desativar'],
+    ['Desatualizados', desat.length, 'inclui OpenClaw se houver'],
+    ['Missões na ponte', pend.length, 'pendentes ou em andamento'],
+  ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="d">${k[2]}</div></div>`).join('');
+
+  // Heartbeats
+  document.getElementById('tbHeart').innerHTML=
+   '<tr><th>Fonte</th><th>Último sinal</th><th>Status</th><th>Snapshot</th></tr>'+
+   (sts.data.map(s=>{
+     const m=minAtras(s.heartbeat);
+     return `<tr><td><b>${esc(s.fonte)}</b></td><td>${fmtDT(s.heartbeat)}</td>
+      <td>${m<=10?'<span class="badge b-green">Vivo ('+m+' min)</span>':'<span class="badge b-red">Parado há '+m+' min</span>'}</td>
+      <td><details><summary>ver</summary><pre>${esc(JSON.stringify(s.snapshot,null,1))}</pre></details></td></tr>`;
+   }).join('')||'<tr><td colspan="4">Nenhum heartbeat ainda — o coletor será instalado pela ponte</td></tr>');
+
+  // Ponte
+  const bStatus=s=>s==='concluido'?'<span class="badge b-green">Concluído</span>':(s==='em_andamento'?'<span class="badge b-blue">Em andamento</span>':(s==='pendente'?'<span class="badge b-amber">Pendente</span>':'<span class="badge b-red">'+esc(s)+'</span>'));
+  document.getElementById('tbPonte').innerHTML=
+   '<tr><th>Missão</th><th>Criada</th><th>Status</th><th>Relatório</th></tr>'+
+   ponte.data.map(b=>`<tr><td><b>${esc(b.titulo)}</b><details><summary>briefing</summary><pre>${esc(b.briefing)}</pre></details></td>
+    <td>${fmtDT(b.criado_em)}</td><td>${bStatus(b.status)}</td>
+    <td>${b.relatorio?`<details><summary>ler relatório</summary><pre>${esc(b.relatorio)}</pre></details>`:'—'}</td></tr>`).join('');
+
+  // Inventário
+  const iStatus=s=>s==='ativo'?'<span class="badge b-green">Ativo</span>':(s==='orfao'?'<span class="badge b-red">Órfão</span>':(s==='desatualizado'?'<span class="badge b-amber">Desatualizado</span>':(s==='inativo'?'<span class="badge b-amber">Inativo</span>':'<span class="badge b-blue">'+esc(s)+'</span>')));
+  document.getElementById('tbInv').innerHTML=
+   '<tr><th>Origem</th><th>Categoria</th><th>Nome</th><th>Descrição</th><th>Status</th><th>Verificado</th><th>Detalhes</th></tr>'+
+   inv.data.map(i=>`<tr><td>${esc(i.origem)}</td><td>${esc(i.categoria)}</td><td><b>${esc(i.nome)}</b></td>
+    <td style="white-space:normal;max-width:340px">${esc(i.descricao||'')}</td><td>${iStatus(i.status)}</td><td>${fmtDT(i.ultima_verificacao)}</td>
+    <td>${i.detalhes&&Object.keys(i.detalhes).length?`<details><summary>ver</summary><pre>${esc(JSON.stringify(i.detalhes,null,1))}</pre></details>`:'—'}</td></tr>`).join('');
+}
+
+async function criarBriefing(titulo,texto){
+  const {error}=await db.from('vps_briefings').insert({titulo,briefing:texto,status:'pendente',autor:'ops-dashboard'});
+  if(error)alert('Erro: '+error.message); else {alert('Missão enviada. O Claude Code da VPS pega no próximo ciclo (~5-10 min).');carregar();}
+}
+function novaMissao(){
+  const titulo=prompt('Título da missão:'); if(!titulo)return;
+  const texto=prompt('Descreva a missão para o Claude Code da VPS:'); if(!texto)return;
+  if(confirm('Enviar esta missão para execução autônoma na VPS?\n\n'+titulo)) criarBriefing(titulo,texto);
+}
+function missaoPronta(texto,titulo){
+  if(confirm('Enviar missão: '+titulo+'?')) criarBriefing(titulo,texto);
+}
+
+(async()=>{const {data}=await db.auth.getSession();if(data.session)iniciar();})();
+</script>
+</body>
+</html>
