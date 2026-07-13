@@ -1,0 +1,142 @@
+/* ============================================================
+   CFAgro Design System — COMPONENTES
+   Requer tokens.css carregado antes. Catálogo: DESIGN.md
+   ============================================================ */
+
+/* ---------- Base ---------- */
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font);padding:22px;max-width:1280px;margin:0 auto}
+body[data-w=sm]{max-width:640px;padding:24px;min-height:100vh}
+body[data-w=md]{max-width:1100px}
+
+h1{font-size:var(--fs-22);font-weight:700}
+h1 span{font-weight:400;color:var(--muted);font-size:var(--fs-17)}
+h2{font-size:var(--fs-13);font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:28px 0 12px}
+.sub{color:var(--muted);font-size:var(--fs-13);margin-top:4px}
+.scroll{overflow-x:auto}
+#app{display:none}
+
+/* ---------- Topbar ---------- */
+.topbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.topbar .acoes{display:flex;gap:8px}
+.topbar .ident{display:flex;align-items:center;gap:12px}
+.logo-img{border-radius:50%;object-fit:cover;flex-shrink:0}
+
+/* ---------- Cards e KPIs ---------- */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r-md);padding:16px;box-shadow:var(--shadow-1)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:16px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:var(--r-md);padding:14px 16px}
+.kpi .l{font-size:var(--fs-11);color:var(--muted);text-transform:uppercase}
+.kpi .v{font-size:var(--fs-20);font-weight:700;margin-top:5px}
+.kpi .d{font-size:12px;color:var(--muted);margin-top:3px}
+
+/* ---------- Tabelas ---------- */
+table{width:100%;border-collapse:collapse;font-size:var(--fs-12)}
+th{text-align:left;color:var(--muted);font-weight:600;padding:7px 8px;border-bottom:2px solid var(--border);font-size:var(--fs-11);text-transform:uppercase;white-space:nowrap}
+td{padding:7px 8px;border-bottom:1px solid var(--border-soft);white-space:nowrap}
+td.wrap{white-space:normal}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.pos{color:var(--green);font-weight:600}
+.neg{color:var(--red);font-weight:600}
+
+/* ---------- Badges ---------- */
+.badge{display:inline-block;padding:2px 9px;border-radius:var(--r-pill);font-size:var(--fs-11);font-weight:600;white-space:nowrap}
+.b-green{background:var(--greenbg);color:var(--green-text)}
+.b-amber{background:var(--amberbg);color:var(--amber-text)}
+.b-red{background:var(--redbg);color:var(--red-text)}
+.b-blue{background:var(--bluebg);color:var(--blue-text)}
+
+/* ---------- Botões ---------- */
+.btn{background:var(--green);color:#fff;border:none;border-radius:var(--r-sm);padding:9px 18px;font-size:var(--fs-13);font-weight:600;cursor:pointer;text-decoration:none;display:inline-block}
+.btn.sec{background:var(--card);color:var(--text);border:1px solid var(--border)}
+.btn.mini{padding:4px 10px;font-size:var(--fs-11)}
+.btn.warn{background:var(--amber)}
+
+/* ---------- Formulários ---------- */
+input,select,textarea{width:100%;border:1px solid var(--border);border-radius:var(--r-sm);padding:10px;font-size:var(--fs-14);background:var(--field);color:var(--text);font-family:inherit}
+.fld label{display:block;font-size:var(--fs-11);color:var(--muted);text-transform:uppercase;margin-bottom:4px;font-weight:600}
+.err{color:var(--red);font-size:var(--fs-13);margin-top:8px}
+.msg{font-size:var(--fs-12);margin-top:8px;color:var(--green);font-weight:600}
+
+/* ---------- Login ---------- */
+.login-box{max-width:360px;margin:80px auto;text-align:center}
+.login-box input{margin-bottom:10px}
+
+/* ---------- Grids utilitários ---------- */
+.grid{display:grid;gap:10px}
+.g6{grid-template-columns:repeat(6,1fr)}
+@media(max-width:800px){.g6{grid-template-columns:repeat(2,1fr)}}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+.simgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+
+/* ---------- Mini-resultados (simulador) ---------- */
+.res{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:14px}
+.res .r{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+.res .r .l{font-size:10px;color:var(--muted);text-transform:uppercase}
+.res .r .v{font-size:17px;font-weight:700;margin-top:3px}
+
+/* ---------- Hub (Central) ---------- */
+.head{display:flex;align-items:center;gap:14px;margin:18px 0 6px}
+.head img{width:64px;height:64px;border-radius:50%;object-fit:cover}
+.hub-sub{color:var(--muted);font-size:var(--fs-11);letter-spacing:2px;text-transform:uppercase;margin-bottom:22px}
+.apps{display:grid;gap:14px;margin-top:10px}
+.app{display:flex;align-items:center;gap:16px;background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px;text-decoration:none;color:var(--text);box-shadow:var(--shadow-1);transition:transform .1s}
+.app:active{transform:scale(.98)}
+.app .ico{font-size:34px;width:56px;height:56px;display:flex;align-items:center;justify-content:center;border-radius:var(--r-md);flex-shrink:0}
+.app .t{font-size:18px;font-weight:700}
+.app .d{font-size:var(--fs-13);color:var(--muted);margin-top:3px}
+.app .arrow{margin-left:auto;color:var(--muted);font-size:var(--fs-20)}
+.status{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:24px}
+.st{background:var(--card);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;text-align:center}
+.st .v{font-size:19px;font-weight:700}
+.st .l{font-size:10px;color:var(--muted);text-transform:uppercase;margin-top:3px}
+
+/* ---------- Avisos e rodapé ---------- */
+.aviso{background:var(--amberbg);border-radius:10px;padding:8px 12px;font-size:12px;color:var(--amber-text);margin-top:14px;text-align:center}
+.footer,.foot{color:var(--muted);font-size:var(--fs-11);margin:26px 0 8px;text-align:center}
+
+/* ---------- Detalhes expansíveis (Ops) ---------- */
+details{margin-top:6px}
+summary{cursor:pointer;font-size:12px;color:var(--blue);font-weight:600}
+pre{white-space:pre-wrap;font-size:12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px;margin-top:6px;max-height:400px;overflow:auto}
+.fluxo{font-size:var(--fs-13);line-height:2;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px}
+
+/* ---------- Gráficos ---------- */
+canvas{max-height:300px}
+
+/* ---------- Navegação flutuante ---------- */
+.voltar-central{position:fixed;bottom:18px;right:18px;z-index:9999;background:var(--card);border:1px solid var(--border);border-radius:var(--r-pill);padding:10px 16px;font-family:var(--font);font-size:var(--fs-13);font-weight:600;color:var(--text);text-decoration:none;box-shadow:var(--shadow-2)}
+
+/* ---------- Upload / leitura de documentos por IA ---------- */
+.drop{border:2px dashed var(--border);border-radius:var(--r-md);padding:14px;text-align:center;color:var(--muted);cursor:pointer;background:var(--field);font-size:var(--fs-13)}
+.drop.has{border-style:solid;color:var(--text)}
+.drop img{max-height:120px;border-radius:var(--r-sm);display:block;margin:6px auto 0}
+.ocr-topo{display:flex;gap:12px;align-items:stretch;flex-wrap:wrap}
+.ocr-topo .drop{flex:1;min-width:260px}
+.ocr-acoes{display:flex;flex-direction:column;gap:8px;justify-content:center;min-width:170px}
+.tb-edit input,.tb-edit select{padding:4px 6px;font-size:var(--fs-12);min-width:60px}
+.tb-edit td{padding:4px 6px}
+td.c-media{background:var(--amberbg)}
+td.c-baixa{background:var(--redbg)}
+
+/* ---------- Shell de navegação (sidebar fixa — js/cfagro-shell.js) ---------- */
+body.has-shell{display:grid;grid-template-columns:220px minmax(0,1fr);max-width:none;padding:0;margin:0;min-height:100vh}
+.shell-side{position:sticky;top:0;height:100vh;background:var(--card);border-right:1px solid var(--border);padding:18px 12px;display:flex;flex-direction:column;gap:2px;overflow-y:auto}
+.shell-logo{display:flex;align-items:center;gap:10px;padding:4px 8px 14px;color:var(--text);text-decoration:none}
+.shell-logo img{width:34px;height:34px;border-radius:50%;object-fit:cover}
+.shell-logo b{font-size:16px}
+.shell-sec{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin:14px 8px 4px;font-weight:600}
+.shell-link{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--r-sm);color:var(--text);text-decoration:none;font-size:var(--fs-13);font-weight:500}
+.shell-link:hover{background:var(--bg)}
+.shell-link.ativa{background:var(--greenbg);color:var(--green-text);font-weight:600}
+.shell-link .ext{margin-left:auto;color:var(--muted);font-size:var(--fs-11)}
+.shell-content{min-width:0;width:100%;max-width:1280px;margin:0 auto;padding:22px}
+body.has-shell[data-w=md] .shell-content{max-width:1100px}
+body.has-shell .voltar-central{display:none}
+@media(max-width:900px){
+  body.has-shell{grid-template-columns:1fr}
+  .shell-side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;gap:4px;border-right:none;border-bottom:1px solid var(--border);padding:10px 12px}
+  .shell-sec{display:none}
+  .shell-logo{padding:0 8px 0 0}
+}

@@ -1,0 +1,7 @@
+# Dados sensíveis — nunca publicar no GitHub Pages (repo público)
+docs/privado/
+MISSAO-VPS-pesagem-caderno.md
+
+# Sistema
+.DS_Store
+**/.DS_Store

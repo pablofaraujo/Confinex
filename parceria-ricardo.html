@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CFAgro — Parceria Ricardo</title>
+<link rel="icon" type="image/png" href="./confinex-logo.jpg">
+<link rel="apple-touch-icon" href="./confinex-logo.jpg">
+<link rel="stylesheet" href="./design/tokens.css">
+<link rel="stylesheet" href="./design/components.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="./js/cfagro-core.js"></script>
+<script src="./js/cfagro-shell.js" defer></script>
+</head>
+<body>
+
+<div id="login" class="login-box card">
+  <img src="./confinex-logo.jpg" alt="Logo" style="width:72px;height:72px;border-radius:50%;object-fit:cover;margin-bottom:10px">
+  <h1 style="margin-bottom:2px">Parceria Ricardo <span style="font-weight:400;color:#6b7f74;font-size:16px">— PABLO FERREIRA</span></h1>
+  <div class="sub" style="margin-bottom:18px;letter-spacing:2px;text-transform:uppercase;font-size:10px">Engorda por ganho · 60% Ricardo / 40% Pablo</div>
+  <input type="email" id="email" placeholder="seu email" autocomplete="username">
+  <input type="password" id="senha" placeholder="senha" autocomplete="current-password">
+  <button class="btn" style="width:100%" onclick="entrar()">Entrar</button>
+  <div class="err" id="loginErr"></div>
+</div>
+
+<div id="app">
+  <div class="topbar">
+    <div class="ident">
+      <img src="./confinex-logo.jpg" alt="Logo" class="logo-img" style="width:48px;height:48px">
+      <div>
+        <h1>Parceria Ricardo <span style="font-weight:400;color:#6b7f74;font-size:16px">— PABLO FERREIRA</span></h1>
+        <div class="sub" id="subtitle"></div>
+      </div>
+    </div>
+    <div class="acoes">
+      <button class="btn sec" onclick="carregar()">↻ Atualizar</button>
+      <button class="btn sec" onclick="sair()">Sair</button>
+    </div>
+  </div>
+
+  <div class="aviso">Modelo: ganho de <b>peso vivo na balança</b> (saída − entrada) dividido <b>60% Ricardo / 40% Pablo</b>. Ricardo tem franquia de <b>1% de perda ao ano</b> (pro rata); perdas acima disso descontam do acerto dele.</div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <h2>Enviar bois para engorda</h2>
+  <div class="card">
+    <div class="grid g6">
+      <div class="fld"><label>Lote / identificação</label><input type="text" id="eLote" placeholder="ex.: R-26-01"></div>
+      <div class="fld"><label>Cabeças</label><input type="number" id="eCab" value="1"></div>
+      <div class="fld"><label>Data de envio</label><input type="date" id="eData"></div>
+      <div class="fld"><label>Peso entrada (kg vivo, média/cab)</label><input type="number" id="ePeso" step="1"></div>
+      <div class="fld"><label>Obs</label><input type="text" id="eObs"></div>
+      <div class="fld" style="display:flex;align-items:flex-end"><button class="btn" style="width:100%" onclick="enviarBois()">+ Enviar</button></div>
+    </div>
+    <div class="msg" id="msgEnviar"></div>
+  </div>
+
+  <h2>Registrar saída e acerto</h2>
+  <div class="card">
+    <div class="simgrid">
+      <div class="fld"><label>Lote na engorda</label><select id="sLote" onchange="simular()"></select></div>
+      <div class="fld"><label>Data de saída</label><input type="date" id="sData" onchange="simular()"></div>
+      <div class="fld"><label>Peso saída (kg vivo, média/cab)</label><input type="number" id="sPeso" step="1" oninput="simular()"></div>
+      <div class="fld"><label>Perdas (nº de animais)</label><input type="number" id="sPerdas" value="0" oninput="simular()"></div>
+      <div class="fld"><label>Base do preço</label><select id="sBase" onchange="simular()"><option value="arroba">R$/@ (c/ rendimento)</option><option value="kg">R$/kg vivo</option></select></div>
+      <div class="fld" id="fRend"><label>Rendimento (%)</label><input type="number" id="sRend" value="50" step=".5" oninput="simular()"></div>
+      <div class="fld"><label>Preço acordado do ganho</label><input type="number" id="sPreco" step=".01" oninput="simular()"></div>
+      <div class="fld"><label>Valor por animal perdido acima da franquia (R$)</label><input type="number" id="sValPerda" value="0" step=".01" oninput="simular()"></div>
+    </div>
+    <div class="res" id="simRes"></div>
+    <div style="margin-top:12px;display:flex;gap:8px"><button class="btn" onclick="salvarSaida()">Salvar saída e acerto</button></div>
+    <div class="err" id="saidaErr"></div>
+  </div>
+
+  <h2>Bois na engorda e acertos</h2>
+  <div class="card scroll"><table id="tbLotes"></table></div>
+
+  <div class="footer">Parceria Ricardo · dados ao vivo da base CFAgro · acesso protegido por login</div>
+</div>
+
+<a href="./" class="voltar-central">⌂ Central</a>
+
+<script>
+// db, fmtR$, fmtR$2, fmtN, fmtD, cls, esc vêm do cfagro-core.js (DS)
+let LOTES=[];
+
+function calc(r, over){
+  over=over||{};
+  const ent=Number(r.peso_entrada||0);
+  const sai=Number(over.peso_saida ?? r.peso_saida ?? 0);
+  const cab=Number(r.cabecas||0);
+  const perdas=Number(over.perdas ?? r.perdas ?? 0);
+  const base=over.preco_base ?? r.preco_base ?? 'arroba';
+  const rend=Number(over.rendimento ?? r.rendimento ?? 50);
+  const preco=Number(over.preco_acordado ?? r.preco_acordado ?? 0);
+  const valPerda=Number(over.valPerda ?? 0);
+  const dEnv=r.data_envio, dSai=over.data_saida ?? r.data_saida;
+  const dias=(dEnv&&dSai)?Math.max(0,Math.round((new Date(dSai)-new Date(dEnv))/864e5)):0;
+  const franquia=0.01*(dias/365)*cab;                 // animais tolerados
+  const excedente=Math.max(0, perdas-franquia);
+  const vivos=Math.max(0, cab-perdas);
+  const ganhoKg=Math.max(0, sai-ent);                  // por cabeça
+  let ganhoArr=null, valorCab=0;
+  if(base==='kg'){ valorCab=ganhoKg*preco; }
+  else { ganhoArr=ganhoKg*rend/100/15; valorCab=ganhoArr*preco; }
+  const valorTotal=valorCab*vivos;
+  const ricardoBruto=valorTotal*0.6;
+  const pablo=valorTotal*0.4;
+  const descPerda=excedente*valPerda;                  // Ricardo compensa perdas acima da franquia
+  const ricardo=ricardoBruto-descPerda;
+  return {dias,franquia,excedente,vivos,ganhoKg,ganhoArr,valorCab,valorTotal,ricardoBruto,descPerda,ricardo,pablo};
+}
+
+async function carregar(){
+  document.getElementById('subtitle').textContent='Carregando...';
+  if(!document.getElementById('eData').value) document.getElementById('eData').value=new Date().toISOString().slice(0,10);
+  const {data,error}=await db.from('parceria_ricardo').select('*').order('data_envio',{ascending:false});
+  if(error){ document.getElementById('subtitle').textContent='Erro: '+error.message; return; }
+  LOTES=data||[];
+  document.getElementById('subtitle').textContent=`Atualizado ${new Date().toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})} · ${LOTES.length} lotes`;
+  renderKpis(); renderSelect(); renderTabela(); simular();
+}
+
+function renderKpis(){
+  const engorda=LOTES.filter(l=>l.status==='engorda');
+  const cabEng=engorda.reduce((s,l)=>s+Number(l.cabecas||0),0);
+  let ganhoTot=0, aAcertar=0, acertado=0, excTot=0;
+  LOTES.forEach(l=>{
+    if(l.status==='engorda') return;
+    const c=calc(l);
+    ganhoTot+=c.ganhoKg*c.vivos; excTot+=c.excedente;
+    if(l.acertado) acertado+=c.ricardo; else aAcertar+=c.ricardo;
+  });
+  document.getElementById('kpis').innerHTML=[
+    ['Na engorda', engorda.length, cabEng+' cabeças com Ricardo'],
+    ['Ganho vivo total', fmtN(ganhoTot,0)+' kg', 'lotes com saída'],
+    ['A acertar (Ricardo)', fmtR$(aAcertar), 'parte dele pendente'],
+    ['Já acertado', fmtR$(acertado), 'parte do Ricardo paga'],
+    ['Perdas acima da franquia', fmtN(excTot,1), 'animais além de 1% a.a.'],
+  ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="d">${k[2]}</div></div>`).join('');
+}
+
+function renderSelect(){
+  const engorda=LOTES.filter(l=>l.status==='engorda');
+  document.getElementById('sLote').innerHTML='<option value="">— escolha um lote —</option>'+
+    engorda.map(l=>`<option value="${l.id}">${esc(l.lote)||'(sem nome)'} · ${l.cabecas} cab · ent. ${fmtN(l.peso_entrada)}kg · ${fmtD(l.data_envio)}</option>`).join('');
+}
+
+async function enviarBois(){
+  const g=id=>document.getElementById(id).value;
+  const rec={ lote:g('eLote')||null, cabecas:Number(g('eCab'))||1, data_envio:g('eData')||null,
+              peso_entrada:Number(g('ePeso'))||null, obs:g('eObs')||null, status:'engorda' };
+  if(!rec.peso_entrada){ const m=document.getElementById('msgEnviar'); m.className='err'; m.textContent='Informe o peso de entrada.'; return; }
+  const {error}=await db.from('parceria_ricardo').insert(rec);
+  const m=document.getElementById('msgEnviar');
+  if(error){ m.className='err'; m.textContent='Erro: '+error.message; return; }
+  m.className='msg'; m.textContent='Lote enviado para engorda.';
+  ['eLote','ePeso','eObs'].forEach(id=>document.getElementById(id).value=''); document.getElementById('eCab').value='1';
+  carregar();
+}
+
+function simular(){
+  document.getElementById('fRend').style.display = document.getElementById('sBase').value==='arroba'?'block':'none';
+  const id=document.getElementById('sLote').value;
+  const l=LOTES.find(x=>x.id===id);
+  if(!l){ document.getElementById('simRes').innerHTML='<div class="sub">Escolha um lote para simular o acerto.</div>'; return; }
+  const g=id=>document.getElementById(id).value;
+  const c=calc(l,{ peso_saida:Number(g('sPeso'))||0, perdas:Number(g('sPerdas'))||0, data_saida:g('sData'),
+                   preco_base:g('sBase'), rendimento:Number(g('sRend'))||0, preco_acordado:Number(g('sPreco'))||0,
+                   valPerda:Number(g('sValPerda'))||0 });
+  document.getElementById('simRes').innerHTML=[
+    ['Dias de engorda', c.dias+' d'],
+    ['Ganho/cab', fmtN(c.ganhoKg,0)+' kg'+(c.ganhoArr!=null?` (${fmtN(c.ganhoArr,2)} @)`:'')],
+    ['Animais vivos', c.vivos+' de '+l.cabecas],
+    ['Franquia 1% a.a.', fmtN(c.franquia,2)+' cab'],
+    ['Perda excedente', `<span class="${c.excedente>0?'neg':''}">${fmtN(c.excedente,2)} cab</span>`],
+    ['Valor do ganho total', fmtR$(c.valorTotal)],
+    ['Ricardo 60% (bruto)', fmtR$(c.ricardoBruto)],
+    ['Desconto por perdas', c.descPerda?('- '+fmtR$(c.descPerda)):'—'],
+    ['A pagar ao Ricardo', `<b>${fmtR$(c.ricardo)}</b>`],
+    ['Sua parte (40%)', fmtR$(c.pablo)],
+  ].map(r=>`<div class="r"><div class="l">${r[0]}</div><div class="v">${r[1]}</div></div>`).join('');
+}
+
+async function salvarSaida(){
+  const id=document.getElementById('sLote').value;
+  const err=document.getElementById('saidaErr'); err.textContent='';
+  if(!id){ err.textContent='Escolha um lote.'; return; }
+  const g=id=>document.getElementById(id).value;
+  if(!g('sPeso')){ err.textContent='Informe o peso de saída.'; return; }
+  const rec={ data_saida:g('sData')||null, peso_saida:Number(g('sPeso'))||null, perdas:Number(g('sPerdas'))||0,
+              preco_base:g('sBase'), rendimento:Number(g('sRend'))||50, preco_acordado:Number(g('sPreco'))||null,
+              status:'abatido' };
+  const {error}=await db.from('parceria_ricardo').update(rec).eq('id',id);
+  if(error){ err.textContent='Erro: '+error.message; return; }
+  ['sPeso','sPreco'].forEach(x=>document.getElementById(x).value=''); document.getElementById('sPerdas').value='0';
+  carregar();
+}
+
+async function marcarAcertado(id){
+  if(!confirm('Confirmar: acerto do Ricardo pago para este lote?')) return;
+  const {error}=await db.from('parceria_ricardo').update({acertado:true,status:'acertado'}).eq('id',id);
+  if(error) alert('Erro: '+error.message); else carregar();
+}
+async function excluir(id){
+  if(!confirm('Excluir este lote?')) return;
+  const {error}=await db.from('parceria_ricardo').delete().eq('id',id);
+  if(error) alert('Erro: '+error.message); else carregar();
+}
+
+function renderTabela(){
+  document.getElementById('tbLotes').innerHTML=
+   '<tr><th>Lote</th><th class="num">Cab</th><th>Envio</th><th class="num">Ent. (kg)</th><th>Saída</th><th class="num">Saída (kg)</th><th class="num">Ganho/cab</th><th class="num">Ganho total</th><th class="num">Ricardo 60%</th><th class="num">Você 40%</th><th>Status</th><th></th></tr>'+
+   (LOTES.map(l=>{
+     const c=calc(l);
+     const st = l.acertado?'<span class="badge b-green">Acertado</span>' : (l.status==='engorda'?'<span class="badge b-blue">Na engorda</span>':'<span class="badge b-amber">A acertar</span>');
+     const exc = c.excedente>0?` <span class="badge b-red">+${fmtN(c.excedente,1)} perda</span>`:'';
+     const acao = l.status==='engorda' ? '' :
+        (l.acertado?'':`<button class="btn mini" onclick="marcarAcertado('${l.id}')">acertar</button> `)+
+        `<button class="btn mini sec" onclick="excluir('${l.id}')">×</button>`;
+     return `<tr><td><b>${esc(l.lote)||'—'}</b>${exc}</td><td class="num">${l.cabecas}</td>
+       <td>${fmtD(l.data_envio)}</td><td class="num">${fmtN(l.peso_entrada)}</td>
+       <td>${l.data_saida?fmtD(l.data_saida):'—'}</td><td class="num">${l.peso_saida?fmtN(l.peso_saida):'—'}</td>
+       <td class="num">${l.peso_saida?fmtN(c.ganhoKg,0)+' kg':'—'}</td>
+       <td class="num">${l.peso_saida?fmtN(c.ganhoKg*c.vivos,0)+' kg':'—'}</td>
+       <td class="num">${(l.status!=='engorda'&&l.preco_acordado)?fmtR$(c.ricardo):'—'}</td>
+       <td class="num">${(l.status!=='engorda'&&l.preco_acordado)?fmtR$(c.pablo):'—'}</td>
+       <td>${st}</td><td>${acao}</td></tr>`;
+   }).join('') || '<tr><td colspan="12">Nenhum lote com Ricardo ainda.</td></tr>');
+}
+
+CFAgro.authInit(carregar);
+</script>
+</body>
+</html>

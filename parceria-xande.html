@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CFAgro — Parceria Xande</title>
+<link rel="icon" type="image/png" href="./confinex-logo.jpg">
+<link rel="apple-touch-icon" href="./confinex-logo.jpg">
+<link rel="stylesheet" href="./design/tokens.css">
+<link rel="stylesheet" href="./design/components.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="./js/cfagro-core.js"></script>
+<script src="./js/cfagro-shell.js" defer></script>
+</head>
+<body>
+
+<div id="login" class="login-box card">
+  <img src="./confinex-logo.jpg" alt="Logo" style="width:72px;height:72px;border-radius:50%;object-fit:cover;margin-bottom:10px">
+  <h1 style="margin-bottom:2px">Parceria Xande <span style="font-weight:400;color:#6b7f74;font-size:16px">— PABLO FERREIRA</span></h1>
+  <div class="sub" style="margin-bottom:18px;letter-spacing:2px;text-transform:uppercase;font-size:10px">Sociedade 50/50 · Negócio Nº 3</div>
+  <input type="email" id="email" placeholder="seu email" autocomplete="username">
+  <input type="password" id="senha" placeholder="senha" autocomplete="current-password">
+  <button class="btn" style="width:100%" onclick="entrar()">Entrar</button>
+  <div class="err" id="loginErr"></div>
+</div>
+
+<div id="app">
+  <div class="topbar">
+    <div class="ident">
+      <img src="./confinex-logo.jpg" alt="Logo" class="logo-img" style="width:48px;height:48px">
+      <div>
+        <h1>Parceria Xande <span style="font-weight:400;color:#6b7f74;font-size:16px">— PABLO FERREIRA</span></h1>
+        <div class="sub" id="subtitle"></div>
+      </div>
+    </div>
+    <div class="acoes">
+      <button class="btn sec" onclick="carregar()">↻ Atualizar</button>
+      <button class="btn sec" onclick="sair()">Sair</button>
+    </div>
+  </div>
+
+  <div class="aviso">Modelo: sociedade <b>50/50</b>. Lucro = receita bruta − Funrural − compra − custos, dividido meio a meio. Referência: Negócio Nº 3 (novilhas Amauri + acerto Wilson/Maxibeef).</div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <h2>Registrar negócio</h2>
+  <div class="card">
+    <div class="grid g6">
+      <div class="fld"><label>Nº / identificação</label><input type="text" id="nNum" placeholder="ex.: N3-P1"></div>
+      <div class="fld"><label>Descrição</label><input type="text" id="nDesc" placeholder="13 novilhas 50/50"></div>
+      <div class="fld"><label>Receita bruta (R$)</label><input type="number" id="nRec" step=".01" oninput="prev()"></div>
+      <div class="fld"><label>Funrural (R$)</label><input type="number" id="nFun" step=".01" value="0" oninput="prev()"></div>
+      <div class="fld"><label>Compra do gado (R$)</label><input type="number" id="nComp" step=".01" value="0" oninput="prev()"></div>
+      <div class="fld"><label>Outros custos (R$)</label><input type="number" id="nCust" step=".01" value="0" oninput="prev()"></div>
+    </div>
+    <div class="res" id="prevRes" style="margin-top:12px"></div>
+    <div style="margin-top:12px;display:flex;gap:8px"><button class="btn" onclick="salvar()">+ Salvar negócio</button></div>
+    <div class="err" id="msgErr"></div>
+  </div>
+
+  <h2>Negócios da parceria</h2>
+  <div class="card scroll"><table id="tbNeg"></table></div>
+
+  <div class="footer">Parceria Xande · dados ao vivo da base CFAgro · acesso protegido por login</div>
+</div>
+
+<a href="./" class="voltar-central">⌂ Central</a>
+
+<script>
+// db, fmtR$, fmtN, fmtD, cls, esc vêm do cfagro-core.js (DS)
+let NEG=[];
+
+const lucroDe = n => Number(n.receita_bruta||0)-Number(n.funrural||0)-Number(n.compra||0)-Number(n.custos||0);
+
+async function carregar(){
+  document.getElementById('subtitle').textContent='Carregando...';
+  const {data,error}=await db.from('parceria_xande').select('*').order('created_at',{ascending:false});
+  if(error){ document.getElementById('subtitle').textContent='Erro: '+error.message; return; }
+  NEG=data||[];
+  document.getElementById('subtitle').textContent=`Atualizado ${new Date().toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})} · ${NEG.length} negócios`;
+  renderKpis(); renderTabela(); prev();
+}
+
+function renderKpis(){
+  const lucro=NEG.reduce((s,n)=>s+lucroDe(n),0);
+  const meta=lucro/2;
+  const aAcertar=NEG.filter(n=>!n.acertado).reduce((s,n)=>s+lucroDe(n)/2,0);
+  document.getElementById('kpis').innerHTML=[
+    ['Negócios', NEG.length, 'registrados'],
+    ['Lucro total', fmtR$(lucro), 'receita − custos'],
+    ['Parte Xande (50%)', fmtR$(meta), ''],
+    ['Sua parte (50%)', fmtR$(meta), ''],
+    ['A acertar', fmtR$(aAcertar), 'parte Xande pendente'],
+  ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="d">${k[2]}</div></div>`).join('');
+}
+
+function prev(){
+  const g=id=>Number(document.getElementById(id).value)||0;
+  const lucro=g('nRec')-g('nFun')-g('nComp')-g('nCust');
+  document.getElementById('prevRes').innerHTML=[
+    ['Lucro do negócio', `<span class="${cls(lucro)}">${fmtR$(lucro)}</span>`],
+    ['Parte Xande', fmtR$(lucro/2)],
+    ['Sua parte', fmtR$(lucro/2)],
+  ].map(r=>`<div class="r"><div class="l">${r[0]}</div><div class="v">${r[1]}</div></div>`).join('');
+}
+
+async function salvar(){
+  const g=id=>document.getElementById(id).value;
+  const rec={ numero:g('nNum')||null, descricao:g('nDesc')||null,
+              receita_bruta:Number(g('nRec'))||0, funrural:Number(g('nFun'))||0,
+              compra:Number(g('nComp'))||0, custos:Number(g('nCust'))||0, status:'aberto' };
+  const err=document.getElementById('msgErr'); err.textContent='';
+  if(!rec.receita_bruta && !rec.compra){ err.textContent='Informe ao menos receita ou compra.'; return; }
+  const {error}=await db.from('parceria_xande').insert(rec);
+  if(error){ err.textContent='Erro: '+error.message; return; }
+  ['nNum','nDesc','nRec'].forEach(id=>document.getElementById(id).value='');
+  ['nFun','nComp','nCust'].forEach(id=>document.getElementById(id).value='0');
+  carregar();
+}
+
+async function marcarAcertado(id){
+  if(!confirm('Confirmar: acerto com Xande realizado para este negócio?')) return;
+  const {error}=await db.from('parceria_xande').update({acertado:true,status:'acertado'}).eq('id',id);
+  if(error) alert('Erro: '+error.message); else carregar();
+}
+async function excluir(id){
+  if(!confirm('Excluir este negócio?')) return;
+  const {error}=await db.from('parceria_xande').delete().eq('id',id);
+  if(error) alert('Erro: '+error.message); else carregar();
+}
+
+function renderTabela(){
+  document.getElementById('tbNeg').innerHTML=
+   '<tr><th>Nº</th><th>Descrição</th><th class="num">Receita</th><th class="num">Funrural</th><th class="num">Compra</th><th class="num">Custos</th><th class="num">Lucro</th><th class="num">Xande 50%</th><th class="num">Você 50%</th><th>Status</th><th></th></tr>'+
+   (NEG.map(n=>{
+     const L=lucroDe(n);
+     const st=n.acertado?'<span class="badge b-green">Acertado</span>':'<span class="badge b-amber">A acertar</span>';
+     return `<tr><td><b>${esc(n.numero)||'—'}</b></td><td class="wrap">${esc(n.descricao)||'—'}</td>
+       <td class="num">${fmtR$(n.receita_bruta)}</td><td class="num">${fmtR$(n.funrural)}</td>
+       <td class="num">${fmtR$(n.compra)}</td><td class="num">${fmtR$(n.custos)}</td>
+       <td class="num ${cls(L)}">${fmtR$(L)}</td><td class="num">${fmtR$(L/2)}</td><td class="num">${fmtR$(L/2)}</td>
+       <td>${st}</td>
+       <td>${n.acertado?'':`<button class="btn mini" onclick="marcarAcertado('${n.id}')">acertar</button> `}<button class="btn mini sec" onclick="excluir('${n.id}')">×</button></td></tr>`;
+   }).join('') || '<tr><td colspan="11">Nenhum negócio registrado ainda.</td></tr>');
+}
+
+CFAgro.authInit(carregar);
+</script>
+</body>
+</html>

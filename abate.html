@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CFAgro — Abate</title>
+<link rel="icon" type="image/png" href="./confinex-logo.jpg">
+<link rel="apple-touch-icon" href="./confinex-logo.jpg">
+<link rel="stylesheet" href="./design/tokens.css">
+<link rel="stylesheet" href="./design/components.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="./js/cfagro-core.js"></script>
+<script src="./js/cfagro-shell.js" defer></script>
+</head>
+<body>
+
+<div id="login" class="login-box card">
+  <img src="./confinex-logo.jpg" alt="Logo" style="width:72px;height:72px;border-radius:50%;object-fit:cover;margin-bottom:10px">
+  <h1 style="margin-bottom:2px">Abate <span style="font-weight:400;color:#6b7f74;font-size:16px">— PABLO FERREIRA</span></h1>
+  <div class="sub" style="margin-bottom:18px;letter-spacing:2px;text-transform:uppercase;font-size:10px">Balança → gancho · animal a animal</div>
+  <input type="email" id="email" placeholder="seu email" autocomplete="username">
+  <input type="password" id="senha" placeholder="senha" autocomplete="current-password">
+  <button class="btn" style="width:100%" onclick="entrar()">Entrar</button>
+  <div class="err" id="loginErr"></div>
+</div>
+
+<div id="app">
+  <div class="topbar">
+    <div class="ident">
+      <img src="./confinex-logo.jpg" alt="Logo" class="logo-img" style="width:48px;height:48px">
+      <div>
+        <h1>Abate <span style="font-weight:400;color:#6b7f74;font-size:16px">— PABLO FERREIRA</span></h1>
+        <div class="sub" id="subtitle"></div>
+      </div>
+    </div>
+    <div class="acoes">
+      <button class="btn sec" onclick="carregar()">↻ Atualizar</button>
+      <button class="btn sec" onclick="sair()">Sair</button>
+    </div>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <h2>Novo abate</h2>
+  <div class="card">
+    <div class="ocr-topo">
+      <div class="drop" id="drop">
+        <input type="file" id="file" accept="image/*,application/pdf" hidden>
+        <span id="dropTxt">📄 Subir folha do frigorífico (foto ou PDF) — o sistema preenche tudo para sua aprovação</span>
+        <img id="preview" style="display:none" alt="">
+        <div id="pdfNome" style="display:none;font-weight:600"></div>
+      </div>
+      <div class="ocr-acoes">
+        <button class="btn" id="btnLer" disabled onclick="lerFolha()">🔍 Ler folha</button>
+        <details>
+          <summary>⚙️ Config. IA</summary>
+          <div class="fld" style="margin-top:8px"><label>Provedor</label><select id="prov"><option value="gemini">Gemini</option><option value="anthropic">Anthropic</option><option value="openai">OpenAI (só imagem)</option></select></div>
+          <div class="fld" style="margin-top:6px"><label>API Key</label><input type="password" id="apikey" placeholder="cole a chave"></div>
+          <div class="fld" style="margin-top:6px"><label>Modelo</label><input type="text" id="model"></div>
+        </details>
+      </div>
+    </div>
+    <div class="sub" id="ocrStatus"></div>
+
+    <div class="grid g6" style="margin-top:14px">
+      <div class="fld"><label>Data</label><input type="date" id="nData"></div>
+      <div class="fld"><label>Frigorífico</label><input type="text" id="nFrig" placeholder="FRISA, Maxibeef..."></div>
+      <div class="fld"><label>Origem</label><select id="nOrigem">
+        <option value="fazenda">Fazenda própria</option>
+        <option value="ricardo">Parceria Ricardo</option>
+        <option value="xande">Parceria Xande</option>
+        <option value="wilson">Wilson</option>
+      </select></div>
+      <div class="fld"><label>Romaneio</label><input type="text" id="nRom" placeholder="nº"></div>
+      <div class="fld"><label>GTA</label><input type="text" id="nGta" placeholder="nº"></div>
+      <div class="fld" style="display:flex;align-items:flex-end"><button class="btn" style="width:100%" onclick="criarAbate()">+ Criar abate vazio</button></div>
+    </div>
+    <div class="msg" id="msgAbate"></div>
+
+    <div id="ocrRev" style="display:none;margin-top:14px">
+      <h2 style="margin:0 0 10px">Conferência — corrija o que precisar antes de aprovar <span style="text-transform:none;letter-spacing:0;font-weight:400">(células <span class="badge b-amber">âmbar</span> = leitura incerta, <span class="badge b-red">vermelhas</span> = muito incerta)</span></h2>
+      <div class="scroll"><table id="tbOcr" class="tb-edit"></table></div>
+      <div style="display:flex;gap:12px;margin-top:12px;align-items:flex-end;flex-wrap:wrap">
+        <button class="btn" onclick="aprovarFolha()">✓ Aprovar e criar abate</button>
+        <button class="btn sec" onclick="cancelarFolha()">descartar leitura</button>
+        <div class="fld" style="max-width:210px"><label>Manejo (todos os animais)</label><select id="ocrRacao"><option value="true">Confinado c/ ração</option><option value="false">Pasto</option></select></div>
+        <span class="sub" id="ocrResumo"></span>
+      </div>
+    </div>
+  </div>
+
+  <h2>Abate selecionado — passagem animal a animal</h2>
+  <div class="card" id="cardAnimais">
+    <div class="sub" id="abateSel" style="margin-bottom:12px">Nenhum abate selecionado. Crie um acima ou escolha no histórico.</div>
+    <div id="formAnimal" style="display:none">
+      <div class="simgrid">
+        <div class="fld"><label>Brinco / nº</label><input type="text" id="aBrinco"></div>
+        <div class="fld"><label>Peso balança (kg)</label><input type="number" id="aPeso" step="1"></div>
+        <div class="fld"><label>Tipo</label><select id="aTipo"><option value="macho">Macho</option><option value="femea">Fêmea</option></select></div>
+        <div class="fld"><label>Categoria</label><select id="aCat"><option value="boi">Boi</option><option value="novilha">Novilha</option><option value="vaca">Vaca</option><option value="bezerro">Bezerro</option></select></div>
+        <div class="fld"><label>Ração?</label><select id="aRacao"><option value="false">Pasto</option><option value="true">Confinado c/ ração</option></select></div>
+        <div class="fld"><label>Acabamento (0–5)</label><select id="aNota">
+          <option value="">—</option>
+          <option value="0">0 · magro</option>
+          <option value="1">1 · escassa</option>
+          <option value="2">2 · mediana</option>
+          <option value="3" selected>3 · uniforme (ideal)</option>
+          <option value="4">4 · excessiva</option>
+          <option value="5">5 · gordo demais</option>
+        </select></div>
+        <div class="fld"><label>Carcaça (kg)</label><input type="number" id="aCarc" step="1" placeholder="opcional"></div>
+        <div class="fld"><label>Penalização</label><select id="aPen">
+          <option value="">nenhuma</option>
+          <option value="magro">magro</option>
+          <option value="hematoma">hematoma/contusão</option>
+          <option value="abscesso">abscesso</option>
+          <option value="aspa">aspa/chifre</option>
+          <option value="sujo">sujo</option>
+          <option value="denticao">dentição/idade</option>
+          <option value="fora_padrao">fora do padrão</option>
+        </select></div>
+        <div class="fld"><label>Penal. R$</label><input type="number" id="aPenV" step=".01" value="0"></div>
+        <div class="fld"><label>Doença</label><select id="aDoenca">
+          <option value="">nenhuma</option>
+          <option value="fasciola">fasciola (bicho do fígado)</option>
+          <option value="cisticercose">cisticercose</option>
+          <option value="tuberculose">tuberculose</option>
+          <option value="hidatidose">hidatidose</option>
+          <option value="abscesso">abscesso</option>
+          <option value="contaminacao">contaminação</option>
+        </select></div>
+        <div class="fld"><label>Condenação</label><select id="aCond"><option value="">—</option><option value="parcial">parcial</option><option value="total">total</option></select></div>
+        <div class="fld" style="display:flex;align-items:flex-end"><button class="btn" style="width:100%" onclick="addAnimal()">+ Registrar passagem</button></div>
+      </div>
+      <div class="err" id="animalErr"></div>
+      <div class="card scroll" style="margin-top:14px"><table id="tbAnimais"></table></div>
+    </div>
+  </div>
+
+  <h2>Histórico de abates</h2>
+  <div class="card scroll"><table id="tbAbates"></table></div>
+
+  <h2>Relatório por origem — Fazenda × Parcerias</h2>
+  <div class="card scroll"><table id="tbOrigem"></table></div>
+
+  <div class="footer">Abate · dados ao vivo da base CFAgro · acesso protegido por login</div>
+</div>
+
+<a href="./" class="voltar-central">⌂ Central</a>
+
+<script>
+// db, fmtR$, fmtN, fmtD, fmtDT, cls, esc vêm do cfagro-core.js (DS)
+let ABATES=[], ANIMAIS=[], SEL=null;
+
+const ORIGEM_LABEL = {fazenda:'Fazenda própria', ricardo:'Parceria Ricardo', xande:'Parceria Xande', wilson:'Wilson'};
+const NOTA_LABEL = {0:'0 magro',1:'1 escassa',2:'2 mediana',3:'3 uniforme',4:'4 excessiva',5:'5 gordo'};
+
+function badgeNota(n){
+  if(n==null||n==='') return '—';
+  const c = n==3 ? 'b-green' : (n<=1 ? 'b-red' : (n>=5 ? 'b-amber' : 'b-blue'));
+  return `<span class="badge ${c}">${NOTA_LABEL[n]||n}</span>`;
+}
+const rc = a => (a.peso_carcaca && a.peso_balanca) ? a.peso_carcaca/a.peso_balanca*100 : null;
+const arr = a => a.peso_carcaca ? a.peso_carcaca/15 : null;
+
+async function carregar(){
+  document.getElementById('subtitle').textContent='Carregando...';
+  const hoje=new Date().toISOString().slice(0,10);
+  if(!document.getElementById('nData').value) document.getElementById('nData').value=hoje;
+  const [ab, an] = await Promise.all([
+    db.from('abates').select('*').order('data_abate',{ascending:false}),
+    db.from('abate_animais').select('*').order('hora_passagem',{ascending:true})
+  ]);
+  if(ab.error||an.error){ document.getElementById('subtitle').textContent='Erro: '+((ab.error||an.error).message); return; }
+  ABATES=ab.data||[]; ANIMAIS=an.data||[];
+  document.getElementById('subtitle').textContent =
+    `Atualizado ${fmtDT(new Date())} · ${ABATES.length} abates · ${ANIMAIS.length} cabeças`;
+  renderKpis(); renderAbates(); renderOrigem();
+  if(SEL) renderAnimais();
+}
+
+function renderKpis(){
+  const cab=ANIMAIS.length;
+  const arrTot=ANIMAIS.reduce((s,a)=>s+(arr(a)||0),0);
+  const pb=ANIMAIS.reduce((s,a)=>s+Number(a.peso_balanca||0),0);
+  const pc=ANIMAIS.reduce((s,a)=>s+Number(a.peso_carcaca||0),0);
+  const rcMed = pb? pc/pb*100 : 0;
+  const comNota=ANIMAIS.filter(a=>a.nota_acabamento!=null);
+  const notaMed = comNota.length? comNota.reduce((s,a)=>s+Number(a.nota_acabamento),0)/comNota.length : 0;
+  const penal=ANIMAIS.reduce((s,a)=>s+Number(a.penalizacao_valor||0),0);
+  const cond=ANIMAIS.filter(a=>a.condenacao).length;
+  document.getElementById('kpis').innerHTML=[
+    ['Abates', ABATES.length, 'registrados'],
+    ['Cabeças', cab, 'passaram pela balança'],
+    ['Arrobas', fmtN(arrTot,1)+' @', 'carcaça total'],
+    ['RC médio', pc? fmtN(rcMed,2)+'%':'—', 'gancho ÷ balança'],
+    ['Nota média', comNota.length? fmtN(notaMed,2):'—', 'acabamento 0–5'],
+    ['Penalizações', fmtR$(penal), 'descontos no gancho'],
+    ['Condenações', cond, 'parciais/totais'],
+  ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="d">${k[2]}</div></div>`).join('');
+}
+
+async function criarAbate(){
+  const g=id=>document.getElementById(id).value;
+  const rec={ data_abate:g('nData')||null, frigorifico:g('nFrig')||null, origem:g('nOrigem'),
+              romaneio:g('nRom')||null, gta:g('nGta')||null };
+  if(!rec.data_abate){ document.getElementById('msgAbate').className='err'; document.getElementById('msgAbate').textContent='Informe a data.'; return; }
+  const {data,error}=await db.from('abates').insert(rec).select().single();
+  if(error){ document.getElementById('msgAbate').className='err'; document.getElementById('msgAbate').textContent='Erro: '+error.message; return; }
+  document.getElementById('msgAbate').className='msg'; document.getElementById('msgAbate').textContent='Abate criado.';
+  document.getElementById('nRom').value=''; document.getElementById('nGta').value='';
+  await carregar(); selecionar(data.id);
+}
+
+function selecionar(id){
+  SEL=id;
+  const a=ABATES.find(x=>x.id===id); if(!a) return;
+  document.getElementById('formAnimal').style.display='block';
+  document.getElementById('abateSel').innerHTML =
+    `Abate <b>${fmtD(a.data_abate)}</b> · ${a.frigorifico||'—'} · <b>${ORIGEM_LABEL[a.origem]||a.origem||'—'}</b>`+
+    (a.romaneio?` · rom. ${esc(a.romaneio)}`:'')+(a.gta?` · GTA ${esc(a.gta)}`:'');
+  renderAnimais();
+  document.getElementById('cardAnimais').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+async function addAnimal(){
+  if(!SEL){ return; }
+  const g=id=>document.getElementById(id).value;
+  const num=id=>{const v=g(id);return v===''?null:Number(v);};
+  const rec={
+    abate_id:SEL, brinco:g('aBrinco')||null, peso_balanca:num('aPeso'),
+    hora_passagem:new Date().toISOString(), tipo:g('aTipo'), categoria:g('aCat'),
+    com_racao:g('aRacao')==='true', nota_acabamento:g('aNota')===''?null:Number(g('aNota')),
+    peso_carcaca:num('aCarc'), penalizacao_tipo:g('aPen')||null, penalizacao_valor:num('aPenV')||0,
+    doenca_tipo:g('aDoenca')||null, condenacao:g('aCond')||null
+  };
+  if(!rec.peso_balanca){ document.getElementById('animalErr').textContent='Informe o peso da balança.'; return; }
+  document.getElementById('animalErr').textContent='';
+  const {error}=await db.from('abate_animais').insert(rec);
+  if(error){ document.getElementById('animalErr').textContent='Erro: '+error.message; return; }
+  ['aBrinco','aPeso','aCarc'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('aPen').value=''; document.getElementById('aPenV').value='0';
+  document.getElementById('aDoenca').value=''; document.getElementById('aCond').value='';
+  document.getElementById('aBrinco').focus();
+  await carregar();
+}
+
+async function setCarcaca(id){
+  const v=prompt('Peso de carcaça (kg) no gancho:');
+  if(v===null) return;
+  const {error}=await db.from('abate_animais').update({peso_carcaca:Number(v)||null}).eq('id',id);
+  if(error) alert('Erro: '+error.message); else carregar();
+}
+async function delAnimal(id){
+  if(!confirm('Remover esta passagem?')) return;
+  const {error}=await db.from('abate_animais').delete().eq('id',id);
+  if(error) alert('Erro: '+error.message); else carregar();
+}
+
+function renderAnimais(){
+  const list=ANIMAIS.filter(a=>a.abate_id===SEL);
+  const tot={cab:list.length, pb:0, pc:0};
+  const rows=list.map((a,i)=>{
+    tot.pb+=Number(a.peso_balanca||0); tot.pc+=Number(a.peso_carcaca||0);
+    const r=rc(a);
+    const flags=[a.penalizacao_tipo?`<span class="badge b-amber">${esc(a.penalizacao_tipo)}</span>`:'',
+      a.doenca_tipo?`<span class="badge b-red">${esc(a.doenca_tipo)}${a.condenacao?' ('+a.condenacao+')':''}</span>`:''].filter(Boolean).join(' ')||'—';
+    return `<tr><td class="num">${i+1}</td><td><b>${esc(a.brinco)||'—'}</b></td>
+      <td>${new Date(a.hora_passagem).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</td>
+      <td class="num">${fmtN(a.peso_balanca)}</td>
+      <td>${a.tipo==='femea'?'Fêmea':'Macho'} · ${a.categoria||''}</td>
+      <td>${a.com_racao?'<span class="badge b-blue">ração</span>':'pasto'}</td>
+      <td>${badgeNota(a.nota_acabamento)}</td>
+      <td class="num">${a.peso_carcaca?fmtN(a.peso_carcaca):'<button class="btn mini sec" onclick="setCarcaca(\''+a.id+'\')">+ carcaça</button>'}</td>
+      <td class="num">${r?fmtN(r,1)+'%':'—'}</td>
+      <td class="num">${arr(a)?fmtN(arr(a),2):'—'}</td>
+      <td>${flags}</td>
+      <td class="num">${a.penalizacao_valor?fmtR$(a.penalizacao_valor):'—'}</td>
+      <td><button class="btn mini sec" onclick="delAnimal('${a.id}')">×</button></td></tr>`;
+  }).join('');
+  const rcT=tot.pb?tot.pc/tot.pb*100:null;
+  document.getElementById('tbAnimais').innerHTML=
+   '<tr><th class="num">#</th><th>Brinco</th><th>Hora</th><th class="num">Balança</th><th>Tipo</th><th>Manejo</th><th>Acab.</th><th class="num">Carcaça</th><th class="num">RC</th><th class="num">@</th><th>Ocorrências</th><th class="num">Penal.</th><th></th></tr>'+
+   (rows||'<tr><td colspan="13">Nenhuma passagem ainda — registre o primeiro animal acima.</td></tr>')+
+   (list.length?`<tr style="font-weight:700"><td colspan="3">Total ${tot.cab}</td><td class="num">${fmtN(tot.pb)}</td><td colspan="3"></td><td class="num">${fmtN(tot.pc)}</td><td class="num">${rcT?fmtN(rcT,1)+'%':'—'}</td><td class="num">${fmtN(tot.pc/15,2)}</td><td colspan="3"></td></tr>`:'');
+}
+
+function renderAbates(){
+  document.getElementById('tbAbates').innerHTML=
+   '<tr><th>Data</th><th>Frigorífico</th><th>Origem</th><th>Romaneio</th><th class="num">Cab</th><th class="num">Carcaça (kg)</th><th class="num">@</th><th class="num">RC méd</th><th class="num">Nota méd</th><th></th></tr>'+
+   (ABATES.map(a=>{
+     const ans=ANIMAIS.filter(x=>x.abate_id===a.id);
+     const pb=ans.reduce((s,x)=>s+Number(x.peso_balanca||0),0);
+     const pc=ans.reduce((s,x)=>s+Number(x.peso_carcaca||0),0);
+     const cn=ans.filter(x=>x.nota_acabamento!=null);
+     const nm=cn.length?cn.reduce((s,x)=>s+Number(x.nota_acabamento),0)/cn.length:null;
+     const sel = a.id===SEL?' style="background:var(--greenbg)"':'';
+     return `<tr${sel}><td><b>${fmtD(a.data_abate)}</b></td><td>${esc(a.frigorifico)||'—'}</td>
+       <td>${ORIGEM_LABEL[a.origem]||a.origem||'—'}</td><td>${esc(a.romaneio)||'—'}</td>
+       <td class="num">${ans.length}</td><td class="num">${pc?fmtN(pc):'—'}</td>
+       <td class="num">${pc?fmtN(pc/15,1):'—'}</td><td class="num">${pb&&pc?fmtN(pc/pb*100,1)+'%':'—'}</td>
+       <td class="num">${nm!=null?fmtN(nm,1):'—'}</td>
+       <td><button class="btn mini" onclick="selecionar('${a.id}')">abrir</button></td></tr>`;
+   }).join('') || '<tr><td colspan="10">Nenhum abate ainda.</td></tr>');
+}
+
+function renderOrigem(){
+  const grp={};
+  ANIMAIS.forEach(a=>{
+    const ab=ABATES.find(x=>x.id===a.abate_id); const o=ab?ab.origem||'—':'—';
+    (grp[o]=grp[o]||{cab:0,pb:0,pc:0,nota:0,ncnt:0,penal:0,cond:0});
+    const G=grp[o]; G.cab++; G.pb+=Number(a.peso_balanca||0); G.pc+=Number(a.peso_carcaca||0);
+    if(a.nota_acabamento!=null){G.nota+=Number(a.nota_acabamento);G.ncnt++;}
+    G.penal+=Number(a.penalizacao_valor||0); if(a.condenacao)G.cond++;
+  });
+  const keys=Object.keys(grp);
+  document.getElementById('tbOrigem').innerHTML=
+   '<tr><th>Origem</th><th class="num">Cab</th><th class="num">Arrobas</th><th class="num">RC médio</th><th class="num">Nota média</th><th class="num">Penalizações</th><th class="num">Condenações</th></tr>'+
+   (keys.map(o=>{const G=grp[o];
+     return `<tr><td><b>${ORIGEM_LABEL[o]||o}</b></td><td class="num">${G.cab}</td>
+       <td class="num">${G.pc?fmtN(G.pc/15,1):'—'}</td>
+       <td class="num">${G.pb&&G.pc?fmtN(G.pc/G.pb*100,2)+'%':'—'}</td>
+       <td class="num">${G.ncnt?fmtN(G.nota/G.ncnt,2):'—'}</td>
+       <td class="num">${G.penal?fmtR$(G.penal):'—'}</td>
+       <td class="num">${G.cond||'—'}</td></tr>`;
+   }).join('') || '<tr><td colspan="7">Sem dados ainda.</td></tr>');
+}
+
+// ============================================================
+// Leitura da folha do frigorífico por IA (imagem ou PDF)
+// Padrão compartilhado com ocr-pesagem.html — mesma API key (localStorage 'ocrp:*')
+// ============================================================
+const DEFAULT_MODELS = {gemini:'gemini-2.5-flash', openai:'gpt-4o', anthropic:'claude-sonnet-4-5'};
+let docBase64=null, docMime=null, FOLHA=null;
+
+function loadCfg(){
+  const p=localStorage.getItem('ocrp:prov')||'gemini';
+  document.getElementById('prov').value=p;
+  document.getElementById('apikey').value=localStorage.getItem('ocrp:key:'+p)||'';
+  document.getElementById('model').value=localStorage.getItem('ocrp:model:'+p)||DEFAULT_MODELS[p];
+}
+function saveCfg(){
+  const p=document.getElementById('prov').value;
+  localStorage.setItem('ocrp:prov',p);
+  localStorage.setItem('ocrp:key:'+p,document.getElementById('apikey').value.trim());
+  localStorage.setItem('ocrp:model:'+p,document.getElementById('model').value.trim());
+}
+document.getElementById('prov').addEventListener('change',()=>{
+  const p=document.getElementById('prov').value;
+  document.getElementById('apikey').value=localStorage.getItem('ocrp:key:'+p)||'';
+  document.getElementById('model').value=localStorage.getItem('ocrp:model:'+p)||DEFAULT_MODELS[p];
+  saveCfg();
+});
+['apikey','model'].forEach(id=>document.getElementById(id).addEventListener('input',saveCfg));
+loadCfg();
+
+document.getElementById('drop').addEventListener('click',()=>document.getElementById('file').click());
+document.getElementById('file').addEventListener('change',e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    const d=ev.target.result;
+    docMime=d.substring(5,d.indexOf(';'));
+    docBase64=d.substring(d.indexOf(',')+1);
+    const isPdf=docMime==='application/pdf';
+    document.getElementById('preview').style.display=isPdf?'none':'block';
+    if(!isPdf) document.getElementById('preview').src=d;
+    document.getElementById('pdfNome').style.display=isPdf?'block':'none';
+    document.getElementById('pdfNome').textContent=isPdf?('📑 '+f.name):'';
+    document.getElementById('dropTxt').style.display='none';
+    document.getElementById('drop').classList.add('has');
+    document.getElementById('btnLer').disabled=false;
+  };
+  r.readAsDataURL(f);
+});
+
+const PROMPT_FOLHA = `Você é um transcritor de romaneios/folhas de abate de frigoríficos brasileiros (gado bovino).
+O documento tem um CABEÇALHO (data do abate, nome do frigorífico, nº do romaneio, nº da GTA — nem sempre todos presentes) e uma TABELA com um animal por linha.
+
+Regras:
+- Transcreva TODAS as linhas de animais, na ordem do documento.
+- "brinco": identificador do animal (nº sequencial, brinco ou SISBOV), como texto.
+- "peso_carcaca": peso de carcaça em kg, como número. Se a folha listar meias-carcaças (duas bandas, dianteiro/traseiro), SOME e informe o total do animal. Carcaças bovinas pesam tipicamente 150–450 kg — use só como sanidade, não invente.
+- "sexo": "macho" ou "femea" se identificável (M/F, castrado=macho); senão null.
+- "categoria": "boi", "vaca", "novilha" ou "bezerro" se identificável; senão null.
+- "acabamento": nota de acabamento/tipificação 0–5 se houver; senão null.
+- "ocorrencia": texto curto de penalização/desconto/observação da linha (hematoma, abscesso, condenação...); senão null.
+- "penal_valor": valor de desconto em R$ na linha, se houver; senão null.
+- Para cada campo dê confiança 0 a 1 em "conf". Seja honesto: rasuras e dígitos ambíguos merecem confiança baixa.
+- Campos ilegíveis: melhor palpite com confiança <0.5.
+
+Responda SOMENTE com JSON válido, sem texto fora do JSON:
+{"data":"dd/mm/aaaa","frigorifico":"","romaneio":"","gta":"","animais":[{"brinco":"123","peso_carcaca":287.5,"sexo":"macho","categoria":"boi","acabamento":3,"ocorrencia":null,"penal_valor":null,"conf":{"brinco":0.95,"peso_carcaca":0.9,"sexo":0.8,"categoria":0.8,"acabamento":0.7,"ocorrencia":1,"penal_valor":1}}]}`;
+
+async function chamarVLM(){
+  const prov=document.getElementById('prov').value,
+        key=document.getElementById('apikey').value.trim(),
+        model=document.getElementById('model').value.trim()||DEFAULT_MODELS[prov];
+  if(!key) throw new Error('Cole a API key em ⚙️ Config. IA (a mesma do OCR Pesagem serve).');
+  const isPdf=docMime==='application/pdf';
+
+  if(prov==='gemini'){
+    const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+    const body={contents:[{parts:[{text:PROMPT_FOLHA},{inline_data:{mime_type:docMime,data:docBase64}}]}],
+      generationConfig:{temperature:0,response_mime_type:'application/json'}};
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const j=await r.json();
+    if(!r.ok) throw new Error(j.error?.message||('Gemini erro '+r.status));
+    return j.candidates[0].content.parts.map(p=>p.text).join('');
+  }
+  if(prov==='openai'){
+    if(isPdf) throw new Error('OpenAI não aceita PDF aqui — use Gemini/Anthropic ou envie uma foto.');
+    const r=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+      body:JSON.stringify({model,temperature:0,response_format:{type:'json_object'},
+        messages:[{role:'user',content:[{type:'text',text:PROMPT_FOLHA},
+          {type:'image_url',image_url:{url:`data:${docMime};base64,${docBase64}`}}]}]})});
+    const j=await r.json();
+    if(!r.ok) throw new Error(j.error?.message||('OpenAI erro '+r.status));
+    return j.choices[0].message.content;
+  }
+  const bloco = isPdf
+    ? {type:'document',source:{type:'base64',media_type:'application/pdf',data:docBase64}}
+    : {type:'image',source:{type:'base64',media_type:docMime,data:docBase64}};
+  const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model,max_tokens:8192,
+      messages:[{role:'user',content:[bloco,{type:'text',text:PROMPT_FOLHA}]}]})});
+  const j=await r.json();
+  if(!r.ok) throw new Error(j.error?.message||('Anthropic erro '+r.status));
+  return j.content.map(c=>c.text||'').join('');
+}
+
+function extrairJSON(txt){
+  let s=txt.trim().replace(/^```(json)?/i,'').replace(/```$/,'').trim();
+  const a=s.indexOf('{'), b=s.lastIndexOf('}');
+  if(a>=0&&b>a) s=s.substring(a,b+1);
+  return JSON.parse(s);
+}
+const dataISO = br => {
+  const m=String(br||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if(!m) return '';
+  const y=m[3].length===2?'20'+m[3]:m[3];
+  return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+};
+
+async function lerFolha(){
+  saveCfg();
+  const st=document.getElementById('ocrStatus');
+  st.textContent='⏳ Lendo a folha… (alguns segundos)';
+  document.getElementById('btnLer').disabled=true;
+  try{
+    const bruto=extrairJSON(await chamarVLM());
+    FOLHA={animais:(bruto.animais||[]).map(a=>({...a,conf:a.conf||{}}))};
+    // preenche o cabeçalho para aprovação
+    if(bruto.data) document.getElementById('nData').value=dataISO(bruto.data)||document.getElementById('nData').value;
+    if(bruto.frigorifico) document.getElementById('nFrig').value=bruto.frigorifico;
+    if(bruto.romaneio) document.getElementById('nRom').value=bruto.romaneio;
+    if(bruto.gta) document.getElementById('nGta').value=bruto.gta;
+    renderOcr();
+    st.textContent=`✅ ${FOLHA.animais.length} animais lidos. Confira o cabeçalho acima e a tabela abaixo — nada foi gravado ainda.`;
+  }catch(e){
+    st.textContent='⚠️ '+e.message;
+  }
+  document.getElementById('btnLer').disabled=false;
+}
+
+const confCls = c => c==null?'':(c<0.5?' class="c-baixa"':(c<0.8?' class="c-media"':''));
+function renderOcr(){
+  const sel=(v,ops)=>ops.map(o=>`<option value="${o[0]}"${String(v)===o[0]?' selected':''}>${o[1]}</option>`).join('');
+  document.getElementById('tbOcr').innerHTML=
+   '<tr><th class="num">#</th><th>Brinco</th><th class="num">Carcaça (kg)</th><th class="num">@</th><th>Sexo</th><th>Categoria</th><th>Acab.</th><th>Ocorrência</th><th class="num">Penal. R$</th><th></th></tr>'+
+   FOLHA.animais.map((a,i)=>`<tr>
+     <td class="num">${i+1}</td>
+     <td${confCls(a.conf.brinco)}><input data-i="${i}" data-f="brinco" value="${esc(a.brinco??'')}"></td>
+     <td${confCls(a.conf.peso_carcaca)}><input data-i="${i}" data-f="peso_carcaca" type="number" step=".1" value="${a.peso_carcaca??''}"></td>
+     <td class="num">${a.peso_carcaca?fmtN(a.peso_carcaca/15,2):'—'}</td>
+     <td${confCls(a.conf.sexo)}><select data-i="${i}" data-f="sexo">${sel(a.sexo||'macho',[['macho','Macho'],['femea','Fêmea']])}</select></td>
+     <td${confCls(a.conf.categoria)}><select data-i="${i}" data-f="categoria">${sel(a.categoria||'boi',[['boi','Boi'],['vaca','Vaca'],['novilha','Novilha'],['bezerro','Bezerro']])}</select></td>
+     <td${confCls(a.conf.acabamento)}><select data-i="${i}" data-f="acabamento">${sel(a.acabamento??'',[['','—'],['0','0'],['1','1'],['2','2'],['3','3'],['4','4'],['5','5']])}</select></td>
+     <td${confCls(a.conf.ocorrencia)}><input data-i="${i}" data-f="ocorrencia" value="${esc(a.ocorrencia??'')}" placeholder="—"></td>
+     <td${confCls(a.conf.penal_valor)}><input data-i="${i}" data-f="penal_valor" type="number" step=".01" value="${a.penal_valor??''}"></td>
+     <td><button class="btn mini sec" onclick="delLinhaOcr(${i})">×</button></td></tr>`).join('');
+  const pc=FOLHA.animais.reduce((s,a)=>s+Number(a.peso_carcaca||0),0);
+  document.getElementById('ocrResumo').textContent=
+    `${FOLHA.animais.length} animais · ${fmtN(pc)} kg de carcaça · ${fmtN(pc/15,1)} @`;
+  document.getElementById('ocrRev').style.display='block';
+  document.getElementById('tbOcr').querySelectorAll('input,select').forEach(el=>{
+    el.addEventListener('change',()=>{
+      const a=FOLHA.animais[Number(el.dataset.i)];
+      a[el.dataset.f]=el.value===''?null:(el.type==='number'?Number(el.value):el.value);
+      if(a.conf) a.conf[el.dataset.f]=1; // corrigido pelo Pablo = confiança total
+      renderOcr();
+    });
+  });
+}
+function delLinhaOcr(i){ FOLHA.animais.splice(i,1); renderOcr(); }
+function cancelarFolha(){
+  FOLHA=null; docBase64=null;
+  document.getElementById('ocrRev').style.display='none';
+  document.getElementById('ocrStatus').textContent='';
+  document.getElementById('drop').classList.remove('has');
+  document.getElementById('dropTxt').style.display='inline';
+  document.getElementById('preview').style.display='none';
+  document.getElementById('pdfNome').style.display='none';
+  document.getElementById('file').value='';
+  document.getElementById('btnLer').disabled=true;
+}
+
+async function aprovarFolha(){
+  if(!FOLHA||!FOLHA.animais.length){ alert('Nada para aprovar.'); return; }
+  const g=id=>document.getElementById(id).value;
+  if(!g('nData')){ alert('Informe a data do abate.'); return; }
+  const semPeso=FOLHA.animais.filter(a=>!a.peso_carcaca).length;
+  if(!confirm(`Criar abate com ${FOLHA.animais.length} animais`+(semPeso?` (${semPeso} sem peso de carcaça)`:'')+`?`)) return;
+
+  const {data:ab,error}=await db.from('abates').insert({
+    data_abate:g('nData'), frigorifico:g('nFrig')||null, origem:g('nOrigem'),
+    romaneio:g('nRom')||null, gta:g('nGta')||null
+  }).select().single();
+  if(error){ alert('Erro ao criar abate: '+error.message); return; }
+
+  const racao=document.getElementById('ocrRacao').value==='true';
+  const base=Date.now();
+  const recs=FOLHA.animais.map((a,i)=>({
+    abate_id:ab.id, brinco:a.brinco?String(a.brinco):null,
+    peso_balanca:null, peso_carcaca:a.peso_carcaca?Number(a.peso_carcaca):null,
+    hora_passagem:new Date(base+i*1000).toISOString(),
+    tipo:a.sexo||'macho', categoria:a.categoria||'boi', com_racao:racao,
+    nota_acabamento:(a.acabamento===''||a.acabamento==null)?null:Number(a.acabamento),
+    penalizacao_tipo:a.ocorrencia||null, penalizacao_valor:a.penal_valor?Number(a.penal_valor):0,
+    doenca_tipo:null, condenacao:null
+  }));
+  const {error:e2}=await db.from('abate_animais').insert(recs);
+  if(e2){ alert('Abate criado, mas erro ao gravar animais: '+e2.message); return; }
+
+  document.getElementById('ocrStatus').textContent=`✅ Abate criado com ${recs.length} animais.`;
+  cancelarFolha();
+  await carregar(); selecionar(ab.id);
+}
+
+CFAgro.authInit(carregar);
+</script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CFAgro — Parcerias</title>
+<link rel="icon" type="image/png" href="./confinex-logo.jpg">
+<link rel="apple-touch-icon" href="./confinex-logo.jpg">
+<link rel="stylesheet" href="./design/tokens.css">
+<link rel="stylesheet" href="./design/components.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="./js/cfagro-core.js"></script>
+<script src="./js/cfagro-shell.js" defer></script>
+</head>
+<body>
+<div class="head">
+  <img src="./confinex-logo.jpg" alt="Logo">
+  <div>
+    <h1>Parcerias <span>— PABLO FERREIRA</span></h1>
+    <div class="hub-sub">Sócios e acertos</div>
+  </div>
+</div>
+
+<div class="apps">
+  <a class="app" href="./parceria-ricardo.html">
+    <div class="ico" style="background:#e8f5ee">🐂</div>
+    <div><div class="t">Ricardo</div><div class="d">Engorda por ganho — 60% Ricardo / 40% você · franquia 1% a.a.</div></div>
+    <div class="arrow">›</div>
+  </a>
+  <a class="app" href="./parceria-xande.html">
+    <div class="ico" style="background:#dbeafe">🤝</div>
+    <div><div class="t">Xande</div><div class="d">Sociedade 50/50 — Negócio Nº 3 (novilhas + Wilson/Maxibeef)</div></div>
+    <div class="arrow">›</div>
+  </a>
+  <span class="app" style="opacity:.7;cursor:default">
+    <div class="ico" style="background:#f3f4f6">📁</div>
+    <div><div class="t">JP (João Paulo) <span class="badge b-green" style="vertical-align:middle">Fechada</span></div><div class="d">Capitalista — apuração encerrada (out/24 → fev/26)</div></div>
+  </span>
+</div>
+
+<div class="status" id="status" style="display:none">
+  <div class="st"><div class="v" id="stRic">—</div><div class="l">A acertar Ricardo</div></div>
+  <div class="st"><div class="v" id="stXan">—</div><div class="l">A acertar Xande</div></div>
+  <div class="st"><div class="v" id="stEng">—</div><div class="l">Bois na engorda</div></div>
+</div>
+<div class="aviso" id="aviso" style="display:none">Faça login em qualquer app uma vez para ver os totais aqui.</div>
+
+<a href="./" class="voltar-central">⌂ Central</a>
+<div class="foot">Ricardo · Xande · JP — uma só fonte de verdade (Supabase) · CFAgro</div>
+
+<script>
+// db vem do cfagro-core.js
+function calcRic(l){
+  const dias=(l.data_envio&&l.data_saida)?Math.max(0,Math.round((new Date(l.data_saida)-new Date(l.data_envio))/864e5)):0;
+  const franquia=0.01*(dias/365)*Number(l.cabecas||0);
+  const excedente=Math.max(0,Number(l.perdas||0)-franquia);
+  const vivos=Math.max(0,Number(l.cabecas||0)-Number(l.perdas||0));
+  const ganhoKg=Math.max(0,Number(l.peso_saida||0)-Number(l.peso_entrada||0));
+  const preco=Number(l.preco_acordado||0);
+  const valorCab = l.preco_base==='kg' ? ganhoKg*preco : (ganhoKg*Number(l.rendimento||50)/100/15)*preco;
+  return valorCab*vivos*0.6; // parte bruta do Ricardo (sem desconto de perda, aproximação p/ o hub)
+}
+(async()=>{
+  const {data:s}=await db.auth.getSession();
+  if(!s.session){ document.getElementById('aviso').style.display='block'; return; }
+  const [ric,xan]=await Promise.all([
+    db.from('parceria_ricardo').select('*'),
+    db.from('parceria_xande').select('*')
+  ]);
+  if(ric.error||xan.error){ document.getElementById('aviso').style.display='block'; return; }
+  document.getElementById('status').style.display='grid';
+  const aRic=(ric.data||[]).filter(l=>l.status!=='engorda'&&!l.acertado).reduce((a,l)=>a+calcRic(l),0);
+  const eng=(ric.data||[]).filter(l=>l.status==='engorda').reduce((a,l)=>a+Number(l.cabecas||0),0);
+  const aXan=(xan.data||[]).filter(n=>!n.acertado).reduce((a,n)=>a+(Number(n.receita_bruta||0)-Number(n.funrural||0)-Number(n.compra||0)-Number(n.custos||0))/2,0);
+  document.getElementById('stRic').textContent=fmtR$(aRic);
+  document.getElementById('stXan').textContent=fmtR$(aXan);
+  document.getElementById('stEng').textContent=eng.toLocaleString('pt-BR');
+})();
+</script>
+</body>
+</html>
