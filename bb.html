@@ -128,6 +128,10 @@
 
 let CONTATOS_LIST = [];
 let PREVISOES = [];
+let COMPRAS_LIST = [];
+let VENDAS_LIST = [];
+
+function validDate(s){ return /^\d{4}-\d{2}-\d{2}$/.test(String(s||'')); }
 
 // ---------- DESCONTO DE CAPIM (mesma regra do Confinex — divisorCapim()/calcArrobas()) ----------
 function divisorCapim(modo){
@@ -268,11 +272,16 @@ async function proximoCodigoBB(){
 async function confirmarPrevisao(id){
   const n = PREVISOES.find(x=>x.id===id);
   if(!n){ alert('Previsão não encontrada — atualize a página.'); return; }
+
+  const dataPesagem = prompt('Data da pesagem (compra) — AAAA-MM-DD:', new Date().toISOString().slice(0,10));
+  if(dataPesagem===null) return;
+  if(!validDate(dataPesagem)){ alert('Data inválida. Use o formato AAAA-MM-DD.'); return; }
+
   let codigo;
   try{ codigo = await proximoCodigoBB(); }
   catch(e){ alert('Erro ao gerar código do lote: '+e.message); return; }
 
-  if(!confirm(`Confirmar negócio ${codigo}: ${n.quantidade} cab. × ${fmtN(n.peso_vivo_medio)} kg — Valor total ${fmtR$(n.custo_compra_total)}?\nIsso cria um LOTE REAL no banco (operações + compras).`)) return;
+  if(!confirm(`Confirmar negócio ${codigo}: ${n.quantidade} cab. × ${fmtN(n.peso_vivo_medio)} kg — Valor total ${fmtR$(n.custo_compra_total)}\nData da pesagem: ${fmtD(dataPesagem)} — vencimento em ${n.prazo_pagamento_dias||0} dias a partir dela.\nIsso cria um LOTE REAL no banco (operações + compras).`)) return;
 
   const {data:op, error:e1} = await db.from('operacoes').insert({
     codigo, tipo_negocio:'boi_balanca', status:'comprada',
@@ -282,7 +291,7 @@ async function confirmarPrevisao(id){
 
   const {error:e2} = await db.from('compras').insert({
     operacao_id: op.id,
-    data: new Date().toISOString().slice(0,10),
+    data: dataPesagem,
     vendedor_id: n.vendedor_id,
     quantidade: n.quantidade,
     peso_total_kg: Math.round(n.peso_vivo_medio*n.quantidade),
@@ -306,6 +315,51 @@ async function cancelarPrevisao(id){
   if(!confirm('Cancelar esta previsão? (não apaga, só marca como cancelada)'))return;
   const {error}=await db.from('negocios_boi_balanca').update({status:'cancelado'}).eq('id',id);
   if(error)alert('Erro: '+error.message); else carregar();
+}
+
+// ---------- EDITAR DATAS (self-service, sem precisar mexer no banco na mão) ----------
+async function editarDatasLote(operacaoId, codigo){
+  const c = COMPRAS_LIST.find(x=>x.operacao_id===operacaoId);
+  if(!c){ alert('Compra deste lote não encontrada — atualize a página.'); return; }
+  const v = VENDAS_LIST.find(x=>x.operacao_id===operacaoId);
+
+  const novaDataPesagem = prompt(`Lote ${codigo} — data da pesagem (compra), AAAA-MM-DD:`, c.data);
+  if(novaDataPesagem===null) return;
+  if(!validDate(novaDataPesagem)){ alert('Data inválida. Use o formato AAAA-MM-DD.'); return; }
+
+  const novoPrazoPagamento = prompt('Prazo de pagamento (dias, a partir da pesagem):', String(c.prazo_dias??0));
+  if(novoPrazoPagamento===null) return;
+  if(isNaN(Number(novoPrazoPagamento))){ alert('Prazo inválido — informe um número de dias.'); return; }
+
+  let novaDataAbate=null, novoPrazoRecebimento=null;
+  if(v){
+    novaDataAbate = prompt('Data do abate, AAAA-MM-DD:', v.data_abate);
+    if(novaDataAbate===null) return;
+    if(!validDate(novaDataAbate)){ alert('Data inválida. Use o formato AAAA-MM-DD.'); return; }
+
+    novoPrazoRecebimento = prompt('Previsão de recebimento (data), AAAA-MM-DD:', v.prazo_recebimento||v.data_abate);
+    if(novoPrazoRecebimento===null) return;
+    if(!validDate(novoPrazoRecebimento)){ alert('Data inválida. Use o formato AAAA-MM-DD.'); return; }
+  }
+
+  const resumo = `Lote ${codigo}\nPesagem: ${fmtD(novaDataPesagem)} · prazo pagamento: ${novoPrazoPagamento} dias`+
+    (v?`\nAbate: ${fmtD(novaDataAbate)} · previsão recebimento: ${fmtD(novoPrazoRecebimento)}`:'')+
+    `\n\nSalvar essas datas?`;
+  if(!confirm(resumo)) return;
+
+  const {error:e1} = await db.from('compras').update({
+    data: novaDataPesagem, prazo_dias: Number(novoPrazoPagamento)
+  }).eq('id', c.id);
+  if(e1){ alert('Erro ao salvar a compra: '+e1.message); return; }
+
+  if(v){
+    const {error:e2} = await db.from('vendas').update({
+      data_abate: novaDataAbate, prazo_recebimento: novoPrazoRecebimento
+    }).eq('id', v.id);
+    if(e2){ alert('Compra salva, mas erro ao salvar a venda: '+e2.message); return; }
+  }
+
+  carregar();
 }
 
 // ---------- REGISTRAR ABATE (venda) ----------
@@ -375,6 +429,8 @@ async function carregar(){
   const bbIds = new Set(ops.data.map(o=>o.id));
   const cs = compras.data.filter(c=>bbIds.has(c.operacao_id));
   const vs = vendas.data.filter(v=>bbIds.has(v.operacao_id));
+  COMPRAS_LIST = cs;
+  VENDAS_LIST = vs;
   const ps = pend.data.filter(p=>bbIds.has(p.operacao_id) && !['validado','cancelado'].includes(p.status));
   const ativos = ops.data.filter(o=>o.status!=='cancelada');
 
@@ -424,7 +480,7 @@ async function carregar(){
 
   // Lotes
   document.getElementById('tbLotes').innerHTML =
-   '<tr><th>Lote</th><th>Compra</th><th>Vendedor</th><th class="num">Cab</th><th class="num">Peso vivo (kg)</th><th class="num">R$/@ compra</th><th class="num">Valor compra</th><th>Abate</th><th>Frigorífico</th><th class="num">Carcaça (kg)</th><th class="num">RC real</th><th class="num">R$/@ gancho</th><th class="num">Margem</th><th>Status</th></tr>'+
+   '<tr><th>Lote</th><th>Compra</th><th>Vendedor</th><th class="num">Cab</th><th class="num">Peso vivo (kg)</th><th class="num">R$/@ compra</th><th class="num">Valor compra</th><th>Abate</th><th>Frigorífico</th><th class="num">Carcaça (kg)</th><th class="num">RC real</th><th class="num">R$/@ gancho</th><th class="num">Margem</th><th>Status</th><th></th></tr>'+
    ativos.sort((a,b)=>b.codigo.localeCompare(a.codigo)).map(o=>{
      const c=cs.find(x=>x.operacao_id===o.id)||{};
      const v=vs.find(x=>x.operacao_id===o.id);
@@ -438,8 +494,9 @@ async function carregar(){
       <td class="num">${rc?fmtN(rc,2)+'%':'—'}</td>
       <td class="num">${v?fmtN(v.preco_arroba,2):'—'}</td>
       <td class="num ${cls(margem)}">${margem!=null?fmtR$(margem):'—'}</td>
-      <td>${v?'<span class="badge b-green">Abatido</span>':'<span class="badge b-amber">Aguardando abate</span>'}</td></tr>`;
-   }).join('') || '<tr><td colspan="14">Nenhum lote ainda — registre uma previsão no simulador acima e confirme, ou registre pelo Juan no grupo Boi Balança</td></tr>';
+      <td>${v?'<span class="badge b-green">Abatido</span>':'<span class="badge b-amber">Aguardando abate</span>'}</td>
+      <td><button class="btn mini sec" onclick="editarDatasLote('${o.id}','${o.codigo}')">✏️ editar datas</button></td></tr>`;
+   }).join('') || '<tr><td colspan="15">Nenhum lote ainda — registre uma previsão no simulador acima e confirme, ou registre pelo Juan no grupo Boi Balança</td></tr>';
 
   // A pagar
   const pagarRows = cs.filter(c=>ativos.some(o=>o.id===c.operacao_id));
