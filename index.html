@@ -16,53 +16,53 @@
 <body>
 
 <div id="login" class="login-box card">
-  <img src="./confinex-logo.jpg" alt="Logo" class="logo-img" style="width:72px;height:72px;margin-bottom:10px">
-  <h1 style="margin-bottom:2px">CFAgro <span>— PABLO FERREIRA</span></h1>
-  <div class="hub-sub" style="margin-bottom:18px">Central de Operações</div>
-  <input type="email" id="email" placeholder="seu email" autocomplete="username">
-  <input type="password" id="senha" placeholder="senha" autocomplete="current-password">
-  <button class="btn" style="width:100%" onclick="entrar()">Entrar</button>
-  <div class="err" id="loginErr"></div>
+<img src="./confinex-logo.jpg" alt="Logo" class="logo-img" style="width:72px;height:72px;margin-bottom:10px">
+<h1 style="margin-bottom:2px">CFAgro <span>— PABLO FERREIRA</span></h1>
+<div class="hub-sub" style="margin-bottom:18px">Central de Operações</div>
+<input type="email" id="email" placeholder="seu email" autocomplete="username">
+<input type="password" id="senha" placeholder="senha" autocomplete="current-password">
+<button class="btn" style="width:100%" onclick="entrar()">Entrar</button>
+<div class="err" id="loginErr"></div>
 </div>
 
 <div id="app">
-  <div class="topbar">
-    <div class="ident">
-      <img src="./confinex-logo.jpg" alt="Logo" class="logo-img" style="width:48px;height:48px">
-      <div>
-        <h1>Visão Geral <span>— CFAGRO</span></h1>
-        <div class="sub" id="subtitle"></div>
-      </div>
-    </div>
-    <div class="acoes">
-      <button class="btn sec" onclick="carregar()">↻ Atualizar</button>
-      <button class="btn sec" onclick="sair()">Sair</button>
-    </div>
-  </div>
+<div class="topbar">
+<div class="ident">
+<img src="./confinex-logo.jpg" alt="Logo" class="logo-img" style="width:48px;height:48px">
+<div>
+<h1>Visão Geral <span>— CFAGRO</span></h1>
+<div class="sub" id="subtitle"></div>
+</div>
+</div>
+<div class="acoes">
+<button class="btn sec" onclick="carregar()">↻ Atualizar</button>
+<button class="btn sec" onclick="sair()">Sair</button>
+</div>
+</div>
 
-  <div class="kpis" id="kpis"></div>
+<div class="kpis" id="kpis"></div>
 
-  <h2>Exposição BGI por lote (view ao vivo)</h2>
-  <div class="card scroll"><table id="tbExpo"></table></div>
+<h2>Exposição BGI por lote (view ao vivo)</h2>
+<div class="card scroll"><table id="tbExpo"></table></div>
 
-  <h2>Posições na B3 — hedge × especulação</h2>
-  <div class="card scroll"><table id="tbPos"></table></div>
+<h2>Posições na B3 — hedge × especulação</h2>
+<div class="card scroll"><table id="tbPos"></table></div>
 
-  <h2>Estoque em confinamento (view ao vivo)</h2>
-  <div class="card scroll"><table id="tbEstoque"></table></div>
+<h2>Estoque em confinamento (view ao vivo)</h2>
+<div class="card scroll"><table id="tbEstoque"></table></div>
 
-  <h2 id="pendencias">Pendências de documentos — quem deve GTA/NF</h2>
-  <div class="card scroll"><table id="tbPend"></table></div>
+<h2 id="pendencias">Pendências de documentos — quem deve GTA/NF</h2>
+<div class="card scroll"><table id="tbPend"></table></div>
 
-  <h2>Acertos dos confinamentos</h2>
-  <div class="card scroll"><table id="tbAcertos"></table></div>
+<h2>Acertos dos confinamentos</h2>
+<div class="card scroll"><table id="tbAcertos"></table></div>
 
-  <div class="grid2" style="margin-top:14px">
-    <div class="card" id="fluxo"><h2 style="margin-top:0">Fluxo de caixa acumulado</h2><canvas id="chFluxo"></canvas></div>
-    <div class="card" id="eventos"><h2 style="margin-top:0">Próximos eventos (90 dias)</h2><div class="scroll"><table id="tbProx"></table></div></div>
-  </div>
+<div class="grid2" style="margin-top:14px">
+<div class="card" id="fluxo"><h2 style="margin-top:0">Fluxo de caixa acumulado</h2><canvas id="chFluxo"></canvas></div>
+<div class="card" id="eventos"><h2 style="margin-top:0">Próximos eventos (90 dias)</h2><div class="scroll"><table id="tbProx"></table></div></div>
+</div>
 
-  <div class="footer">Lendo ao vivo da base CFAgro (Supabase) · RLS ativo · CFAgro/Confinex</div>
+<div class="footer">Lendo ao vivo da base CFAgro (Supabase) · RLS ativo · CFAgro/Confinex</div>
 </div>
 
 <script>
@@ -70,116 +70,119 @@
 
 let chart;
 async function carregar(){
-  document.getElementById('subtitle').textContent = 'Carregando...';
-  const [ops, expo, posicoes, estoque, pend, acertos, fluxo] = await Promise.all([
-    db.from('operacoes').select('id,codigo,status,sexo,modalidade,confinamentos(nome)'),
-    db.from('v_exposicao_hedge').select('*'),
-    db.from('posicoes_hedge').select('contrato,direcao,contratos_qtd,preco_entrada,preco_saida,data_saida,status,resultado_realizado,categoria,negocio_rateio').or('status.in.(aberta,rolada),origem.eq.bgi-portfolio').order('status').order('contrato'),
-    db.from('v_estoque_atual').select('*'),
-    db.from('pendencias_documentos').select('id,tipo,status,cobrancas,created_at,operacoes(codigo),contatos(nome),compras(quantidade,data)').not('status','in','("validado","cancelado")'),
-    db.from('acertos').select('*,operacoes(codigo),confinamentos(nome)').order('created_at'),
-    db.from('fluxo_caixa').select('data,descricao,tipo,valor,realizado,categoria').order('data')
-  ]);
-  const errs=[ops,expo,posicoes,estoque,pend,acertos,fluxo].filter(r=>r.error);
-  if(errs.length){ document.getElementById('subtitle').textContent='Erro: '+errs[0].error.message; return; }
+document.getElementById('subtitle').textContent = 'Carregando...';
+const [ops, expo, posicoes, estoque, pend, acertos, fluxo] = await Promise.all([
+db.from('operacoes').select('id,codigo,status,sexo,modalidade,confinamentos(nome)'),
+db.from('v_exposicao_hedge').select('*'),
+db.from('posicoes_hedge').select('contrato,direcao,contratos_qtd,preco_entrada,preco_saida,data_saida,status,resultado_realizado,categoria,negocio_rateio').or('status.in.(aberta,rolada),origem.eq.bgi-portfolio').order('status').order('contrato'),
+db.from('v_estoque_atual').select('*'),
+db.from('pendencias_documentos').select('id,tipo,status,cobrancas,created_at,operacoes(codigo),contatos(nome),compras(quantidade,data)').not('status','in','("validado","cancelado")'),
+db.from('acertos').select('*,operacoes(codigo),confinamentos(nome)').order('created_at'),
+db.from('fluxo_caixa').select('data,descricao,tipo,valor,realizado,categoria').order('data')
+]);
+const errs=[ops,expo,posicoes,estoque,pend,acertos,fluxo].filter(r=>r.error);
+if(errs.length){ document.getElementById('subtitle').textContent='Erro: '+errs[0].error.message; return; }
 
-  document.getElementById('subtitle').textContent =
-    `Atualizado ${new Date().toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})} · ${ops.data.length} operações no banco`;
+document.getElementById('subtitle').textContent =
+`Atualizado ${new Date().toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})} · ${ops.data.length} operações no banco`;
 
-  // ---- KPIs
-  const cab = estoque.data.reduce((s,e)=>s+Number(e.cabecas||0),0);
-  const ativos = ops.data.filter(o=>['comprada','em_confinamento'].includes(o.status));
-  const descob = expo.data.reduce((s,e)=>s+Math.max(Number(e.cts_descobertos||0),0),0);
-  const credit = expo.data.reduce((s,e)=>s+Number(e.hedge_realizado_creditado||0),0);
-  const pendAbertas = pend.data.filter(p=>p.status==='aguardando_vendedor');
-  const acAguard = acertos.data.filter(a=>['aguardando','divergente'].includes(a.status));
-  const fluxoReal = fluxo.data.filter(f=>f.realizado);
-  const saldoReal = fluxoReal.reduce((s,f)=>s+(f.tipo==='entrada'?1:-1)*Number(f.valor),0);
-  document.getElementById('kpis').innerHTML = [
-    ['Cabeças no cocho', fmtN(cab), estoque.data.length+' currais · '+ativos.length+' lotes ativos'],
-    ['Hedge descoberto', fmtN(descob,1)+' cts', '≈ '+fmtN(descob*330)+' @ expostas'],
-    ['Hedge já creditado', fmtR$(credit), 'lucro realizado nos lotes'],
-    ['Pendências GTA/NF', pendAbertas.length, 'aguardando vendedor'],
-    ['Acertos em aberto', acAguard.length, 'aguardando ou divergentes'],
-    ['Caixa (a conciliar)', fmtR$(saldoReal), fluxoReal.length+' lançamentos realizados'],
-  ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="d">${k[2]}</div></div>`).join('');
+// ---- KPIs
+const cab = estoque.data.reduce((s,e)=>s+Number(e.cabecas||0),0);
+const ativos = ops.data.filter(o=>['comprada','em_confinamento'].includes(o.status));
+const descob = expo.data.reduce((s,e)=>s+Math.max(Number(e.cts_descobertos||0),0),0);
+const credit = expo.data.reduce((s,e)=>s+Number(e.hedge_realizado_creditado||0),0);
+const pendAbertas = pend.data.filter(p=>p.status==='aguardando_vendedor');
+const acAguard = acertos.data.filter(a=>['aguardando','divergente'].includes(a.status));
+const fluxoReal = fluxo.data.filter(f=>f.realizado);
+const saldoReal = fluxoReal.reduce((s,f)=>s+(f.tipo==='entrada'?1:-1)*Number(f.valor),0);
+document.getElementById('kpis').innerHTML = [
+['Cabeças no cocho', fmtN(cab), estoque.data.length+' currais · '+ativos.length+' lotes ativos'],
+['Hedge descoberto', fmtN(descob,1)+' cts', '≈ '+fmtN(descob*330)+' @ expostas'],
+['Hedge já creditado', fmtR$(credit), 'lucro realizado nos lotes'],
+['Pendências GTA/NF', pendAbertas.length, 'aguardando vendedor'],
+['Acertos em aberto', acAguard.length, 'aguardando ou divergentes'],
+['Caixa (a conciliar)', fmtR$(saldoReal), fluxoReal.length+' lançamentos realizados'],
+].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="d">${k[2]}</div></div>`).join('');
 
-  // ---- Exposição
-  document.getElementById('tbExpo').innerHTML =
-   '<tr><th>Lote</th><th class="num">@ previstas</th><th class="num">Cts necessários</th><th class="num">Cts abertos</th><th class="num">Descoberto</th><th class="num">Creditado (realizado)</th><th>Status</th></tr>'+
-   expo.data.sort((a,b)=>a.codigo.localeCompare(b.codigo)).map(e=>{
-     const d=Number(e.cts_descobertos||0);
-     return `<tr><td><b>${e.codigo}</b></td><td class="num">${fmtN(e.arrobas_previstas)}</td>
-      <td class="num">${fmtN(e.cts_necessarios,2)}</td><td class="num">${fmtN(e.cts_abertos,2)}</td>
-      <td class="num ${d>0.1?'neg':'pos'}">${fmtN(d,2)}</td>
-      <td class="num ${cls(e.hedge_realizado_creditado)}">${fmtR$(e.hedge_realizado_creditado)}</td>
-      <td>${d>0.1?'<span class="badge b-red">Descoberto</span>':'<span class="badge b-green">Coberto</span>'}</td></tr>`;
-   }).join('');
+// ---- Exposição
+document.getElementById('tbExpo').innerHTML =
+'<tr><th>Lote</th><th class="num">@ previstas</th><th class="num">Cts necessários</th><th class="num">Cts abertos</th><th class="num">Descoberto</th><th class="num">Creditado (realizado)</th><th>Status</th></tr>'+
+expo.data.sort((a,b)=>a.codigo.localeCompare(b.codigo)).map(e=>{
+const d=Number(e.cts_descobertos||0);
+return `<tr><td><b>${e.codigo}</b></td><td class="num">${fmtN(e.arrobas_previstas)}</td>
+<td class="num">${fmtN(e.cts_necessarios,2)}</td><td class="num">${fmtN(e.cts_abertos,2)}</td>
+<td class="num ${d>0.1?'neg':'pos'}">${fmtN(d,2)}</td>
+<td class="num ${cls(e.hedge_realizado_creditado)}">${fmtR$(e.hedge_realizado_creditado)}</td>
+<td>${d>0.1?'<span class="badge b-red">Descoberto</span>':'<span class="badge b-green">Coberto</span>'}</td></tr>`;
+}).join('');
 
-  // ---- Posições B3 (hedge × especulação)
-  document.getElementById('tbPos').innerHTML =
-   '<tr><th>Contrato</th><th>Lado</th><th class="num">Cts</th><th class="num">Entrada</th><th class="num">Saída</th><th>Status</th><th class="num">Resultado líq.</th><th>Tipo</th><th>Negócio/Rateio</th></tr>'+
-   posicoes.data.map(p=>`<tr><td><b>${p.contrato}</b></td><td>${p.direcao==='comprado'?'Comprado':'Vendido'}</td>
-    <td class="num">${fmtN(p.contratos_qtd,2)}</td><td class="num">${fmtN(p.preco_entrada,2)}</td>
-    <td class="num">${p.preco_saida!=null?fmtN(p.preco_saida,2):'—'}</td>
-    <td>${['aberta','rolada'].includes(p.status)?'<span class="badge b-amber">Aberta</span>':'<span class="badge b-green">Encerrada</span>'}</td>
-    <td class="num ${cls(p.resultado_realizado)}">${fmtR$(p.resultado_realizado)}</td>
-    <td>${p.categoria==='especulacao'?'<span class="badge b-red">Especulação</span>':'<span class="badge b-green">Hedge</span>'}</td>
-    <td>${p.negocio_rateio&&p.negocio_rateio!=='ESPEC'?p.negocio_rateio:'—'}</td></tr>`).join('')
-   || '<tr><td colspan="9">Nenhuma posição</td></tr>';
+// ---- Posições B3 (hedge × especulação)
+document.getElementById('tbPos').innerHTML =
+'<tr><th>Contrato</th><th>Lado</th><th class="num">Cts</th><th class="num">Entrada</th><th class="num">Saída</th><th>Status</th><th class="num">Resultado líq.</th><th>Tipo</th><th>Negócio/Rateio</th></tr>'+
+posicoes.data.map(p=>{
+const lado = p.direcao==='comprado'?'Comprado':p.direcao==='termo'?'Termo':'Vendido';
+return `<tr><td><b>${p.contrato}</b></td><td>${lado}</td>
+<td class="num">${fmtN(p.contratos_qtd,2)}</td><td class="num">${fmtN(p.preco_entrada,2)}</td>
+<td class="num">${p.preco_saida!=null?fmtN(p.preco_saida,2):'—'}</td>
+<td>${['aberta','rolada'].includes(p.status)?'<span class="badge b-amber">Aberta</span>':'<span class="badge b-green">Encerrada</span>'}</td>
+<td class="num ${cls(p.resultado_realizado)}">${fmtR$(p.resultado_realizado)}</td>
+<td>${p.categoria==='especulacao'?'<span class="badge b-red">Especulação</span>':'<span class="badge b-green">Hedge</span>'}</td>
+<td>${p.negocio_rateio&&p.negocio_rateio!=='ESPEC'?p.negocio_rateio:'—'}</td></tr>`;
+}).join('')
+|| '<tr><td colspan="9">Nenhuma posição</td></tr>';
 
-  // ---- Estoque
-  document.getElementById('tbEstoque').innerHTML =
-   '<tr><th>Lote</th><th>Confinamento</th><th>Curral</th><th class="num">Cabeças</th><th>Desde</th><th class="num">Dias</th></tr>'+
-   estoque.data.sort((a,b)=>a.codigo.localeCompare(b.codigo)).map(e=>{
-     const dias = e.desde?Math.round((Date.now()-new Date(e.desde))/864e5):null;
-     return `<tr><td><b>${e.codigo}</b></td><td>${e.confinamento||'—'}</td><td>${e.curral||'—'}</td>
-      <td class="num">${fmtN(e.cabecas)}</td><td>${fmtD(e.desde)}</td><td class="num">${dias??'—'}</td></tr>`;
-   }).join('');
+// ---- Estoque
+document.getElementById('tbEstoque').innerHTML =
+'<tr><th>Lote</th><th>Confinamento</th><th>Curral</th><th class="num">Cabeças</th><th>Desde</th><th class="num">Dias</th></tr>'+
+estoque.data.sort((a,b)=>a.codigo.localeCompare(b.codigo)).map(e=>{
+const dias = e.desde?Math.round((Date.now()-new Date(e.desde))/864e5):null;
+return `<tr><td><b>${e.codigo}</b></td><td>${e.confinamento||'—'}</td><td>${e.curral||'—'}</td>
+<td class="num">${fmtN(e.cabecas)}</td><td>${fmtD(e.desde)}</td><td class="num">${dias??'—'}</td></tr>`;
+}).join('');
 
-  // ---- Pendências
-  document.getElementById('tbPend').innerHTML =
-   '<tr><th>Lote</th><th>Vendedor</th><th>Documento</th><th>Compra</th><th class="num">Cab</th><th class="num">Dias em aberto</th><th>Status</th></tr>'+
-   pend.data.sort((a,b)=>(a.operacoes?.codigo||'').localeCompare(b.operacoes?.codigo||'')).map(p=>{
-     const dias=Math.round((Date.now()-new Date(p.created_at))/864e5);
-     const compData = p.compras?.data;
-     return `<tr><td><b>${p.operacoes?.codigo||'—'}</b></td><td>${p.contatos?.nome||'<span class="badge b-amber">sem vendedor vinculado</span>'}</td>
-      <td>${p.tipo==='gta'?'GTA':'NF entrada'}</td><td>${fmtD(compData)}</td><td class="num">${p.compras?.quantidade??'—'}</td>
-      <td class="num">${dias}</td>
-      <td>${p.status==='aguardando_vendedor'?'<span class="badge b-red">Aguardando</span>':'<span class="badge b-green">'+p.status+'</span>'}</td></tr>`;
-   }).join('') || '<tr><td colspan="7">Nenhuma pendência 🎉</td></tr>';
+// ---- Pendências
+document.getElementById('tbPend').innerHTML =
+'<tr><th>Lote</th><th>Vendedor</th><th>Documento</th><th>Compra</th><th class="num">Cab</th><th class="num">Dias em aberto</th><th>Status</th></tr>'+
+pend.data.sort((a,b)=>(a.operacoes?.codigo||'').localeCompare(b.operacoes?.codigo||'')).map(p=>{
+const dias=Math.round((Date.now()-new Date(p.created_at))/864e5);
+const compData = p.compras?.data;
+return `<tr><td><b>${p.operacoes?.codigo||'—'}</b></td><td>${p.contatos?.nome||'<span class="badge b-amber">sem vendedor vinculado</span>'}</td>
+<td>${p.tipo==='gta'?'GTA':'NF entrada'}</td><td>${fmtD(compData)}</td><td class="num">${p.compras?.quantidade??'—'}</td>
+<td class="num">${dias}</td>
+<td>${p.status==='aguardando_vendedor'?'<span class="badge b-red">Aguardando</span>':'<span class="badge b-green">'+p.status+'</span>'}</td></tr>`;
+}).join('') || '<tr><td colspan="7">Nenhuma pendência 🎉</td></tr>';
 
-  // ---- Acertos
-  document.getElementById('tbAcertos').innerHTML =
-   '<tr><th>Lote</th><th>Confinamento</th><th class="num">Esperado</th><th class="num">Recebido</th><th class="num">Divergência</th><th>Status</th></tr>'+
-   acertos.data.sort((a,b)=>(a.operacoes?.codigo||'').localeCompare(b.operacoes?.codigo||'')).map(a=>`
-    <tr><td><b>${a.operacoes?.codigo||'—'}</b></td><td>${a.confinamentos?.nome||'—'}</td>
-     <td class="num">${fmtR$(a.esperado_calculado)}</td><td class="num">${fmtR$(a.valor_recebido)}</td>
-     <td class="num ${cls(a.divergencia)}">${a.valor_liquido!=null?fmtR$(a.divergencia):'—'}</td>
-     <td>${a.status==='aguardando'?'<span class="badge b-amber">Aguardando</span>':a.status==='divergente'?'<span class="badge b-red">Divergente</span>':'<span class="badge b-green">'+a.status+'</span>'}</td></tr>`).join('');
+// ---- Acertos
+document.getElementById('tbAcertos').innerHTML =
+'<tr><th>Lote</th><th>Confinamento</th><th class="num">Esperado</th><th class="num">Recebido</th><th class="num">Divergência</th><th>Status</th></tr>'+
+acertos.data.sort((a,b)=>(a.operacoes?.codigo||'').localeCompare(b.operacoes?.codigo||'')).map(a=>`
+<tr><td><b>${a.operacoes?.codigo||'—'}</b></td><td>${a.confinamentos?.nome||'—'}</td>
+<td class="num">${fmtR$(a.esperado_calculado)}</td><td class="num">${fmtR$(a.valor_recebido)}</td>
+<td class="num ${cls(a.divergencia)}">${a.valor_liquido!=null?fmtR$(a.divergencia):'—'}</td>
+<td>${a.status==='aguardando'?'<span class="badge b-amber">Aguardando</span>':a.status==='divergente'?'<span class="badge b-red">Divergente</span>':'<span class="badge b-green">'+a.status+'</span>'}</td></tr>`).join('');
 
-  // ---- Fluxo
-  const fl = fluxo.data;
-  let acc=0; const serie = fl.map(f=>{acc+=(f.tipo==='entrada'?1:-1)*Number(f.valor);return {d:f.data,v:acc,real:f.realizado,desc:f.descricao}});
-  const cut = serie.findIndex(s=>!s.real);
-  if(chart) chart.destroy();
-  Chart.defaults.color='#6b7f74';Chart.defaults.borderColor='#e3e9e5';
-  chart = new Chart(document.getElementById('chFluxo'),{type:'line',data:{
-    labels:serie.map(s=>fmtD(s.d)),
-    datasets:[
-     {label:'Realizado',data:serie.map((s,i)=>(cut<0||i<cut)?s.v:null),borderColor:'#059669',backgroundColor:'rgba(5,150,105,.07)',fill:true,pointRadius:0,borderWidth:2,tension:.2},
-     {label:'Projetado',data:serie.map((s,i)=>(cut>=0&&i>=cut-1)?s.v:null),borderColor:'#2563eb',borderDash:[6,4],pointRadius:0,borderWidth:2,tension:.2}]},
-    options:{interaction:{mode:'index',intersect:false},
-     plugins:{tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmtR$(c.raw),afterTitle:it=>serie[it[0].dataIndex]?.desc||''}}},
-     scales:{y:{ticks:{callback:v=>'R$'+(v/1e6).toFixed(1)+'M'}},x:{ticks:{maxTicksLimit:12}}}}});
+// ---- Fluxo
+const fl = fluxo.data;
+let acc=0; const serie = fl.map(f=>{acc+=(f.tipo==='entrada'?1:-1)*Number(f.valor);return {d:f.data,v:acc,real:f.realizado,desc:f.descricao}});
+const cut = serie.findIndex(s=>!s.real);
+if(chart) chart.destroy();
+Chart.defaults.color='#6b7f74';Chart.defaults.borderColor='#e3e9e5';
+chart = new Chart(document.getElementById('chFluxo'),{type:'line',data:{
+labels:serie.map(s=>fmtD(s.d)),
+datasets:[
+{label:'Realizado',data:serie.map((s,i)=>(cut<0||i<cut)?s.v:null),borderColor:'#059669',backgroundColor:'rgba(5,150,105,.07)',fill:true,pointRadius:0,borderWidth:2,tension:.2},
+{label:'Projetado',data:serie.map((s,i)=>(cut>=0&&i>=cut-1)?s.v:null),borderColor:'#2563eb',borderDash:[6,4],pointRadius:0,borderWidth:2,tension:.2}]},
+options:{interaction:{mode:'index',intersect:false},
+plugins:{tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmtR$(c.raw),afterTitle:it=>serie[it[0].dataIndex]?.desc||''}}},
+scales:{y:{ticks:{callback:v=>'R$'+(v/1e6).toFixed(1)+'M'}},x:{ticks:{maxTicksLimit:12}}}}});
 
-  const hoje=new Date().toISOString().slice(0,10);
-  const lim=new Date(Date.now()+90*864e5).toISOString().slice(0,10);
-  const prox=fl.filter(f=>!f.realizado&&f.data>=hoje&&f.data<=lim);
-  document.getElementById('tbProx').innerHTML='<tr><th>Data</th><th>Descrição</th><th class="num">Valor</th></tr>'+
-   prox.map(f=>`<tr><td>${fmtD(f.data)}</td><td class="wrap">${f.descricao||''}</td>
-    <td class="num ${f.tipo==='entrada'?'pos':'neg'}">${f.tipo==='entrada'?'+':'−'}${fmtR$(f.valor)}</td></tr>`).join('')
-   || '<tr><td colspan="3">Sem eventos projetados nos próximos 90 dias</td></tr>';
+const hoje=new Date().toISOString().slice(0,10);
+const lim=new Date(Date.now()+90*864e5).toISOString().slice(0,10);
+const prox=fl.filter(f=>!f.realizado&&f.data>=hoje&&f.data<=lim);
+document.getElementById('tbProx').innerHTML='<tr><th>Data</th><th>Descrição</th><th class="num">Valor</th></tr>'+
+prox.map(f=>`<tr><td>${fmtD(f.data)}</td><td class="wrap">${f.descricao||''}</td>
+<td class="num ${f.tipo==='entrada'?'pos':'neg'}">${f.tipo==='entrada'?'+':'−'}${fmtR$(f.valor)}</td></tr>`).join('')
+|| '<tr><td colspan="3">Sem eventos projetados nos próximos 90 dias</td></tr>';
 }
 
 CFAgro.authInit(carregar);
