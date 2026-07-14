@@ -46,9 +46,26 @@
     <div class="simgrid">
       <div class="fld"><label>Cabeças</label><input type="number" id="sQtd" value="50"></div>
       <div class="fld"><label>Peso vivo médio (kg)</label><input type="number" id="sPeso" value="510"></div>
+      <div class="fld"><label>Sexo</label><select id="sSexo" onchange="simular()"><option value="macho" selected>Macho</option><option value="femea">Fêmea</option></select></div>
       <div class="fld"><label>Compra por</label><select id="sModo" onchange="simular()"><option value="kg">R$/kg vivo</option><option value="arroba" selected>R$/@ (rend. combinado)</option></select></div>
+      <div class="fld"><label>Desconto de capim (compra)</label><select id="sModoDesc" onchange="simular()">
+        <option value="rc" selected>RC direto (%)</option>
+        <option value="sem">Sem desconto (50%)</option>
+        <option value="10kg">10 kg fixo</option>
+        <option value="700g">700 g/@</option>
+        <option value="800g">800 g/@</option>
+        <option value="1kg">1 kg/@</option>
+      </select></div>
       <div class="fld" id="fRend"><label>Rend. combinado (%)</label><input type="number" id="sRendC" value="50" step=".5"></div><!-- fld = campo padrão do DS -->
+      <div class="fld" id="fLimCapim" style="display:none"><label>Limite de capim (kg)</label><input type="number" id="sLimCapim" value="300" step="1"></div>
       <div class="fld"><label>Preço compra</label><input type="number" id="sPrecoC" value="300" step=".5"></div>
+      <div class="fld" id="fBezerroChk" style="display:none">
+        <label>Desconto bezerra</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:400;height:38px">
+          <input type="checkbox" id="sDescBezerro" onchange="simular()"> Aplicar desconto de bezerra
+        </label>
+      </div>
+      <div class="fld" id="fLimBezerro" style="display:none"><label>Limite bezerra (kg)</label><input type="number" id="sLimBezerro" value="280" step="1"></div>
       <div class="fld"><label>RC estimado no gancho (%)</label><input type="number" id="sRC" value="52" step=".5"></div>
       <div class="fld"><label>Preço gancho (R$/@)</label><input type="number" id="sPrecoV" value="330" step=".5"></div>
       <div class="fld"><label>Funrural na venda (%)</label><input type="number" id="sFun" value="1.5" step=".1"></div>
@@ -58,10 +75,41 @@
       <div class="fld"><label>Prazo recebimento (dias)</label><input type="number" id="sPrazoR" value="30"></div>
     </div>
     <div class="res" id="simRes"></div>
+    <div class="simgrid" style="margin-top:14px">
+      <div class="fld"><label>Vendedor (se já souber)</label><select id="sVendedor"><option value="">Selecionar vendedor…</option></select></div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap">
+      <button class="btn" onclick="registrarPrevisao()">📝 Registrar previsão</button>
+      <div style="font-size:12px;color:var(--muted)">Grava a negociação como previsão — ainda não é um lote real. Confirme no quadro "Previsões em aberto" abaixo quando fechar com o vendedor.</div>
+    </div>
+    <div class="msg" id="msgFechar"></div>
   </div>
+
+  <h2>Previsões / negociações em aberto</h2>
+  <div class="card scroll"><table id="tbPrevisoes"></table></div>
 
   <h2>Lotes — balança → gancho</h2>
   <div class="card scroll"><table id="tbLotes"></table></div>
+
+  <h2>Registrar abate — lote vendido ao frigorífico</h2>
+  <div class="card">
+    <div class="simgrid">
+      <div class="fld"><label>Lote</label><select id="vLote"></select></div>
+      <div class="fld"><label>Data do abate</label><input type="date" id="vData"></div>
+      <div class="fld"><label>Frigorífico</label><select id="vComprador"><option value="">Selecionar…</option></select></div>
+      <div class="fld"><label>Carcaça total (kg)</label><input type="number" id="vPesoCarc" step="1"></div>
+      <div class="fld"><label>Preço gancho (R$/@)</label><input type="number" id="vPrecoArroba" step=".5"></div>
+      <div class="fld"><label>Funrural (%)</label><input type="number" id="vFun" value="0.2" step=".1"></div>
+      <div class="fld"><label>Previsão de recebimento</label><input type="date" id="vPrazoRec"></div>
+      <div class="fld"><label>Outros custos do abate (R$)</label><input type="number" id="vOutrosCustos" value="0" step=".01"></div>
+      <div class="fld" style="grid-column:span 2"><label>Descrição dos custos</label><input type="text" id="vCustosObs" placeholder="ex: acompanhamento de abate - fulano, R$50/cab"></div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap">
+      <button class="btn" onclick="registrarAbate()">🥩 Registrar abate</button>
+      <div style="font-size:12px;color:var(--muted)">Grava a venda (vendas) ligada ao lote — some do OCR de romaneio da Plataforma de Abate, que é um sistema separado por enquanto. "Outros custos" cobre acompanhamento de abate ou qualquer outra despesa lançada nessa etapa.</div>
+    </div>
+    <div class="msg" id="msgAbate"></div>
+  </div>
 
   <h2>Contas a pagar (compras) e a receber (frigoríficos)</h2>
   <div class="card scroll" style="margin-bottom:14px"><table id="tbPagar"></table></div>
@@ -78,16 +126,55 @@
 <script>
 // db, fmtR$, fmtR$2, fmtN, fmtD, addDias, cls vêm do js/cfagro-core.js (DS)
 
+let CONTATOS_LIST = [];
+let PREVISOES = [];
+
+// ---------- DESCONTO DE CAPIM (mesma regra do Confinex — divisorCapim()/calcArrobas()) ----------
+function divisorCapim(modo){
+  if(modo==='700g') return 15/(15-0.7)*30;
+  if(modo==='800g') return 15/(15-0.8)*30;
+  if(modo==='1kg') return 15/(15-1)*30;
+  return null;
+}
+function arrobasCompraCapim(peso, modoDesc, rendC, limCapim, sexo, descBez, limBezerro){
+  const limB = parseFloat(limBezerro)||280;
+  const bezDesc = (sexo==='femea' && descBez && peso>=limB) ? 10/15 : 0; // -10/15 @ p/ bezerra, igual ao Confinex
+  if(modoDesc==='rc'){
+    return Math.max(0, peso*(rendC/100)/15 - bezDesc);
+  }
+  if(modoDesc==='sem'){
+    return Math.max(0, peso/2/15 - bezDesc); // igual ao Confinex: rendimento livre 50%, ignora limite de capim
+  }
+  const limC = parseFloat(limCapim)||300;
+  if(modoDesc==='10kg'){
+    const aplicar = peso>=limC;
+    const carcaca = peso*0.5;
+    const capimKg = aplicar ? 10 : 0;
+    return Math.max(0, (carcaca-capimKg)/15 - bezDesc);
+  }
+  const div = divisorCapim(modoDesc); // 700g/800g/1kg
+  if(peso<limC) return Math.max(0, peso/2/15 - bezDesc);
+  return Math.max(0, peso/div - bezDesc);
+}
+
 // ---------- SIMULADOR ----------
 function simular(){
   const g = id => Number(document.getElementById(id).value)||0;
   const qtd=g('sQtd'), peso=g('sPeso'), modo=document.getElementById('sModo').value;
+  const sexo=document.getElementById('sSexo').value;
+  const modoDesc=document.getElementById('sModoDesc').value;
   const rendC=g('sRendC'), precoC=g('sPrecoC'), rc=g('sRC'), precoV=g('sPrecoV');
+  const limCapim=g('sLimCapim'), limBezerro=g('sLimBezerro');
+  const descBez=document.getElementById('sDescBezerro').checked;
   const fun=g('sFun'), frete=g('sFrete'), outros=g('sOutros'), prazoP=g('sPrazoP'), prazoR=g('sPrazoR');
-  document.getElementById('fRend').style.display = modo==='arroba'?'block':'none';
+  document.getElementById('fRend').style.display = (modo==='arroba' && modoDesc==='rc') ? 'block':'none';
+  document.getElementById('fLimCapim').style.display = (modo==='arroba' && modoDesc!=='rc' && modoDesc!=='sem') ? 'block':'none';
+  document.getElementById('fBezerroChk').style.display = sexo==='femea' ? 'block':'none';
+  document.getElementById('fLimBezerro').style.display = (sexo==='femea' && descBez) ? 'block':'none';
   if(!qtd||!peso||!precoC||!precoV){document.getElementById('simRes').innerHTML='';return;}
-  const custoCab = modo==='kg' ? peso*precoC : peso*(rendC/100)/15*precoC;
-  const arrCarc = peso*(rc/100)/15;                       // @ de carcaça por cabeça
+  const arrCompraCab = modo==='arroba' ? arrobasCompraCapim(peso,modoDesc,rendC,limCapim,sexo,descBez,limBezerro) : null;
+  const custoCab = modo==='kg' ? peso*precoC : arrCompraCab*precoC;
+  const arrCarc = peso*(rc/100)/15;                       // @ de carcaça por cabeça (venda no gancho)
   const receitaCab = arrCarc*precoV;
   const funCab = receitaCab*fun/100;
   const custosCab = custoCab + frete/qtd + outros/qtd;
@@ -98,6 +185,7 @@ function simular(){
   const giroCaixa = prazoR - prazoP;
   document.getElementById('simRes').innerHTML = [
     ['Custo compra/cab', fmtR$2(custoCab)],
+    ...(modo==='arroba' ? [['@ compra/cab (c/ desconto)', fmtN(arrCompraCab,2)+' @']] : []),
     ['@ carcaça/cab', fmtN(arrCarc,2)+' @'],
     ['Receita líq./cab', fmtR$2(receitaCab-funCab)],
     ['Margem/cab', `<span class="${cls(margemCab)}">${fmtR$2(margemCab)}</span>`],
@@ -108,39 +196,223 @@ function simular(){
   ].map(r=>`<div class="r"><div class="l">${r[0]}</div><div class="v">${r[1]}</div></div>`).join('');
 }
 document.querySelectorAll('#sQtd,#sPeso,#sRendC,#sPrecoC,#sRC,#sPrecoV,#sFun,#sFrete,#sOutros,#sPrazoP,#sPrazoR').forEach(()=>{});
-['sQtd','sPeso','sRendC','sPrecoC','sRC','sPrecoV','sFun','sFrete','sOutros','sPrazoP','sPrazoR'].forEach(id=>document.getElementById(id).addEventListener('input',simular));
+['sQtd','sPeso','sRendC','sPrecoC','sRC','sPrecoV','sFun','sFrete','sOutros','sPrazoP','sPrazoR','sLimCapim','sLimBezerro'].forEach(id=>document.getElementById(id).addEventListener('input',simular));
+
+// ---------- PREVISÃO (negocios_boi_balanca) ----------
+async function registrarPrevisao(){
+  const msg=document.getElementById('msgFechar');
+  msg.textContent='';
+  const g = id => Number(document.getElementById(id).value)||0;
+  const qtd=g('sQtd'), peso=g('sPeso'), modo=document.getElementById('sModo').value, precoC=g('sPrecoC'), precoV=g('sPrecoV');
+  if(!qtd||!peso||!precoC||!precoV){ msg.textContent='Preencha cabeças, peso vivo, preço de compra e preço de gancho antes de registrar a previsão.'; return; }
+  const sexo=document.getElementById('sSexo').value;
+  const modoDesc=document.getElementById('sModoDesc').value;
+  const rendC=g('sRendC'), limCapim=g('sLimCapim'), limBezerro=g('sLimBezerro');
+  const descBez=document.getElementById('sDescBezerro').checked;
+  const rc=g('sRC'), fun=g('sFun'), frete=g('sFrete'), outros=g('sOutros'), prazoP=g('sPrazoP'), prazoR=g('sPrazoR');
+  const vendedorId=document.getElementById('sVendedor').value || null;
+
+  const arrCompraCab = modo==='arroba' ? arrobasCompraCapim(peso,modoDesc,rendC,limCapim,sexo,descBez,limBezerro) : null;
+  const custoCab = modo==='kg' ? peso*precoC : arrCompraCab*precoC;
+  const custoTotal = custoCab*qtd;
+  const arrCarc = peso*(rc/100)/15;
+  const receitaCab = arrCarc*precoV;
+  const funCab = receitaCab*fun/100;
+  const custosCab = custoCab + frete/qtd + outros/qtd;
+  const margemCab = receitaCab - funCab - custosCab;
+  const margemTotal = margemCab*qtd;
+
+  const payload = {
+    status: 'previsto',
+    quantidade: qtd,
+    peso_vivo_medio: peso,
+    sexo,
+    modo_compra: modo,
+    modo_desconto_capim: modo==='arroba' ? modoDesc : null,
+    rend_combinado: (modo==='arroba' && modoDesc==='rc') ? rendC : null,
+    limite_capim: (modo==='arroba' && modoDesc!=='rc') ? limCapim : null,
+    desconto_bezerra: descBez,
+    limite_bezerra: sexo==='femea' ? limBezerro : null,
+    preco_compra: precoC,
+    rc_estimado_gancho: rc,
+    preco_gancho: precoV,
+    funrural_pct: fun,
+    frete_total: frete,
+    outros_custos: outros,
+    prazo_pagamento_dias: prazoP,
+    prazo_recebimento_dias: prazoR,
+    vendedor_id: vendedorId,
+    arrobas_compra_cab: arrCompraCab,
+    custo_compra_cab: custoCab,
+    custo_compra_total: Math.round(custoTotal*100)/100,
+    margem_cab_prevista: Math.round(margemCab*100)/100,
+    margem_total_prevista: Math.round(margemTotal*100)/100
+  };
+  const {error} = await db.from('negocios_boi_balanca').insert(payload);
+  if(error){ msg.textContent='Erro ao registrar previsão: '+error.message; return; }
+  msg.textContent='✓ Previsão registrada — confirme no quadro "Previsões em aberto" quando fechar com o vendedor.';
+  carregar();
+}
+
+async function proximoCodigoBB(){
+  const hoje=new Date();
+  const yymm=String(hoje.getFullYear()).slice(-2)+String(hoje.getMonth()+1).padStart(2,'0');
+  const prefixo='BB'+yymm+'-';
+  const {data,error}=await db.from('operacoes').select('codigo').ilike('codigo',prefixo+'%');
+  if(error) throw error;
+  const nums=(data||[]).map(o=>parseInt((o.codigo||'').slice(prefixo.length),10)||0);
+  const prox=(nums.length?Math.max(...nums):0)+1;
+  return prefixo+String(prox).padStart(2,'0');
+}
+
+async function confirmarPrevisao(id){
+  const n = PREVISOES.find(x=>x.id===id);
+  if(!n){ alert('Previsão não encontrada — atualize a página.'); return; }
+  let codigo;
+  try{ codigo = await proximoCodigoBB(); }
+  catch(e){ alert('Erro ao gerar código do lote: '+e.message); return; }
+
+  if(!confirm(`Confirmar negócio ${codigo}: ${n.quantidade} cab. × ${fmtN(n.peso_vivo_medio)} kg — Valor total ${fmtR$(n.custo_compra_total)}?\nIsso cria um LOTE REAL no banco (operações + compras).`)) return;
+
+  const {data:op, error:e1} = await db.from('operacoes').insert({
+    codigo, tipo_negocio:'boi_balanca', status:'comprada',
+    obs:'Confirmado a partir de previsão do simulador web (bb.html)'
+  }).select().single();
+  if(e1){ alert('Erro ao criar operação: '+e1.message); return; }
+
+  const {error:e2} = await db.from('compras').insert({
+    operacao_id: op.id,
+    data: new Date().toISOString().slice(0,10),
+    vendedor_id: n.vendedor_id,
+    quantidade: n.quantidade,
+    peso_total_kg: Math.round(n.peso_vivo_medio*n.quantidade),
+    preco_arroba: n.modo_compra==='arroba' ? n.preco_compra : null,
+    valor_total: n.custo_compra_total,
+    prazo_dias: n.prazo_pagamento_dias||0,
+    pago: false
+  });
+  if(e2){ alert(`Operação ${codigo} foi criada, mas a compra falhou (confira/apague manualmente se preciso): `+e2.message); return; }
+
+  const {error:e3} = await db.from('negocios_boi_balanca').update({
+    status:'confirmado', operacao_id: op.id, confirmado_em: new Date().toISOString()
+  }).eq('id', id);
+  if(e3){ alert('O lote foi criado, mas não consegui marcar a previsão como confirmada: '+e3.message); }
+
+  alert('✓ Negócio fechado: '+codigo);
+  carregar();
+}
+
+async function cancelarPrevisao(id){
+  if(!confirm('Cancelar esta previsão? (não apaga, só marca como cancelada)'))return;
+  const {error}=await db.from('negocios_boi_balanca').update({status:'cancelado'}).eq('id',id);
+  if(error)alert('Erro: '+error.message); else carregar();
+}
+
+// ---------- REGISTRAR ABATE (venda) ----------
+let LOTES_AGUARDANDO = [];
+async function registrarAbate(){
+  const msg=document.getElementById('msgAbate');
+  msg.textContent='';
+  const operacaoId=document.getElementById('vLote').value;
+  const dataAbate=document.getElementById('vData').value;
+  const compradorId=document.getElementById('vComprador').value||null;
+  const pesoCarc=Number(document.getElementById('vPesoCarc').value)||0;
+  const precoArroba=Number(document.getElementById('vPrecoArroba').value)||0;
+  const fun=Number(document.getElementById('vFun').value)||0;
+  const prazoRec=document.getElementById('vPrazoRec').value||null;
+  const outrosCustos=Number(document.getElementById('vOutrosCustos').value)||0;
+  const custosObs=document.getElementById('vCustosObs').value.trim()||null;
+  if(!operacaoId){ msg.textContent='Selecione o lote.'; return; }
+  if(!dataAbate){ msg.textContent='Informe a data do abate.'; return; }
+  if(!pesoCarc||!precoArroba){ msg.textContent='Preencha carcaça total e preço do gancho.'; return; }
+
+  const arrobas = pesoCarc/15;
+  const valorBruto = Math.round(arrobas*precoArroba*100)/100;
+  const funruralValor = Math.round(valorBruto*fun/100*100)/100;
+  const lote = LOTES_AGUARDANDO.find(o=>o.id===operacaoId);
+
+  if(!confirm(`Registrar abate do lote ${lote?lote.codigo:''}: ${fmtN(pesoCarc)} kg carcaça × R$${fmtN(precoArroba,2)}/@ = ${fmtR$(valorBruto)} bruto`+(outrosCustos?` (outros custos: ${fmtR$(outrosCustos)})`:'')+`?`)) return;
+
+  const {error}=await db.from('vendas').insert({
+    operacao_id: operacaoId,
+    data_abate: dataAbate,
+    comprador_id: compradorId,
+    peso_carcaca_total: pesoCarc,
+    preco_arroba: precoArroba,
+    valor_bruto: valorBruto,
+    funrural: funruralValor,
+    recebido: false,
+    prazo_recebimento: prazoRec,
+    outros_custos: outrosCustos,
+    custos_obs: custosObs
+  });
+  if(error){ msg.textContent='Erro ao registrar abate: '+error.message; return; }
+  msg.textContent='✓ Abate registrado — o lote passa a aparecer como Abatido e entra em Contas a receber.';
+  document.getElementById('vPesoCarc').value='';
+  document.getElementById('vPrecoArroba').value='';
+  document.getElementById('vOutrosCustos').value='0';
+  document.getElementById('vCustosObs').value='';
+  carregar();
+}
 
 // ---------- DADOS ----------
 async function carregar(){
   document.getElementById('subtitle').textContent='Carregando...';
-  const [ops, compras, vendas, pend, contatos] = await Promise.all([
+  const [ops, compras, vendas, pend, contatos, previsoes] = await Promise.all([
     db.from('operacoes').select('id,codigo,status,obs').eq('tipo_negocio','boi_balanca'),
     db.from('compras').select('*'),
     db.from('vendas').select('*'),
     db.from('pendencias_documentos').select('id,tipo,status,operacao_id,created_at'),
-    db.from('contatos').select('id,nome')
+    db.from('contatos').select('id,nome'),
+    db.from('negocios_boi_balanca').select('*').eq('status','previsto').order('created_at',{ascending:false})
   ]);
-  const errs=[ops,compras,vendas,pend,contatos].filter(r=>r.error);
+  const errs=[ops,compras,vendas,pend,contatos,previsoes].filter(r=>r.error);
   if(errs.length){ document.getElementById('subtitle').textContent='Erro: '+errs[0].error.message; return; }
   const nome = Object.fromEntries(contatos.data.map(c=>[c.id,c.nome]));
+  CONTATOS_LIST = contatos.data;
+  document.getElementById('sVendedor').innerHTML = '<option value="">Selecionar vendedor…</option>'+
+    CONTATOS_LIST.slice().sort((a,b)=>a.nome.localeCompare(b.nome)).map(c=>`<option value="${c.id}">${c.nome}</option>`).join('');
   const bbIds = new Set(ops.data.map(o=>o.id));
   const cs = compras.data.filter(c=>bbIds.has(c.operacao_id));
   const vs = vendas.data.filter(v=>bbIds.has(v.operacao_id));
   const ps = pend.data.filter(p=>bbIds.has(p.operacao_id) && !['validado','cancelado'].includes(p.status));
   const ativos = ops.data.filter(o=>o.status!=='cancelada');
 
+  PREVISOES = previsoes.data;
+  document.getElementById('tbPrevisoes').innerHTML =
+   '<tr><th>Registrada em</th><th>Vendedor</th><th class="num">Cab</th><th class="num">Peso vivo (kg)</th><th class="num">Preço compra</th><th class="num">Valor previsto</th><th class="num">Margem prevista</th><th></th></tr>'+
+   PREVISOES.map(n=>`<tr><td>${fmtD((n.created_at||'').slice(0,10))}</td><td>${nome[n.vendedor_id]||'—'}</td>
+    <td class="num">${fmtN(n.quantidade)}</td><td class="num">${fmtN(n.peso_vivo_medio)}</td>
+    <td class="num">${fmtN(n.preco_compra,2)}</td><td class="num">${fmtR$(n.custo_compra_total)}</td>
+    <td class="num ${cls(n.margem_total_prevista)}">${fmtR$(n.margem_total_prevista)}</td>
+    <td><button class="btn mini" onclick="confirmarPrevisao('${n.id}')">✓ Confirmar</button> <button class="btn mini sec" onclick="cancelarPrevisao('${n.id}')">✗ Cancelar</button></td></tr>`).join('')
+   || '<tr><td colspan="8">Nenhuma previsão em aberto — use o simulador acima e clique em "Registrar previsão"</td></tr>';
+
   document.getElementById('subtitle').textContent =
     `Atualizado ${new Date().toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})} · ${ativos.length} lotes`;
 
   // KPIs
   const emAndamento = ativos.filter(o=>!vs.some(v=>v.operacao_id===o.id));
+
+  // Registrar abate — popula lote e frigorífico, mantém o que já estava digitado
+  LOTES_AGUARDANDO = emAndamento;
+  const vLoteAtual = document.getElementById('vLote').value;
+  document.getElementById('vLote').innerHTML = '<option value="">Selecionar lote…</option>'+
+    emAndamento.slice().sort((a,b)=>b.codigo.localeCompare(a.codigo)).map(o=>`<option value="${o.id}">${o.codigo}</option>`).join('');
+  if(emAndamento.some(o=>o.id===vLoteAtual)) document.getElementById('vLote').value=vLoteAtual;
+  const vCompradorAtual = document.getElementById('vComprador').value;
+  document.getElementById('vComprador').innerHTML = '<option value="">Selecionar…</option>'+
+    CONTATOS_LIST.slice().sort((a,b)=>a.nome.localeCompare(b.nome)).map(c=>`<option value="${c.id}">${c.nome}</option>`).join('');
+  document.getElementById('vComprador').value=vCompradorAtual;
+  if(!document.getElementById('vData').value) document.getElementById('vData').value=new Date().toISOString().slice(0,10);
+  if(!document.getElementById('vPrazoRec').value) document.getElementById('vPrazoRec').value=addDias(new Date().toISOString().slice(0,10),30);
   const cab = cs.filter(c=>emAndamento.some(o=>o.id===c.operacao_id)).reduce((s,c)=>s+Number(c.quantidade||0),0);
   const aPagar = cs.filter(c=>!c.pago && ativos.some(o=>o.id===c.operacao_id)).reduce((s,c)=>s+Number(c.valor_total||0),0);
   const aReceber = vs.filter(v=>!v.recebido).reduce((s,v)=>s+Number(v.valor_bruto||0)-Number(v.funrural||0),0);
   const margemReal = ativos.reduce((s,o)=>{
     const c=cs.find(x=>x.operacao_id===o.id), v=vs.find(x=>x.operacao_id===o.id);
     if(!c||!v)return s;
-    return s + (Number(v.valor_bruto||0)-Number(v.funrural||0)-Number(c.valor_total||0));
+    return s + (Number(v.valor_bruto||0)-Number(v.funrural||0)-Number(v.outros_custos||0)-Number(c.valor_total||0));
   },0);
   document.getElementById('kpis').innerHTML = [
     ['Lotes em andamento', emAndamento.length, cab+' cabeças aguardando abate'],
@@ -157,7 +429,7 @@ async function carregar(){
      const c=cs.find(x=>x.operacao_id===o.id)||{};
      const v=vs.find(x=>x.operacao_id===o.id);
      const rc = v&&c.peso_total_kg? v.peso_carcaca_total/c.peso_total_kg*100 : null;
-     const margem = v? Number(v.valor_bruto||0)-Number(v.funrural||0)-Number(c.valor_total||0) : null;
+     const margem = v? Number(v.valor_bruto||0)-Number(v.funrural||0)-Number(v.outros_custos||0)-Number(c.valor_total||0) : null;
      return `<tr><td><b>${o.codigo}</b></td><td>${fmtD(c.data)}</td><td>${nome[c.vendedor_id]||'—'}</td>
       <td class="num">${fmtN(c.quantidade)}</td><td class="num">${fmtN(c.peso_total_kg)}</td>
       <td class="num">${fmtN(c.preco_arroba,2)}</td><td class="num">${fmtR$(c.valor_total)}</td>
@@ -167,7 +439,7 @@ async function carregar(){
       <td class="num">${v?fmtN(v.preco_arroba,2):'—'}</td>
       <td class="num ${cls(margem)}">${margem!=null?fmtR$(margem):'—'}</td>
       <td>${v?'<span class="badge b-green">Abatido</span>':'<span class="badge b-amber">Aguardando abate</span>'}</td></tr>`;
-   }).join('') || '<tr><td colspan="14">Nenhum lote ainda — registre a primeira compra pelo Juan no grupo Boi Balança</td></tr>';
+   }).join('') || '<tr><td colspan="14">Nenhum lote ainda — registre uma previsão no simulador acima e confirme, ou registre pelo Juan no grupo Boi Balança</td></tr>';
 
   // A pagar
   const pagarRows = cs.filter(c=>ativos.some(o=>o.id===c.operacao_id));
