@@ -1,11 +1,15 @@
 /* ============================================================
    CFAgro shell — sidebar fixa de navegação (mesma em todo módulo).
    Carregar com defer em toda página do ecossistema (exceto as
-   ainda fora do DS: confinex.html e ocr-pesagem.html).
+   ainda fora do DS: confinex.html e ocr-pesagem.html), e também no
+   boi-gordo-portfolio (repo separado) para manter a navegação
+   consistente — por isso os links são absolutos, não relativos.
    Estilos: design/components.css (seção Shell). Docs: DESIGN.md
    ============================================================ */
 (function(){
 'use strict';
+
+var BASE = 'https://pablofaraujo.github.io/Confinex/';
 
 var NAV = [
   { href:'./',              rotulo:'Visão Geral',  icone:'⌂' },
@@ -28,6 +32,11 @@ var NAV = [
   { href:'./ops.html',      rotulo:'Agentes / Ops', icone:'⚙️' }
 ];
 
+function resolveHref(href){
+  if(/^https?:\/\//.test(href)) return href;
+  return BASE + href.replace(/^\.\//,'');
+}
+
 function montar(){
   if(document.body.classList.contains('has-shell')) return;
 
@@ -36,19 +45,26 @@ function montar(){
   main.className = 'shell-content';
   while(document.body.firstChild) main.appendChild(document.body.firstChild);
 
-  // monta a sidebar
-  var aqui = location.pathname.split('/').pop() || 'index.html';
+  // detecta se estamos num repo/app externo (ex.: boi-gordo-portfolio) —
+  // nesse caso nenhum link "interno" bate por nome de arquivo, e o próprio
+  // item externo correspondente fica marcado como atual
+  var onPortfolio = /\/boi-gordo-portfolio\//.test(location.pathname);
+  var aqui = onPortfolio ? '' : (location.pathname.split('/').pop() || 'index.html');
+
   var aside = document.createElement('aside');
   aside.className = 'shell-side';
   aside.innerHTML =
-    '<a class="shell-logo" href="./"><img src="./confinex-logo.jpg" alt=""><b>CFAgro</b></a>' +
+    '<a class="shell-logo" href="'+BASE+'"><img src="'+BASE+'confinex-logo.jpg" alt=""><b>CFAgro</b></a>' +
     NAV.map(function(n){
       if(n.sec) return '<div class="shell-sec">'+n.sec+'</div>';
-      var arquivo = n.href.split('#')[0].split('/').pop() || 'index.html';
-      var ativa = !n.ext && n.href.indexOf('#')<0 && arquivo===aqui ? ' ativa' : '';
+      var full = resolveHref(n.href);
+      var arquivo = full.split('#')[0].split('/').pop() || 'index.html';
+      var ativa = onPortfolio
+        ? (n.ext ? ' ativa' : '')
+        : (!n.ext && n.href.indexOf('#')<0 && arquivo===aqui ? ' ativa' : '');
       var alvo = n.ext ? ' target="_blank" rel="noopener"' : '';
       var ext = n.ext ? '<span class="ext">↗</span>' : '';
-      return '<a class="shell-link'+ativa+'" href="'+n.href+'"'+alvo+'><span>'+n.icone+'</span>'+n.rotulo+ext+'</a>';
+      return '<a class="shell-link'+ativa+'" href="'+full+'"'+alvo+'><span>'+n.icone+'</span>'+n.rotulo+ext+'</a>';
     }).join('');
 
   document.body.prepend(aside);
