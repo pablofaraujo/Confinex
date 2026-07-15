@@ -83,54 +83,29 @@
       <div style="display:flex;gap:12px;margin-top:12px;align-items:flex-end;flex-wrap:wrap">
         <button class="btn" onclick="aprovarFolha()">✓ Aprovar e criar abate</button>
         <button class="btn sec" onclick="cancelarFolha()">descartar leitura</button>
-        <div class="fld" style="max-width:210px"><label>Manejo (todos os animais)</label><select id="ocrRacao"><option value="true">Confinado c/ ração</option><option value="false">Pasto</option></select></div>
         <span class="sub" id="ocrResumo"></span>
       </div>
     </div>
   </div>
 
-  <h2>Abate selecionado — passagem animal a animal</h2>
+  <h2>Abate selecionado — romaneio animal a animal</h2>
   <div class="card" id="cardAnimais">
     <div class="sub" id="abateSel" style="margin-bottom:12px">Nenhum abate selecionado. Crie um acima ou escolha no histórico.</div>
     <div id="formAnimal" style="display:none">
       <div class="simgrid">
         <div class="fld"><label>Brinco / nº</label><input type="text" id="aBrinco"></div>
-        <div class="fld"><label>Peso balança (kg)</label><input type="number" id="aPeso" step="1"></div>
-        <div class="fld"><label>Tipo</label><select id="aTipo"><option value="macho">Macho</option><option value="femea">Fêmea</option></select></div>
-        <div class="fld"><label>Categoria</label><select id="aCat"><option value="boi">Boi</option><option value="novilha">Novilha</option><option value="vaca">Vaca</option><option value="bezerro">Bezerro</option></select></div>
-        <div class="fld"><label>Ração?</label><select id="aRacao"><option value="false">Pasto</option><option value="true">Confinado c/ ração</option></select></div>
-        <div class="fld"><label>Acabamento (0–5)</label><select id="aNota">
-          <option value="">—</option>
-          <option value="0">0 · magro</option>
-          <option value="1">1 · escassa</option>
-          <option value="2">2 · mediana</option>
-          <option value="3" selected>3 · uniforme (ideal)</option>
-          <option value="4">4 · excessiva</option>
-          <option value="5">5 · gordo demais</option>
-        </select></div>
-        <div class="fld"><label>Carcaça (kg)</label><input type="number" id="aCarc" step="1" placeholder="opcional"></div>
-        <div class="fld"><label>Penalização</label><select id="aPen">
-          <option value="">nenhuma</option>
-          <option value="magro">magro</option>
-          <option value="hematoma">hematoma/contusão</option>
-          <option value="abscesso">abscesso</option>
-          <option value="aspa">aspa/chifre</option>
-          <option value="sujo">sujo</option>
-          <option value="denticao">dentição/idade</option>
-          <option value="fora_padrao">fora do padrão</option>
-        </select></div>
-        <div class="fld"><label>Penal. R$</label><input type="number" id="aPenV" step=".01" value="0"></div>
-        <div class="fld"><label>Doença</label><select id="aDoenca">
-          <option value="">nenhuma</option>
-          <option value="fasciola">fasciola (bicho do fígado)</option>
-          <option value="cisticercose">cisticercose</option>
-          <option value="tuberculose">tuberculose</option>
-          <option value="hidatidose">hidatidose</option>
-          <option value="abscesso">abscesso</option>
-          <option value="contaminacao">contaminação</option>
-        </select></div>
-        <div class="fld"><label>Condenação</label><select id="aCond"><option value="">—</option><option value="parcial">parcial</option><option value="total">total</option></select></div>
-        <div class="fld" style="display:flex;align-items:flex-end"><button class="btn" style="width:100%" onclick="addAnimal()">+ Registrar passagem</button></div>
+        <div class="fld"><label>Descrição</label><input type="text" id="aDescricao" placeholder="ex: Boi, macho, gordo"></div>
+        <div class="fld"><label>Classificação</label><input type="text" id="aClassificacao" placeholder="ex: B / dianteiro / conforme romaneio"></div>
+        <div class="fld"><label>Meia carcaça esq. (kg)</label><input type="number" id="aMeiaEsq" step=".1"></div>
+        <div class="fld"><label>Meia carcaça dir. (kg)</label><input type="number" id="aMeiaDir" step=".1"></div>
+        <div class="fld"><label>Peso carcaça total (kg)</label><input type="number" id="aPeso" step=".1" placeholder="soma das meias, se souber"></div>
+        <div class="fld"><label>R$/kg</label><input type="number" id="aVlrKg" step=".01"></div>
+        <div class="fld"><label>R$/@</label><input type="number" id="aVlrArroba" step=".01"></div>
+        <div class="fld"><label>Valor total (R$)</label><input type="number" id="aVlrTotal" step=".01" placeholder="calculado, ajustável"></div>
+        <div class="fld"><label>Bônus (R$)</label><input type="number" id="aBonus" step=".01" value="0"></div>
+        <div class="fld"><label>Penalização (R$)</label><input type="number" id="aPenalizacao" step=".01" value="0"></div>
+        <div class="fld"><label>Condenação / ocorrência</label><input type="text" id="aCondenacao" placeholder="ex: hematoma, condenação parcial..."></div>
+        <div class="fld" style="display:flex;align-items:flex-end"><button class="btn" style="width:100%" onclick="addAnimal()">+ Registrar animal</button></div>
       </div>
       <div class="err" id="animalErr"></div>
       <div class="card scroll" style="margin-top:14px"><table id="tbAnimais"></table></div>
@@ -153,15 +128,10 @@
 let ABATES=[], ANIMAIS=[], SEL=null;
 
 const ORIGEM_LABEL = {fazenda:'Fazenda própria', ricardo:'Parceria Ricardo', xande:'Parceria Xande', wilson:'Wilson'};
-const NOTA_LABEL = {0:'0 magro',1:'1 escassa',2:'2 mediana',3:'3 uniforme',4:'4 excessiva',5:'5 gordo'};
 
-function badgeNota(n){
-  if(n==null||n==='') return '—';
-  const c = n==3 ? 'b-green' : (n<=1 ? 'b-red' : (n>=5 ? 'b-amber' : 'b-blue'));
-  return `<span class="badge ${c}">${NOTA_LABEL[n]||n}</span>`;
-}
-const rc = a => (a.peso_carcaca && a.peso_balanca) ? a.peso_carcaca/a.peso_balanca*100 : null;
-const arr = a => a.peso_carcaca ? a.peso_carcaca/15 : null;
+// peso_kg = peso de carcaça (o schema de abate_animais não guarda peso vivo/balança
+// nem hora de passagem — é o romaneio do frigorífico, animal a animal)
+const arr = a => a.peso_kg ? a.peso_kg/15 : null;
 
 async function carregar(){
   document.getElementById('subtitle').textContent='Carregando...';
@@ -169,7 +139,7 @@ async function carregar(){
   if(!document.getElementById('nData').value) document.getElementById('nData').value=hoje;
   const [ab, an] = await Promise.all([
     db.from('abates').select('*').order('data_abate',{ascending:false}),
-    db.from('abate_animais').select('*').order('hora_passagem',{ascending:true})
+    db.from('abate_animais').select('*').order('seq',{ascending:true})
   ]);
   if(ab.error||an.error){ document.getElementById('subtitle').textContent='Erro: '+((ab.error||an.error).message); return; }
   ABATES=ab.data||[]; ANIMAIS=an.data||[];
@@ -182,28 +152,26 @@ async function carregar(){
 function renderKpis(){
   const cab=ANIMAIS.length;
   const arrTot=ANIMAIS.reduce((s,a)=>s+(arr(a)||0),0);
-  const pb=ANIMAIS.reduce((s,a)=>s+Number(a.peso_balanca||0),0);
-  const pc=ANIMAIS.reduce((s,a)=>s+Number(a.peso_carcaca||0),0);
-  const rcMed = pb? pc/pb*100 : 0;
-  const comNota=ANIMAIS.filter(a=>a.nota_acabamento!=null);
-  const notaMed = comNota.length? comNota.reduce((s,a)=>s+Number(a.nota_acabamento),0)/comNota.length : 0;
-  const penal=ANIMAIS.reduce((s,a)=>s+Number(a.penalizacao_valor||0),0);
+  const pc=ANIMAIS.reduce((s,a)=>s+Number(a.peso_kg||0),0);
+  const valorTot=ANIMAIS.reduce((s,a)=>s+Number(a.vlr_total||0),0);
+  const bonusTot=ANIMAIS.reduce((s,a)=>s+Number(a.bonus||0),0);
+  const penal=ANIMAIS.reduce((s,a)=>s+Number(a.penalizacao||0),0);
   const cond=ANIMAIS.filter(a=>a.condenacao).length;
   document.getElementById('kpis').innerHTML=[
     ['Abates', ABATES.length, 'registrados'],
-    ['Cabeças', cab, 'passaram pela balança'],
+    ['Cabeças', cab, 'no romaneio'],
     ['Arrobas', fmtN(arrTot,1)+' @', 'carcaça total'],
-    ['RC médio', pc? fmtN(rcMed,2)+'%':'—', 'gancho ÷ balança'],
-    ['Nota média', comNota.length? fmtN(notaMed,2):'—', 'acabamento 0–5'],
+    ['Valor total', fmtR$(valorTot), 'romaneios lançados'],
+    ['Bônus', fmtR$(bonusTot), 'prêmios no gancho'],
     ['Penalizações', fmtR$(penal), 'descontos no gancho'],
-    ['Condenações', cond, 'parciais/totais'],
+    ['Condenações/ocorrências', cond, 'linhas com observação'],
   ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="d">${k[2]}</div></div>`).join('');
 }
 
 async function criarAbate(){
   const g=id=>document.getElementById(id).value;
   const rec={ data_abate:g('nData')||null, frigorifico:g('nFrig')||null, origem:g('nOrigem'),
-              romaneio:g('nRom')||null, gta:g('nGta')||null };
+    romaneio:g('nRom')||null, gta:g('nGta')||null };
   if(!rec.data_abate){ document.getElementById('msgAbate').className='err'; document.getElementById('msgAbate').textContent='Informe a data.'; return; }
   const {data,error}=await db.from('abates').insert(rec).select().single();
   if(error){ document.getElementById('msgAbate').className='err'; document.getElementById('msgAbate').textContent='Erro: '+error.message; return; }
@@ -223,107 +191,114 @@ function selecionar(id){
   document.getElementById('cardAnimais').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
+// auto-completa peso total (soma das meias) e valor total (peso × R$/kg) —
+// só quando o campo de destino está vazio, nunca sobrescreve o que o usuário digitou
+function autoCalcAnimal(){
+  const esq=Number(document.getElementById('aMeiaEsq').value)||0;
+  const dir=Number(document.getElementById('aMeiaDir').value)||0;
+  const pesoEl=document.getElementById('aPeso');
+  if((esq||dir) && !pesoEl.value) pesoEl.value = Math.round((esq+dir)*100)/100;
+  const vlrKgEl=document.getElementById('aVlrKg'), vlrArrEl=document.getElementById('aVlrArroba');
+  const vlrKg=Number(vlrKgEl.value)||0, vlrArr=Number(vlrArrEl.value)||0;
+  if(vlrArr && !vlrKgEl.value) vlrKgEl.value = Math.round(vlrArr/15*100)/100;
+  if(vlrKg && !vlrArrEl.value) vlrArrEl.value = Math.round(vlrKg*15*100)/100;
+  const peso=Number(pesoEl.value)||0;
+  const vlrTotalEl=document.getElementById('aVlrTotal');
+  const precoKg=Number(vlrKgEl.value)||0;
+  if(peso && precoKg && !vlrTotalEl.value) vlrTotalEl.value = Math.round(peso*precoKg*100)/100;
+}
+['aMeiaEsq','aMeiaDir','aPeso','aVlrKg','aVlrArroba'].forEach(id=>document.getElementById(id).addEventListener('change',autoCalcAnimal));
+
 async function addAnimal(){
   if(!SEL){ return; }
   const g=id=>document.getElementById(id).value;
   const num=id=>{const v=g(id);return v===''?null:Number(v);};
+  const proxSeq = (ANIMAIS.filter(a=>a.abate_id===SEL).reduce((m,a)=>Math.max(m,Number(a.seq)||0),0))+1;
   const rec={
-    abate_id:SEL, brinco:g('aBrinco')||null, peso_balanca:num('aPeso'),
-    hora_passagem:new Date().toISOString(), tipo:g('aTipo'), categoria:g('aCat'),
-    com_racao:g('aRacao')==='true', nota_acabamento:g('aNota')===''?null:Number(g('aNota')),
-    peso_carcaca:num('aCarc'), penalizacao_tipo:g('aPen')||null, penalizacao_valor:num('aPenV')||0,
-    doenca_tipo:g('aDoenca')||null, condenacao:g('aCond')||null
+    abate_id:SEL, seq:proxSeq, brinco:g('aBrinco')||null, descricao:g('aDescricao')||null,
+    classificacao:g('aClassificacao')||null,
+    meia_esq_kg:num('aMeiaEsq'), meia_dir_kg:num('aMeiaDir'), peso_kg:num('aPeso'),
+    vlr_kg:num('aVlrKg'), vlr_arroba:num('aVlrArroba'), vlr_total:num('aVlrTotal'),
+    bonus:num('aBonus')||0, penalizacao:num('aPenalizacao')||0, condenacao:g('aCondenacao')||null
   };
-  if(!rec.peso_balanca){ document.getElementById('animalErr').textContent='Informe o peso da balança.'; return; }
+  if(!rec.peso_kg && !rec.meia_esq_kg && !rec.meia_dir_kg){ document.getElementById('animalErr').textContent='Informe ao menos o peso de carcaça (ou as duas meias).'; return; }
   document.getElementById('animalErr').textContent='';
   const {error}=await db.from('abate_animais').insert(rec);
   if(error){ document.getElementById('animalErr').textContent='Erro: '+error.message; return; }
-  ['aBrinco','aPeso','aCarc'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('aPen').value=''; document.getElementById('aPenV').value='0';
-  document.getElementById('aDoenca').value=''; document.getElementById('aCond').value='';
+  ['aBrinco','aDescricao','aClassificacao','aMeiaEsq','aMeiaDir','aPeso','aVlrKg','aVlrArroba','aVlrTotal','aCondenacao'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('aBonus').value='0'; document.getElementById('aPenalizacao').value='0';
   document.getElementById('aBrinco').focus();
   await carregar();
 }
 
-async function setCarcaca(id){
+async function setPeso(id){
   const v=prompt('Peso de carcaça (kg) no gancho:');
   if(v===null) return;
-  const {error}=await db.from('abate_animais').update({peso_carcaca:Number(v)||null}).eq('id',id);
+  const {error}=await db.from('abate_animais').update({peso_kg:Number(v)||null}).eq('id',id);
   if(error) alert('Erro: '+error.message); else carregar();
 }
 async function delAnimal(id){
-  if(!confirm('Remover esta passagem?')) return;
+  if(!confirm('Remover esta linha?')) return;
   const {error}=await db.from('abate_animais').delete().eq('id',id);
   if(error) alert('Erro: '+error.message); else carregar();
 }
 
 function renderAnimais(){
   const list=ANIMAIS.filter(a=>a.abate_id===SEL);
-  const tot={cab:list.length, pb:0, pc:0};
+  const tot={cab:list.length, pc:0, vlr:0, bonus:0, penal:0};
   const rows=list.map((a,i)=>{
-    tot.pb+=Number(a.peso_balanca||0); tot.pc+=Number(a.peso_carcaca||0);
-    const r=rc(a);
-    const flags=[a.penalizacao_tipo?`<span class="badge b-amber">${esc(a.penalizacao_tipo)}</span>`:'',
-      a.doenca_tipo?`<span class="badge b-red">${esc(a.doenca_tipo)}${a.condenacao?' ('+a.condenacao+')':''}</span>`:''].filter(Boolean).join(' ')||'—';
-    return `<tr><td class="num">${i+1}</td><td><b>${esc(a.brinco)||'—'}</b></td>
-      <td>${new Date(a.hora_passagem).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</td>
-      <td class="num">${fmtN(a.peso_balanca)}</td>
-      <td>${a.tipo==='femea'?'Fêmea':'Macho'} · ${a.categoria||''}</td>
-      <td>${a.com_racao?'<span class="badge b-blue">ração</span>':'pasto'}</td>
-      <td>${badgeNota(a.nota_acabamento)}</td>
-      <td class="num">${a.peso_carcaca?fmtN(a.peso_carcaca):'<button class="btn mini sec" onclick="setCarcaca(\''+a.id+'\')">+ carcaça</button>'}</td>
-      <td class="num">${r?fmtN(r,1)+'%':'—'}</td>
+    tot.pc+=Number(a.peso_kg||0); tot.vlr+=Number(a.vlr_total||0); tot.bonus+=Number(a.bonus||0); tot.penal+=Number(a.penalizacao||0);
+    return `<tr><td class="num">${a.seq??(i+1)}</td><td><b>${esc(a.brinco)||'—'}</b></td>
+      <td>${esc(a.descricao)||'—'}</td><td>${esc(a.classificacao)||'—'}</td>
+      <td class="num">${a.peso_kg?fmtN(a.peso_kg):'<button class="btn mini sec" onclick="setPeso(\''+a.id+'\')">+ peso</button>'}</td>
       <td class="num">${arr(a)?fmtN(arr(a),2):'—'}</td>
-      <td>${flags}</td>
-      <td class="num">${a.penalizacao_valor?fmtR$(a.penalizacao_valor):'—'}</td>
+      <td class="num">${a.vlr_kg?fmtN(a.vlr_kg,2):'—'}</td>
+      <td class="num">${a.vlr_total?fmtR$(a.vlr_total):'—'}</td>
+      <td class="num">${a.bonus?fmtR$(a.bonus):'—'}</td>
+      <td class="num">${a.penalizacao?fmtR$(a.penalizacao):'—'}</td>
+      <td>${a.condenacao?`<span class="badge b-red">${esc(a.condenacao)}</span>`:'—'}</td>
       <td><button class="btn mini sec" onclick="delAnimal('${a.id}')">×</button></td></tr>`;
   }).join('');
-  const rcT=tot.pb?tot.pc/tot.pb*100:null;
   document.getElementById('tbAnimais').innerHTML=
-   '<tr><th class="num">#</th><th>Brinco</th><th>Hora</th><th class="num">Balança</th><th>Tipo</th><th>Manejo</th><th>Acab.</th><th class="num">Carcaça</th><th class="num">RC</th><th class="num">@</th><th>Ocorrências</th><th class="num">Penal.</th><th></th></tr>'+
-   (rows||'<tr><td colspan="13">Nenhuma passagem ainda — registre o primeiro animal acima.</td></tr>')+
-   (list.length?`<tr style="font-weight:700"><td colspan="3">Total ${tot.cab}</td><td class="num">${fmtN(tot.pb)}</td><td colspan="3"></td><td class="num">${fmtN(tot.pc)}</td><td class="num">${rcT?fmtN(rcT,1)+'%':'—'}</td><td class="num">${fmtN(tot.pc/15,2)}</td><td colspan="3"></td></tr>`:'');
+    '<tr><th class="num">#</th><th>Brinco</th><th>Descrição</th><th>Classificação</th><th class="num">Carcaça (kg)</th><th class="num">@</th><th class="num">R$/kg</th><th class="num">Valor</th><th class="num">Bônus</th><th class="num">Penal.</th><th>Ocorrência</th><th></th></tr>'+
+    (rows||'<tr><td colspan="12">Nenhum animal ainda — registre o primeiro acima ou leia a folha do frigorífico.</td></tr>')+
+    (list.length?`<tr style="font-weight:700"><td colspan="4">Total ${tot.cab}</td><td class="num">${fmtN(tot.pc)}</td><td class="num">${fmtN(tot.pc/15,2)}</td><td></td><td class="num">${fmtR$(tot.vlr)}</td><td class="num">${fmtR$(tot.bonus)}</td><td class="num">${fmtR$(tot.penal)}</td><td colspan="2"></td></tr>`:'');
 }
 
 function renderAbates(){
   document.getElementById('tbAbates').innerHTML=
-   '<tr><th>Data</th><th>Frigorífico</th><th>Origem</th><th>Romaneio</th><th class="num">Cab</th><th class="num">Carcaça (kg)</th><th class="num">@</th><th class="num">RC méd</th><th class="num">Nota méd</th><th></th></tr>'+
-   (ABATES.map(a=>{
-     const ans=ANIMAIS.filter(x=>x.abate_id===a.id);
-     const pb=ans.reduce((s,x)=>s+Number(x.peso_balanca||0),0);
-     const pc=ans.reduce((s,x)=>s+Number(x.peso_carcaca||0),0);
-     const cn=ans.filter(x=>x.nota_acabamento!=null);
-     const nm=cn.length?cn.reduce((s,x)=>s+Number(x.nota_acabamento),0)/cn.length:null;
-     const sel = a.id===SEL?' style="background:var(--greenbg)"':'';
-     return `<tr${sel}><td><b>${fmtD(a.data_abate)}</b></td><td>${esc(a.frigorifico)||'—'}</td>
-       <td>${ORIGEM_LABEL[a.origem]||a.origem||'—'}</td><td>${esc(a.romaneio)||'—'}</td>
-       <td class="num">${ans.length}</td><td class="num">${pc?fmtN(pc):'—'}</td>
-       <td class="num">${pc?fmtN(pc/15,1):'—'}</td><td class="num">${pb&&pc?fmtN(pc/pb*100,1)+'%':'—'}</td>
-       <td class="num">${nm!=null?fmtN(nm,1):'—'}</td>
-       <td><button class="btn mini" onclick="selecionar('${a.id}')">abrir</button></td></tr>`;
-   }).join('') || '<tr><td colspan="10">Nenhum abate ainda.</td></tr>');
+    '<tr><th>Data</th><th>Frigorífico</th><th>Origem</th><th>Romaneio</th><th class="num">Cab</th><th class="num">Carcaça (kg)</th><th class="num">@</th><th class="num">Valor total</th><th></th></tr>'+
+    (ABATES.map(a=>{
+      const ans=ANIMAIS.filter(x=>x.abate_id===a.id);
+      const pc=ans.reduce((s,x)=>s+Number(x.peso_kg||0),0);
+      const vlr=ans.reduce((s,x)=>s+Number(x.vlr_total||0),0);
+      const sel = a.id===SEL?' style="background:var(--greenbg)"':'';
+      return `<tr${sel}><td><b>${fmtD(a.data_abate)}</b></td><td>${esc(a.frigorifico)||'—'}</td>
+        <td>${ORIGEM_LABEL[a.origem]||a.origem||'—'}</td><td>${esc(a.romaneio)||'—'}</td>
+        <td class="num">${ans.length}</td><td class="num">${pc?fmtN(pc):'—'}</td>
+        <td class="num">${pc?fmtN(pc/15,1):'—'}</td><td class="num">${vlr?fmtR$(vlr):'—'}</td>
+        <td><button class="btn mini" onclick="selecionar('${a.id}')">abrir</button></td></tr>`;
+    }).join('') || '<tr><td colspan="9">Nenhum abate ainda.</td></tr>');
 }
 
 function renderOrigem(){
   const grp={};
   ANIMAIS.forEach(a=>{
     const ab=ABATES.find(x=>x.id===a.abate_id); const o=ab?ab.origem||'—':'—';
-    (grp[o]=grp[o]||{cab:0,pb:0,pc:0,nota:0,ncnt:0,penal:0,cond:0});
-    const G=grp[o]; G.cab++; G.pb+=Number(a.peso_balanca||0); G.pc+=Number(a.peso_carcaca||0);
-    if(a.nota_acabamento!=null){G.nota+=Number(a.nota_acabamento);G.ncnt++;}
-    G.penal+=Number(a.penalizacao_valor||0); if(a.condenacao)G.cond++;
+    (grp[o]=grp[o]||{cab:0,pc:0,vlr:0,penal:0,cond:0});
+    const G=grp[o]; G.cab++; G.pc+=Number(a.peso_kg||0); G.vlr+=Number(a.vlr_total||0);
+    G.penal+=Number(a.penalizacao||0); if(a.condenacao)G.cond++;
   });
   const keys=Object.keys(grp);
   document.getElementById('tbOrigem').innerHTML=
-   '<tr><th>Origem</th><th class="num">Cab</th><th class="num">Arrobas</th><th class="num">RC médio</th><th class="num">Nota média</th><th class="num">Penalizações</th><th class="num">Condenações</th></tr>'+
-   (keys.map(o=>{const G=grp[o];
-     return `<tr><td><b>${ORIGEM_LABEL[o]||o}</b></td><td class="num">${G.cab}</td>
-       <td class="num">${G.pc?fmtN(G.pc/15,1):'—'}</td>
-       <td class="num">${G.pb&&G.pc?fmtN(G.pc/G.pb*100,2)+'%':'—'}</td>
-       <td class="num">${G.ncnt?fmtN(G.nota/G.ncnt,2):'—'}</td>
-       <td class="num">${G.penal?fmtR$(G.penal):'—'}</td>
-       <td class="num">${G.cond||'—'}</td></tr>`;
-   }).join('') || '<tr><td colspan="7">Sem dados ainda.</td></tr>');
+    '<tr><th>Origem</th><th class="num">Cab</th><th class="num">Arrobas</th><th class="num">Valor total</th><th class="num">Penalizações</th><th class="num">Condenações/ocorrências</th></tr>'+
+    (keys.map(o=>{const G=grp[o];
+      return `<tr><td><b>${ORIGEM_LABEL[o]||o}</b></td><td class="num">${G.cab}</td>
+        <td class="num">${G.pc?fmtN(G.pc/15,1):'—'}</td>
+        <td class="num">${G.vlr?fmtR$(G.vlr):'—'}</td>
+        <td class="num">${G.penal?fmtR$(G.penal):'—'}</td>
+        <td class="num">${G.cond||'—'}</td></tr>`;
+    }).join('') || '<tr><td colspan="6">Sem dados ainda.</td></tr>');
 }
 
 // ============================================================
@@ -380,22 +355,24 @@ O documento tem um CABEÇALHO (data do abate, nome do frigorífico, nº do roman
 Regras:
 - Transcreva TODAS as linhas de animais, na ordem do documento.
 - "brinco": identificador do animal (nº sequencial, brinco ou SISBOV), como texto.
-- "peso_carcaca": peso de carcaça em kg, como número. Se a folha listar meias-carcaças (duas bandas, dianteiro/traseiro), SOME e informe o total do animal. Carcaças bovinas pesam tipicamente 150–450 kg — use só como sanidade, não invente.
-- "sexo": "macho" ou "femea" se identificável (M/F, castrado=macho); senão null.
-- "categoria": "boi", "vaca", "novilha" ou "bezerro" se identificável; senão null.
-- "acabamento": nota de acabamento/tipificação 0–5 se houver; senão null.
-- "ocorrencia": texto curto de penalização/desconto/observação da linha (hematoma, abscesso, condenação...); senão null.
+- "descricao": descrição livre do animal na linha (sexo, categoria — ex: "Boi", "Vaca gorda"), se houver; senão null.
+- "classificacao": código/classificação de tipificação da carcaça impresso na linha, se houver; senão null.
+- "meia_esq_kg" e "meia_dir_kg": peso de cada meia-carcaça em kg, SE a folha listar as duas bandas separadamente; senão null nos dois.
+- "peso_kg": peso de carcaça TOTAL do animal em kg (se a folha só traz o total, preencha só este; se traz as meias, preencha também a soma aqui). Carcaças bovinas pesam tipicamente 150–450 kg — use só como sanidade, não invente.
+- "vlr_kg", "vlr_arroba", "vlr_total": valores em R$ da linha, os que estiverem impressos; os que não houver, deixe null.
+- "bonus": valor de bônus/prêmio em R$ na linha, se houver; senão null.
+- "condenacao": texto curto de penalização/condenação/observação da linha (hematoma, abscesso, condenação parcial...); senão null.
 - "penal_valor": valor de desconto em R$ na linha, se houver; senão null.
 - Para cada campo dê confiança 0 a 1 em "conf". Seja honesto: rasuras e dígitos ambíguos merecem confiança baixa.
 - Campos ilegíveis: melhor palpite com confiança <0.5.
 
 Responda SOMENTE com JSON válido, sem texto fora do JSON:
-{"data":"dd/mm/aaaa","frigorifico":"","romaneio":"","gta":"","animais":[{"brinco":"123","peso_carcaca":287.5,"sexo":"macho","categoria":"boi","acabamento":3,"ocorrencia":null,"penal_valor":null,"conf":{"brinco":0.95,"peso_carcaca":0.9,"sexo":0.8,"categoria":0.8,"acabamento":0.7,"ocorrencia":1,"penal_valor":1}}]}`;
+{"data":"dd/mm/aaaa","frigorifico":"","romaneio":"","gta":"","animais":[{"brinco":"123","descricao":"Boi","classificacao":"","meia_esq_kg":null,"meia_dir_kg":null,"peso_kg":287.5,"vlr_kg":null,"vlr_arroba":null,"vlr_total":null,"bonus":null,"condenacao":null,"penal_valor":null,"conf":{"brinco":0.95,"peso_kg":0.9,"descricao":0.8,"classificacao":0.8,"condenacao":1,"penal_valor":1}}]}`;
 
 async function chamarVLM(){
   const prov=document.getElementById('prov').value,
-        key=document.getElementById('apikey').value.trim(),
-        model=document.getElementById('model').value.trim()||DEFAULT_MODELS[prov];
+    key=document.getElementById('apikey').value.trim(),
+    model=document.getElementById('model').value.trim()||DEFAULT_MODELS[prov];
   if(!key) throw new Error('Cole a API key em ⚙️ Config. IA (a mesma do OCR Pesagem serve).');
   const isPdf=docMime==='application/pdf';
 
@@ -468,21 +445,22 @@ async function lerFolha(){
 
 const confCls = c => c==null?'':(c<0.5?' class="c-baixa"':(c<0.8?' class="c-media"':''));
 function renderOcr(){
-  const sel=(v,ops)=>ops.map(o=>`<option value="${o[0]}"${String(v)===o[0]?' selected':''}>${o[1]}</option>`).join('');
   document.getElementById('tbOcr').innerHTML=
-   '<tr><th class="num">#</th><th>Brinco</th><th class="num">Carcaça (kg)</th><th class="num">@</th><th>Sexo</th><th>Categoria</th><th>Acab.</th><th>Ocorrência</th><th class="num">Penal. R$</th><th></th></tr>'+
-   FOLHA.animais.map((a,i)=>`<tr>
-     <td class="num">${i+1}</td>
-     <td${confCls(a.conf.brinco)}><input data-i="${i}" data-f="brinco" value="${esc(a.brinco??'')}"></td>
-     <td${confCls(a.conf.peso_carcaca)}><input data-i="${i}" data-f="peso_carcaca" type="number" step=".1" value="${a.peso_carcaca??''}"></td>
-     <td class="num">${a.peso_carcaca?fmtN(a.peso_carcaca/15,2):'—'}</td>
-     <td${confCls(a.conf.sexo)}><select data-i="${i}" data-f="sexo">${sel(a.sexo||'macho',[['macho','Macho'],['femea','Fêmea']])}</select></td>
-     <td${confCls(a.conf.categoria)}><select data-i="${i}" data-f="categoria">${sel(a.categoria||'boi',[['boi','Boi'],['vaca','Vaca'],['novilha','Novilha'],['bezerro','Bezerro']])}</select></td>
-     <td${confCls(a.conf.acabamento)}><select data-i="${i}" data-f="acabamento">${sel(a.acabamento??'',[['','—'],['0','0'],['1','1'],['2','2'],['3','3'],['4','4'],['5','5']])}</select></td>
-     <td${confCls(a.conf.ocorrencia)}><input data-i="${i}" data-f="ocorrencia" value="${esc(a.ocorrencia??'')}" placeholder="—"></td>
-     <td${confCls(a.conf.penal_valor)}><input data-i="${i}" data-f="penal_valor" type="number" step=".01" value="${a.penal_valor??''}"></td>
-     <td><button class="btn mini sec" onclick="delLinhaOcr(${i})">×</button></td></tr>`).join('');
-  const pc=FOLHA.animais.reduce((s,a)=>s+Number(a.peso_carcaca||0),0);
+    '<tr><th class="num">#</th><th>Brinco</th><th>Descrição</th><th>Classificação</th><th class="num">Carcaça (kg)</th><th class="num">@</th><th class="num">R$/kg</th><th class="num">Valor</th><th class="num">Bônus</th><th>Condenação</th><th class="num">Penal. R$</th><th></th></tr>'+
+    FOLHA.animais.map((a,i)=>`<tr>
+      <td class="num">${i+1}</td>
+      <td${confCls(a.conf.brinco)}><input data-i="${i}" data-f="brinco" value="${esc(a.brinco??'')}"></td>
+      <td${confCls(a.conf.descricao)}><input data-i="${i}" data-f="descricao" value="${esc(a.descricao??'')}"></td>
+      <td${confCls(a.conf.classificacao)}><input data-i="${i}" data-f="classificacao" value="${esc(a.classificacao??'')}"></td>
+      <td${confCls(a.conf.peso_kg)}><input data-i="${i}" data-f="peso_kg" type="number" step=".1" value="${a.peso_kg??''}"></td>
+      <td class="num">${a.peso_kg?fmtN(a.peso_kg/15,2):'—'}</td>
+      <td><input data-i="${i}" data-f="vlr_kg" type="number" step=".01" value="${a.vlr_kg??''}"></td>
+      <td><input data-i="${i}" data-f="vlr_total" type="number" step=".01" value="${a.vlr_total??''}"></td>
+      <td><input data-i="${i}" data-f="bonus" type="number" step=".01" value="${a.bonus??''}"></td>
+      <td${confCls(a.conf.condenacao)}><input data-i="${i}" data-f="condenacao" value="${esc(a.condenacao??'')}" placeholder="—"></td>
+      <td${confCls(a.conf.penal_valor)}><input data-i="${i}" data-f="penal_valor" type="number" step=".01" value="${a.penal_valor??''}"></td>
+      <td><button class="btn mini sec" onclick="delLinhaOcr(${i})">×</button></td></tr>`).join('');
+  const pc=FOLHA.animais.reduce((s,a)=>s+Number(a.peso_kg||0),0);
   document.getElementById('ocrResumo').textContent=
     `${FOLHA.animais.length} animais · ${fmtN(pc)} kg de carcaça · ${fmtN(pc/15,1)} @`;
   document.getElementById('ocrRev').style.display='block';
@@ -512,7 +490,7 @@ async function aprovarFolha(){
   if(!FOLHA||!FOLHA.animais.length){ alert('Nada para aprovar.'); return; }
   const g=id=>document.getElementById(id).value;
   if(!g('nData')){ alert('Informe a data do abate.'); return; }
-  const semPeso=FOLHA.animais.filter(a=>!a.peso_carcaca).length;
+  const semPeso=FOLHA.animais.filter(a=>!a.peso_kg).length;
   if(!confirm(`Criar abate com ${FOLHA.animais.length} animais`+(semPeso?` (${semPeso} sem peso de carcaça)`:'')+`?`)) return;
 
   const {data:ab,error}=await db.from('abates').insert({
@@ -521,16 +499,15 @@ async function aprovarFolha(){
   }).select().single();
   if(error){ alert('Erro ao criar abate: '+error.message); return; }
 
-  const racao=document.getElementById('ocrRacao').value==='true';
-  const base=Date.now();
   const recs=FOLHA.animais.map((a,i)=>({
-    abate_id:ab.id, brinco:a.brinco?String(a.brinco):null,
-    peso_balanca:null, peso_carcaca:a.peso_carcaca?Number(a.peso_carcaca):null,
-    hora_passagem:new Date(base+i*1000).toISOString(),
-    tipo:a.sexo||'macho', categoria:a.categoria||'boi', com_racao:racao,
-    nota_acabamento:(a.acabamento===''||a.acabamento==null)?null:Number(a.acabamento),
-    penalizacao_tipo:a.ocorrencia||null, penalizacao_valor:a.penal_valor?Number(a.penal_valor):0,
-    doenca_tipo:null, condenacao:null
+    abate_id:ab.id, seq:i+1, brinco:a.brinco?String(a.brinco):null,
+    descricao:a.descricao||null, classificacao:a.classificacao||null,
+    meia_esq_kg:a.meia_esq_kg?Number(a.meia_esq_kg):null, meia_dir_kg:a.meia_dir_kg?Number(a.meia_dir_kg):null,
+    peso_kg:a.peso_kg?Number(a.peso_kg):null,
+    vlr_kg:a.vlr_kg?Number(a.vlr_kg):null, vlr_arroba:a.vlr_arroba?Number(a.vlr_arroba):null,
+    vlr_total:a.vlr_total?Number(a.vlr_total):null,
+    bonus:a.bonus?Number(a.bonus):0, penalizacao:a.penal_valor?Number(a.penal_valor):0,
+    condenacao:a.condenacao||null
   }));
   const {error:e2}=await db.from('abate_animais').insert(recs);
   if(e2){ alert('Abate criado, mas erro ao gravar animais: '+e2.message); return; }
