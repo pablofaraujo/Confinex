@@ -121,6 +121,21 @@
   <div class="footer">Boi Balança · dados ao vivo da base CFAgro · acesso protegido por login</div>
 </div>
 
+<div id="modalConciliar" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center;padding:20px">
+  <div class="card" style="max-width:560px;width:100%;max-height:80vh;display:flex;flex-direction:column">
+    <h3 style="margin-top:0">Conciliar recebimento — <span id="mcLote"></span></h3>
+    <div class="sub" id="mcResumo" style="margin-bottom:10px"></div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Selecione o(s) lançamento(s) de entrada do fluxo de caixa que correspondem a este recebimento. É possível marcar mais de um (pagamento parcelado).</div>
+    <div id="mcLista" style="overflow:auto;flex:1;border-top:1px solid #e5e5e5;border-bottom:1px solid #e5e5e5"></div>
+    <div style="margin:10px 0;font-weight:600;font-size:13px" id="mcTotais"></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn" onclick="confirmarConciliacao()">✓ Conciliar e marcar recebido</button>
+      <button class="btn sec" onclick="fecharModalConciliar()">Cancelar</button>
+    </div>
+    <div class="msg" id="mcMsg"></div>
+  </div>
+</div>
+
 <a href="./" class="voltar-central">⌂ Central</a>
 
 <script>
@@ -130,6 +145,7 @@ let CONTATOS_LIST = [];
 let PREVISOES = [];
 let COMPRAS_LIST = [];
 let VENDAS_LIST = [];
+let OPERACOES_LIST = [];
 
 function validDate(s){ return /^\d{4}-\d{2}-\d{2}$/.test(String(s||'')); }
 
@@ -409,6 +425,106 @@ async function registrarAbate(){
   carregar();
 }
 
+// ---------- CONCILIAÇÃO BANCÁRIA (fluxo_caixa <-> vendas) ----------
+// Vincula lançamentos reais de entrada no fluxo de caixa (dinheiro que caiu
+// no banco) à venda esperada, em vez de só marcar "recebido" por clique
+// cego. Usa a coluna fluxo_caixa.operacao_id (já existente no schema) como
+// vínculo — não precisou de migração nova.
+let FLUXO_CANDIDATOS = [];
+let CONCILIAR_VENDA_ID = null;
+let CONCILIAR_SELECIONADOS = new Set();
+
+function valorEsperadoVenda(v){
+  // Valor líquido esperado no banco: bruto menos os descontos que já saem
+  // antes do dinheiro cair na conta (funrural, finpec, outros custos do abate).
+  return Number(v.valor_bruto||0) - Number(v.funrural||0) - Number(v.finpec||0) - Number(v.outros_custos||0);
+}
+
+async function abrirConciliacao(vendaId){
+  const v = VENDAS_LIST.find(x=>x.id===vendaId);
+  if(!v){ alert('Venda não encontrada — atualize a página.'); return; }
+  const o = OPERACOES_LIST.find(x=>x.id===v.operacao_id) || {};
+  CONCILIAR_VENDA_ID = vendaId;
+  CONCILIAR_SELECIONADOS = new Set();
+  const esperado = valorEsperadoVenda(v);
+  document.getElementById('mcLote').textContent = o.codigo || '—';
+  document.getElementById('mcResumo').textContent =
+    `Valor líquido esperado: ${fmtR$(esperado)} (bruto ${fmtR$(v.valor_bruto)} − funrural ${fmtR$(v.funrural||0)}`+
+    (v.finpec?` − finpec ${fmtR$(v.finpec)}`:'')+(v.outros_custos?` − outros custos ${fmtR$(v.outros_custos)}`:'')+')';
+  document.getElementById('mcLista').innerHTML = '<div style="padding:10px;color:var(--muted)">Carregando lançamentos do fluxo de caixa...</div>';
+  document.getElementById('mcMsg').textContent = '';
+  document.getElementById('modalConciliar').style.display='flex';
+  const {data, error} = await db.from('fluxo_caixa').select('*').eq('tipo','entrada').is('operacao_id',null).eq('realizado',true).order('data',{ascending:false}).limit(60);
+  if(error){ document.getElementById('mcLista').innerHTML=''; document.getElementById('mcMsg').textContent='Erro ao buscar fluxo de caixa: '+error.message; return; }
+  FLUXO_CANDIDATOS = data||[];
+  renderListaConciliacao();
+}
+
+function renderListaConciliacao(){
+  document.getElementById('mcLista').innerHTML = FLUXO_CANDIDATOS.length ? FLUXO_CANDIDATOS.map(f=>`
+    <label style="display:flex;gap:10px;align-items:center;padding:7px 4px;border-bottom:1px solid #f0f0f0;font-size:13px;cursor:pointer">
+      <input type="checkbox" onchange="toggleConciliar('${f.id}', this.checked)">
+      <span style="flex:1">${fmtD(f.data)} — ${f.descricao||'(sem descrição)'} <span style="color:var(--muted)">[${f.conta||'—'}]</span></span>
+      <b>${fmtR$(f.valor)}</b>
+    </label>`).join('') : '<div style="padding:10px;color:var(--muted)">Nenhum lançamento de entrada não conciliado encontrado no fluxo de caixa. Confirme se o extrato bancário já foi lançado.</div>';
+  atualizarTotaisConciliacao();
+}
+
+function toggleConciliar(id, checked){
+  if(checked) CONCILIAR_SELECIONADOS.add(id); else CONCILIAR_SELECIONADOS.delete(id);
+  atualizarTotaisConciliacao();
+}
+
+function atualizarTotaisConciliacao(){
+  const v = VENDAS_LIST.find(x=>x.id===CONCILIAR_VENDA_ID);
+  if(!v) return;
+  const esperado = valorEsperadoVenda(v);
+  const selecionados = FLUXO_CANDIDATOS.filter(f=>CONCILIAR_SELECIONADOS.has(f.id));
+  const total = selecionados.reduce((s,f)=>s+Number(f.valor||0),0);
+  const diff = Math.round((total-esperado)*100)/100;
+  document.getElementById('mcTotais').innerHTML =
+    `Selecionado: ${fmtR$(total)} · Esperado: ${fmtR$(esperado)} · Divergência: <span class="${cls(diff===0?1:-Math.abs(diff))}">${fmtR$(diff)}</span>`;
+}
+
+function fecharModalConciliar(){
+  document.getElementById('modalConciliar').style.display='none';
+  CONCILIAR_VENDA_ID=null; CONCILIAR_SELECIONADOS=new Set(); FLUXO_CANDIDATOS=[];
+}
+
+async function confirmarConciliacao(){
+  if(!CONCILIAR_SELECIONADOS.size){ alert('Selecione ao menos um lançamento do fluxo de caixa que corresponda a este recebimento.'); return; }
+  const v = VENDAS_LIST.find(x=>x.id===CONCILIAR_VENDA_ID);
+  if(!v) return;
+  const esperado = valorEsperadoVenda(v);
+  const selecionados = FLUXO_CANDIDATOS.filter(f=>CONCILIAR_SELECIONADOS.has(f.id));
+  const total = selecionados.reduce((s,f)=>s+Number(f.valor||0),0);
+  const diff = Math.round((total-esperado)*100)/100;
+  const avisoDiff = Math.abs(diff)>0.01 ? `\n\nAtenção: divergência de ${fmtR$(diff)} entre o esperado e o selecionado.` : '';
+  if(!confirm(`Conciliar ${fmtR$(total)} recebido(s) contra ${fmtR$(esperado)} esperado(s) e marcar a venda como recebida?`+avisoDiff)) return;
+  const ids = selecionados.map(f=>f.id);
+  const {error:e1} = await db.from('fluxo_caixa').update({operacao_id: v.operacao_id}).in('id', ids);
+  if(e1){ alert('Erro ao vincular lançamentos do fluxo de caixa: '+e1.message); return; }
+  const {error:e2} = await db.from('vendas').update({recebido:true}).eq('id', v.id);
+  if(e2){ alert('Lançamentos vinculados, mas houve erro ao marcar a venda como recebida: '+e2.message); return; }
+  fecharModalConciliar();
+  carregar();
+}
+
+// ---------- FINALIZAR NEGÓCIO ----------
+// Marca o lote como liquidado (status já previsto no schema de operacoes,
+// só nunca tinha sido usado) quando a compra está paga E a(s) venda(s)
+// foram conciliadas/recebidas.
+async function finalizarNegocio(operacaoId, codigo){
+  const compras = COMPRAS_LIST.filter(x=>x.operacao_id===operacaoId);
+  const vendas = VENDAS_LIST.filter(x=>x.operacao_id===operacaoId);
+  if(!compras.length || !compras.every(c=>c.pago)){ alert('Ainda há compra(s) deste lote em aberto (não paga).'); return; }
+  if(!vendas.length || !vendas.every(v=>v.recebido)){ alert('Ainda há venda(s) deste lote não conciliada(s)/recebida(s).'); return; }
+  if(!confirm(`Finalizar negócio ${codigo}? O lote será marcado como liquidado — compra paga e venda(s) conciliada(s) com o banco.`)) return;
+  const {error} = await db.from('operacoes').update({status:'liquidada'}).eq('id', operacaoId);
+  if(error){ alert('Erro ao finalizar: '+error.message); return; }
+  carregar();
+}
+
 // ---------- DADOS ----------
 async function carregar(){
   document.getElementById('subtitle').textContent='Carregando...';
@@ -431,6 +547,7 @@ async function carregar(){
   const vs = vendas.data.filter(v=>bbIds.has(v.operacao_id));
   COMPRAS_LIST = cs;
   VENDAS_LIST = vs;
+  OPERACOES_LIST = ops.data;
   const ps = pend.data.filter(p=>bbIds.has(p.operacao_id) && !['validado','cancelado'].includes(p.status));
   const ativos = ops.data.filter(o=>o.status!=='cancelada');
 
@@ -449,6 +566,7 @@ async function carregar(){
 
   // KPIs
   const emAndamento = ativos.filter(o=>!vs.some(v=>v.operacao_id===o.id));
+  const liquidados = ativos.filter(o=>o.status==='liquidada');
 
   // Registrar abate — popula lote e frigorífico, mantém o que já estava digitado
   LOTES_AGUARDANDO = emAndamento;
@@ -475,6 +593,7 @@ async function carregar(){
     ['A pagar', fmtR$(aPagar), 'compras em aberto'],
     ['A receber', fmtR$(aReceber), 'frigoríficos'],
     ['Margem realizada', fmtR$(margemReal), 'lotes com venda fechada'],
+    ['Negócios finalizados', liquidados.length, 'compra paga + venda conciliada'],
     ['Pendências GTA/NF', ps.length, 'documentos em aberto'],
   ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="d">${k[2]}</div></div>`).join('');
 
@@ -486,6 +605,13 @@ async function carregar(){
      const v=vs.find(x=>x.operacao_id===o.id);
      const rc = v&&c.peso_total_kg? v.peso_carcaca_total/c.peso_total_kg*100 : null;
      const margem = v? Number(v.valor_bruto||0)-Number(v.funrural||0)-Number(v.outros_custos||0)-Number(c.valor_total||0) : null;
+     const comprasOp = cs.filter(x=>x.operacao_id===o.id);
+     const vendasOp = vs.filter(x=>x.operacao_id===o.id);
+     const podeFinalizar = o.status!=='liquidada' && comprasOp.length>0 && comprasOp.every(x=>x.pago) && vendasOp.length>0 && vendasOp.every(x=>x.recebido);
+     let statusBadge;
+     if(o.status==='liquidada') statusBadge='<span class="badge b-blue">Liquidado</span>';
+     else if(v) statusBadge='<span class="badge b-green">Abatido</span>';
+     else statusBadge='<span class="badge b-amber">Aguardando abate</span>';
      return `<tr><td><b>${o.codigo}</b></td><td>${fmtD(c.data)}</td><td>${nome[c.vendedor_id]||'—'}</td>
       <td class="num">${fmtN(c.quantidade)}</td><td class="num">${fmtN(c.peso_total_kg)}</td>
       <td class="num">${fmtN(c.preco_arroba,2)}</td><td class="num">${fmtR$(c.valor_total)}</td>
@@ -494,8 +620,8 @@ async function carregar(){
       <td class="num">${rc?fmtN(rc,2)+'%':'—'}</td>
       <td class="num">${v?fmtN(v.preco_arroba,2):'—'}</td>
       <td class="num ${cls(margem)}">${margem!=null?fmtR$(margem):'—'}</td>
-      <td>${v?'<span class="badge b-green">Abatido</span>':'<span class="badge b-amber">Aguardando abate</span>'}</td>
-      <td><button class="btn mini sec" onclick="editarDatasLote('${o.id}','${o.codigo}')">✏️ editar datas</button></td></tr>`;
+      <td>${statusBadge}</td>
+      <td><button class="btn mini sec" onclick="editarDatasLote('${o.id}','${o.codigo}')">✏️ editar datas</button>${podeFinalizar?` <button class="btn mini" onclick="finalizarNegocio('${o.id}','${o.codigo}')">✔ Finalizar</button>`:''}</td></tr>`;
    }).join('') || '<tr><td colspan="15">Nenhum lote ainda — registre uma previsão no simulador acima e confirme, ou registre pelo Juan no grupo Boi Balança</td></tr>';
 
   // A pagar
@@ -522,7 +648,7 @@ async function carregar(){
      return `<tr><td><b>${o.codigo||'—'}</b></td><td>${nome[v.comprador_id]||'—'}</td>
       <td class="num">${fmtR$(Number(v.valor_bruto||0)-Number(v.funrural||0))}</td><td>${fmtD(prev)}</td>
       <td>${v.recebido?'<span class="badge b-green">Recebido</span>':(atrasado?'<span class="badge b-red">Atrasado</span>':'<span class="badge b-blue">A receber</span>')}</td>
-      <td>${v.recebido?'':`<button class="btn mini" onclick="marcarRecebido('${v.id}')">marcar recebido</button>`}</td></tr>`;
+      <td>${v.recebido?'':`<button class="btn mini" onclick="abrirConciliacao('${v.id}')">🔄 conciliar</button>`}</td></tr>`;
    }).join('') || '<tr><td colspan="6">Nenhuma venda registrada</td></tr>';
 
   // Pendências
@@ -539,11 +665,6 @@ async function carregar(){
 async function marcarPago(id){
   if(!confirm('Confirmar: marcar esta compra como PAGA?'))return;
   const {error}=await db.from('compras').update({pago:true}).eq('id',id);
-  if(error)alert('Erro: '+error.message); else carregar();
-}
-async function marcarRecebido(id){
-  if(!confirm('Confirmar: marcar este recebimento do frigorífico como RECEBIDO?'))return;
-  const {error}=await db.from('vendas').update({recebido:true}).eq('id',id);
   if(error)alert('Erro: '+error.message); else carregar();
 }
 
