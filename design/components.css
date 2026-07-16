@@ -77,16 +77,20 @@ input,select,textarea{width:100%;border:1px solid var(--border);border-radius:va
 .res .r .v{font-size:17px;font-weight:700;margin-top:3px}
 
 /* ---------- Hub (Central) ---------- */
+/* Escopado em .apps (nunca solto) para nao colidir com apps externos que
+   por acaso tambem usem a classe generica "app" no seu proprio container
+   (ex.: confinex-app.latest.js usa .app como wrapper de layout — colisao
+   real detectada em 2026-07-16, quebrou o Confinex em layout horizontal). */
 .head{display:flex;align-items:center;gap:14px;margin:18px 0 6px}
 .head img{width:64px;height:64px;border-radius:50%;object-fit:cover}
 .hub-sub{color:var(--muted);font-size:var(--fs-11);letter-spacing:2px;text-transform:uppercase;margin-bottom:22px}
 .apps{display:grid;gap:14px;margin-top:10px}
-.app{display:flex;align-items:center;gap:16px;background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px;text-decoration:none;color:var(--text);box-shadow:var(--shadow-1);transition:transform .1s}
-.app:active{transform:scale(.98)}
-.app .ico{font-size:34px;width:56px;height:56px;display:flex;align-items:center;justify-content:center;border-radius:var(--r-md);flex-shrink:0}
-.app .t{font-size:18px;font-weight:700}
-.app .d{font-size:var(--fs-13);color:var(--muted);margin-top:3px}
-.app .arrow{margin-left:auto;color:var(--muted);font-size:var(--fs-20)}
+.apps .app{display:flex;align-items:center;gap:16px;background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px;text-decoration:none;color:var(--text);box-shadow:var(--shadow-1);transition:transform .1s}
+.apps .app:active{transform:scale(.98)}
+.apps .app .ico{font-size:34px;width:56px;height:56px;display:flex;align-items:center;justify-content:center;border-radius:var(--r-md);flex-shrink:0}
+.apps .app .t{font-size:18px;font-weight:700}
+.apps .app .d{font-size:var(--fs-13);color:var(--muted);margin-top:3px}
+.apps .app .arrow{margin-left:auto;color:var(--muted);font-size:var(--fs-20)}
 .status{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:24px}
 .st{background:var(--card);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;text-align:center}
 .st .v{font-size:19px;font-weight:700}
