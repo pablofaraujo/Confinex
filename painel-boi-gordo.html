@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CFAgro — Painel Boi Gordo</title>
+<link rel="icon" type="image/png" href="./confinex-logo.jpg">
+<link rel="apple-touch-icon" href="./confinex-logo.jpg">
+<link rel="stylesheet" href="./design/tokens.css">
+<link rel="stylesheet" href="./design/components.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="./js/cfagro-shell.js" defer></script>
+<style>
+/* específico do Painel Boi Gordo: cor da variação nos KPIs e listas de manchetes/contexto (não catalogados no DS) */
+.kpi .d.up{color:var(--green)}
+.kpi .d.down{color:var(--red)}
+.manchete{display:block;padding:9px 0;border-bottom:1px solid var(--border-soft);text-decoration:none;color:var(--text)}
+.manchete:last-child{border-bottom:none}
+.manchete:hover .t{text-decoration:underline}
+.manchete .t{font-size:var(--fs-13);font-weight:600}
+.manchete .f{font-size:var(--fs-11);color:var(--muted);margin-top:2px}
+ul.ctx{list-style:none}
+ul.ctx li{font-size:var(--fs-12);padding:6px 0 6px 18px;position:relative;color:var(--text)}
+ul.ctx li::before{content:"•";position:absolute;left:4px;color:var(--green)}
+.chart-box{position:relative;height:260px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="ident">
+    <div>
+      <h1>Painel Boi Gordo <span>— CFAGRO</span></h1>
+      <div class="sub">Atualizado em <span id="ts"></span> · atualização automática seg–sex às 6h32</div>
+    </div>
+  </div>
+</div>
+
+<div class="kpis" id="cards"></div>
+
+<h2>Curva futura BGI (B3) — R$/arroba</h2>
+<div class="card">
+  <div class="chart-box"><canvas id="chartBGI"></canvas></div>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Contrato</th><th>Vencimento</th><th class="num">Cotação (R$/@)</th><th class="num">Ágio vs. físico</th></tr></thead>
+      <tbody id="tbodyBGI"></tbody>
+    </table>
+  </div>
+</div>
+
+<h2>Manchetes do dia</h2>
+<div class="card" id="manchetes"></div>
+
+<h2>Contexto do mercado</h2>
+<div class="card"><ul class="ctx" id="contexto"></ul></div>
+
+<div class="footer">
+  Fontes: CEPEA/Esalq, B3, FarmNews, Notícias Agrícolas, Canal Rural ·
+  <a href="https://www.cepea.esalq.usp.br/br/indicador/boi-gordo.aspx" target="_blank">Indicador CEPEA</a> ·
+  <a href="https://br.tradingview.com/symbols/BMFBOVESPA-BGI1!/contracts/" target="_blank">BGI na B3 (TradingView)</a>
+</div>
+
+<a href="./" class="voltar-central">⌂ Central</a>
+
+<script id="painel-data" type="application/json">
+{
+  "atualizadoEm": "15/07/2026 10:21",
+  "indicadores": [
+    { "label": "Boi gordo CEPEA/B3 (SP)", "valor": "R$ 328,10/@", "delta": "+1,08% no dia (ter 14/07) · −2,47% no mês", "dir": "up" },
+    { "label": "Bezerro CEPEA (MS)", "valor": "R$ 461,50/@", "delta": "−1,2% no mês · referência de 10/07", "dir": "down" },
+    { "label": "Relação de troca", "valor": "10,27 @/bezerro", "delta": "Máxima histórica para julho (= out/2021)", "dir": "up" },
+    { "label": "Carne exportada (média)", "valor": "US$ 6.384/t", "delta": "+15% vs jul/2025 · ritmo caiu a 13,1 mil t/dia na 2ª semana, ainda acima de 2025", "dir": "up" }
+  ],
+  "curvaBGI": [
+    { "venc": "Físico (CEPEA)", "mes": "jul/26", "valor": 328.10, "agio": null },
+    { "venc": "BGI U26", "mes": "set/26", "valor": 341.20, "agio": 13.10 },
+    { "venc": "BGI V26", "mes": "out/26", "valor": 350.40, "agio": 22.30 },
+    { "venc": "BGI X26", "mes": "nov/26", "valor": 353.50, "agio": 25.40 },
+    { "venc": "BGI F27", "mes": "jan/27", "valor": 363.30, "agio": 35.20 }
+  ],
+  "manchetes": [
+    { "titulo": "Expectativa do preço futuro do boi gordo sobe para 2026, com exceção de julho", "url": "https://www.farmnews.com.br/mercado/expectativa-do-preco-futuro-do-boi-gordo-sobe-para-2026-com-excecao-de-julho/", "fonte": "FarmNews" },
+    { "titulo": "Boi gordo volta a subir e frigoríficos reduzem escalas de abate", "url": "https://www.comprerural.com/boi-gordo-volta-a-subir-e-frigorificos-reduzem-escalas-de-abate/", "fonte": "CompreRural" },
+    { "titulo": "Exportações de carne bovina começam julho em alta mesmo após fim da cota chinesa", "url": "https://www.canalrural.com.br/pecuaria/exportacoes-de-carne-bovina-comecam-julho-em-alta-mesmo-apos-fim-da-cota-chinesa", "fonte": "Canal Rural" },
+    { "titulo": "Preço do bezerro amplia vantagem sobre o boi gordo em julho", "url": "https://farmnews.com.br/mercado/preco-do-bezerro-amplia-vantagem-sobre-o-boi-gordo-em-julho/", "fonte": "FarmNews" },
+    { "titulo": "Exportação de carne bovina cai na segunda parcial de julho, mas segue acima de 2025", "url": "https://farmnews.com.br/mercado/exportacao-de-carne-bovina-cai-na-segunda-parcial-de-julho-mas-segue-acima-de-2025/", "fonte": "FarmNews" }
+  ],
+  "contexto": [
+    "Indicador CEPEA/B3 subiu 1,08% na terça (14/07), a R$ 328,10/@ — primeira alta firme após a sequência de quedas de julho; no mês o acumulado melhorou de −3,51% para −2,47%.",
+    "Curva do BGI segue com as cotações por vencimento do fechamento de sexta (10/07) — não foram localizadas cotações mais recentes por contrato até esta atualização; os ágios foram recalculados sobre o físico de 14/07 (de R$ 13,10 em set/26 a R$ 35,20 em jan/27). Segundo o FarmNews (14/07), na semana de 6 a 13/07 todos os contratos de jul/26 a fev/27 subiram, com maior alta em outubro.",
+    "Bezerro CEPEA (MS) mantém a referência de 10/07 (R$ 461,50/@) — sem divulgação mais recente até esta manhã. Relação de troca segue em 10,27 @/bezerro, máxima histórica para julho, igualando outubro/2021.",
+    "Exportações: ritmo diário caiu de 15,1 para 13,1 mil t na 2ª semana de julho com o esgotamento da cota chinesa sem tarifa, mas segue acima de jul/2025 (12,0 mil t); preço médio estável em US$ 6,38/kg. Frigol, Better Beef, Iguatemi Beef e Plena reduzem escalas de abate e concedem férias coletivas.",
+    "1º semestre fechou com recorde de exportação: 1,705 milhão de toneladas embarcadas (+15,5% vs 2025), consolidando o Brasil como maior fornecedor global de carne bovina."
+  ]
+}
+</script>
+
+<script>
+const D = JSON.parse(document.getElementById('painel-data').textContent);
+const fmt = v => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+document.getElementById('ts').textContent = D.atualizadoEm;
+
+document.getElementById('cards').innerHTML = D.indicadores.map(i =>
+  `<div class="kpi"><div class="l">${i.label}</div><div class="v">${i.valor}</div><div class="d ${i.dir}">${i.delta}</div></div>`
+).join('');
+
+document.getElementById('tbodyBGI').innerHTML = D.curvaBGI.map(r =>
+  `<tr><td>${r.venc}</td><td>${r.mes}</td><td class="num">${fmt(r.valor)}</td><td class="num${r.agio == null ? '' : ' pos'}">${r.agio == null ? '—' : '+' + fmt(r.agio)}</td></tr>`
+).join('');
+
+document.getElementById('manchetes').innerHTML = D.manchetes.map(m =>
+  `<a class="manchete" href="${m.url}" target="_blank" rel="noopener"><div class="t">${m.titulo}</div><div class="f">${m.fonte}</div></a>`
+).join('');
+
+document.getElementById('contexto').innerHTML = D.contexto.map(c => `<li>${c}</li>`).join('');
+
+new Chart(document.getElementById('chartBGI'), {
+  type: 'line',
+  data: {
+    labels: D.curvaBGI.map(r => r.mes),
+    datasets: [{
+      label: 'R$/arroba',
+      // cores espelham os tokens --green/--red (canvas não lê var() do CSS)
+      data: D.curvaBGI.map(r => r.valor),
+      borderColor: '#059669',
+      backgroundColor: 'rgba(5,150,105,0.08)',
+      fill: true,
+      tension: 0.3,
+      pointRadius: 5,
+      pointBackgroundColor: D.curvaBGI.map((r,i) => i === 0 ? '#dc2626' : '#059669')
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: c => 'R$ ' + fmt(c.parsed.y) + '/@' + (D.curvaBGI[c.dataIndex].agio != null ? ' (ágio +' + fmt(D.curvaBGI[c.dataIndex].agio) + ')' : ' · físico') } }
+    },
+    scales: {
+      y: { ticks: { callback: v => 'R$ ' + v }, grid: { color: '#eef2ef' } },
+      x: { grid: { display: false } }
+    }
+  }
+});
+</script>
+</body>
+</html>

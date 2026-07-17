@@ -20,6 +20,7 @@ var NAV = [
   { href:'./bb.html',       rotulo:'Boi Balança',   icone:'⚖️' },
   { href:'./abate.html',    rotulo:'Abate',         icone:'🥩' },
   { href:'./ocr-pesagem.html',rotulo:'OCR Pesagem', icone:'📷' },
+  { href:'./painel-boi-gordo.html', rotulo:'Painel Boi Gordo', icone:'🐂' },
   { href:'./#fluxo',        rotulo:'Financeiro',    icone:'💰' },
   { sec:'Parcerias' },
   { href:'./parcerias.html', rotulo:'Resumo',       icone:'🤝' },

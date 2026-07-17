@@ -24,13 +24,15 @@ Leia conforme a tarefa:
 | `bb.html` | Boi Balança — giro rápido balança→gancho |
 | `bgi.html` | BGI — posições de hedge B3 (módulo principal; o portfolio externo `boi-gordo-portfolio` virou link secundário na topbar) |
 | `ocr-pesagem.html` | OCR Pesagem — leitura de tickets de balança (tema escuro próprio, ainda fora do DS) |
+| `painel-boi-gordo.html` | Painel Boi Gordo — arroba CEPEA/B3, bezerro, relação de troca, curva futura BGI, manchetes e contexto de mercado (dados estáticos no DS, sem Supabase; atualizados por automação — ver Armadilhas) |
 | `painel.html` | LEGADA — redirect para `index.html` (conteúdo migrou para a Home) |
 | `ops.html` | Ops — heartbeats de agentes + fila de missões `vps_briefings` para o Claude Code da VPS |
 | `central.html` | LEGADA — agora só redirect para `index.html` |
+| `abate.html` | Abate — cabeçalho do abate + romaneio animal a animal (`abate_animais`), com leitura OCR da folha do frigorífico |
 
 ## Backend
 
-- **Supabase** `fkmdzwjmjlmxqotznvgq.supabase.co` — usado por bb, bgi, painel, ops e index (auth email/senha, chave publicável hardcoded, RLS protege). Tabelas principais: `operacoes`, `compras`, `vendas`, `posicoes_hedge`, `alocacoes_hedge`, `cotacoes_bgi`, `pendencias_documentos`, `acertos`, `fluxo_caixa`, `promissorias`, `vps_briefings`, `ecossistema_inventario`, `ecossistema_status`; views `v_exposicao_hedge`, `v_estoque_atual`.
+- **Supabase** `fkmdzwjmjlmxqotznvgq.supabase.co` — usado por bb, bgi, painel, ops, abate e index (auth email/senha, chave publicável hardcoded, RLS protege). Tabelas principais: `operacoes` (status inclui `liquidada` desde jul/2026 — compra paga + venda conciliada), `compras`, `vendas`, `posicoes_hedge`, `alocacoes_hedge`, `cotacoes_bgi`, `pendencias_documentos`, `acertos`, `fluxo_caixa` (jul/2026: conciliação liga `operacao_id` ao lançamento real de entrada), `promissorias`, `vps_briefings`, `ecossistema_inventario`, `ecossistema_status`, `abates`, `abate_animais` (romaneio por animal); views `v_exposicao_hedge`, `v_estoque_atual`.
 - **Confinex é a exceção**: localStorage + Google Sheets via Apps Script (JSONP para leitura, POST para escrita, debounce 10s, detecção de conflito multi-dispositivo por `clientUpdatedAt`). Chaves: `confinex:last-state:v3`, `confinex:named-versions:v1`, etc.
 
 ## Deploy
@@ -44,15 +46,16 @@ Push na `main` → workflow `deploy.yml` publica o repositório inteiro no GitHu
 ## Convenções
 
 - Tudo em pt-BR: código, variáveis, UI, commits.
-- Single-file por app na lógica, mas visual e infra compartilhados: páginas carregam `design/tokens.css` + `design/components.css` + `js/cfagro-core.js` (client Supabase único, `fmtR$`/`fmtN`/`fmtD` etc. e `CFAgro.authInit`) + `js/cfagro-shell.js` (sidebar fixa de navegação, defer). Sem framework, sem package.json, sem testes. Exceções ainda fora do DS: `confinex.html` (bundle React, fase 4) e `ocr-pesagem.html` (tema escuro próprio, pendente).
+- Single-file por app na lógica, mas visual e infra compartilhados: páginas carregam `design/tokens.css` + `design/components.css` + `js/cfagro-core.js` (client Supabase único, `fmtR$`/`fmtN`/`fmtD` etc. e `CFAgro.authInit`) + `js/cfagro-shell.js` (sidebar fixa de navegação, defer). Sem framework, sem package.json, sem testes. `confinex.html` (jul/2026) passou a carregar tokens.css/components.css/cfagro-shell.js também (ganhou a sidebar), mas segue sem `cfagro-core.js` — é bundle React (fase 4) com persistência própria (Sheets/localStorage). **`ops.html` (jul/2026) é a exceção inversa**: removeu `cfagro-core.js` e passou a duplicar localmente client Supabase + variáveis de tema/estilos que já existem em `components.css` — foge da convenção, não seguir esse padrão em código novo.
 - Fonte padrão: Inter (via tokens.css). Dark mode preparado em `[data-theme=dark]`, sem toggle ainda.
 - Botão flutuante "⌂ Central" (`.voltar-central`) em toda página-satélite.
 - Ações destrutivas com `confirm()`/`prompt()` nativos.
-- Constantes de domínio: **1 @ = 15 kg**; **1 contrato BGI = 330 @**; RC padrão 50–53%; 65 bois/carreta (macho) / 70 (fêmea); limite de capim padrão 300 kg; Funrural 0,2% (Confinex) / 1,5% default no simulador do bb.
+- Constantes de domínio: **1 @ = 15 kg**; **1 contrato BGI = 330 @**; RC padrão 50–53%; 65 bois/carreta (macho) / 70 (fêmea); limite de capim padrão 300 kg; Funrural 0,2% default (Confinex e simulador do bb — alinhados desde jul/2026).
 
 ## Armadilhas conhecidas
 
 - O fonte do Confinex não está no repo — só o bundle `confinex-app.latest.js` (legível, não minificado). Edite o bundle diretamente com cuidado ou reconstrua fora.
 - Cotações B3: cascata frágil (API B3 → histórico → Yahoo `{contrato}.SA` → scrape CEPEA via allorigins.win) com heurística `extrairNumeroB3` que aceita qualquer número entre 100 e 800.
-- `rolar()`/`encerrar()` no bgi.html fazem escritas sequenciais sem transação.
+- `rolar()`/`encerrar()`/`encerrarParcial()` no bgi.html fazem escritas sequenciais sem transação.
 - `central.html` legada e `bgi.html` órfão podem divergir do resto.
+- `painel-boi-gordo.html` nasceu como artifact do Cowork (a tarefa agendada `atualiza-painel-boi-gordo` ainda escreve nesse artifact separado, não neste arquivo do repo) — até a automação ser redirecionada para editar/commitar este arquivo, o conteúdo aqui é uma cópia estática que só atualiza manualmente.
