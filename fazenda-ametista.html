@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CFAgro — Fazenda Ametista</title>
+<link rel="icon" type="image/png" href="./confinex-logo.jpg">
+<link rel="apple-touch-icon" href="./confinex-logo.jpg">
+<link rel="stylesheet" href="./design/tokens.css">
+<link rel="stylesheet" href="./design/components.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="./js/cfagro-core.js"></script>
+<script src="./js/cfagro-shell.js" defer></script>
+</head>
+<body>
+
+<div id="login" class="login-box card">
+  <img src="./confinex-logo.jpg" alt="Logo" style="width:72px;height:72px;border-radius:50%;object-fit:cover;margin-bottom:10px">
+  <h1 style="margin-bottom:2px">Fazenda Ametista <span style="font-weight:400;color:#6b7f74;font-size:16px">— PABLO FERREIRA</span></h1>
+  <div class="sub" style="margin-bottom:18px;letter-spacing:2px;text-transform:uppercase;font-size:10px">Controle de rebanho próprio</div>
+  <input type="email" id="email" placeholder="seu email" autocomplete="username">
+  <input type="password" id="senha" placeholder="senha" autocomplete="current-password">
+  <button class="btn" style="width:100%" onclick="entrar()">Entrar</button>
+  <div class="err" id="loginErr"></div>
+</div>
+
+<div id="app">
+  <div class="topbar">
+    <div class="ident">
+      <img src="./confinex-logo.jpg" alt="Logo" class="logo-img" style="width:48px;height:48px">
+      <div>
+        <h1>Fazenda Ametista <span style="font-weight:400;color:#6b7f74;font-size:16px">— PABLO FERREIRA</span></h1>
+        <div class="sub" id="subtitle"></div>
+      </div>
+    </div>
+    <div class="acoes">
+      <button class="btn sec" onclick="carregar()">↻ Atualizar</button>
+      <button class="btn sec" onclick="sair()">Sair</button>
+    </div>
+  </div>
+
+  <div class="aviso">Rebanho próprio, à parte do cocho e das parcerias. Gado pode ir da Ametista pro confinamento ou pra parceria Ricardo (ou não) — registre a saída aqui com o motivo; a entrada no destino é lançada separadamente em cada tela.</div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <h2>Registrar lançamento</h2>
+  <div class="card">
+    <div class="grid g6">
+      <div class="fld"><label>Tipo</label><select id="lTipo" onchange="atualizarMotivos()"><option value="entrada">Entrada</option><option value="saida">Saída</option></select></div>
+      <div class="fld"><label>Data</label><input type="date" id="lData"></div>
+      <div class="fld"><label>Cabeças</label><input type="number" id="lCab" value="1" min="1"></div>
+      <div class="fld"><label>Motivo</label><select id="lMotivo"></select></div>
+      <div class="fld" style="grid-column:span 2"><label>Obs</label><input type="text" id="lObs" placeholder="opcional"></div>
+    </div>
+    <div style="margin-top:12px"><button class="btn" onclick="lancar()">+ Lançar</button></div>
+    <div class="msg" id="msgLancar"></div>
+  </div>
+
+  <h2>Histórico de lançamentos</h2>
+  <div class="card scroll"><table id="tbHist"></table></div>
+
+  <div class="footer">Fazenda Ametista · dados ao vivo da base CFAgro · acesso protegido por login</div>
+</div>
+
+<a href="./" class="voltar-central">⌂ Central</a>
+
+<script>
+// db, fmtR$, fmtN, fmtD, esc vêm do cfagro-core.js (DS)
+const MOTIVOS = {
+  entrada: ['Compra','Nascimento','Transferência recebida','Outro'],
+  saida:   ['Venda','Envio para confinamento (cocho)','Envio para parceria Ricardo','Envio para parceria Xande','Morte/perda','Outro']
+};
+let LANC=[];
+
+function atualizarMotivos(){
+  const tipo=document.getElementById('lTipo').value;
+  document.getElementById('lMotivo').innerHTML = MOTIVOS[tipo].map(m=>`<option value="${m}">${m}</option>`).join('');
+}
+
+async function carregar(){
+  document.getElementById('subtitle').textContent='Carregando...';
+  if(!document.getElementById('lData').value) document.getElementById('lData').value=new Date().toISOString().slice(0,10);
+  atualizarMotivos();
+  const {data,error}=await db.from('fazenda_ametista').select('*').order('data',{ascending:true}).order('created_at',{ascending:true});
+  if(error){ document.getElementById('subtitle').textContent='Erro: '+error.message; return; }
+  LANC=data||[];
+  document.getElementById('subtitle').textContent=`Atualizado ${new Date().toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})} · ${LANC.length} lançamentos`;
+  renderKpis(); renderTabela();
+}
+
+function saldoAtual(){
+  return LANC.reduce((s,l)=>s+(l.tipo==='entrada'?1:-1)*Number(l.cabecas||0),0);
+}
+
+function renderKpis(){
+  const hoje=new Date().toISOString().slice(0,10);
+  const mes30=new Date(Date.now()-30*864e5).toISOString().slice(0,10);
+  const recentes=LANC.filter(l=>l.data>=mes30);
+  const entr30=recentes.filter(l=>l.tipo==='entrada').reduce((s,l)=>s+Number(l.cabecas||0),0);
+  const sai30=recentes.filter(l=>l.tipo==='saida').reduce((s,l)=>s+Number(l.cabecas||0),0);
+  const ultimo=LANC[LANC.length-1];
+  document.getElementById('kpis').innerHTML=[
+    ['Estoque atual', fmtN(saldoAtual()), 'cabeças na Ametista hoje'],
+    ['Entradas (30d)', fmtN(entr30), 'cabeças'],
+    ['Saídas (30d)', fmtN(sai30), 'cabeças'],
+    ['Último lançamento', ultimo?fmtD(ultimo.data):'—', ultimo?(ultimo.tipo==='entrada'?'+':'−')+ultimo.cabecas+' · '+(ultimo.motivo||''):'nenhum ainda'],
+  ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="d">${k[2]}</div></div>`).join('');
+}
+
+async function lancar(){
+  const g=id=>document.getElementById(id).value;
+  const rec={ tipo:g('lTipo'), data:g('lData')||null, cabecas:Number(g('lCab'))||0, motivo:g('lMotivo')||null, obs:g('lObs')||null };
+  const m=document.getElementById('msgLancar');
+  if(!rec.cabecas || rec.cabecas<1){ m.className='err'; m.textContent='Informe a quantidade de cabeças.'; return; }
+  const {error}=await db.from('fazenda_ametista').insert(rec);
+  if(error){ m.className='err'; m.textContent='Erro: '+error.message; return; }
+  m.className='msg'; m.textContent='Lançamento registrado.';
+  document.getElementById('lCab').value='1'; document.getElementById('lObs').value='';
+  carregar();
+}
+
+async function excluir(id){
+  if(!confirm('Excluir este lançamento?')) return;
+  const {error}=await db.from('fazenda_ametista').delete().eq('id',id);
+  if(error) alert('Erro: '+error.message); else carregar();
+}
+
+function renderTabela(){
+  let saldo=0;
+  const linhas = LANC.map(l=>{
+    saldo += (l.tipo==='entrada'?1:-1)*Number(l.cabecas||0);
+    return {...l, saldo};
+  });
+  document.getElementById('tbHist').innerHTML=
+   '<tr><th>Data</th><th>Tipo</th><th>Motivo</th><th class="num">Cabeças</th><th class="num">Saldo</th><th>Obs</th><th></th></tr>'+
+   (linhas.slice().reverse().map(l=>`
+    <tr><td>${fmtD(l.data)}</td>
+     <td>${l.tipo==='entrada'?'<span class="badge b-green">Entrada</span>':'<span class="badge b-red">Saída</span>'}</td>
+     <td>${esc(l.motivo)||'—'}</td>
+     <td class="num ${l.tipo==='entrada'?'pos':'neg'}">${l.tipo==='entrada'?'+':'−'}${fmtN(l.cabecas)}</td>
+     <td class="num">${fmtN(l.saldo)}</td>
+     <td class="wrap">${esc(l.obs)||''}</td>
+     <td><button class="btn mini sec" onclick="excluir('${l.id}')">×</button></td></tr>`).join('')
+   || '<tr><td colspan="7">Nenhum lançamento ainda.</td></tr>');
+}
+
+CFAgro.authInit(carregar);
+</script>
+</body>
+</html>

@@ -16,6 +16,7 @@ var NAV = [
   { sec:'Operações' },
   { href:'./confinex.html', rotulo:'Confinex',     icone:'🧮' },
   { href:'./confinamento.html', rotulo:'Confinamento', icone:'🐮' },
+  { href:'./fazenda-ametista.html', rotulo:'Fazenda Ametista', icone:'🌾' },
   { href:'https://pablofaraujo.github.io/boi-gordo-portfolio/', rotulo:'Portfolio B3', icone:'🗂', ext:true },
   { href:'./bgi.html',      rotulo:'BGI',           icone:'📈' },
   { href:'./bb.html',       rotulo:'Boi Balança',   icone:'⚖️' },
