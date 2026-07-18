@@ -12,7 +12,8 @@
 var BASE = 'https://pablofaraujo.github.io/Confinex/';
 
 var NAV = [
-  { href:'./',              rotulo:'Visão Geral',  icone:'⌂' },
+  { href:'./',              rotulo:'Geral',        icone:'⌂' },
+  { href:'./confinados.html', rotulo:'Confinados', icone:'🛡️' },
   { sec:'Operações' },
   { href:'./confinex.html', rotulo:'Confinex',     icone:'🧮' },
   { href:'./confinamento.html', rotulo:'Confinamento', icone:'🐮' },
