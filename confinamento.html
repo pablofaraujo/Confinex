@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CFAgro — Confinamento</title>
+<link rel="icon" type="image/png" href="./confinex-logo.jpg">
+<link rel="apple-touch-icon" href="./confinex-logo.jpg">
+<link rel="stylesheet" href="./design/tokens.css">
+<link rel="stylesheet" href="./design/components.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="./js/cfagro-core.js"></script>
+<script src="./js/cfagro-shell.js" defer></script>
+</head>
+<body>
+
+<div id="login" class="login-box card">
+<img src="./confinex-logo.jpg" alt="Logo" class="logo-img" style="width:72px;height:72px;margin-bottom:10px">
+<h1 style="margin-bottom:2px">CFAgro <span>— PABLO FERREIRA</span></h1>
+<div class="hub-sub" style="margin-bottom:18px">Central de Operações</div>
+<input type="email" id="email" placeholder="seu email" autocomplete="username">
+<input type="password" id="senha" placeholder="senha" autocomplete="current-password">
+<button class="btn" style="width:100%" onclick="entrar()">Entrar</button>
+<div class="err" id="loginErr"></div>
+</div>
+
+<div id="app">
+<div class="topbar">
+<div class="ident">
+<img src="./confinex-logo.jpg" alt="Logo" class="logo-img" style="width:48px;height:48px">
+<div>
+<h1>Confinamento <span>— CFAGRO</span></h1>
+<div class="sub" id="subtitle"></div>
+</div>
+</div>
+<div class="acoes">
+<button class="btn sec" onclick="carregar()">↻ Atualizar</button>
+<button class="btn sec" onclick="sair()">Sair</button>
+</div>
+</div>
+
+<div class="kpis" id="kpis"></div>
+
+<h2>Confinamentos (parceiros)</h2>
+<div class="card scroll"><table id="tbConf"></table></div>
+
+<h2>Lotes de confinamento</h2>
+<div class="card scroll"><table id="tbLotes"></table></div>
+
+<h2>Custos registrados por categoria</h2>
+<div class="card scroll"><table id="tbCustos"></table></div>
+
+<h2>Fechamentos — previsto × realizado</h2>
+<div class="card scroll"><table id="tbFechamentos"></table></div>
+
+<h2>Eventos recentes (pesagens, dieta, manejo)</h2>
+<div class="card scroll"><table id="tbEventos"></table></div>
+
+<div class="footer">Lendo ao vivo da base CFAgro (Supabase) · RLS ativo · CFAgro/Confinex</div>
+</div>
+
+<script>
+// db, fmtR$, fmtN, fmtD, cls vêm do js/cfagro-core.js (DS)
+
+const STATUS_BADGE = {
+  em_confinamento: '<span class="badge b-green">Em confinamento</span>',
+  comprada:        '<span class="badge b-amber">Comprada</span>',
+  abatida:         '<span class="badge">Abatida</span>',
+  cancelada:        '<span class="badge b-red">Cancelada</span>',
+};
+
+async function carregar(){
+  document.getElementById('subtitle').textContent = 'Carregando...';
+  const [ops, entradas, custos, eventos, fechamentos] = await Promise.all([
+    db.from('operacoes').select('id,codigo,status,sexo,modalidade,contrato_confinamento,resultado_previsto,confinamentos(id,nome,municipio,uf,modalidades)').not('confinamento_id','is',null),
+    db.from('entradas_confinamento').select('operacao_id,data_entrada,curral,cabecas,peso_embarque_kg,peso_chegada_kg,perda_transporte_pct,km_percorridos,gta,nf').order('data_entrada'),
+    db.from('custos_operacao').select('operacao_id,data,categoria,descricao,valor').order('categoria'),
+    db.from('eventos_operacao').select('operacao_id,data,tipo,descricao').order('data',{ascending:false}).limit(30),
+    db.from('fechamentos_operacao').select('operacao_id,previsto,realizado_bruto,realizado_liquido,hedge_creditado,desvio,explicacao')
+  ]);
+  const errs=[ops,entradas,custos,eventos,fechamentos].filter(r=>r.error);
+  if(errs.length){ document.getElementById('subtitle').textContent='Erro: '+errs[0].error.message; return; }
+
+  document.getElementById('subtitle').textContent =
+    `Atualizado ${new Date().toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})} · ${ops.data.length} lotes de confinamento no banco`;
+
+  // ---- agrupa entradas por operação
+  const entradasPorOp = {};
+  entradas.data.forEach(e=>{
+    (entradasPorOp[e.operacao_id] ||= []).push(e);
+  });
+
+  // ---- KPIs
+  const ativos = ops.data.filter(o=>['comprada','em_confinamento'].includes(o.status));
+  const cabAtivas = ativos.reduce((s,o)=>s + (entradasPorOp[o.id]||[]).reduce((s2,e)=>s2+Number(e.cabecas||0),0), 0);
+  const confinamentosAtivos = new Set(ativos.map(o=>o.confinamentos?.id).filter(Boolean)).size;
+  const abatidos = ops.data.filter(o=>o.status==='abatida').length;
+  const custoTotal = custos.data.reduce((s,c)=>s+Number(c.valor||0),0);
+  document.getElementById('kpis').innerHTML = [
+    ['Confinamentos ativos', fmtN(confinamentosAtivos), ativos.length+' lotes em aberto'],
+    ['Cabeças em confinamento', fmtN(cabAtivas), 'somando entradas dos lotes abertos'],
+    ['Lotes abatidos', fmtN(abatidos), 'de '+ops.data.length+' lotes no total'],
+    ['Custos registrados', fmtR$(custoTotal), custos.data.length+' lançamentos (frete/trato/financeiro)'],
+  ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="d">${k[2]}</div></div>`).join('');
+
+  // ---- Confinamentos (parceiros)
+  const porConfinamento = {};
+  ops.data.forEach(o=>{
+    const c = o.confinamentos;
+    if(!c) return;
+    const g = (porConfinamento[c.id] ||= {nome:c.nome, municipio:c.municipio, uf:c.uf, modalidades:c.modalidades||[], lotes:0, ativos:0, cabecas:0});
+    g.lotes++;
+    if(['comprada','em_confinamento'].includes(o.status)){
+      g.ativos++;
+      g.cabecas += (entradasPorOp[o.id]||[]).reduce((s,e)=>s+Number(e.cabecas||0),0);
+    }
+  });
+  document.getElementById('tbConf').innerHTML =
+    '<tr><th>Confinamento</th><th>Local</th><th>Modalidades</th><th class="num">Lotes (total)</th><th class="num">Lotes ativos</th><th class="num">Cabeças ativas</th></tr>'+
+    Object.values(porConfinamento).sort((a,b)=>b.ativos-a.ativos || a.nome.localeCompare(b.nome)).map(c=>
+      `<tr><td><b>${c.nome}</b></td><td>${[c.municipio,c.uf].filter(Boolean).join('/')||'—'}</td>
+      <td>${c.modalidades.join(', ')||'—'}</td><td class="num">${fmtN(c.lotes)}</td>
+      <td class="num">${fmtN(c.ativos)}</td><td class="num">${fmtN(c.cabecas)}</td></tr>`
+    ).join('') || '<tr><td colspan="6">Nenhum confinamento cadastrado</td></tr>';
+
+  // ---- Lotes de confinamento
+  document.getElementById('tbLotes').innerHTML =
+    '<tr><th>Lote</th><th>Confinamento</th><th>Modalidade</th><th>Sexo</th><th>Status</th><th>Contrato</th><th>Curral(is)</th><th class="num">Cabeças</th><th>Entrada</th><th class="num">Perda transp.</th><th>GTA / NF</th></tr>'+
+    ops.data.sort((a,b)=>a.codigo.localeCompare(b.codigo)).map(o=>{
+      const ent = entradasPorOp[o.id]||[];
+      const currais = [...new Set(ent.map(e=>e.curral).filter(c=>c&&c!=='-'))].join(', ') || '—';
+      const cab = ent.reduce((s,e)=>s+Number(e.cabecas||0),0);
+      const dataEnt = ent.length ? ent.map(e=>e.data_entrada).sort()[0] : null;
+      const perdas = ent.map(e=>Number(e.perda_transporte_pct)).filter(v=>!isNaN(v));
+      const perdaMedia = perdas.length ? perdas.reduce((a,b)=>a+b,0)/perdas.length : null;
+      const docs = [...new Set(ent.flatMap(e=>[e.gta,e.nf].filter(Boolean)))].join(' · ') || '—';
+      return `<tr><td><b>${o.codigo}</b></td><td>${o.confinamentos?.nome||'—'}</td><td>${o.modalidade||'—'}</td>
+      <td>${o.sexo||'—'}</td><td>${STATUS_BADGE[o.status]||o.status}</td><td>${o.contrato_confinamento||'—'}</td>
+      <td>${currais}</td><td class="num">${cab||'—'}</td><td>${dataEnt?fmtD(dataEnt):'—'}</td>
+      <td class="num ${perdaMedia!=null && perdaMedia<-0.001?'neg':''}">${perdaMedia!=null?(perdaMedia*100).toFixed(1)+'%':'—'}</td>
+      <td class="wrap">${docs}</td></tr>`;
+    }).join('') || '<tr><td colspan="11">Nenhum lote de confinamento</td></tr>';
+
+  // ---- Custos por categoria
+  const porCategoria = {};
+  custos.data.forEach(c=>{
+    const g = (porCategoria[c.categoria||'outros'] ||= {qtd:0, total:0});
+    g.qtd++; g.total += Number(c.valor||0);
+  });
+  document.getElementById('tbCustos').innerHTML =
+    '<tr><th>Categoria</th><th class="num">Lançamentos</th><th class="num">Valor total</th></tr>'+
+    Object.entries(porCategoria).sort((a,b)=>b[1].total-a[1].total).map(([cat,g])=>
+      `<tr><td>${cat}</td><td class="num">${fmtN(g.qtd)}</td><td class="num">${fmtR$(g.total)}</td></tr>`
+    ).join('') || '<tr><td colspan="3">Nenhum custo registrado</td></tr>';
+
+  // ---- Fechamentos (previsto x realizado)
+  const opsPorId = {}; ops.data.forEach(o=>opsPorId[o.id]=o);
+  document.getElementById('tbFechamentos').innerHTML =
+    '<tr><th>Lote</th><th class="num">Previsto</th><th class="num">Realizado bruto</th><th class="num">Realizado líquido</th><th class="num">Hedge creditado</th><th class="num">Desvio</th></tr>'+
+    fechamentos.data.map(f=>{
+      const o = opsPorId[f.operacao_id];
+      return `<tr><td><b>${o?.codigo||'—'}</b></td><td class="num">${fmtR$(f.previsto)}</td>
+      <td class="num">${fmtR$(f.realizado_bruto)}</td><td class="num">${fmtR$(f.realizado_liquido)}</td>
+      <td class="num">${fmtR$(f.hedge_creditado)}</td><td class="num ${cls(f.desvio)}">${fmtR$(f.desvio)}</td></tr>`;
+    }).join('') || '<tr><td colspan="6">Sem fechamentos registrados ainda — nenhum lote foi fechado nesta tabela até o momento.</td></tr>';
+
+  // ---- Eventos recentes
+  document.getElementById('tbEventos').innerHTML =
+    '<tr><th>Data</th><th>Lote</th><th>Tipo</th><th>Descrição</th></tr>'+
+    eventos.data.map(e=>{
+      const o = opsPorId[e.operacao_id];
+      return `<tr><td>${fmtD(e.data)}</td><td><b>${o?.codigo||'—'}</b></td><td>${e.tipo||'—'}</td><td class="wrap">${e.descricao||''}</td></tr>`;
+    }).join('') || '<tr><td colspan="4">Sem eventos registrados ainda (pesagens, dieta, manejo) — tabela vazia no momento.</td></tr>';
+}
+
+CFAgro.authInit(carregar);
+</script>
+</body>
+</html>

@@ -21,6 +21,7 @@ Leia conforme a tarefa:
 |---|---|
 | `index.html` | Visão Geral — Home/dashboard do ecossistema (KPIs, exposição, estoque, pendências, acertos, fluxo; absorveu o antigo painel) |
 | `confinex.html` + `confinex-app.latest.js` | Confinex — simulador de compra/confinamento/revenda (React 19 via esm.sh; bundle esbuild commitado, sem `src/` no repo) |
+| `confinamento.html` | Confinamento — visão operacional ao vivo por confinamento/parceiro: lotes, currais, entradas (GTA/NF/peso/perda de transporte), custos por categoria, fechamentos previsto×realizado. Lê `operacoes`/`confinamentos`/`entradas_confinamento`/`custos_operacao`/`eventos_operacao`/`fechamentos_operacao` (populadas em 07/07/2026 por outra sessão, sem UI até esta página — `eventos_operacao`/`fechamentos_operacao` ainda vazias) |
 | `bb.html` | Boi Balança — giro rápido balança→gancho |
 | `bgi.html` | BGI — posições de hedge B3 (módulo principal; o portfolio externo `boi-gordo-portfolio` virou link secundário na topbar) |
 | `ocr-pesagem.html` | OCR Pesagem — leitura de tickets de balança (tema escuro próprio, ainda fora do DS) |
@@ -32,7 +33,7 @@ Leia conforme a tarefa:
 
 ## Backend
 
-- **Supabase** `fkmdzwjmjlmxqotznvgq.supabase.co` — usado por bb, bgi, painel, ops, abate e index (auth email/senha, chave publicável hardcoded, RLS protege). Tabelas principais: `operacoes` (status inclui `liquidada` desde jul/2026 — compra paga + venda conciliada), `compras`, `vendas`, `posicoes_hedge`, `alocacoes_hedge`, `cotacoes_bgi`, `pendencias_documentos`, `acertos`, `fluxo_caixa` (jul/2026: conciliação liga `operacao_id` ao lançamento real de entrada), `promissorias`, `vps_briefings`, `ecossistema_inventario`, `ecossistema_status`, `abates`, `abate_animais` (romaneio por animal); views `v_exposicao_hedge`, `v_estoque_atual`.
+- **Supabase** `fkmdzwjmjlmxqotznvgq.supabase.co` — usado por bb, bgi, painel, ops, abate, confinamento e index (auth email/senha, chave publicável hardcoded, RLS protege). Tabelas principais: `operacoes` (status inclui `liquidada` desde jul/2026 — compra paga + venda conciliada; `confinamento_id` linka a `confinamentos`), `compras`, `vendas`, `posicoes_hedge`, `alocacoes_hedge`, `cotacoes_bgi`, `pendencias_documentos`, `acertos`, `fluxo_caixa` (jul/2026: conciliação liga `operacao_id` ao lançamento real de entrada), `promissorias`, `vps_briefings`, `ecossistema_inventario`, `ecossistema_status`, `abates`, `abate_animais` (romaneio por animal); views `v_exposicao_hedge`, `v_estoque_atual`. **Grupo `confinamento` (criado 07/07/2026, sem UI até `confinamento.html`)**: `confinamentos` (cadastro dos parceiros/confinadores), `entradas_confinamento` (curral, peso embarque/chegada, perda de transporte, GTA/NF por lote — pode ter várias entradas por operação), `custos_operacao` (frete/trato/financeiro/baldeio/adiantamento_juros), `eventos_operacao` e `fechamentos_operacao` (ainda vazias). Também `transacoes_banco` e `emprestimos` (conciliação bancária Sicoob, jul/2026, sem UI ainda) e `notas_fiscais_xml_raw` (staging bruto de NFe/NFSe, não curado).
 - **Confinex é a exceção**: localStorage + Google Sheets via Apps Script (JSONP para leitura, POST para escrita, debounce 10s, detecção de conflito multi-dispositivo por `clientUpdatedAt`). Chaves: `confinex:last-state:v3`, `confinex:named-versions:v1`, etc.
 
 ## Deploy
