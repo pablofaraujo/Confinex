@@ -39,7 +39,7 @@
     </div>
   </div>
 
-  <div class="aviso">Modelo: sociedade <b>50/50</b>. Lucro = receita bruta − Funrural − compra − custos, dividido meio a meio. Referência: Negócio Nº 3 (novilhas Amauri + acerto Wilson/Maxibeef).</div>
+  <div class="aviso">Modelo: sociedade por negócio (o rateio varia — nem sempre é 50/50). Lucro = receita bruta − Funrural − compra − custos, dividido pelo percentual definido em cada negócio.</div>
 
   <div class="kpis" id="kpis"></div>
 
@@ -52,6 +52,7 @@
       <div class="fld"><label>Funrural (R$)</label><input type="number" id="nFun" step=".01" value="0" oninput="prev()"></div>
       <div class="fld"><label>Compra do gado (R$)</label><input type="number" id="nComp" step=".01" value="0" oninput="prev()"></div>
       <div class="fld"><label>Outros custos (R$)</label><input type="number" id="nCust" step=".01" value="0" oninput="prev()"></div>
+      <div class="fld"><label>% do Xande no negócio</label><input type="number" id="nPct" step="1" value="50" min="0" max="100" oninput="prev()"></div>
     </div>
     <div class="res" id="prevRes" style="margin-top:12px"></div>
     <div style="margin-top:12px;display:flex;gap:8px"><button class="btn" onclick="salvar()">+ Salvar negócio</button></div>
@@ -81,15 +82,20 @@ async function carregar(){
   renderKpis(); renderTabela(); prev();
 }
 
+const pctXande = n => n.percentual_xande!=null ? Number(n.percentual_xande) : 50;
+const parteXande = n => lucroDe(n)*pctXande(n)/100;
+const partePablo = n => lucroDe(n)*(100-pctXande(n))/100;
+
 function renderKpis(){
   const lucro=NEG.reduce((s,n)=>s+lucroDe(n),0);
-  const meta=lucro/2;
-  const aAcertar=NEG.filter(n=>!n.acertado).reduce((s,n)=>s+lucroDe(n)/2,0);
+  const xandeTot=NEG.reduce((s,n)=>s+parteXande(n),0);
+  const pabloTot=NEG.reduce((s,n)=>s+partePablo(n),0);
+  const aAcertar=NEG.filter(n=>!n.acertado).reduce((s,n)=>s+parteXande(n),0);
   document.getElementById('kpis').innerHTML=[
     ['Negócios', NEG.length, 'registrados'],
     ['Lucro total', fmtR$(lucro), 'receita − custos'],
-    ['Parte Xande (50%)', fmtR$(meta), ''],
-    ['Sua parte (50%)', fmtR$(meta), ''],
+    ['Parte Xande', fmtR$(xandeTot), 'soma do % de cada negócio'],
+    ['Sua parte', fmtR$(pabloTot), 'soma do % de cada negócio'],
     ['A acertar', fmtR$(aAcertar), 'parte Xande pendente'],
   ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="d">${k[2]}</div></div>`).join('');
 }
@@ -97,10 +103,11 @@ function renderKpis(){
 function prev(){
   const g=id=>Number(document.getElementById(id).value)||0;
   const lucro=g('nRec')-g('nFun')-g('nComp')-g('nCust');
+  const pct=Math.min(100,Math.max(0,g('nPct')||50));
   document.getElementById('prevRes').innerHTML=[
     ['Lucro do negócio', `<span class="${cls(lucro)}">${fmtR$(lucro)}</span>`],
-    ['Parte Xande', fmtR$(lucro/2)],
-    ['Sua parte', fmtR$(lucro/2)],
+    [`Parte Xande (${pct}%)`, fmtR$(lucro*pct/100)],
+    [`Sua parte (${100-pct}%)`, fmtR$(lucro*(100-pct)/100)],
   ].map(r=>`<div class="r"><div class="l">${r[0]}</div><div class="v">${r[1]}</div></div>`).join('');
 }
 
@@ -108,13 +115,15 @@ async function salvar(){
   const g=id=>document.getElementById(id).value;
   const rec={ numero:g('nNum')||null, descricao:g('nDesc')||null,
               receita_bruta:Number(g('nRec'))||0, funrural:Number(g('nFun'))||0,
-              compra:Number(g('nComp'))||0, custos:Number(g('nCust'))||0, status:'aberto' };
+              compra:Number(g('nComp'))||0, custos:Number(g('nCust'))||0,
+              percentual_xande:Math.min(100,Math.max(0,Number(g('nPct'))||50)), status:'aberto' };
   const err=document.getElementById('msgErr'); err.textContent='';
   if(!rec.receita_bruta && !rec.compra){ err.textContent='Informe ao menos receita ou compra.'; return; }
   const {error}=await db.from('parceria_xande').insert(rec);
   if(error){ err.textContent='Erro: '+error.message; return; }
   ['nNum','nDesc','nRec'].forEach(id=>document.getElementById(id).value='');
   ['nFun','nComp','nCust'].forEach(id=>document.getElementById(id).value='0');
+  document.getElementById('nPct').value='50';
   carregar();
 }
 
@@ -131,17 +140,19 @@ async function excluir(id){
 
 function renderTabela(){
   document.getElementById('tbNeg').innerHTML=
-   '<tr><th>Nº</th><th>Descrição</th><th class="num">Receita</th><th class="num">Funrural</th><th class="num">Compra</th><th class="num">Custos</th><th class="num">Lucro</th><th class="num">Xande 50%</th><th class="num">Você 50%</th><th>Status</th><th></th></tr>'+
+   '<tr><th>Nº</th><th>Descrição</th><th class="num">Receita</th><th class="num">Funrural</th><th class="num">Compra</th><th class="num">Custos</th><th class="num">Lucro</th><th class="num">% Xande</th><th class="num">Xande</th><th class="num">Você</th><th>Status</th><th></th></tr>'+
    (NEG.map(n=>{
      const L=lucroDe(n);
+     const pct=pctXande(n);
      const st=n.acertado?'<span class="badge b-green">Acertado</span>':'<span class="badge b-amber">A acertar</span>';
      return `<tr><td><b>${esc(n.numero)||'—'}</b></td><td class="wrap">${esc(n.descricao)||'—'}</td>
        <td class="num">${fmtR$(n.receita_bruta)}</td><td class="num">${fmtR$(n.funrural)}</td>
        <td class="num">${fmtR$(n.compra)}</td><td class="num">${fmtR$(n.custos)}</td>
-       <td class="num ${cls(L)}">${fmtR$(L)}</td><td class="num">${fmtR$(L/2)}</td><td class="num">${fmtR$(L/2)}</td>
+       <td class="num ${cls(L)}">${fmtR$(L)}</td><td class="num">${pct}%</td>
+       <td class="num">${fmtR$(parteXande(n))}</td><td class="num">${fmtR$(partePablo(n))}</td>
        <td>${st}</td>
        <td>${n.acertado?'':`<button class="btn mini" onclick="marcarAcertado('${n.id}')">acertar</button> `}<button class="btn mini sec" onclick="excluir('${n.id}')">×</button></td></tr>`;
-   }).join('') || '<tr><td colspan="11">Nenhum negócio registrado ainda.</td></tr>');
+   }).join('') || '<tr><td colspan="12">Nenhum negócio registrado ainda.</td></tr>');
 }
 
 CFAgro.authInit(carregar);
