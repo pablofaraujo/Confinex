@@ -8,4 +8,160 @@
 <link rel="apple-touch-icon" href="./confinex-logo.jpg">
 <link rel="stylesheet" href="./design/tokens.css">
 <link rel="stylesheet" href="./design/components.css">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/s
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="./js/cfagro-core.js"></script>
+<script src="./js/cfagro-shell.js" defer></script>
+</head>
+<body>
+
+<div id="login" class="login-box card">
+<img src="./confinex-logo.jpg" alt="Logo" class="logo-img" style="width:72px;height:72px;margin-bottom:10px">
+<h1 style="margin-bottom:2px">CFAgro <span>— PABLO FERREIRA</span></h1>
+<div class="hub-sub" style="margin-bottom:18px">Visão Geral do ecossistema</div>
+<input type="email" id="email" placeholder="seu email" autocomplete="username">
+<input type="password" id="senha" placeholder="senha" autocomplete="current-password">
+<button class="btn" style="width:100%" onclick="entrar()">Entrar</button>
+<div class="err" id="loginErr"></div>
+</div>
+
+<div id="app">
+<div class="topbar">
+<div class="ident">
+<img src="./confinex-logo.jpg" alt="Logo" class="logo-img" style="width:48px;height:48px">
+<div>
+<h1>Visão Geral <span>— CFAGRO</span></h1>
+<div class="sub" id="subtitle"></div>
+</div>
+</div>
+<div class="acoes">
+<button class="btn sec" onclick="carregar()">↻ Atualizar</button>
+<button class="btn sec" onclick="sair()">Sair</button>
+</div>
+</div>
+
+<div class="kpis" id="kpis"></div>
+
+<h2>Áreas do ecossistema</h2>
+<div class="apps">
+  <a class="app" href="./confinados.html">
+    <div class="ico" style="background:#e8f5ee">📊</div>
+    <div><div class="t">Confinados</div><div class="d">Hedge B3, exposição, estoque em confinamento, fluxo de caixa</div></div>
+    <div class="arrow">›</div>
+  </a>
+  <a class="app" href="./confinamento.html">
+    <div class="ico" style="background:#fdf3e7">🐮</div>
+    <div><div class="t">Confinamento</div><div class="d">Visão operacional por lote: currais, entradas, custos, fechamentos</div></div>
+    <div class="arrow">›</div>
+  </a>
+  <a class="app" href="./fazenda-ametista.html">
+    <div class="ico" style="background:#eef6e8">🌾</div>
+    <div><div class="t">Fazenda Ametista</div><div class="d">Ledger de entrada/saída do rebanho próprio</div></div>
+    <div class="arrow">›</div>
+  </a>
+  <a class="app" href="./bb.html">
+    <div class="ico" style="background:#eef2ff">⚖️</div>
+    <div><div class="t">Boi Balança</div><div class="d">Giro rápido balança → gancho</div></div>
+    <div class="arrow">›</div>
+  </a>
+  <a class="app" href="./parceria-ricardo.html">
+    <div class="ico" style="background:#e8f5ee">🐂</div>
+    <div><div class="t">Parceria Ricardo</div><div class="d">Engorda por ganho — 60% Ricardo / 40% Pablo</div></div>
+    <div class="arrow">›</div>
+  </a>
+  <a class="app" href="./parceria-xande.html">
+    <div class="ico" style="background:#dbeafe">🤝</div>
+    <div><div class="t">Parceria Xande</div><div class="d">Sociedade por negócio — rateio variável</div></div>
+    <div class="arrow">›</div>
+  </a>
+</div>
+
+<div class="footer">Lendo ao vivo da base CFAgro (Supabase) · RLS ativo · CFAgro/Confinex</div>
+</div>
+
+<script>
+function calcRicardo(r){
+  const ent=Number(r.peso_entrada||0), sai=Number(r.peso_saida||0), cab=Number(r.cabecas||0);
+  const perdas=Number(r.perdas||0), rend=Number(r.rendimento||50), preco=Number(r.preco_acordado||0);
+  const vivos=Math.max(0, cab-perdas);
+  const ganhoKg=Math.max(0, sai-ent);
+  const ganhoArr = r.preco_base==='kg' ? null : ganhoKg*rend/100/15;
+  const valorCab = r.preco_base==='kg' ? ganhoKg*preco : ganhoArr*preco;
+  return valorCab*vivos*0.6;
+}
+
+const lucroXande = n => Number(n.receita_bruta||0)-Number(n.funrural||0)-Number(n.compra||0)-Number(n.custos||0);
+
+function consultaComTimeout(nome, consulta, ms=12000){
+  return Promise.race([
+    consulta.then(r => ({nome, ...r})).catch(error => ({nome, data:[], error})),
+    new Promise(resolve => setTimeout(() => resolve({
+      nome,
+      data:[],
+      error:{message:`Tempo excedido ao carregar ${nome}`}
+    }), ms))
+  ]);
+}
+
+async function carregar(){
+  const subtitle=document.getElementById('subtitle');
+  const kpis=document.getElementById('kpis');
+  subtitle.textContent='Carregando...';
+
+  try {
+    const resultados = await Promise.all([
+      consultaComTimeout('Fazenda Ametista', db.from('fazenda_ametista').select('tipo,cabecas')),
+      consultaComTimeout('Operações de confinamento', db.from('operacoes').select('id,status').not('confinamento_id','is',null)),
+      consultaComTimeout('Entradas de confinamento', db.from('entradas_confinamento').select('operacao_id,cabecas')),
+      consultaComTimeout('Parceria Ricardo', db.from('parceria_ricardo').select('*')),
+      consultaComTimeout('Parceria Xande', db.from('parceria_xande').select('*')),
+      consultaComTimeout('Boi Balança', db.from('operacoes').select('id,compras(quantidade)').eq('tipo_negocio','boi_balanca').not('status','in','("liquidada","cancelada")'))
+    ]);
+
+    const [fazenda, confOps, confEntradas, ricardo, xande, bb] = resultados;
+    const falhas=resultados.filter(r=>r.error);
+
+    const cabFazenda = (fazenda.data||[]).reduce((s,l)=>s+(l.tipo==='entrada'?1:-1)*Number(l.cabecas||0),0);
+    const entradasPorOp = {};
+    (confEntradas.data||[]).forEach(e=>{
+      entradasPorOp[e.operacao_id]=(entradasPorOp[e.operacao_id]||0)+Number(e.cabecas||0);
+    });
+    const confAtivas = (confOps.data||[]).filter(o=>['comprada','em_confinamento'].includes(o.status));
+    const cabConfinamento = confAtivas.reduce((s,o)=>s+(entradasPorOp[o.id]||0),0);
+    const cabRicardoEngorda = (ricardo.data||[]).filter(r=>r.status==='engorda').reduce((s,r)=>s+Number(r.cabecas||0),0);
+    const cabBB = (bb.data||[]).reduce((s,o)=>s+(o.compras||[]).reduce((s2,c)=>s2+Number(c.quantidade||0),0),0);
+    const cabecasTotal = cabFazenda + cabConfinamento + cabRicardoEngorda + cabBB;
+
+    const aRicardo = (ricardo.data||[]).filter(r=>r.status!=='engorda' && !r.acertado).reduce((s,r)=>s+calcRicardo(r),0);
+    const aXande = (xande.data||[]).filter(n=>!n.acertado).reduce((s,n)=>{
+      const pct = n.percentual_xande!=null ? Number(n.percentual_xande) : 50;
+      return s + lucroXande(n)*pct/100;
+    },0);
+
+    kpis.innerHTML = [
+      ['Cabeças sob controle', fmtN(cabecasTotal), 'Fazenda + confinamento + engorda Ricardo + Boi Balança'],
+      ['Confinamentos ativos', fmtN(confAtivas.length), cabConfinamento+' cabeças no cocho'],
+      ['Fazenda Ametista', fmtN(cabFazenda), 'cabeças no rebanho próprio'],
+      ['Boi Balança em aberto', fmtN((bb.data||[]).length), cabBB+' cabeças'],
+      ['A acertar — Ricardo', fmtR$(aRicardo), 'parte dele pendente'],
+      ['A acertar — Xande', fmtR$(aXande), 'parte dele pendente, rateio variável']
+    ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="d">${k[2]}</div></div>`).join('');
+
+    const atualizado=`Atualizado ${new Date().toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}`;
+    subtitle.textContent = falhas.length
+      ? `${atualizado} · ${falhas.length} fonte(s) indisponível(is): ${falhas.map(f=>f.nome).join(', ')}`
+      : atualizado;
+  } catch(error){
+    console.error('Falha ao carregar visão geral:', error);
+    subtitle.textContent='Erro ao carregar: '+(error?.message||'falha desconhecida');
+    kpis.innerHTML='<div class="card"><b>Não foi possível carregar os indicadores.</b><br>Tente novamente pelo botão Atualizar.</div>';
+  }
+}
+
+if(!window.CFAgro || !window.db){
+  document.getElementById('loginErr').textContent='Erro ao iniciar conexão com o banco. Recarregue a página.';
+} else {
+  CFAgro.authInit(carregar);
+}
+</script>
+</body>
+</html>
