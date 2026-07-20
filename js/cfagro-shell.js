@@ -23,6 +23,7 @@ var NAV = [
   { href:'./bb.html',       rotulo:'Boi Balança',   icone:'⚖️' },
   { href:'./abate.html',    rotulo:'Abate',         icone:'🥩' },
   { href:'./ocr-pesagem.html',rotulo:'OCR Pesagem', icone:'📷' },
+  { href:'https://monitoring.livestock.datamars.com/', rotulo:'Datamars Livestock', icone:'🏷️', ext:true },
   { href:'./painel-boi-gordo.html', rotulo:'Painel Boi Gordo', icone:'📊' },
   { href:'./#fluxo',        rotulo:'Financeiro',    icone:'💰' },
   { sec:'Parcerias' },
