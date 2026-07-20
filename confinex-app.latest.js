@@ -39,6 +39,7 @@ body{background:${T.bg};color:${T.text};font-family:'Plus Jakarta Sans',sans-ser
 .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
 .g4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px}
 @media(max-width:680px){.g2,.g3,.g4{grid-template-columns:1fr 1fr}}
+@media(max-width:680px){.hdr{flex-direction:column;gap:14px}.hdr>div:last-child{margin-left:0!important;width:100%;flex-wrap:wrap}}
 @media(max-width:420px){.g2,.g3,.g4{grid-template-columns:1fr}}
 .fld{display:flex;flex-direction:column;gap:5px}
 .lbl{font-size:10px;font-weight:600;color:${T.label};letter-spacing:.5px;text-transform:uppercase}
@@ -1872,6 +1873,7 @@ function Confinex() {
           ] })
         ] }),
         /* @__PURE__ */ jsxs("div", { style: { marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }, children: [
+          /* @__PURE__ */ jsx("a", { href: "./", className: "tb", style: { display: "inline-flex", alignItems: "center", textDecoration: "none", whiteSpace: "nowrap" }, children: "\u2302 In\xEDcio" }),
           /* @__PURE__ */ jsxs(
             "label",
             {
