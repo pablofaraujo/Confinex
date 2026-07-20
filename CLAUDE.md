@@ -19,7 +19,7 @@ Leia conforme a tarefa:
 
 | Arquivo | App |
 |---|---|
-| `index.html` | Visão Geral — Home/dashboard do ecossistema (KPIs, exposição, estoque, pendências, acertos, fluxo; absorveu o antigo painel) |
+| `index.html` | Visão Geral — Home/dashboard do ecossistema (total de cabeças, confinados, Fazenda Ametista, Parceria Ricardo e cobertura de arrobas por confinamento) |
 | `confinex.html` + `confinex-app.latest.js` + `confinex-app.mobile.js` | Confinex — simulador de compra/confinamento/revenda. O arquivo `latest` preserva o bundle legível; `mobile` contém React 19 e o app empacotados em um único script compatível com Safari móvel, sem import map ou módulos externos |
 | `fazenda-ametista.html` | Fazenda Ametista — ledger de entrada/saída de cabeças do rebanho próprio (gado que ainda não foi pra cocho/confinamento nem pra parceria). KPI de estoque atual = soma de entradas − saídas. Tabela `fazenda_ametista`. Existia só como arquivo solto no Drive desde 12/07/2026 (nunca commitado, tabela nunca criada) até ser trazido ao repo em 18/07/2026 — histórico retroativo de movimentação ainda não foi lançado |
 | `confinamento.html` | Confinamento — visão operacional ao vivo por confinamento/parceiro: lotes, currais, entradas (GTA/NF/peso/perda de transporte), custos por categoria, fechamentos previsto×realizado. Lê `operacoes`/`confinamentos`/`entradas_confinamento`/`custos_operacao`/`eventos_operacao`/`fechamentos_operacao` (populadas em 07/07/2026 por outra sessão, sem UI até esta página — `eventos_operacao`/`fechamentos_operacao` ainda vazias) |
@@ -48,15 +48,15 @@ Push na `main` → workflow `deploy.yml` publica o repositório inteiro no GitHu
 ## Convenções
 
 - Tudo em pt-BR: código, variáveis, UI, commits.
-- Single-file por app na lógica, mas visual e infra compartilhados: páginas carregam `design/tokens.css` + `design/components.css` + `js/cfagro-core.js` (client Supabase único, `fmtR$`/`fmtN`/`fmtD` etc. e `CFAgro.authInit`) + `js/cfagro-shell.js` (sidebar fixa de navegação, defer). Sem framework, sem package.json, sem testes. `confinex.html` (jul/2026) passou a carregar tokens.css/components.css/cfagro-shell.js também (ganhou a sidebar), mas segue sem `cfagro-core.js` — é bundle React (fase 4) com persistência própria (Sheets/localStorage). **`ops.html` (jul/2026) é a exceção inversa**: removeu `cfagro-core.js` e passou a duplicar localmente client Supabase + variáveis de tema/estilos que já existem em `components.css` — foge da convenção, não seguir esse padrão em código novo.
-- Fonte padrão: Inter (via tokens.css). Dark mode preparado em `[data-theme=dark]`, sem toggle ainda.
+- Single-file por app na lógica, mas visual e infra compartilhados: páginas carregam `design/tokens.css` + `design/components.css` + `js/cfagro-shell.js` (cabeçalho azul-marinho, logo amarelo, sidebar e navegação móvel). As páginas Supabase também carregam `js/cfagro-core.js`, salvo `ops.html`, que mantém apenas seu client local por motivo legado, mas reutiliza integralmente os estilos do DS. `confinex.html` usa o shell compartilhado e preserva sua lógica React/Sheets própria.
+- Fonte padrão: Inter (via tokens.css). Identidade visual global: cabeçalho azul-marinho, amarelo do logo como destaque, superfícies brancas e sem gradientes. Dark mode preparado em `[data-theme=dark]`, sem toggle ainda.
 - Botão flutuante "⌂ Central" (`.voltar-central`) em toda página-satélite.
 - Ações destrutivas com `confirm()`/`prompt()` nativos.
 - Constantes de domínio: **1 @ = 15 kg**; **1 contrato BGI = 330 @**; RC padrão 50–53%; 65 bois/carreta (macho) / 70 (fêmea); limite de capim padrão 300 kg; Funrural 0,2% default (Confinex e simulador do bb — alinhados desde jul/2026).
 
 ## Armadilhas conhecidas
 
-- O fonte do Confinex não está no repo — `confinex-app.latest.js` é o bundle legível usado como entrada e `confinex-app.mobile.js` é o pacote de execução autocontido. Ao editar o `latest`, regenere o `mobile` com React 19.2.6 e alvo Safari 14 antes do deploy.
+- O fonte do Confinex não está no repo — `confinex-app.latest.js` é o bundle legível usado como entrada e `confinex-app.mobile.js` é o pacote de execução autocontido. Ao editar o `latest`, regenere o `mobile` com React 19 e alvo Safari 14 antes do deploy.
 - Cotações B3: cascata frágil (API B3 → histórico → Yahoo `{contrato}.SA` → scrape CEPEA via allorigins.win) com heurística `extrairNumeroB3` que aceita qualquer número entre 100 e 800.
 - `rolar()`/`encerrar()`/`encerrarParcial()` no bgi.html fazem escritas sequenciais sem transação.
 - `central.html` legada e `bgi.html` órfão podem divergir do resto.

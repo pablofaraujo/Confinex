@@ -1,7 +1,7 @@
 /* ============================================================
    CFAgro shell — sidebar fixa de navegação (mesma em todo módulo).
    Carregar com defer em toda página do ecossistema (exceto as
-   ainda fora do DS: confinex.html e ocr-pesagem.html), e também no
+   incluindo Confinex e OCR Pesagem), e também no
    boi-gordo-portfolio (repo separado) para manter a navegação
    consistente — por isso os links são absolutos, não relativos.
    Estilos: design/components.css (seção Shell). Docs: DESIGN.md
@@ -23,6 +23,10 @@ var NAV = [
   { href:'./bb.html',       rotulo:'Boi Balança',   icone:'⚖️' },
   { href:'./abate.html',    rotulo:'Abate',         icone:'🥩' },
   { href:'./ocr-pesagem.html',rotulo:'OCR Pesagem', icone:'📷' },
+  { sep:true },
+  { href:'https://monitoring.livestock.datamars.com/', rotulo:'Datamars Livestock', icone:'🏷️', ext:true },
+  { href:'https://app.agronota.com.br/', rotulo:'AgroNota', icone:'🧾', ext:true },
+  { href:'https://www.sidagro.ima.mg.gov.br/portaldoprodutor/login.jsf', rotulo:'IMA / SIDAGRO', icone:'🏛️', ext:true },
   { href:'./painel-boi-gordo.html', rotulo:'Painel Boi Gordo', icone:'📊' },
   { href:'./#fluxo',        rotulo:'Financeiro',    icone:'💰' },
   { sec:'Parcerias' },
@@ -58,9 +62,9 @@ function montar(){
   var aside = document.createElement('aside');
   aside.className = 'shell-side';
   aside.innerHTML =
-    '<a class="shell-logo" href="'+BASE+'"><img src="'+BASE+'confinex-logo.jpg" alt=""><b>CFAgro</b></a>' +
     NAV.map(function(n){
       if(n.sec) return '<div class="shell-sec">'+n.sec+'</div>';
+      if(n.sep) return '<div class="shell-sep" aria-hidden="true"></div>';
       var full = resolveHref(n.href);
       var arquivo = full.split('#')[0].split('/').pop() || 'index.html';
       var ativa = onPortfolio
@@ -71,7 +75,13 @@ function montar(){
       return '<a class="shell-link'+ativa+'" href="'+full+'"'+alvo+'><span>'+n.icone+'</span>'+n.rotulo+ext+'</a>';
     }).join('');
 
-  document.body.prepend(aside);
+  var topo = document.createElement('header');
+  topo.className = 'shell-top';
+  topo.innerHTML =
+    '<a class="shell-brand" href="'+BASE+'"><img src="'+BASE+'confinex-logo.jpg" alt="Logo Confinex"><span>CONFINEX</span></a>'+
+    '<div class="shell-context">Ecossistema pecuário CFAgro</div>';
+
+  document.body.prepend(topo, aside);
   document.body.appendChild(main);
   document.body.classList.add('has-shell');
 }

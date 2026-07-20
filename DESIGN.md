@@ -1,6 +1,6 @@
 # DESIGN.md — Design System CFAgro
 
-**Fonte única da verdade visual do ecossistema.** Benchmark: Linear, Stripe Dashboard, GitHub — densidade de dados alta, cinzas neutros, um único verde de destaque, sombras sutis, zero gradiente e zero animação decorativa.
+**Fonte única da verdade visual do ecossistema.** Identidade aprovada: azul-marinho, amarelo do brinco CFAgro, superfícies brancas e cinzas neutros; densidade de dados alta, sombras sutis, zero gradiente e zero animação decorativa.
 
 > **Regra permanente:** antes de criar qualquer tela, componente ou estilo, verificar se já existe equivalente aqui. Se existir, reutilizar. Se não existir, criar AQUI (nunca na página) e documentar neste arquivo.
 
@@ -39,6 +39,7 @@ Larguras: padrão 1280px; `<body data-w="md">` = 1100px; `<body data-w="sm">` = 
 ## Tokens (resumo — valores em tokens.css)
 
 - **Cores base:** `--bg --card --field --border --border-soft --text --muted`
+- **Marca:** `--navy --navy-2 --yellow --yellow-soft --brand --brand-hover --brand-text`
 - **Semânticas:** `--green/--greenbg/--green-text` (positivo/ação), `--red/...` (negativo/perigo), `--amber/...` (atenção), `--blue/...` (informativo)
 - **Fonte:** `--font` = Inter, fallback system
 - **Tamanhos:** `--fs-11` (labels/th/badges) · `--fs-12` (tabelas) · `--fs-13` (botões/corpo) · `--fs-14` (inputs) · `--fs-17` (sub do h1) · `--fs-20` (KPI) · `--fs-22` (h1)
@@ -61,11 +62,12 @@ Larguras: padrão 1280px; `<body data-w="md">` = 1100px; `<body data-w="sm">` = 
 | Grids | `.grid.g6`, `.grid2`, `.simgrid` | layouts de form/painel |
 | Mini-resultado | `.res > .r > .l/.v` | saída de simuladores |
 | Hub | `.head .apps .app .ico .status .st .hub-sub` | cards da Central |
+| Visão Geral | `.kpis-overview .ecossistema-card .eco-section .eco-row .eco-progress .eco-metricas` | resumo de rebanho e cobertura por área |
 | Aviso | `.aviso` | banner de atenção |
 | Rodapé | `.footer` (alias `.foot`) | assinatura da página |
 | Detalhes | `details/summary/pre`, `.fluxo` | conteúdo expansível (Ops) |
 | Voltar | `.voltar-central` | botão flutuante ⌂ (oculto quando o shell está ativo) |
-| Shell | `.shell-side .shell-logo .shell-sec .shell-link(.ativa) .shell-content` | sidebar fixa; montada pelo cfagro-shell.js |
+| Shell | `.shell-top .shell-brand .shell-side .shell-sec .shell-sep .shell-link(.ativa) .shell-content` | cabeçalho azul-marinho + sidebar fixa; montados pelo cfagro-shell.js |
 
 ## Convenções de comportamento
 
@@ -77,4 +79,4 @@ Larguras: padrão 1280px; `<body data-w="md">` = 1100px; `<body data-w="sm">` = 
 
 ## Roadmap do DS
 
-~~Fase 3~~ feita: shell de navegação (sidebar fixa) + index como Home/dashboard (painel.html e central.html viraram redirects). Fase 4: Confinex e OCR Pesagem adotam tokens + shell. Fase 5: tabela rica (ordenar/filtrar/buscar/exportar), toasts/modais no lugar de alert/confirm/prompt, ícones Lucide. Fase 6: toggle dark mode. Detalhes: `docs/auditoria-ui-ux.md`.
+~~Fases 3 e 4~~ feitas: shell de navegação, index como Home/dashboard e adoção do padrão por Confinex, OCR Pesagem e Ops. Fase 5: tabela rica (ordenar/filtrar/buscar/exportar), toasts/modais no lugar de alert/confirm/prompt, ícones Lucide. Fase 6: toggle dark mode. Detalhes: `docs/auditoria-ui-ux.md`.

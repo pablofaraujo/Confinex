@@ -7,13 +7,22 @@
 
 :root{
   /* Cores base */
-  --bg:#f5f7f6;
+  --bg:#f5f6f8;
   --card:#ffffff;
-  --field:#fbfdfc;          /* fundo de inputs */
-  --border:#e3e9e5;
-  --border-soft:#eef2ef;    /* linhas internas de tabela */
-  --text:#182b21;
-  --muted:#6b7f74;
+  --field:#fafbfc;          /* fundo de inputs */
+  --border:#dfe4ea;
+  --border-soft:#edf0f3;    /* linhas internas de tabela */
+  --text:#172536;
+  --muted:#6c7885;
+
+  /* Identidade CFAgro / Confinex */
+  --navy:#142b42;
+  --navy-2:#203c56;
+  --yellow:#f2c500;
+  --yellow-soft:#fff8d9;
+  --brand:var(--navy);
+  --brand-hover:var(--navy-2);
+  --brand-text:#ffffff;
 
   /* Cores semânticas (ação/estado) */
   --green:#059669;  --greenbg:#d1fae5;  --green-text:#065f46;
@@ -47,13 +56,17 @@
 
 /* Dark mode — preparado (fase 6). Ativar com <html data-theme="dark">. */
 [data-theme=dark]{
-  --bg:#101613;
-  --card:#182019;
-  --field:#141b16;
-  --border:#26312a;
-  --border-soft:#1f2923;
-  --text:#e7ede9;
-  --muted:#93a49a;
+  --bg:#101821;
+  --card:#182430;
+  --field:#131e28;
+  --border:#2b3a48;
+  --border-soft:#22313e;
+  --text:#eef2f6;
+  --muted:#9aa7b4;
+  --navy:#0c1d2d;
+  --navy-2:#203c56;
+  --yellow:#f2c500;
+  --yellow-soft:#3b3515;
   --greenbg:#0b3a2a; --green-text:#6ee7b7;
   --redbg:#43191b;   --red-text:#fca5a5;
   --amberbg:#3d2c0d; --amber-text:#fcd34d;
