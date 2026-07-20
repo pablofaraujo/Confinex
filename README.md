@@ -17,9 +17,13 @@ Todos são single-file (um arquivo por app), sem framework de build. Visual e in
 |---|---|---|
 | `index.html` | **Visão Geral** | Home/dashboard: KPIs, exposição, estoque, pendências, caixa |
 | `confinex.html` | **Confinex** | Simulador de compra/confinamento/revenda (React) |
+| `fazenda-ametista.html` | **Fazenda Ametista** | Entradas, saídas e estoque do rebanho próprio |
+| `confinamento.html`, `confinados.html` | **Confinamentos** | Operação por confinamento e visão consolidada dos animais confinados |
 | `bb.html` | **Boi Balança** | Giro rápido balança → gancho |
 | `bgi.html` | **BGI** | Posições de hedge na B3 |
+| `abate.html` | **Abate** | Cabeçalho de abate e romaneio animal a animal |
 | `ocr-pesagem.html` | **OCR Pesagem** | Lê a foto do caderno de pesagem, você confere, e alimenta o sistema |
+| `painel-boi-gordo.html` | **Painel Boi Gordo** | Indicadores, curva futura e contexto de mercado |
 | `ops.html` | **Ops / Agentes** | Heartbeats dos agentes + Ponte VPS (fila de missões) |
 | `parcerias.html`, `parceria-ricardo.html`, `parceria-xande.html` | **Parcerias** | Acompanhamento das parcerias |
 | `painel.html`, `central.html` | *(legadas)* | Redirecionam para `index.html` |
@@ -27,7 +31,7 @@ Todos são single-file (um arquivo por app), sem framework de build. Visual e in
 ## Como está montado
 
 - **Frontend:** HTML/JS puro, sem build. Cada página carrega o Design System (`design/tokens.css` + `design/components.css`), o núcleo (`js/cfagro-core.js`) e a navegação (`js/cfagro-shell.js`).
-- **Backend:** Supabase (Postgres + login por email/senha, RLS protege os dados). Usado por index, bb, bgi, ops, parcerias e OCR Pesagem.
+- **Backend:** Supabase (Postgres + login por email/senha, RLS protege os dados). Usado pela maior parte dos módulos operacionais, incluindo Visão Geral, Boi Balança, BGI, confinamentos, fazenda, abate, parcerias, OCR Pesagem e Ops.
 - **Exceção:** a **Confinex** usa Google Sheets + localStorage (não o Supabase) e roda em React.
 - **Agentes/automação:** um agente na VPS ("Juan") executa tarefas e grava no banco. O app **Ops** deposita missões na fila (Ponte VPS) que o agente consome. Detalhes de infra ficam nos docs privados.
 
@@ -68,7 +72,7 @@ O site publica **automaticamente** a partir do GitHub:
 |---|---|
 | Visão Geral, Boi Balança, BGI, Ops, Parcerias | No ar |
 | Confinex (simulador) | No ar |
-| OCR Pesagem — tela de conferência | Feita; migração ao Design System concluída |
-| OCR Pesagem — botão 📷 dentro da Confinex | Feito no arquivo; **aguardando publicar** |
+| OCR Pesagem — tela de conferência | No ar; integrada ao Design System |
+| OCR Pesagem — botão 📷 dentro da Confinex | Pendente; não aparece nos bundles atualmente versionados |
 | OCR Pesagem — leitura + gravação no VPS/Juan | Em implementação (missão na Ponte VPS) |
 | Reconciliação caderno × Datamars (Fase 2) | Planejada |
