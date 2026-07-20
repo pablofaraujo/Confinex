@@ -24,6 +24,8 @@ var NAV = [
   { href:'./abate.html',    rotulo:'Abate',         icone:'🥩' },
   { href:'./ocr-pesagem.html',rotulo:'OCR Pesagem', icone:'📷' },
   { href:'https://monitoring.livestock.datamars.com/', rotulo:'Datamars Livestock', icone:'🏷️', ext:true },
+  { href:'https://app.agronota.com.br/', rotulo:'AgroNota', icone:'🧾', ext:true },
+  { href:'https://www.sidagro.ima.mg.gov.br/portaldoprodutor/login.jsf', rotulo:'IMA / SIDAGRO', icone:'🏛️', ext:true },
   { href:'./painel-boi-gordo.html', rotulo:'Painel Boi Gordo', icone:'📊' },
   { href:'./#fluxo',        rotulo:'Financeiro',    icone:'💰' },
   { sec:'Parcerias' },
