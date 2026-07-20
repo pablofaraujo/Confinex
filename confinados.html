@@ -6,12 +6,12 @@
 <title>CFAgro — Confinados</title>
 <link rel="icon" type="image/png" href="./confinex-logo.jpg">
 <link rel="apple-touch-icon" href="./confinex-logo.jpg">
-<link rel="stylesheet" href="./design/tokens.css">
-<link rel="stylesheet" href="./design/components.css">
+<link rel="stylesheet" href="./design/tokens.css?v=20260720-1">
+<link rel="stylesheet" href="./design/components.css?v=20260720-1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="./js/cfagro-core.js"></script>
-<script src="./js/cfagro-shell.js?v=20260719-4" defer></script>
+<script src="./js/cfagro-shell.js?v=20260720-1" defer></script>
 </head>
 <body>
 
@@ -166,7 +166,7 @@ const fl = fluxo.data;
 let acc=0; const serie = fl.map(f=>{acc+=(f.tipo==='entrada'?1:-1)*Number(f.valor);return {d:f.data,v:acc,real:f.realizado,desc:f.descricao}});
 const cut = serie.findIndex(s=>!s.real);
 if(chart) chart.destroy();
-Chart.defaults.color='#6b7f74';Chart.defaults.borderColor='#e3e9e5';
+Chart.defaults.color='#6c7885';Chart.defaults.borderColor='#dfe4ea';
 chart = new Chart(document.getElementById('chFluxo'),{type:'line',data:{
 labels:serie.map(s=>fmtD(s.d)),
 datasets:[

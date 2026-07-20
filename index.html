@@ -6,11 +6,11 @@
 <title>CFAgro — Visão Geral</title>
 <link rel="icon" type="image/png" href="./confinex-logo.jpg">
 <link rel="apple-touch-icon" href="./confinex-logo.jpg">
-<link rel="stylesheet" href="./design/tokens.css?v=20260719-3">
-<link rel="stylesheet" href="./design/components.css?v=20260719-3">
+<link rel="stylesheet" href="./design/tokens.css?v=20260720-1">
+<link rel="stylesheet" href="./design/components.css?v=20260720-1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="./js/cfagro-core.js?v=20260719-3"></script>
-<script src="./js/cfagro-shell.js?v=20260719-4" defer></script>
+<script src="./js/cfagro-shell.js?v=20260720-1" defer></script>
 </head>
 <body>
 <div id="login" class="login-box card">
@@ -26,32 +26,34 @@
 <div class="topbar">
 <div class="ident">
 <img src="./confinex-logo.jpg" alt="Logo" class="logo-img" style="width:48px;height:48px">
-<div><h1>Visão Geral <span>— CFAGRO</span></h1><div class="sub" id="subtitle">Painel disponível</div></div>
+<div><h1>Visão Geral</h1><div class="sub" id="subtitle">Resumo do ecossistema pecuário</div></div>
 </div>
 <div class="acoes"><button class="btn sec" onclick="carregar()">↻ Atualizar</button><button class="btn sec" onclick="sair()">Sair</button></div>
 </div>
-<div class="kpis" id="kpis"><div class="kpi"><div class="l">Status</div><div class="v">Online</div><div class="d">Carregando indicadores em segundo plano</div></div></div>
-<h2>Áreas do ecossistema</h2>
-<div class="apps">
-<a class="app" href="./confinex.html"><div class="ico" style="background:#e8f5ee">🧮</div><div><div class="t">Confinex</div><div class="d">Simulador de compra, confinamento e revenda</div></div><div class="arrow">›</div></a>
-<a class="app" href="./confinados.html"><div class="ico" style="background:#e8f5ee">📊</div><div><div class="t">Confinados</div><div class="d">Hedge B3, exposição, estoque em confinamento, fluxo de caixa</div></div><div class="arrow">›</div></a>
-<a class="app" href="./confinamento.html"><div class="ico" style="background:#fdf3e7">🐮</div><div><div class="t">Confinamento</div><div class="d">Visão operacional por lote: currais, entradas, custos, fechamentos</div></div><div class="arrow">›</div></a>
-<a class="app" href="./fazenda-ametista.html"><div class="ico" style="background:#eef6e8">🌾</div><div><div class="t">Fazenda Ametista</div><div class="d">Ledger de entrada/saída do rebanho próprio</div></div><div class="arrow">›</div></a>
-<a class="app" href="./bb.html"><div class="ico" style="background:#eef2ff">⚖️</div><div><div class="t">Boi Balança</div><div class="d">Giro rápido balança → gancho</div></div><div class="arrow">›</div></a>
-<a class="app" href="./parceria-ricardo.html"><div class="ico" style="background:#e8f5ee">🐂</div><div><div class="t">Parceria Ricardo</div><div class="d">Engorda por ganho — 60% Ricardo / 40% Pablo</div></div><div class="arrow">›</div></a>
-<a class="app" href="./parceria-xande.html"><div class="ico" style="background:#dbeafe">🤝</div><div><div class="t">Parceria Xande</div><div class="d">Sociedade por negócio — rateio variável</div></div><div class="arrow">›</div></a>
+<div class="kpis kpis-overview" id="kpis">
+  <div class="kpi"><div class="l">Total cabeças</div><div class="v">—</div><div class="d">Carregando</div></div>
+  <div class="kpi"><div class="l">Total cabeças confinadas</div><div class="v">—</div><div class="d">Carregando</div></div>
+  <div class="kpi"><div class="l">Total cabeças Fazenda Ametista</div><div class="v">—</div><div class="d">Carregando</div></div>
+  <div class="kpi"><div class="l">Total cabeças Parceria Ricardo</div><div class="v">—</div><div class="d">Carregando</div></div>
 </div>
-<div class="footer">Build 20260719-3 · Supabase ao vivo · CFAgro/Confinex</div>
+<h2>Áreas do ecossistema</h2>
+<div class="card ecossistema-card">
+  <section class="eco-section">
+    <div class="eco-title"><span>Confinados</span><a href="./confinados.html">Ver detalhes ›</a></div>
+    <div id="confinamentosResumo" class="eco-lista"><div class="eco-empty">Carregando confinamentos...</div></div>
+  </section>
+  <section class="eco-section">
+    <div class="eco-title"><span>Fazenda Ametista</span><a href="./fazenda-ametista.html">Ver detalhes ›</a></div>
+    <div id="fazendaResumo" class="eco-metricas"><div><strong>—</strong><span>Machos</span></div><div><strong>—</strong><span>Fêmeas</span></div></div>
+  </section>
+  <section class="eco-section">
+    <div class="eco-title"><span>Parceria Ricardo</span><a href="./parceria-ricardo.html">Ver detalhes ›</a></div>
+    <div id="ricardoResumo" class="eco-metricas"><div><strong>—</strong><span>Bois</span></div></div>
+  </section>
+</div>
+<div class="footer">Build 20260720-1 · Supabase ao vivo · CFAgro/Confinex</div>
 </div>
 <script>
-function calcRicardo(r){
-  const ent=Number(r.peso_entrada||0), sai=Number(r.peso_saida||0), cab=Number(r.cabecas||0);
-  const perdas=Number(r.perdas||0), rend=Number(r.rendimento||50), preco=Number(r.preco_acordado||0);
-  const vivos=Math.max(0,cab-perdas), ganhoKg=Math.max(0,sai-ent);
-  const ganhoArr=r.preco_base==='kg'?null:ganhoKg*rend/100/15;
-  return (r.preco_base==='kg'?ganhoKg*preco:ganhoArr*preco)*vivos*0.6;
-}
-const lucroXande=n=>Number(n.receita_bruta||0)-Number(n.funrural||0)-Number(n.compra||0)-Number(n.custos||0);
 function consultaComTimeout(nome,consulta,ms=10000){
   return Promise.race([
     Promise.resolve(consulta).then(r=>({nome,...r})).catch(error=>({nome,data:[],error})),
@@ -63,31 +65,53 @@ async function carregar(){
   subtitle.textContent='Atualizando indicadores...';
   try{
     const resultados=await Promise.all([
-      consultaComTimeout('Fazenda Ametista',db.from('fazenda_ametista').select('tipo,cabecas')),
-      consultaComTimeout('Operações de confinamento',db.from('operacoes').select('id,status').not('confinamento_id','is',null)),
+      consultaComTimeout('Fazenda Ametista',db.from('fazenda_ametista').select('*')),
+      consultaComTimeout('Operações de confinamento',db.from('operacoes').select('id,codigo,status,confinamentos(id,nome)').not('confinamento_id','is',null)),
       consultaComTimeout('Entradas de confinamento',db.from('entradas_confinamento').select('operacao_id,cabecas')),
-      consultaComTimeout('Parceria Ricardo',db.from('parceria_ricardo').select('*')),
-      consultaComTimeout('Parceria Xande',db.from('parceria_xande').select('*')),
-      consultaComTimeout('Boi Balança',db.from('operacoes').select('id,compras(quantidade)').eq('tipo_negocio','boi_balanca').not('status','in','("liquidada","cancelada")'))
+      consultaComTimeout('Exposição de hedge',db.from('v_exposicao_hedge').select('codigo,arrobas_previstas,cts_descobertos')),
+      consultaComTimeout('Parceria Ricardo',db.from('parceria_ricardo').select('cabecas,status'))
     ]);
-    const [fazenda,confOps,confEntradas,ricardo,xande,bb]=resultados;
-    const falhas=resultados.filter(r=>r.error),entradasPorOp={};
+    const [fazenda,confOps,confEntradas,exposicao,ricardo]=resultados;
+    const falhas=resultados.filter(r=>r.error),entradasPorOp={},expoPorCodigo={};
     (confEntradas.data||[]).forEach(e=>entradasPorOp[e.operacao_id]=(entradasPorOp[e.operacao_id]||0)+Number(e.cabecas||0));
+    (exposicao.data||[]).forEach(e=>expoPorCodigo[e.codigo]=e);
     const cabFazenda=(fazenda.data||[]).reduce((s,l)=>s+(l.tipo==='entrada'?1:-1)*Number(l.cabecas||0),0);
     const confAtivas=(confOps.data||[]).filter(o=>['comprada','em_confinamento'].includes(o.status));
     const cabConfinamento=confAtivas.reduce((s,o)=>s+(entradasPorOp[o.id]||0),0);
     const cabRicardo=(ricardo.data||[]).filter(r=>r.status==='engorda').reduce((s,r)=>s+Number(r.cabecas||0),0);
-    const cabBB=(bb.data||[]).reduce((s,o)=>s+(o.compras||[]).reduce((a,c)=>a+Number(c.quantidade||0),0),0);
-    const aRicardo=(ricardo.data||[]).filter(r=>r.status!=='engorda'&&!r.acertado).reduce((s,r)=>s+calcRicardo(r),0);
-    const aXande=(xande.data||[]).filter(n=>!n.acertado).reduce((s,n)=>s+lucroXande(n)*Number(n.percentual_xande??50)/100,0);
+    const cabTotal=cabFazenda+cabConfinamento+cabRicardo;
     kpis.innerHTML=[
-      ['Cabeças sob controle',fmtN(cabFazenda+cabConfinamento+cabRicardo+cabBB),'Fazenda + confinamento + Ricardo + Boi Balança'],
-      ['Confinamentos ativos',fmtN(confAtivas.length),cabConfinamento+' cabeças no cocho'],
-      ['Fazenda Ametista',fmtN(cabFazenda),'cabeças no rebanho próprio'],
-      ['Boi Balança em aberto',fmtN((bb.data||[]).length),cabBB+' cabeças'],
-      ['A acertar — Ricardo',fmtR$(aRicardo),'parte dele pendente'],
-      ['A acertar — Xande',fmtR$(aXande),'parte dele pendente']
+      ['Total cabeças',fmtN(cabTotal),'Confinados + Ametista + Ricardo'],
+      ['Total cabeças confinadas',fmtN(cabConfinamento),confAtivas.length+' lotes ativos'],
+      ['Total cabeças Fazenda Ametista',fmtN(cabFazenda),'rebanho próprio'],
+      ['Total cabeças Parceria Ricardo',fmtN(cabRicardo),'bois em engorda']
     ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="d">${k[2]}</div></div>`).join('');
+
+    const grupos={};
+    confAtivas.forEach(o=>{
+      const nome=o.confinamentos?.nome||'Confinamento sem nome';
+      const g=grupos[nome]||(grupos[nome]={nome,cabecas:0,arrobas:0,descobertas:0,lotes:0});
+      const ex=expoPorCodigo[o.codigo]||{};
+      g.cabecas+=entradasPorOp[o.id]||0;
+      g.arrobas+=Number(ex.arrobas_previstas||0);
+      g.descobertas+=Math.max(0,Number(ex.cts_descobertos||0))*330;
+      g.lotes++;
+    });
+    const confEl=document.getElementById('confinamentosResumo');
+    const lista=Object.values(grupos).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+    confEl.innerHTML=lista.length?lista.map(g=>{
+      const descobertas=Math.min(g.descobertas,g.arrobas||g.descobertas);
+      const pct=g.arrobas?Math.min(100,descobertas/g.arrobas*100):0;
+      const cobertura=g.arrobas?`${fmtN(descobertas,0)} arrobas descobertas das ${fmtN(g.arrobas,0)} arrobas totais previstas (${fmtN(pct,0)}%)`:'Previsão de arrobas ainda não cadastrada';
+      return `<a class="eco-row" href="./confinamento.html"><div class="eco-row-top"><span><b>${esc(g.nome)}</b> · ${fmtN(g.cabecas)} cab</span><span>${g.lotes} ${g.lotes===1?'lote':'lotes'}</span></div><div class="eco-detail">${cobertura}</div><div class="eco-progress" aria-label="${fmtN(pct,0)}% descoberto"><span style="width:${pct.toFixed(1)}%"></span></div></a>`;
+    }).join(''):'<div class="eco-empty">Nenhum confinamento ativo.</div>';
+
+    const temSexo=(fazenda.data||[]).some(l=>l.sexo);
+    const saldoSexo=sexo=>(fazenda.data||[]).filter(l=>String(l.sexo||'').toLowerCase().startsWith(sexo)).reduce((s,l)=>s+(l.tipo==='entrada'?1:-1)*Number(l.cabecas||0),0);
+    document.getElementById('fazendaResumo').innerHTML=temSexo
+      ? `<div><strong>${fmtN(saldoSexo('m'))}</strong><span>Machos</span></div><div><strong>${fmtN(saldoSexo('f'))}</strong><span>Fêmeas</span></div>`
+      : `<div><strong>—</strong><span>Machos</span></div><div><strong>—</strong><span>Fêmeas</span></div><small>${fmtN(cabFazenda)} cabeças no total · sexo ainda não informado no cadastro</small>`;
+    document.getElementById('ricardoResumo').innerHTML=`<div><strong>${fmtN(cabRicardo)}</strong><span>Bois</span></div>`;
     const atualizado=`Atualizado ${new Date().toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}`;
     subtitle.textContent=falhas.length?`${atualizado} · fontes indisponíveis: ${falhas.map(f=>f.nome).join(', ')}`:atualizado;
   }catch(error){

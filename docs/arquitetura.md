@@ -1,11 +1,11 @@
 # Arquitetura do ecossistema CFAgro
 
-Analisado do repositório `pablofaraujo/Confinex` (HEAD `55cb83d`, 2026-07-16).
+Atualizado em 2026-07-20.
 
 ## Apps e navegação
 
-- **index.html** — Central de Operações (hub e página inicial). Grid de 5 cards: Confinex (`./confinex.html`), BGI (externo: `https://pablofaraujo.github.io/boi-gordo-portfolio/`), Boi Balança (`./bb.html`), Dashboard (`./painel.html`), Ops (`./ops.html`). Mostra 3 KPIs (Cabeças, Cts descobertos, Pendências) lendo do Supabase se houver sessão; senão pede "Faça login no Dashboard uma vez".
-- **confinex.html** — shell mínimo do Confinex: define `window.CONFINEX_SHEETS_API_URL` (Apps Script) e carrega `confinex-app.mobile.js`, pacote autocontido com React 19 e alvo Safari 14. `confinex-app.latest.js` permanece como bundle legível de manutenção; não é carregado diretamente pelo navegador.
+- **index.html** — Visão Geral e página inicial. Mostra quatro KPIs na ordem: total de cabeças, confinadas, Fazenda Ametista e Parceria Ricardo. A seção "Áreas do ecossistema" detalha cabeças e arrobas descobertas por confinamento, sexo do rebanho da Ametista quando disponível e bois ativos de Ricardo.
+- **confinex.html** — shell do Confinex: carrega o Design System e a navegação compartilhada, define `window.CONFINEX_SHEETS_API_URL` (Apps Script) e inicia `confinex-app.mobile.js`, pacote autocontido com React 19 e alvo Safari 14. `confinex-app.latest.js` permanece como bundle legível de manutenção.
 - **bb.html** — Boi Balança: simulador pré-compra + lotes + contas a pagar/receber + pendências GTA/NF.
 - **abate.html** — Abate: cabeçalho por abate (`abates`: data, frigorífico, origem, romaneio, GTA) + romaneio animal a animal (`abate_animais`) com leitura OCR do romaneio do frigorífico (`aprovarFolha`). Não está no design system compartilhado (sem sidebar).
 - **bgi.html** — BGI Posições: exposição por lote, travas, encerramento, rolagem, cotações, basis. Não é linkado por nenhuma página (o card BGI aponta para o repo externo `boi-gordo-portfolio`); acesso por URL direta. Ainda linka de volta para `central.html` (legada).
@@ -14,9 +14,9 @@ Analisado do repositório `pablofaraujo/Confinex` (HEAD `55cb83d`, 2026-07-16).
 - **central.html** — versão legada da Central (3 cards). Ficou para trás no commit `fc9b66c`.
 - **painel-boi-gordo.html** — Painel Boi Gordo: KPIs de mercado (arroba CEPEA/B3, bezerro, relação de troca, exportação), curva futura BGI com gráfico Chart.js, manchetes e contexto. Sem Supabase/login — dados vêm de um bloco JSON estático (`#painel-data`) embutido no HTML. Integrado ao DS/shell nesta sessão; antes vivia como artifact solto do Cowork.
 
-Padrão: botão flutuante "⌂ Central" (`href="./"`) em toda página-satélite. Favicon `confinex-logo.jpg`.
+Padrão: cabeçalho azul-marinho com marca Confinex e sidebar branca no desktop; no celular, a navegação vira uma faixa horizontal rolável. O botão legado "⌂ Central" fica oculto quando o shell está ativo. Favicon `confinex-logo.jpg`.
 
-**Sidebar compartilhada** (`js/cfagro-shell.js`): nav fixa com links absolutos (para funcionar também no repo externo `boi-gordo-portfolio`), injetada via `<script defer>` + `design/tokens.css`/`design/components.css` — já presente em `abate.html`, `bb.html`, `bgi.html`, `ops.html`, `ocr-pesagem.html`. Inclui acessos externos ao Datamars Livestock, AgroNota e Portal do Produtor IMA/SIDAGRO, abertos em nova aba para preservar a sessão do ecossistema. Em jul/2026 `confinex.html` passou a carregar também (perdeu o botão flutuante "📷 Pesagem" ad-hoc — a navegação para `ocr-pesagem.html` agora vem da sidebar), ficando só a lógica React/Sheets fora do DS. **Divergência nova**: no mesmo commit, `ops.html` **removeu** `js/cfagro-core.js` e passou a instanciar seu próprio client Supabase (`const db = window.supabase.createClient(...)`) e a redefinir localmente as variáveis de tema (`--bg`, `--card`, `--green` etc.) e estilos de `.kpi`/`.badge`/`.btn`/tabela que já existem em `components.css` — foge da convenção do `CLAUDE.md` ("páginas carregam tokens.css + components.css + cfagro-core.js + cfagro-shell.js") e aumenta, não reduz, a duplicação de CSS.
+**Shell compartilhado** (`js/cfagro-shell.js`): injeta cabeçalho e navegação com links absolutos (inclusive para o repo externo `boi-gordo-portfolio`) e é carregado com `design/tokens.css`/`design/components.css` por todos os módulos ativos. Preserva a ordem histórica dos módulos e inclui Datamars Livestock, AgroNota e Portal do Produtor IMA/SIDAGRO em nova aba. `ops.html` mantém o client Supabase local, porém não redefine mais tokens nem componentes visuais.
 
 ## Backend Supabase
 
@@ -53,7 +53,7 @@ Bundle esbuild legível de `src/confinex-entry.jsx` + `confinex_work.jsx` (fonte
 
 1. `central.html` legada coexiste com `index.html`; `bgi.html` linka para a legada.
 2. Fonte JSX do bundle React fora do repo; o bundle legível e o pacote móvel gerado ficam versionados.
-3. CSS e helpers duplicados em 6 páginas — a sidebar (`cfagro-shell.js`) já é comum a quase todas; mas `ops.html` (jul/2026) foi na direção contrária e passou a duplicar localmente variáveis de tema e estilos de `components.css` em vez de reusar (ver nota acima); `confinex.html` segue com sua própria stack React/Sheets.
+3. O shell e os componentes principais são compartilhados; o Confinex ainda injeta CSS próprio dentro do bundle React, embora seus tokens visuais estejam alinhados ao DS.
 4. Credenciais Supabase e URL do Apps Script hardcoded em todas as páginas.
 5. Confinex usa persistência diferente (Sheets/localStorage) do resto (Supabase) — a "fonte única de verdade" prometida no footer da Central não vale para ele.
 6. JSONP + scrape CEPEA + heurística `extrairNumeroB3` (aceita 100–800) são frágeis.
