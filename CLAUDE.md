@@ -20,7 +20,7 @@ Leia conforme a tarefa:
 | Arquivo | App |
 |---|---|
 | `index.html` | Visão Geral — Home/dashboard do ecossistema (KPIs, exposição, estoque, pendências, acertos, fluxo; absorveu o antigo painel) |
-| `confinex.html` + `confinex-app.latest.js` | Confinex — simulador de compra/confinamento/revenda (React 19 via esm.sh; bundle esbuild commitado, sem `src/` no repo) |
+| `confinex.html` + `confinex-app.latest.js` + `confinex-app.mobile.js` | Confinex — simulador de compra/confinamento/revenda. O arquivo `latest` preserva o bundle legível; `mobile` contém React 19 e o app empacotados em um único script compatível com Safari móvel, sem import map ou módulos externos |
 | `fazenda-ametista.html` | Fazenda Ametista — ledger de entrada/saída de cabeças do rebanho próprio (gado que ainda não foi pra cocho/confinamento nem pra parceria). KPI de estoque atual = soma de entradas − saídas. Tabela `fazenda_ametista`. Existia só como arquivo solto no Drive desde 12/07/2026 (nunca commitado, tabela nunca criada) até ser trazido ao repo em 18/07/2026 — histórico retroativo de movimentação ainda não foi lançado |
 | `confinamento.html` | Confinamento — visão operacional ao vivo por confinamento/parceiro: lotes, currais, entradas (GTA/NF/peso/perda de transporte), custos por categoria, fechamentos previsto×realizado. Lê `operacoes`/`confinamentos`/`entradas_confinamento`/`custos_operacao`/`eventos_operacao`/`fechamentos_operacao` (populadas em 07/07/2026 por outra sessão, sem UI até esta página — `eventos_operacao`/`fechamentos_operacao` ainda vazias) |
 | `bb.html` | Boi Balança — giro rápido balança→gancho |
@@ -56,7 +56,7 @@ Push na `main` → workflow `deploy.yml` publica o repositório inteiro no GitHu
 
 ## Armadilhas conhecidas
 
-- O fonte do Confinex não está no repo — só o bundle `confinex-app.latest.js` (legível, não minificado). Edite o bundle diretamente com cuidado ou reconstrua fora.
+- O fonte do Confinex não está no repo — `confinex-app.latest.js` é o bundle legível usado como entrada e `confinex-app.mobile.js` é o pacote de execução autocontido. Ao editar o `latest`, regenere o `mobile` com React 19.2.6 e alvo Safari 14 antes do deploy.
 - Cotações B3: cascata frágil (API B3 → histórico → Yahoo `{contrato}.SA` → scrape CEPEA via allorigins.win) com heurística `extrairNumeroB3` que aceita qualquer número entre 100 e 800.
 - `rolar()`/`encerrar()`/`encerrarParcial()` no bgi.html fazem escritas sequenciais sem transação.
 - `central.html` legada e `bgi.html` órfão podem divergir do resto.

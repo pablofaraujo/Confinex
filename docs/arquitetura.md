@@ -5,7 +5,7 @@ Analisado do repositório `pablofaraujo/Confinex` (HEAD `55cb83d`, 2026-07-16).
 ## Apps e navegação
 
 - **index.html** — Central de Operações (hub e página inicial). Grid de 5 cards: Confinex (`./confinex.html`), BGI (externo: `https://pablofaraujo.github.io/boi-gordo-portfolio/`), Boi Balança (`./bb.html`), Dashboard (`./painel.html`), Ops (`./ops.html`). Mostra 3 KPIs (Cabeças, Cts descobertos, Pendências) lendo do Supabase se houver sessão; senão pede "Faça login no Dashboard uma vez".
-- **confinex.html** — shell mínimo do Confinex: importmap React 19.2.6 via esm.sh, define `window.CONFINEX_SHEETS_API_URL` (Apps Script) e importa `./confinex-app.latest.js?v=...`.
+- **confinex.html** — shell mínimo do Confinex: define `window.CONFINEX_SHEETS_API_URL` (Apps Script) e carrega `confinex-app.mobile.js`, pacote autocontido com React 19 e alvo Safari 14. `confinex-app.latest.js` permanece como bundle legível de manutenção; não é carregado diretamente pelo navegador.
 - **bb.html** — Boi Balança: simulador pré-compra + lotes + contas a pagar/receber + pendências GTA/NF.
 - **abate.html** — Abate: cabeçalho por abate (`abates`: data, frigorífico, origem, romaneio, GTA) + romaneio animal a animal (`abate_animais`) com leitura OCR do romaneio do frigorífico (`aprovarFolha`). Não está no design system compartilhado (sem sidebar).
 - **bgi.html** — BGI Posições: exposição por lote, travas, encerramento, rolagem, cotações, basis. Não é linkado por nenhuma página (o card BGI aponta para o repo externo `boi-gordo-portfolio`); acesso por URL direta. Ainda linka de volta para `central.html` (legada).
@@ -52,7 +52,7 @@ Bundle esbuild legível de `src/confinex-entry.jsx` + `confinex_work.jsx` (fonte
 ## Dívidas técnicas
 
 1. `central.html` legada coexiste com `index.html`; `bgi.html` linka para a legada.
-2. Fonte do bundle React fora do repo.
+2. Fonte JSX do bundle React fora do repo; o bundle legível e o pacote móvel gerado ficam versionados.
 3. CSS e helpers duplicados em 6 páginas — a sidebar (`cfagro-shell.js`) já é comum a quase todas; mas `ops.html` (jul/2026) foi na direção contrária e passou a duplicar localmente variáveis de tema e estilos de `components.css` em vez de reusar (ver nota acima); `confinex.html` segue com sua própria stack React/Sheets.
 4. Credenciais Supabase e URL do Apps Script hardcoded em todas as páginas.
 5. Confinex usa persistência diferente (Sheets/localStorage) do resto (Supabase) — a "fonte única de verdade" prometida no footer da Central não vale para ele.
