@@ -517,6 +517,9 @@ function calcCenario(lote, sc) {
     const precoCompraVpMax2 = arrobasCompraTotal2 > 0 ? (receitaVP2 - freteTotal - baldeioTotal2) / arrobasCompraTotal2 : 0;
     const resultadoVP2 = receitaVP2 - custos2;
     const margemCompraVp2 = precoCompraVpMax2 - precoCompra;
+    const arrobasPostasCab2 = pesoProc * 0.5 / 15;
+    const arrobasPostasTotal2 = arrobasPostasCab2 * N;
+    const custoArrobaPosta2 = arrobasPostasTotal2 > 0 ? (custoCompra + freteTotal) / arrobasPostasTotal2 : 0;
     return {
       N,
       pm,
@@ -557,6 +560,14 @@ function calcCenario(lote, sc) {
       mesesCapital: mesesCapital2,
       fretePorCab: fPorCab,
       ganhoTotal: 0,
+      arrobasPostasCab: arrobasPostasCab2,
+      custoArrobaPosta: custoArrobaPosta2,
+      kgCarcacaProduzidaCab: 0,
+      arrobasProduzidasCab: 0,
+      custoArrobaLiquidaProduzida: 0,
+      custoArrobaMarginal: 0,
+      fretePorArrobaProduzida: 0,
+      custoProducaoFretePorArroba: 0,
       custoDinheiroTotal: custoDinheiroTotal2,
       custoDinheiroOperacao: custoDinheiroOperacao2,
       custoDinheiroCompra: custoDinheiroCompra2,
@@ -664,6 +675,19 @@ function calcCenario(lote, sc) {
   const pesoMedioConf = (pesoChegada + pesoAbate) / 2;
   const pctMS = parseFloat(sc.consumoMS) / 100 || 0;
   const msTotalKgCab = pesoMedioConf * pctMS * dias;
+  const arrobasPostasCab = pesoProc * 0.5 / 15;
+  const arrobasPostasTotal = arrobasPostasCab * N;
+  const custoArrobaPosta = arrobasPostasTotal > 0 ? (custoCompra + freteTotal) / arrobasPostasTotal : 0;
+  const kgCarcacaInicialCab = pesoProc * 0.5;
+  const kgCarcacaProduzidaCab = Math.max(carcacaKg - kgCarcacaInicialCab, 0);
+  const arrobasProduzidasCab = kgCarcacaProduzidaCab / 15;
+  const arrobasProduzidasTotal = arrobasProduzidasCab * N;
+  const custoArrobaLiquidaProduzida = arrobasProduzidasTotal > 0 ? custoContTotal / arrobasProduzidasTotal : 0;
+  const custoDiarioCab = dias > 0 && N > 0 ? custoContTotal / N / dias : 0;
+  const kgCarcacaMarginalDia = Math.max(gmd * rcF, 0);
+  const custoArrobaMarginal = kgCarcacaMarginalDia > 0 ? custoDiarioCab / kgCarcacaMarginalDia * 15 : 0;
+  const fretePorArrobaProduzida = arrobasProduzidasTotal > 0 ? freteTotal / arrobasProduzidasTotal : 0;
+  const custoProducaoFretePorArroba = arrobasProduzidasTotal > 0 ? (custoContTotal + freteTotal) / arrobasProduzidasTotal : 0;
   return {
     N,
     pm,
@@ -704,6 +728,14 @@ function calcCenario(lote, sc) {
     mesesCapital,
     fretePorCab: fPorCab,
     ganhoTotal,
+    arrobasPostasCab,
+    custoArrobaPosta,
+    kgCarcacaProduzidaCab,
+    arrobasProduzidasCab,
+    custoArrobaLiquidaProduzida,
+    custoArrobaMarginal,
+    fretePorArrobaProduzida,
+    custoProducaoFretePorArroba,
     msTotalKgCab: sc.modalidade === "ms" ? msTotalKgCab : 0,
     custoDinheiroTotal,
     custoDinheiroOperacao,
@@ -727,21 +759,6 @@ function calcCenario(lote, sc) {
     tipo: "confinamento",
     _id: sc.id
   };
-}
-function calcPontoOtimoDias(lote, sc) {
-  if (!sc || sc.tipo === "revenda") return null;
-  const baseDias = parseFloat(sc.diasCiclo) || 90;
-  const minDias = Math.max(1, Math.min(30, Math.floor(baseDias)));
-  const maxDias = Math.max(240, Math.ceil(baseDias));
-  let melhor = null;
-  for (let dias = minDias; dias <= maxDias; dias += 1) {
-    const teste = calcCenario(lote, { ...sc, diasCiclo: String(dias) });
-    if (!teste || !isFinite(teste.rMliq)) continue;
-    if (!melhor || teste.rMliq > melhor.rMliq) {
-      melhor = { dias, ...teste };
-    }
-  }
-  return melhor;
 }
 var defaultSc = (i) => ({
   id: Date.now() + i,
@@ -867,6 +884,53 @@ function contratoB3DoCenario(sc) {
   const dataSaida = addDiasISO(sc.dataEntrada, parseFloat(sc.diasCiclo) || 0);
   const sugerido = contratoB3PorData(dataSaida);
   return sc.modalidade === "parceria" ? sugerido : sc.contratoB3 || sugerido;
+}
+function contratosB3DaEvolucao(cenarios) {
+  const contratos = /* @__PURE__ */ new Set();
+  (cenarios || []).forEach((sc) => {
+    if (!sc || sc.tipo === "revenda" || sc.modoPreco !== "bolsa") return;
+    for (let dias = 60; dias <= 240; dias += 15) {
+      const contrato = contratoB3PorData(addDiasISO(sc.dataEntrada, dias));
+      if (contrato) contratos.add(contrato);
+    }
+  });
+  return [...contratos];
+}
+function calcEvolucaoTempo(lote, sc) {
+  if (!sc || sc.tipo === "revenda") return [];
+  const diasAtual = Math.round(parseFloat(sc.diasCiclo) || 0);
+  const prazos = /* @__PURE__ */ new Set();
+  for (let dias = 60; dias <= 240; dias += 15) prazos.add(dias);
+  if (diasAtual >= 60 && diasAtual <= 240) prazos.add(diasAtual);
+  return [...prazos].sort((a, b) => a - b).map((dias) => {
+    const dataSaida = addDiasISO(sc.dataEntrada, dias);
+    const contrato = contratoB3PorData(dataSaida);
+    const cotacao = lote.cotacoesB3?.[contrato];
+    if (sc.modoPreco === "bolsa" && !(cotacao && parseFloat(cotacao.preco) > 0)) {
+      return { dias, dataSaida, contrato, cotacao: null, resultado: null };
+    }
+    const scTeste = {
+      ...sc,
+      diasCiclo: String(dias),
+      ...(sc.modoPreco === "bolsa" ? {
+        contratoB3: contrato,
+        precoBolsa: String(cotacao.preco),
+        cotacaoB3Fonte: cotacao.fonte || "",
+        cotacaoB3AtualizadaEm: cotacao.atualizadaEm || ""
+      } : {})
+    };
+    try {
+      return {
+        dias,
+        dataSaida,
+        contrato: sc.modoPreco === "bolsa" ? contrato : "Balcão",
+        cotacao: sc.modoPreco === "bolsa" ? parseFloat(cotacao.preco) : parseFloat(sc.precoBalcao) || 0,
+        resultado: calcCenario(lote, scTeste)
+      };
+    } catch {
+      return { dias, dataSaida, contrato, cotacao: null, resultado: null };
+    }
+  });
 }
 function normalizarMercadoB3(loteInformado, cenariosInformados) {
   const loteNovo = {
@@ -1423,15 +1487,150 @@ function SensPanel({ lote, cenarios, resultados, historico = [], setHistorico = 
     ] })
   ] });
 }
+function EvolucaoTempo({ lote, cenarios }) {
+  const ativos = cenarios.filter((sc) => sc.tipo !== "revenda");
+  if (!ativos.length) return null;
+  return /* @__PURE__ */ jsxs("div", { className: "sec", style: { marginTop: 18 }, children: [
+    /* @__PURE__ */ jsx("div", { className: "sec-t", children: "Evolução entre 60 e 240 dias" }),
+    /* @__PURE__ */ jsx("div", { className: "hint", style: { marginBottom: 16 }, children: "Cada prazo usa a cotação BGI do próprio mês de saída. A linha fica pendente quando a curva não possui aquele vencimento." }),
+    ativos.map((sc) => {
+      const evolucao = calcEvolucaoTempo(lote, sc);
+      const diasAtual = Math.round(parseFloat(sc.diasCiclo) || 0);
+      return /* @__PURE__ */ jsxs("div", { style: { marginBottom: 24 }, children: [
+        /* @__PURE__ */ jsxs("div", { className: "sec-t nm", style: { marginBottom: 8 }, children: [sc.nome, " · ", sc.modalidade, " · ciclo atual ", diasAtual, " dias"] }),
+        /* @__PURE__ */ jsx("div", { className: "tbl-wrap", children: /* @__PURE__ */ jsxs("table", { className: "cmp-tbl", children: [
+          /* @__PURE__ */ jsx("thead", { children: /* @__PURE__ */ jsxs("tr", { children: [
+            /* @__PURE__ */ jsx("th", { children: "Prazo / saída" }),
+            /* @__PURE__ */ jsx("th", { children: "BGI do mês" }),
+            /* @__PURE__ */ jsx("th", { children: "@ produzidas / cab" }),
+            /* @__PURE__ */ jsx("th", { children: "Custo @ produzida" }),
+            /* @__PURE__ */ jsx("th", { children: "Custo marginal @" }),
+            /* @__PURE__ */ jsx("th", { children: "Frete / @ produzida" }),
+            /* @__PURE__ */ jsx("th", { children: "Produção + frete / @" }),
+            /* @__PURE__ */ jsx("th", { children: "Rent. mensal" }),
+            /* @__PURE__ */ jsx("th", { children: "Resultado final" })
+          ] }) }),
+          /* @__PURE__ */ jsx("tbody", { children: evolucao.map((ponto) => {
+            const r = ponto.resultado;
+            return /* @__PURE__ */ jsxs("tr", { className: ponto.dias === diasAtual ? "tot" : "", children: [
+              /* @__PURE__ */ jsxs("td", { children: [ponto.dias, " dias · ", fmtData(ponto.dataSaida)] }),
+              /* @__PURE__ */ jsx("td", { children: ponto.cotacao == null ? `${ponto.contrato} · sem cotação` : `${ponto.contrato} · ${fR(ponto.cotacao)}` }),
+              /* @__PURE__ */ jsx("td", { children: r ? fAt(r.arrobasProduzidasCab) : "—" }),
+              /* @__PURE__ */ jsx("td", { children: r ? fR(r.custoArrobaLiquidaProduzida) : "—" }),
+              /* @__PURE__ */ jsx("td", { children: r ? fR(r.custoArrobaMarginal) : "—" }),
+              /* @__PURE__ */ jsx("td", { children: r ? fR(r.fretePorArrobaProduzida) : "—" }),
+              /* @__PURE__ */ jsx("td", { children: r ? fR(r.custoProducaoFretePorArroba) : "—" }),
+              /* @__PURE__ */ jsx("td", { className: r ? r.rMliq >= 0 ? "pos" : "neg" : "", children: r ? `${fP(r.rMliq)} a.m.` : "—" }),
+              /* @__PURE__ */ jsx("td", { className: r ? r.lucroLiquido >= 0 ? "pos" : "neg" : "", children: r ? fR(r.lucroLiquido) : "—" })
+            ] }, ponto.dias);
+          }) })
+        ] }) })
+      ] }, sc.id);
+    })
+  ] });
+}
+function ItemRelatorio({ label, value }) {
+  return /* @__PURE__ */ jsxs("div", { className: "report-item", children: [
+    /* @__PURE__ */ jsx("div", { className: "report-label", children: label }),
+    /* @__PURE__ */ jsx("div", { className: "report-value", children: value ?? "—" })
+  ] });
+}
+function RelatorioComparativo({ lote, cenarios, resultados }) {
+  const ativos = cenarios.map((sc, i) => ({ sc, r: resultados[i], i })).filter((x) => x.r);
+  if (!ativos.length) return null;
+  const ranked = [...ativos].sort((a, b) => b.r.rMliq - a.r.rMliq || b.r.lucroLiquido - a.r.lucroLiquido || b.r.rTliq - a.r.rTliq || a.i - b.i);
+  return /* @__PURE__ */ jsxs(Fragment, { children: [
+    /* @__PURE__ */ jsxs("div", { className: "sec no-print", style: { marginTop: 18 }, children: [
+      /* @__PURE__ */ jsx("div", { className: "sec-t", children: "Relatório comparativo" }),
+      /* @__PURE__ */ jsxs("div", { className: "g2", children: [
+        /* @__PURE__ */ jsx("div", { className: "hint", children: "Inclui as premissas e os resultados de todos os confinamentos, independentemente do cenário selecionado. Na impressão, escolha Salvar como PDF." }),
+        /* @__PURE__ */ jsx("button", { className: "calc-btn", style: { marginTop: 0 }, onClick: () => window.print(), children: "GERAR RELATÓRIO COMPARATIVO / PDF" })
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxs("div", { className: "report-print", children: [
+      /* @__PURE__ */ jsxs("section", { className: "report-page", children: [
+        /* @__PURE__ */ jsx("div", { className: "report-brand", children: "CONFINEX · RELATÓRIO COMPARATIVO" }),
+        /* @__PURE__ */ jsxs("h1", { children: [lote.origemNome || "Estudo de confinamento", " · ", lote.codigoNegocio || "sem código"] }),
+        /* @__PURE__ */ jsx("div", { className: "report-muted", children: `Gerado em ${(/* @__PURE__ */ new Date()).toLocaleString("pt-BR")}` }),
+        /* @__PURE__ */ jsxs("div", { className: "report-grid", children: [
+          /* @__PURE__ */ jsx(ItemRelatorio, { label: "Cabeças", value: lote.qtd }),
+          /* @__PURE__ */ jsx(ItemRelatorio, { label: "Sexo", value: lote.sexo === "macho" ? "Macho" : "Fêmea" }),
+          /* @__PURE__ */ jsx(ItemRelatorio, { label: "Peso médio", value: `${lote.pesoMedio} kg` }),
+          /* @__PURE__ */ jsx(ItemRelatorio, { label: "Compra", value: `${fR(parseFloat(lote.precoCompra) || 0)}/@` }),
+          /* @__PURE__ */ jsx(ItemRelatorio, { label: "Prazo da compra", value: `${lote.prazoPagtoCompra || 0} dias` }),
+          /* @__PURE__ */ jsx(ItemRelatorio, { label: "Custo do dinheiro", value: `${lote.custoDinheiro || 0}% a.m.` })
+        ] }),
+        /* @__PURE__ */ jsx("h2", { children: "Resumo por rentabilidade mensal" }),
+        /* @__PURE__ */ jsx("table", { className: "report-table", children: /* @__PURE__ */ jsxs("tbody", { children: [
+          /* @__PURE__ */ jsxs("tr", { children: ["#", "Cenário", "Modalidade", "Prazo", "Contrato", "@ posta", "@ produzida", "Rent. mensal", "Resultado"].map((h) => /* @__PURE__ */ jsx("th", { children: h }, h)) }),
+          ranked.map(({ sc, r }, pos) => /* @__PURE__ */ jsxs("tr", { children: [
+            /* @__PURE__ */ jsx("td", { children: pos + 1 }),
+            /* @__PURE__ */ jsx("td", { children: sc.nome }),
+            /* @__PURE__ */ jsx("td", { children: sc.tipo === "revenda" ? "Revenda" : sc.modalidade }),
+            /* @__PURE__ */ jsx("td", { children: sc.tipo === "revenda" ? "—" : `${sc.diasCiclo} dias` }),
+            /* @__PURE__ */ jsx("td", { children: sc.tipo === "revenda" || sc.modoPreco !== "bolsa" ? "—" : sc.contratoB3 || contratoB3DoCenario(sc) }),
+            /* @__PURE__ */ jsx("td", { children: fR(r.custoArrobaPosta) }),
+            /* @__PURE__ */ jsx("td", { children: sc.tipo === "revenda" ? "—" : fR(r.custoArrobaLiquidaProduzida) }),
+            /* @__PURE__ */ jsx("td", { children: `${fP(r.rMliq)} a.m.` }),
+            /* @__PURE__ */ jsx("td", { children: fR(r.lucroLiquido) })
+          ] }, sc.id))
+        ] }) })
+      ] }),
+      ranked.map(({ sc, r }, pos) => {
+        const evolucao = calcEvolucaoTempo(lote, sc);
+        return /* @__PURE__ */ jsxs("section", { className: "report-page", children: [
+          /* @__PURE__ */ jsxs("div", { className: "report-brand", children: [pos + 1, "º · ", sc.nome] }),
+          /* @__PURE__ */ jsxs("h1", { children: [sc.tipo === "revenda" ? "Revenda" : sc.modalidade, " · ", `${fP(r.rMliq)} a.m.`] }),
+          /* @__PURE__ */ jsxs("div", { className: "report-grid", children: [
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Entrada / saída", value: sc.tipo === "revenda" ? "—" : `${fmtData(sc.dataEntrada)} · ${fmtData(addDiasISO(sc.dataEntrada, parseFloat(sc.diasCiclo) || 0))}` }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Ciclo / recebimento", value: sc.tipo === "revenda" ? `${sc.diasPagamento || 0} dias` : `${sc.diasCiclo} + ${sc.diasPagamento || 0} dias` }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Contrato / base", value: sc.modoPreco === "bolsa" ? `${sc.contratoB3 || contratoB3DoCenario(sc)} · -${sc.baseDesc || 0}%` : `Balcão · ${fR(parseFloat(sc.precoBalcao) || 0)}` }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "GMD / RC final", value: sc.tipo === "revenda" ? "—" : `${sc.gmd} kg/d · ${sc.rcFinal}%` }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Premissas da modalidade", value: sc.tipo === "revenda" ? "Revenda direta" : sc.modalidade === "ms" ? `MS ${fR(parseFloat(sc.custoMS) || 0)}/t · ${sc.consumoMS}% PV · adm ${fR(parseFloat(sc.custoAdm) || 0)}/d · protocolo ${fR(parseFloat(sc.protocolo) || 0)}` : sc.modalidade === "arroba" ? `${fR(parseFloat(sc.custoArrobaProd) || 0)}/@ produzida` : sc.modalidade === "diaria" ? `${fR(parseFloat(sc.custoDiaria) || 0)}/cab/dia` : `Parceria · RC entrada ${sc.rcEntrada}%` }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Peso processado / abate", value: sc.tipo === "revenda" ? `${fN(r.pesoProc, 1)} kg` : `${fN(r.pesoProc, 1)} · ${fN(r.pesoAbate, 1)} kg` }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Rota / responsável", value: `${sc.origemFrete || "origem não informada"} → ${sc.destinoFrete || "destino não informado"} · ${sc.respFrete || "—"}` }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Transporte", value: `${fR(r.freteTotal)} · ${sc.freteNoAcerto ? "acerto final" : "à vista"}` }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Custo confinamento", value: fR(r.custoCont) }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Custo @ posta", value: fR(r.custoArrobaPosta) }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "@ líquidas produzidas", value: sc.tipo === "revenda" ? "—" : `${fAt(r.arrobasProduzidasCab)} / cab` }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Custo @ líquida produzida", value: sc.tipo === "revenda" ? "—" : fR(r.custoArrobaLiquidaProduzida) }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Custo marginal @", value: sc.tipo === "revenda" ? "—" : fR(r.custoArrobaMarginal) }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Produção + frete / @", value: sc.tipo === "revenda" ? "—" : fR(r.custoProducaoFretePorArroba) }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Capital", value: fR(r.investInicial) }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Lucro bruto / final", value: `${fR(r.lucro)} · ${fR(r.lucroLiquido)}` }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Rentabilidade", value: `${fP(r.rTliq)} total · ${fP(r.rMliq)} a.m.` }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Adiantamento", value: r.valorAdiantamento > 0 ? `${fR(r.valorAdiantamento)} · ${r.diasAdiantamento} dias · custo ${fR(r.custoAdiantamento)}` : "Não simulado" })
+          ] }),
+          sc.tipo !== "revenda" && /* @__PURE__ */ jsxs(Fragment, { children: [
+            /* @__PURE__ */ jsx("h2", { children: "Evolução de custo e rentabilidade" }),
+            /* @__PURE__ */ jsx("table", { className: "report-table report-table-compact", children: /* @__PURE__ */ jsxs("tbody", { children: [
+              /* @__PURE__ */ jsxs("tr", { children: ["Dias", "Saída", "BGI", "@ prod./cab", "Custo @ prod.", "Frete/@", "Prod.+frete/@", "Rent. mês", "Resultado"].map((h) => /* @__PURE__ */ jsx("th", { children: h }, h)) }),
+              evolucao.map((ponto) => {
+                const e = ponto.resultado;
+                return /* @__PURE__ */ jsxs("tr", { children: [
+                  /* @__PURE__ */ jsx("td", { children: ponto.dias }),
+                  /* @__PURE__ */ jsx("td", { children: fmtData(ponto.dataSaida) }),
+                  /* @__PURE__ */ jsx("td", { children: ponto.cotacao == null ? `${ponto.contrato} · pendente` : `${ponto.contrato} · ${fR(ponto.cotacao)}` }),
+                  /* @__PURE__ */ jsx("td", { children: e ? fAt(e.arrobasProduzidasCab) : "—" }),
+                  /* @__PURE__ */ jsx("td", { children: e ? fR(e.custoArrobaLiquidaProduzida) : "—" }),
+                  /* @__PURE__ */ jsx("td", { children: e ? fR(e.fretePorArrobaProduzida) : "—" }),
+                  /* @__PURE__ */ jsx("td", { children: e ? fR(e.custoProducaoFretePorArroba) : "—" }),
+                  /* @__PURE__ */ jsx("td", { children: e ? fP(e.rMliq) : "—" }),
+                  /* @__PURE__ */ jsx("td", { children: e ? fR(e.lucroLiquido) : "—" })
+                ] }, ponto.dias);
+              })
+            ] }) })
+          ] })
+        ] }, sc.id);
+      })
+    ] })
+  ] });
+}
 function Comparativo({ resultados, cenarios, lote }) {
   const ativos = cenarios.map((sc, i) => ({ sc, r: resultados[i], i })).filter((x) => x.r);
   if (!ativos.length) return null;
   const ranked = [...ativos].sort((a, b) => b.r.rMliq - a.r.rMliq || b.r.lucroLiquido - a.r.lucroLiquido || b.r.rTliq - a.r.rTliq || a.i - b.i);
   const semCustoFrete = (r) => r.respFrete === "confinamento" || r.freteTotal === 0 && r.fretePorCab === 0;
-  const otimos = ativos.reduce((acc, { sc }) => {
-    acc[sc.id] = calcPontoOtimoDias(lote, sc);
-    return acc;
-  }, {});
   const rows = [
     { l: "Arrobas compra / cab", fn: (r) => fAt(r.arrobasCompra) },
     { l: "Perda no transporte", fn: (r) => fP(r.pctPerda) },
@@ -1444,6 +1643,16 @@ function Comparativo({ resultados, cenarios, lote }) {
     { l: "VP da @ (R$/@)", fn: (r) => fR(r.vpArroba), hint: "Valor presente \u2014 pre\xE7o descontado pelo custo do dinheiro" },
     { l: "Pre\xE7o limite de compra (VP)", fn: (r) => fR(r.precoCompraVpMax), hint: "Maior R$/@ de compra que ainda empata o neg\xF3cio em valor presente, j\xE1 descontando frete, confinamento e custo do dinheiro.", cls: (r) => r.margemCompraVp >= 0 ? "pos" : "neg" },
     { l: "Margem vs compra atual (R$/@)", fn: (r) => fR(r.margemCompraVp), cls: (r) => r.margemCompraVp >= 0 ? "pos" : "neg" },
+    { sep: true, l: "MÉTRICAS DE ARROBA" },
+    { l: "Peso processado (kg/cab)", fn: (r) => fN(r.pesoProc, 1) },
+    { l: "Arrobas postas a 50% RC / cab", fn: (r) => fAt(r.arrobasPostasCab) },
+    { l: "Custo da @ posta (compra + frete)", fn: (r) => fR(r.custoArrobaPosta), bold: true },
+    { l: "Carcaça líquida produzida (kg/cab)", fn: (r) => r.tipo === "revenda" ? "—" : fN(r.kgCarcacaProduzidaCab, 1) },
+    { l: "Arrobas líquidas produzidas / cab", fn: (r) => r.tipo === "revenda" ? "—" : fAt(r.arrobasProduzidasCab) },
+    { l: "Custo da @ líquida produzida", fn: (r) => r.tipo === "revenda" ? "—" : fR(r.custoArrobaLiquidaProduzida), bold: true },
+    { l: "Custo marginal da @ de ganho", fn: (r) => r.tipo === "revenda" ? "—" : fR(r.custoArrobaMarginal) },
+    { l: "Frete diluído / @ produzida", fn: (r) => r.tipo === "revenda" ? "—" : fR(r.fretePorArrobaProduzida) },
+    { l: "Produção + frete / @ produzida", fn: (r) => r.tipo === "revenda" ? "—" : fR(r.custoProducaoFretePorArroba), bold: true },
     { sep: true, l: "CUSTOS \u2014 TOTAL DO LOTE" },
     { l: "Custo de compra", fn: (r) => fR(r.custoCompra) },
     { l: "Bois por carreta", fn: (r) => semCustoFrete(r) ? "\u2014" : r.qtdCarretas > 0 ? fN(r.boisPorCarreta, 0) : "\u2014" },
@@ -1488,11 +1697,7 @@ function Comparativo({ resultados, cenarios, lote }) {
     { l: "Rent. total final", fn: (r) => fP(r.rTliq), cls: (r) => r.rTliq >= 0 ? "pos" : "neg" },
     { l: "Rent. mensal antes do adiantamento", fn: (r) => fP(r.rMliqSemAdiantamento ?? r.rMliq), bold: true, cls: (r) => (r.rMliqSemAdiantamento ?? r.rMliq) >= 0 ? "pos" : "neg" },
     { l: "Impacto do adiantamento na rent. mensal", fn: (r) => `${fN(r.impactoAdiantamentoMensal ?? 0, 2)} p.p.`, cls: (r) => (r.impactoAdiantamentoMensal ?? 0) >= 0 ? "pos" : "neg" },
-    { l: "Rent. mensal final", fn: (r) => `${fP(r.rMliq)} a.m.`, bold: true, cls: (r) => r.rMliq >= 0 ? "pos" : "neg", best: true },
-    { sep: true, l: "PONTO \xD3TIMO \u2014 MANTENDO DEMAIS PREMISSAS" },
-    { l: "Melhor ciclo (dias)", fn: (r, sc) => otimos[sc.id] ? fN(otimos[sc.id].dias, 0) : "\u2014", bold: true },
-    { l: "Rent. no ponto \xF3timo", fn: (r, sc) => otimos[sc.id] ? fP(otimos[sc.id].rMliq) + " a.m." : "\u2014", bold: true, cls: (r, sc) => otimos[sc.id]?.rMliq >= 0 ? "pos" : "neg" },
-    { l: "Lucro l\xEDq. no ponto \xF3timo", fn: (r, sc) => otimos[sc.id] ? fR(otimos[sc.id].lucroLiquido) : "\u2014", cls: (r, sc) => otimos[sc.id]?.lucroLiquido >= 0 ? "pos" : "neg" }
+    { l: "Rent. mensal final", fn: (r) => `${fP(r.rMliq)} a.m.`, bold: true, cls: (r) => r.rMliq >= 0 ? "pos" : "neg", best: true }
   ];
   return /* @__PURE__ */ jsxs("div", { className: "res-wrap", children: [
     /* @__PURE__ */ jsx("div", { className: "res-ttl", children: "Resultado" }),
@@ -1505,9 +1710,7 @@ function Comparativo({ resultados, cenarios, lote }) {
       " kg \xB7 ",
       lote.origemNome || "\u2014"
     ] }),
-    /* @__PURE__ */ jsx("div", { className: "rank-row", children: ranked.map(({ r, sc, i }, pos) => /* @__PURE__ */ jsx("div", { className: `rcard ${pos === 0 ? "best" : ""}`, style: { "--c": T.sc[i] }, children: (() => {
-      const otimo = otimos[sc.id];
-      return /* @__PURE__ */ jsxs(Fragment, { children: [
+    /* @__PURE__ */ jsx("div", { className: "rank-row", children: ranked.map(({ r, sc, i }, pos) => /* @__PURE__ */ jsx("div", { className: `rcard ${pos === 0 ? "best" : ""}`, style: { "--c": T.sc[i] }, children: /* @__PURE__ */ jsxs(Fragment, { children: [
         /* @__PURE__ */ jsx("div", { className: "rn", children: pos + 1 }),
         /* @__PURE__ */ jsx("div", { className: "rname", children: sc.nome }),
         /* @__PURE__ */ jsx("div", { className: "rtype", children: r.tipo === "revenda" ? "Revenda" : sc.modalidade }),
@@ -1534,8 +1737,10 @@ function Comparativo({ resultados, cenarios, lote }) {
           " a.m."
         ] }),
         /* @__PURE__ */ jsxs("div", { className: "rsub", children: [
-          "\xF3timo: ",
-          otimo ? `${fN(otimo.dias, 0)} dias \xB7 ${fP(otimo.rMliq)} a.m.` : "\u2014"
+          "@ posta: ",
+          fR(r.custoArrobaPosta),
+          " \xB7 @ produzida: ",
+          r.tipo === "revenda" ? "\u2014" : fR(r.custoArrobaLiquidaProduzida)
         ] }),
         /* @__PURE__ */ jsxs("div", { className: "rsub", children: [
           "lucro bruto: ",
@@ -1554,8 +1759,7 @@ function Comparativo({ resultados, cenarios, lote }) {
           "capital: ",
           fR(r.investInicial)
         ] })
-      ] });
-    })() }, sc.id)) }),
+      ] }) }, sc.id)) }),
     /* @__PURE__ */ jsx("div", { className: "sec", style: { padding: 0 }, children: /* @__PURE__ */ jsx("div", { className: "tbl-wrap", children: /* @__PURE__ */ jsxs("table", { className: "cmp-tbl", children: [
       /* @__PURE__ */ jsx("thead", { children: /* @__PURE__ */ jsxs("tr", { children: [
         /* @__PURE__ */ jsx("th", { style: { textAlign: "left" }, children: "Item" }),
@@ -1607,7 +1811,7 @@ function Confinex() {
   const [statusSupabase, setStatusSupabase] = useState("Supabase: aguardando um negócio ser iniciado.");
   const [versoesSalvas, setVersoesSalvas] = useState(carregarVersoesNomeadas);
   const [versaoSelecionada, setVersaoSelecionada] = useState("");
-  const contratosB3Estudo = [...new Set(cenarios.map(contratoB3DoCenario).filter(Boolean))].sort();
+  const contratosB3Estudo = [...new Set([...cenarios.map(contratoB3DoCenario).filter(Boolean), ...contratosB3DaEvolucao(cenarios)])].sort();
   useEffect(() => {
     try {
       localStorage.setItem(APP_STORAGE_KEY, JSON.stringify({
@@ -2365,9 +2569,9 @@ function Confinex() {
             const cenarioReferencia = cenarios.find((sc) => contratoB3DoCenario(sc) === contrato);
             return /* @__PURE__ */ jsx(F, { label: contrato, hint: registro?.fonte || "Valor inicial do estudo", children: /* @__PURE__ */ jsx("input", { type: "number", value: registro?.preco ?? cenarioReferencia?.precoBolsa ?? "", onChange: (e) => definirCotacaoB3(contrato, e.target.value) }) }, contrato);
           }),
-          /* @__PURE__ */ jsx(F, { label: "Atualizar a curva usada", hint: "Consulta todos os vencimentos acima no mesmo lote", children: /* @__PURE__ */ jsx("button", { className: "tb on", style: { width: "100%", padding: "10px 13px" }, onClick: atualizarMercadoB3, children: "Atualizar cota\xE7\xF5es BGI" }) })
+          /* @__PURE__ */ jsx(F, { label: "Atualizar a curva usada", hint: "Consulta juntos os vencimentos da janela de 60 a 240 dias", children: /* @__PURE__ */ jsx("button", { className: "tb on", style: { width: "100%", padding: "10px 13px" }, onClick: atualizarMercadoB3, children: "Atualizar cota\xE7\xF5es BGI" }) })
         ] }),
-        /* @__PURE__ */ jsx("div", { className: "hint", style: { marginTop: 10 }, children: statusB3 || "Cada contrato tem uma única cotação compartilhada. Parceria usa o vencimento da saída automaticamente; nas demais modalidades você pode escolher o contrato." }),
+        /* @__PURE__ */ jsx("div", { className: "hint", style: { marginTop: 10 }, children: statusB3 || "Cada contrato tem uma única cotação compartilhada. A curva inclui os meses necessários para comparar permanências entre 60 e 240 dias." }),
         lote.cotacoesB3AtualizadasEm && /* @__PURE__ */ jsx("div", { className: "hint", style: { marginTop: 4 }, children: `Última alteração conjunta: ${(/* @__PURE__ */ new Date(lote.cotacoesB3AtualizadasEm)).toLocaleString("pt-BR")}` })
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "sec", style: { padding: 0 }, children: [
@@ -2438,6 +2642,8 @@ function Confinex() {
         cenarios.length === 1 ? "CEN\xC1RIO" : "CEN\xC1RIOS"
       ] }),
       resultados.length > 0 && /* @__PURE__ */ jsx(Comparativo, { resultados, cenarios, lote }),
+      resultados.length > 0 && /* @__PURE__ */ jsx(EvolucaoTempo, { lote, cenarios }),
+      resultados.length > 0 && /* @__PURE__ */ jsx(RelatorioComparativo, { lote, cenarios, resultados }),
       resultados.length > 0 && /* @__PURE__ */ jsxs("div", { className: "sec", style: { marginTop: 18 }, children: [
         /* @__PURE__ */ jsx("div", { className: "sec-t", children: "Iniciar neg\xF3cio \u2014 Supabase" }),
         /* @__PURE__ */ jsxs("div", { className: "g3", children: [

@@ -43,6 +43,9 @@ Bundle esbuild legível de `src/confinex-entry.jsx` + `confinex_work.jsx` (fonte
 - Cenários são classificados pela rentabilidade mensal líquida (`rMliq`), com lucro líquido e rentabilidade total como desempates.
 - A rentabilidade mensal final é o número de maior destaque nos cartões. A rentabilidade total é complementar.
 - Quando há adiantamento, a tela mostra o período em dias, o custo financeiro e a mudança de `rMliqSemAdiantamento` para `rMliq`.
+- A comparação inclui custo da arroba posta, custo da arroba líquida produzida, custo marginal, frete diluído e produção + frete por arroba produzida.
+- `calcEvolucaoTempo` avalia cada cenário entre 60 e 240 dias com a curva BGI correspondente ao mês de cada saída; substitui a antiga indicação de ponto ótimo.
+- `RelatorioComparativo` mantém no DOM uma versão exclusiva para impressão/PDF com resumo ordenado, ficha de todos os cenários e respectivas evoluções, independentemente da aba ativa.
 
 ### Estado
 `estadoAtual()` = `{lote, cenarios (até 5, o 5º nasce "Revenda"), confinamentos (modelos salvos), historico (testes de sensibilidade), scAtivo, resultados, data, versao:"1.3-supabase"}`. Defaults em `defaultLote` e `defaultSc(i)`. `lote.cotacoesB3` guarda a curva compartilhada do estudo, indexada por código de contrato; os cenários preservam uma cópia sincronizada do preço para compatibilidade com cálculos e snapshots antigos.

@@ -135,6 +135,32 @@ pre{white-space:pre-wrap;font-size:12px;background:var(--bg);border:1px solid va
 /* ---------- Gráficos ---------- */
 canvas{max-height:300px}
 
+/* ---------- Relatório comparativo para impressão / PDF ---------- */
+.report-print{display:none}
+@media print{
+  @page{size:A4 landscape;margin:10mm}
+  body{display:block!important;background:#fff!important;color:#172536!important}
+  body *{visibility:hidden!important}
+  .report-print,.report-print *{visibility:visible!important}
+  .report-print{display:block!important;position:absolute;left:0;top:0;width:100%;font-family:var(--font);font-size:10px;color:#172536;background:#fff}
+  .shell-top,.shell-side,.no-print{display:none!important}
+  .report-page{break-after:page;page-break-after:always;min-height:180mm}
+  .report-page:last-child{break-after:auto;page-break-after:auto}
+  .report-brand{font-size:10px;font-weight:800;letter-spacing:1.4px;color:var(--navy);text-transform:uppercase;border-bottom:3px solid var(--yellow);padding-bottom:6px;margin-bottom:10px}
+  .report-print h1{font-size:20px;color:var(--navy);margin:0 0 4px}
+  .report-print h2{font-size:12px;color:var(--navy);margin:16px 0 7px;text-transform:uppercase;letter-spacing:.5px}
+  .report-muted{color:#697586;font-size:9px;margin-bottom:12px}
+  .report-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:10px 0 14px}
+  .report-item{border:1px solid #dfe4ea;border-radius:6px;padding:6px 8px;break-inside:avoid}
+  .report-label{font-size:8px;color:#697586;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}
+  .report-value{font-size:10px;font-weight:700;color:#172536;font-variant-numeric:tabular-nums}
+  .report-table{width:100%;border-collapse:collapse;font-size:9px;font-variant-numeric:tabular-nums}
+  .report-table th{background:#f5f6f8;color:#334155;font-size:8px;text-transform:uppercase;letter-spacing:.3px;text-align:right;padding:5px;border:1px solid #dfe4ea}
+  .report-table th:first-child,.report-table td:first-child{text-align:left}
+  .report-table td{padding:5px;border:1px solid #dfe4ea;text-align:right;white-space:nowrap}
+  .report-table-compact th,.report-table-compact td{padding:3px 4px;font-size:7.5px}
+}
+
 /* ---------- Navegação flutuante ---------- */
 .voltar-central{position:fixed;bottom:18px;right:18px;z-index:9999;background:var(--card);border:1px solid var(--border);border-radius:var(--r-pill);padding:10px 16px;font-family:var(--font);font-size:var(--fs-13);font-weight:600;color:var(--text);text-decoration:none;box-shadow:var(--shadow-2)}
 

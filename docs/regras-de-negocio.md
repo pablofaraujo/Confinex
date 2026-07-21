@@ -40,6 +40,17 @@ Custo de compra: `custoCompra = arrobasCompra × precoCompra × N + baldeio`.
 - `pesoAbate = pesoBase(refGanho) + gmd × diasCiclo` (refGanho: chegada/origem/proc).
 - `carcacaKg = pesoAbate × rcFinal`; `arrobasAbate = carcacaKg / 15`; `arrobasEntrada = pesoRef × rcEntrada / 15`.
 
+## Métricas de custo por arroba
+
+- **Arrobas postas no confinamento**: `arrobasPostas = pesoProcessado × 50% ÷ 15 × N`.
+- **Custo da arroba posta**: `(custoCompra + freteTotal) ÷ arrobasPostas`. Mede o custo do gado já transportado e processado, independentemente do prazo de permanência.
+- **Carcaça líquida produzida**: `kgCarcacaProduzida = pesoAbate × rcFinal − pesoProcessado × 50%`.
+- **Arrobas líquidas produzidas**: `kgCarcacaProduzida ÷ 15`.
+- **Custo da arroba líquida produzida**: `custoConfinamentoTotal ÷ arrobasLiquidasProduzidasTotal`. Considera o ganho de peso e a evolução do RC de 50% no processamento para o RC esperado no abate.
+- **Custo marginal da arroba de ganho**: `custoDiarioCab ÷ (GMD × rcFinal) × 15`. Mostra apenas o custo do ganho diário, sem atribuir ao GMD a evolução do RC sobre o peso já existente.
+- **Frete diluído por arroba produzida**: `freteTotal ÷ arrobasLiquidasProduzidasTotal`; cai conforme mais arrobas são produzidas.
+- **Produção + frete por arroba produzida**: `(custoConfinamentoTotal + freteTotal) ÷ arrobasLiquidasProduzidasTotal`.
+
 ## Custo de confinamento por `modalidade`
 
 - `arroba` → `custoArrobaProd × (arrobasAbate − arrobasEntrada)`.
@@ -65,7 +76,8 @@ Custo de compra: `custoCompra = arrobasCompra × precoCompra × N + baldeio`.
 - O efeito do adiantamento é comparado também na métrica principal: `rMliqSemAdiantamento` versus `rMliq`; `impactoAdiantamentoMensal = rMliq − rMliqSemAdiantamento`, em pontos percentuais ao mês.
 - Ranking dos cenários: `rMliq` decrescente; desempates por lucro líquido, rentabilidade total líquida e ordem original. Cartões e tabela usam a mesma sequência. A rentabilidade mensal final recebe o destaque visual principal; a total permanece como informação complementar.
 - Valor presente: `fatorVP = (1+i)^mesesCapital`; `vpArroba = precoVenda/fatorVP`; **`precoCompraVpMax`** = maior R$/@ de compra que empata em VP = `(receitaVP − freteTotal − custoContTotal − baldeio)/arrobasCompraTotal`; `margemCompraVp = precoCompraVpMax − precoCompra`.
-- `calcPontoOtimoDias` varre diasCiclo ~30–240 e maximiza `rMliq`.
+- A antiga indicação isolada de “ponto ótimo” foi removida. Ela não respeitava o mínimo produtivo e mantinha a mesma cotação ao mudar o mês de saída.
+- A evolução temporal compara 60 a 240 dias em intervalos de 15 dias, incluindo também o ciclo atual quando estiver dentro dessa faixa. Cada prazo recalcula a saída e usa a cotação do contrato BGI daquele mês; sem cotação, o ponto fica pendente e não gera resultado enganoso.
 
 ## Análise de sensibilidade — `SensPanel` / `calcComOverride`
 
