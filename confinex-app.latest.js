@@ -157,18 +157,18 @@ function taxaMensalFluxos(fluxos) {
   }
   return (baixo + alto) / 2;
 }
-function calcImpactoOperacaoFinanceira(sc, { custoDinheiroMensal, dataRecebimento, mesesCapital, baseRentabilidade, lucroLiquidoSemOperacao }) {
+function calcImpactoOperacaoFinanceira(sc, { custoDinheiroMensal, dataRecebimento, mesesCapital, baseRentabilidade, resultadoSemOperacao }) {
   const tipoAdiantamento = sc.tipoAdiantamento === "recebimento" ? "recebimento" : "capital";
   const valorSolicitado = sc.simularAdiantamento ? Math.max(parseFloat(sc.valorAdiantamento) || 0, 0) : 0;
   const baseCalculo = Math.max(baseRentabilidade || 0, 0) || (tipoAdiantamento === "capital" ? valorSolicitado : 0);
   const diasAdiantamento = valorSolicitado > 0 ? diasEntreISO(sc.dataAdiantamento, dataRecebimento) : 0;
   const fatorCusto = custoDinheiroMensal * diasAdiantamento / 30;
-  const valorTerminalSemOperacao = Math.max(baseCalculo + lucroLiquidoSemOperacao, 0);
+  const valorTerminalSemOperacao = Math.max(baseCalculo + resultadoSemOperacao, 0);
   const valorMaximoAntecipacao = tipoAdiantamento === "recebimento" && fatorCusto >= 0 ? valorTerminalSemOperacao / (1 + fatorCusto) : valorSolicitado;
   const valorAdiantamento = tipoAdiantamento === "recebimento" ? Math.min(valorSolicitado, valorMaximoAntecipacao) : valorSolicitado;
   const custoAdiantamento = valorAdiantamento * fatorCusto;
-  const lucroLiquido = lucroLiquidoSemOperacao - custoAdiantamento;
-  const rTliqSemAdiantamento = baseCalculo > 0 ? lucroLiquidoSemOperacao / baseCalculo * 100 : 0;
+  const lucroLiquido = resultadoSemOperacao - custoAdiantamento;
+  const rTliqSemAdiantamento = baseCalculo > 0 ? resultadoSemOperacao / baseCalculo * 100 : 0;
   const rTliq = baseCalculo > 0 ? lucroLiquido / baseCalculo * 100 : 0;
   const rMliqSemAdiantamento = mesesCapital > 0 ? (Math.pow(Math.max(1 + rTliqSemAdiantamento / 100, 0), 1 / mesesCapital) - 1) * 100 : 0;
   let rMliq = mesesCapital > 0 ? (Math.pow(Math.max(1 + rTliq / 100, 0), 1 / mesesCapital) - 1) * 100 : 0;
@@ -198,7 +198,8 @@ function calcImpactoOperacaoFinanceira(sc, { custoDinheiroMensal, dataRecebiment
     valorMaximoAntecipacao,
     valorRecebidoAntecipado,
     saldoRecebimentoFinal,
-    lucroLiquidoSemAdiantamento: lucroLiquidoSemOperacao,
+    resultadoSemOperacaoFinanceira: resultadoSemOperacao,
+    lucroLiquidoSemAdiantamento: resultadoSemOperacao,
     rTliqSemAdiantamento,
     rMliqSemAdiantamento,
     lucroLiquido,
@@ -582,13 +583,12 @@ function calcCenario(lote, sc) {
     const custoDinheiroFrete2 = freteCapital2 * (Math.pow(1 + custoDinheiroMensal2, diasFreteCapital2 / 30) - 1);
     const dataRecebimento2 = addDiasISO(sc.dataEntrada, diasTotal2);
     const custoDinheiroOperacao2 = custoDinheiroCompra2 + custoDinheiroFrete2;
-    const lucroLiquidoSemAdiantamento2 = lucro2 - custoDinheiroOperacao2;
     const impactoFinanceiro2 = calcImpactoOperacaoFinanceira(sc, {
       custoDinheiroMensal: custoDinheiroMensal2,
       dataRecebimento: dataRecebimento2,
       mesesCapital: mesesCapital2,
       baseRentabilidade: investInicial2,
-      lucroLiquidoSemOperacao: lucroLiquidoSemAdiantamento2
+      resultadoSemOperacao: lucro2
     });
     const custoDinheiroTotal2 = custoDinheiroOperacao2 + impactoFinanceiro2.custoAdiantamento;
     const fatorVP2 = custoDinheiroMensal2 > 0 ? Math.pow(1 + custoDinheiroMensal2, mesesCapital2) : 1;
@@ -723,13 +723,12 @@ function calcCenario(lote, sc) {
   const custoDinheiroFrete = freteCapital * (Math.pow(1 + custoDinheiroMensal, diasFreteCapital / 30) - 1);
   const dataRecebimentoAdiantamento = addDiasISO(sc.dataEntrada, diasTotal);
   const custoDinheiroOperacao = custoDinheiroCompra + custoDinheiroFrete;
-  const lucroLiquidoSemAdiantamento = lucro - custoDinheiroOperacao;
   const impactoFinanceiro = calcImpactoOperacaoFinanceira(sc, {
     custoDinheiroMensal,
     dataRecebimento: dataRecebimentoAdiantamento,
     mesesCapital,
     baseRentabilidade: investInicial,
-    lucroLiquidoSemOperacao: lucroLiquidoSemAdiantamento
+    resultadoSemOperacao: lucro
   });
   const custoDinheiroTotal = custoDinheiroOperacao + impactoFinanceiro.custoAdiantamento;
   const fatorVP = custoDinheiroMensal > 0 ? Math.pow(1 + custoDinheiroMensal, mesesCapital) : 1;
@@ -1741,16 +1740,16 @@ function Comparativo({ resultados, cenarios, lote }) {
     { l: "Receita a valor presente", fn: (r) => fR(r.receitaVP), cls: () => "pos" },
     { l: "Lucro bruto", fn: (r) => fR(r.lucro), bold: true, cls: (r) => r.lucro >= 0 ? "pos" : "neg", best: true },
     { l: "Lucro bruto / cab", fn: (r) => fR(r.lucro / r.N), cls: (r) => r.lucro >= 0 ? "pos" : "neg" },
-    { l: "Custo financeiro da compra", fn: (r) => fR(r.custoDinheiroCompra), cls: () => "neg" },
-    { l: "Custo financeiro do frete", fn: (r) => fR(r.custoDinheiroFrete), cls: () => "neg" },
+    { l: "Custo de oportunidade da compra", fn: (r) => fR(r.custoDinheiroCompra), hint: "Informativo: não reduz a rentabilidade total nem a mensal", cls: () => "neg" },
+    { l: "Custo de oportunidade do frete", fn: (r) => fR(r.custoDinheiroFrete), hint: "Informativo: não reduz a rentabilidade total nem a mensal", cls: () => "neg" },
     { l: "Opera\xE7\xE3o financeira", fn: (r) => r.valorAdiantamento > 0 ? r.tipoAdiantamento === "recebimento" ? "Antecipa\xE7\xE3o do recebimento" : "Adiantamento de capital" : "\u2014" },
     { l: "Valor da opera\xE7\xE3o", fn: (r) => r.valorAdiantamento > 0 ? fR(r.valorAdiantamento) : "\u2014" },
     { l: "Per\xEDodo da opera\xE7\xE3o", fn: (r) => r.valorAdiantamento > 0 ? `${fmtData(r.dataAdiantamento)} a ${fmtData(r.dataRecebimentoAdiantamento)} \xB7 ${fN(r.diasAdiantamento, 0)} dias` : "\u2014" },
     { l: "Custo da opera\xE7\xE3o", fn: (r) => r.valorAdiantamento > 0 ? fR(r.custoAdiantamento) : "\u2014", cls: () => "neg" },
     { l: "Valor recebido antecipadamente", fn: (r) => r.tipoAdiantamento === "recebimento" && r.valorAdiantamento > 0 ? fR(r.valorRecebidoAntecipado) : "\u2014", cls: () => "pos" },
     { l: "Saldo previsto no acerto final", fn: (r) => r.tipoAdiantamento === "recebimento" && r.valorAdiantamento > 0 ? fR(r.saldoRecebimentoFinal) : "\u2014" },
-    { l: "Custo do dinheiro total", fn: (r) => fR(r.custoDinheiroTotal), cls: () => "neg" },
-    { l: "Lucro l\xEDquido sem opera\xE7\xE3o financeira", fn: (r) => fR(r.lucroLiquidoSemAdiantamento), cls: (r) => r.lucroLiquidoSemAdiantamento >= 0 ? "pos" : "neg" },
+    { l: "Custo de oportunidade total", fn: (r) => fR(r.custoDinheiroOperacao), hint: "Usado na análise de valor presente; não é abatido do resultado", cls: () => "neg" },
+    { l: "Resultado sem opera\xE7\xE3o financeira", fn: (r) => fR(r.resultadoSemOperacaoFinanceira ?? r.lucroLiquidoSemAdiantamento), cls: (r) => (r.resultadoSemOperacaoFinanceira ?? r.lucroLiquidoSemAdiantamento) >= 0 ? "pos" : "neg" },
     { l: "Resultado final com opera\xE7\xE3o financeira", fn: (r) => fR(r.lucroLiquido), bold: true, cls: (r) => r.lucroLiquido >= 0 ? "pos" : "neg" },
     { l: "Lucro l\xEDquido / cab", fn: (r) => fR(r.lucroLiquido / r.N), cls: (r) => r.lucroLiquido >= 0 ? "pos" : "neg" },
     { l: "Resultado VP", fn: (r) => fR(r.resultadoVP), bold: true, cls: (r) => r.resultadoVP >= 0 ? "pos" : "neg" },
@@ -1763,11 +1762,9 @@ function Comparativo({ resultados, cenarios, lote }) {
     { l: "Prazo recebimento (dias)", fn: (r) => fN(r.diasPag, 0) },
     { l: "Prazo total (dias)", fn: (r) => fN(r.diasTotal, 0), bold: true },
     { l: "Tempo capital investido (meses)", fn: (r) => fN(r.mesesCapital, 1) },
-    { l: "Rent. total (sem custo $)", fn: (r) => fP(r.rentTotal), cls: (r) => r.rentTotal >= 0 ? "pos" : "neg" },
-    { l: "Rent. mensal (sem custo $)", fn: (r) => fP(r.rentMensal), cls: (r) => r.rentMensal >= 0 ? "pos" : "neg" },
-    { l: "Rent. total sem opera\xE7\xE3o financeira", fn: (r) => fP(r.rTliqSemAdiantamento), cls: (r) => r.rTliqSemAdiantamento >= 0 ? "pos" : "neg" },
+    { l: "Rent. total operacional", fn: (r) => fP(r.rTliqSemAdiantamento), hint: "Sem abatimento do custo de oportunidade", cls: (r) => r.rTliqSemAdiantamento >= 0 ? "pos" : "neg" },
     { l: "Rent. total final", fn: (r) => fP(r.rTliq), cls: (r) => r.rTliq >= 0 ? "pos" : "neg" },
-    { l: "Rent. mensal sem opera\xE7\xE3o financeira", fn: (r) => fP(r.rMliqSemAdiantamento ?? r.rMliq), bold: true, cls: (r) => (r.rMliqSemAdiantamento ?? r.rMliq) >= 0 ? "pos" : "neg" },
+    { l: "Rent. mensal operacional", fn: (r) => fP(r.rMliqSemAdiantamento ?? r.rMliq), hint: "Sem abatimento do custo de oportunidade", bold: true, cls: (r) => (r.rMliqSemAdiantamento ?? r.rMliq) >= 0 ? "pos" : "neg" },
     { l: "Impacto da opera\xE7\xE3o na rent. mensal", fn: (r) => `${fN(r.impactoAdiantamentoMensal ?? 0, 2)} p.p.`, cls: (r) => (r.impactoAdiantamentoMensal ?? 0) >= 0 ? "pos" : "neg" },
     { l: "Rent. mensal final", fn: (r) => `${fP(r.rMliq)} a.m.`, bold: true, cls: (r) => r.rMliq >= 0 ? "pos" : "neg", best: true }
   ];

@@ -21,7 +21,7 @@
         var box = document.getElementById('boot-status');
         if (box) {
           box.style.display = 'block';
-          box.innerHTML = '<b>Erro ao abrir o Confinex</b><br>' + (event.message || 'Falha ao carregar o aplicativo.') + '<br><small>Build 20260721-10</small>';
+          box.innerHTML = '<b>Erro ao abrir o Confinex</b><br>' + (event.message || 'Falha ao carregar o aplicativo.') + '<br><small>Build 20260721-11</small>';
         }
       });
       setTimeout(function () {
@@ -29,7 +29,7 @@
         var box = document.getElementById('boot-status');
         if (box) {
           box.style.display = 'block';
-          box.innerHTML = '<b>O aplicativo não terminou de carregar.</b><br>Recarregue a página.<br><small>Build 20260721-10</small>';
+          box.innerHTML = '<b>O aplicativo não terminou de carregar.</b><br>Recarregue a página.<br><small>Build 20260721-11</small>';
         }
       }, 12000);
     </script>
@@ -39,8 +39,8 @@
     </style>
   </head>
   <body>
-    <div id="boot-status">Abrindo Confinex… <small>Build 20260721-10</small></div>
+    <div id="boot-status">Abrindo Confinex… <small>Build 20260721-11</small></div>
     <div id="root"></div>
-    <script defer src="./confinex-app.mobile.js?v=20260721-10" onload="window.__CONFINEX_BOOT_OK=true;document.getElementById('boot-status').style.display='none'"></script>
+    <script defer src="./confinex-app.mobile.js?v=20260721-11" onload="window.__CONFINEX_BOOT_OK=true;document.getElementById('boot-status').style.display='none'"></script>
   </body>
 </html>

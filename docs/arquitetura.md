@@ -44,6 +44,7 @@ Bundle esbuild legível de `src/confinex-entry.jsx` + `confinex_work.jsx` (fonte
 - A rentabilidade mensal final é o número de maior destaque nos cartões. A rentabilidade total é complementar.
 - Quando há operação financeira, a tela mostra o tipo, o período em dias, o custo e a mudança de `rMliqSemAdiantamento` para `rMliq`.
 - `calcImpactoOperacaoFinanceira` separa adiantamento de capital de antecipação do recebimento. No segundo caso, `taxaMensalFluxos` calcula a rentabilidade mensal pelos fluxos datados do capital, do recebimento antecipado e do saldo final.
+- `custoDinheiroOperacao` é custo de oportunidade informativo e alimenta somente análises de valor presente; não reduz `rTliq` nem `rMliq`. Apenas o custo explícito de adiantamento ou antecipação altera essas rentabilidades.
 - A comparação inclui custo da arroba posta, custo da arroba líquida produzida, custo marginal, frete diluído e produção + frete por arroba produzida.
 - `calcEvolucaoTempo` avalia cada cenário entre 60 e 240 dias com a curva BGI correspondente ao mês de cada saída; substitui a antiga indicação de ponto ótimo.
 - `RelatorioComparativo` mantém no DOM uma versão exclusiva para impressão/PDF com resumo ordenado, ficha de todos os cenários e respectivas evoluções, independentemente da aba ativa.

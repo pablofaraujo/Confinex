@@ -70,9 +70,10 @@ Custo de compra: `custoCompra = arrobasCompra × precoCompra × N + baldeio`.
 - `diasTotal = diasCiclo + diasPagamento` (diasPagamento = prazo de RECEBIMENTO da venda); `diasCapitalCompra = max(diasTotal − prazoPagtoCompra, 0)`.
 - Frete pago à vista integra o capital pelo prazo total e recebe custo do dinheiro. Frete marcado **pago no acerto final** continua como despesa operacional, mas não integra capital nem custo financeiro.
 - O tempo consolidado do capital é ponderado pelo valor e prazo de compra e frete.
-- `rentTotal = lucro/investInicial`; `rentMensal = (1+rT)^(1/mesesCapital) − 1` (composto).
-- Custo do dinheiro da compra e do frete é calculado separadamente conforme o prazo de cada desembolso.
+- `rentTotal = lucro/investInicial`; `rentMensal = (1+rT)^(1/mesesCapital) − 1` (composto). O custo de oportunidade da compra e do frete não é abatido dessas rentabilidades.
+- O custo do dinheiro da compra e do frete é calculado separadamente conforme o prazo de cada desembolso, apenas como análise informativa e de valor presente.
 - A simulação financeira possui dois tipos. **Adiantamento de capital** representa dinheiro adicional colocado no negócio: `custoAdiantamento = valorAdiantamento × i × diasAdiantamento/30`; o custo reduz o resultado e o prazo original permanece. **Antecipação do recebimento** representa parte do valor final recebida antes: o valor antecipado entra na data escolhida, enquanto principal e custo são abatidos do saldo no acerto final.
+- Somente `custoAdiantamento`, quando houver adiantamento ou antecipação, reduz o resultado usado em `rTliq` e `rMliq`. Sem operação financeira, `rTliq = rentTotal` e `rMliq = rentMensal`.
 - Na antecipação, o valor máximo é `valorTerminalSemOperacao ÷ (1 + i × diasAdiantamento/30)`, evitando saldo final negativo. A rentabilidade mensal é a taxa interna de retorno dos fluxos `−capital` no início equivalente, `+valorAntecipado` na data escolhida e `+saldoFinal` no acerto. Assim, o lucro nominal diminui pelo custo, mas a rentabilidade mensal pode aumentar pela redução do tempo de capital exposto.
 - O efeito da operação é comparado na métrica principal: `rMliqSemAdiantamento` versus `rMliq`; `impactoAdiantamentoMensal = rMliq − rMliqSemAdiantamento`, em pontos percentuais ao mês.
 - Ranking dos cenários: `rMliq` decrescente; desempates por lucro líquido, rentabilidade total líquida e ordem original. Cartões e tabela usam a mesma sequência. A rentabilidade mensal final recebe o destaque visual principal; a total permanece como informação complementar.
