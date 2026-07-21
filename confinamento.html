@@ -109,7 +109,7 @@ async function carregar(){
     db.from('custos_operacao').select('operacao_id,data,categoria,descricao,valor').order('categoria'),
     db.from('eventos_operacao').select('operacao_id,data,tipo,descricao').order('data',{ascending:false}).limit(30),
     db.from('fechamentos_operacao').select('operacao_id,previsto,realizado_bruto,realizado_liquido,hedge_creditado,desvio,explicacao'),
-    db.from('confinex_avaliacoes').select('id,codigo,nome,status,grupo_origem_id,grupo_origem_nome,estimativa_versao_atual,criado_em,confinex_estimativas(versao,tipo,premissas,resultado)').neq('status','cancelado'),
+    db.from('confinex_avaliacoes').select('id,codigo,nome,status,grupo_origem_nome,estimativa_versao_atual,criado_em,confinex_estimativas(versao,tipo,premissas,resultado)').neq('status','cancelado'),
     db.from('confinex_consolidacoes').select('id,avaliacao_id,estimativa_versao,comentario_geral,consolidado_em'),
     db.from('confinex_desvios').select('id,consolidacao_id,indicador,natureza,estimado,realizado,desvio,desvio_percentual,classificacao,comentario_automatico,comentario_manual,material').order('indicador')
   ]);
@@ -152,7 +152,7 @@ async function carregar(){
       const temAdiantamento = Number(r.valorAdiantamento||0)>0;
       const adiantamento = temAdiantamento ? `${fmtN(r.diasAdiantamento||0)} dias · ${fmtR$(r.custoAdiantamento||0)}` : '—';
       return `<tr><td><b>${esc(a.codigo)}</b><div class="hint">${esc(a.nome||'')}</div></td>
-      <td>${esc(a.grupo_origem_nome||'—')}<div class="hint">${esc(a.grupo_origem_id||'ID não informado')}</div></td>
+      <td>${esc(a.grupo_origem_nome||'—')}</td>
       <td class="num ${cls(mensal)}"><b>${Number.isFinite(mensal)?fmtN(mensal,1)+'% a.m.':'—'}</b></td>
       <td class="num">${Number.isFinite(mensalAntes)?fmtN(mensalAntes,1)+'% a.m.':'—'}</td>
       <td>${adiantamento}</td><td><button class="btn mini" onclick="aprovarAvaliacao('${a.id}','${esc(a.codigo)}',${Number(a.estimativa_versao_atual)||1})">Aprovar</button> <button class="btn mini warn" onclick="recusarAvaliacao('${a.id}','${esc(a.codigo)}')">Recusar</button></td></tr>`;

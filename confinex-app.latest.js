@@ -836,7 +836,6 @@ function scFromModelo(sc, modelo) {
 var defaultLote = {
   codigoNegocio: "",
   grupoOrigemNome: "Confinamento",
-  grupoOrigemId: "",
   origemNome: "Fazenda Ametista",
   sexo: "macho",
   qtd: "65",
@@ -2026,7 +2025,7 @@ function Confinex() {
       const { data, error } = await db.rpc("iniciar_negocio_confinex", {
         p_codigo: codigo,
         p_nome: `${codigo} — ${lote.origemNome || cenario.nome}`,
-        p_grupo_origem_id: String(lote.grupoOrigemId || "").trim() || null,
+        p_grupo_origem_id: null,
         p_grupo_origem_nome: grupoNome,
         p_premissas: { lote, cenario },
         p_resultado: resultado
@@ -2147,10 +2146,9 @@ function Confinex() {
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "sec", children: [
         /* @__PURE__ */ jsx("div", { className: "sec-t", children: "01 \u2014 Dados do Lote (base comum a todos os cen\xE1rios)" }),
-        /* @__PURE__ */ jsxs("div", { className: "g3", children: [
+        /* @__PURE__ */ jsxs("div", { className: "g2", children: [
           /* @__PURE__ */ jsx(F, { label: "C\xF3digo do neg\xF3cio", hint: "Obrigat\xF3rio ao iniciar. Ex.: CF-26-012", children: /* @__PURE__ */ jsx("input", { value: lote.codigoNegocio || "", placeholder: "CF-26-012", onChange: (e) => updLote("codigoNegocio", e.target.value.toUpperCase()) }) }),
-          /* @__PURE__ */ jsx(F, { label: "Grupo Telegram de origem", hint: "Define o contexto operacional do lote", children: /* @__PURE__ */ jsx("input", { value: lote.grupoOrigemNome || "", placeholder: "Confinamento", onChange: (e) => updLote("grupoOrigemNome", e.target.value) }) }),
-          /* @__PURE__ */ jsx(F, { label: "ID do grupo Telegram", hint: "Opcional na tela; recomendado para concilia\xE7\xE3o autom\xE1tica", children: /* @__PURE__ */ jsx("input", { value: lote.grupoOrigemId || "", placeholder: "-100...", onChange: (e) => updLote("grupoOrigemId", e.target.value) }) })
+          /* @__PURE__ */ jsx(F, { label: "Grupo Telegram de origem", hint: "Use somente o nome do grupo; o identificador t\xE9cnico \xE9 tratado automaticamente", children: /* @__PURE__ */ jsx("input", { value: lote.grupoOrigemNome || "", placeholder: "Confinamento", onChange: (e) => updLote("grupoOrigemNome", e.target.value) }) })
         ] }),
         /* @__PURE__ */ jsx("div", { className: "dvdr" }),
         /* @__PURE__ */ jsxs("div", { className: "g4", children: [
