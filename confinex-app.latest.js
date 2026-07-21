@@ -130,6 +130,83 @@ function calcArrobas({ peso, sexo, modoCapim, limCapim, descBezerro, limBezerro 
   }
   return Math.max(0, peso / div - bezDesc);
 }
+function taxaMensalFluxos(fluxos) {
+  const validos = (fluxos || []).filter((f) => Number.isFinite(f.valor) && Number.isFinite(f.meses));
+  if (!validos.some((f) => f.valor < 0) || !validos.some((f) => f.valor > 0)) return null;
+  const vp = (taxa) => validos.reduce((total, fluxo) => total + fluxo.valor / Math.pow(1 + taxa, Math.max(Number(fluxo.meses) || 0, 0)), 0);
+  let baixo = -0.9999;
+  let alto = 1;
+  let vpBaixo = vp(baixo);
+  let vpAlto = vp(alto);
+  while (vpBaixo * vpAlto > 0 && alto < 1e6) {
+    alto *= 2;
+    vpAlto = vp(alto);
+  }
+  if (!Number.isFinite(vpBaixo) || !Number.isFinite(vpAlto) || vpBaixo * vpAlto > 0) return null;
+  for (let i = 0; i < 100; i += 1) {
+    const meio = (baixo + alto) / 2;
+    const vpMeio = vp(meio);
+    if (Math.abs(vpMeio) < 1e-7) return meio;
+    if (vpBaixo * vpMeio <= 0) {
+      alto = meio;
+      vpAlto = vpMeio;
+    } else {
+      baixo = meio;
+      vpBaixo = vpMeio;
+    }
+  }
+  return (baixo + alto) / 2;
+}
+function calcImpactoOperacaoFinanceira(sc, { custoDinheiroMensal, dataRecebimento, mesesCapital, baseRentabilidade, lucroLiquidoSemOperacao }) {
+  const tipoAdiantamento = sc.tipoAdiantamento === "recebimento" ? "recebimento" : "capital";
+  const valorSolicitado = sc.simularAdiantamento ? Math.max(parseFloat(sc.valorAdiantamento) || 0, 0) : 0;
+  const baseCalculo = Math.max(baseRentabilidade || 0, 0) || (tipoAdiantamento === "capital" ? valorSolicitado : 0);
+  const diasAdiantamento = valorSolicitado > 0 ? diasEntreISO(sc.dataAdiantamento, dataRecebimento) : 0;
+  const fatorCusto = custoDinheiroMensal * diasAdiantamento / 30;
+  const valorTerminalSemOperacao = Math.max(baseCalculo + lucroLiquidoSemOperacao, 0);
+  const valorMaximoAntecipacao = tipoAdiantamento === "recebimento" && fatorCusto >= 0 ? valorTerminalSemOperacao / (1 + fatorCusto) : valorSolicitado;
+  const valorAdiantamento = tipoAdiantamento === "recebimento" ? Math.min(valorSolicitado, valorMaximoAntecipacao) : valorSolicitado;
+  const custoAdiantamento = valorAdiantamento * fatorCusto;
+  const lucroLiquido = lucroLiquidoSemOperacao - custoAdiantamento;
+  const rTliqSemAdiantamento = baseCalculo > 0 ? lucroLiquidoSemOperacao / baseCalculo * 100 : 0;
+  const rTliq = baseCalculo > 0 ? lucroLiquido / baseCalculo * 100 : 0;
+  const rMliqSemAdiantamento = mesesCapital > 0 ? (Math.pow(Math.max(1 + rTliqSemAdiantamento / 100, 0), 1 / mesesCapital) - 1) * 100 : 0;
+  let rMliq = mesesCapital > 0 ? (Math.pow(Math.max(1 + rTliq / 100, 0), 1 / mesesCapital) - 1) * 100 : 0;
+  let valorRecebidoAntecipado = 0;
+  let saldoRecebimentoFinal = valorTerminalSemOperacao;
+  let mesesAteAntecipacao = mesesCapital;
+  if (tipoAdiantamento === "recebimento" && valorAdiantamento > 0 && baseCalculo > 0) {
+    valorRecebidoAntecipado = valorAdiantamento;
+    saldoRecebimentoFinal = Math.max(valorTerminalSemOperacao - valorAdiantamento - custoAdiantamento, 0);
+    mesesAteAntecipacao = Math.max(mesesCapital - diasAdiantamento / 30, 0);
+    const taxaFluxo = taxaMensalFluxos([
+      { valor: -baseCalculo, meses: 0 },
+      { valor: valorRecebidoAntecipado, meses: mesesAteAntecipacao },
+      { valor: saldoRecebimentoFinal, meses: mesesCapital }
+    ]);
+    if (Number.isFinite(taxaFluxo)) rMliq = taxaFluxo * 100;
+  }
+  return {
+    tipoAdiantamento,
+    valorAdiantamentoSolicitado: valorSolicitado,
+    valorAdiantamento,
+    dataAdiantamento: sc.dataAdiantamento || "",
+    dataRecebimentoAdiantamento: dataRecebimento,
+    diasAdiantamento,
+    mesesAteAntecipacao,
+    custoAdiantamento,
+    valorMaximoAntecipacao,
+    valorRecebidoAntecipado,
+    saldoRecebimentoFinal,
+    lucroLiquidoSemAdiantamento: lucroLiquidoSemOperacao,
+    rTliqSemAdiantamento,
+    rMliqSemAdiantamento,
+    lucroLiquido,
+    rTliq,
+    rMliq,
+    impactoAdiantamentoMensal: rMliq - rMliqSemAdiantamento
+  };
+}
 function perdaKm(km) {
   if (km <= 0) return 0;
   return 0.07 + (km > 300 ? Math.ceil((km - 300) / 100) * 5e-3 : 0);
@@ -504,19 +581,16 @@ function calcCenario(lote, sc) {
     const custoDinheiroCompra2 = custoCompra * (Math.pow(1 + custoDinheiroMensal2, diasCapital2 / 30) - 1);
     const custoDinheiroFrete2 = freteCapital2 * (Math.pow(1 + custoDinheiroMensal2, diasFreteCapital2 / 30) - 1);
     const dataRecebimento2 = addDiasISO(sc.dataEntrada, diasTotal2);
-    const valorAdiantamento2 = sc.simularAdiantamento ? Math.max(parseFloat(sc.valorAdiantamento) || 0, 0) : 0;
-    const diasAdiantamento2 = valorAdiantamento2 > 0 ? diasEntreISO(sc.dataAdiantamento, dataRecebimento2) : 0;
-    const custoAdiantamento2 = valorAdiantamento2 * custoDinheiroMensal2 * diasAdiantamento2 / 30;
     const custoDinheiroOperacao2 = custoDinheiroCompra2 + custoDinheiroFrete2;
-    const custoDinheiroTotal2 = custoDinheiroOperacao2 + custoAdiantamento2;
     const lucroLiquidoSemAdiantamento2 = lucro2 - custoDinheiroOperacao2;
-    const lucroLiquido2 = lucro2 - custoDinheiroTotal2;
-    const baseRentabilidade2 = investInicial2 || valorAdiantamento2;
-    const rTliqSemAdiantamento2 = baseRentabilidade2 > 0 ? lucroLiquidoSemAdiantamento2 / baseRentabilidade2 * 100 : 0;
-    const rTliq2 = baseRentabilidade2 > 0 ? lucroLiquido2 / baseRentabilidade2 * 100 : 0;
-    const rMliqSemAdiantamento2 = mesesCapital2 > 0 ? (Math.pow(1 + rTliqSemAdiantamento2 / 100, 1 / mesesCapital2) - 1) * 100 : 0;
-    const rMliq2 = mesesCapital2 > 0 ? (Math.pow(1 + rTliq2 / 100, 1 / mesesCapital2) - 1) * 100 : 0;
-    const impactoAdiantamentoMensal2 = rMliq2 - rMliqSemAdiantamento2;
+    const impactoFinanceiro2 = calcImpactoOperacaoFinanceira(sc, {
+      custoDinheiroMensal: custoDinheiroMensal2,
+      dataRecebimento: dataRecebimento2,
+      mesesCapital: mesesCapital2,
+      baseRentabilidade: investInicial2,
+      lucroLiquidoSemOperacao: lucroLiquidoSemAdiantamento2
+    });
+    const custoDinheiroTotal2 = custoDinheiroOperacao2 + impactoFinanceiro2.custoAdiantamento;
     const fatorVP2 = custoDinheiroMensal2 > 0 ? Math.pow(1 + custoDinheiroMensal2, mesesCapital2) : 1;
     const vpArroba2 = precoVenda2 / fatorVP2;
     const receitaVP2 = receita2 / fatorVP2;
@@ -580,18 +654,7 @@ function calcCenario(lote, sc) {
       custoDinheiroOperacao: custoDinheiroOperacao2,
       custoDinheiroCompra: custoDinheiroCompra2,
       custoDinheiroFrete: custoDinheiroFrete2,
-      valorAdiantamento: valorAdiantamento2,
-      dataAdiantamento: sc.dataAdiantamento || "",
-      dataRecebimentoAdiantamento: dataRecebimento2,
-      diasAdiantamento: diasAdiantamento2,
-      custoAdiantamento: custoAdiantamento2,
-      lucroLiquidoSemAdiantamento: lucroLiquidoSemAdiantamento2,
-      rTliqSemAdiantamento: rTliqSemAdiantamento2,
-      rMliqSemAdiantamento: rMliqSemAdiantamento2,
-      lucroLiquido: lucroLiquido2,
-      rTliq: rTliq2,
-      rMliq: rMliq2,
-      impactoAdiantamentoMensal: impactoAdiantamentoMensal2,
+      ...impactoFinanceiro2,
       precoCompraVpMax: precoCompraVpMax2,
       resultadoVP: resultadoVP2,
       margemCompraVp: margemCompraVp2,
@@ -659,19 +722,16 @@ function calcCenario(lote, sc) {
   const custoDinheiroCompra = custoCompra * (Math.pow(1 + custoDinheiroMensal, diasCapital / 30) - 1);
   const custoDinheiroFrete = freteCapital * (Math.pow(1 + custoDinheiroMensal, diasFreteCapital / 30) - 1);
   const dataRecebimentoAdiantamento = addDiasISO(sc.dataEntrada, diasTotal);
-  const valorAdiantamento = sc.simularAdiantamento ? Math.max(parseFloat(sc.valorAdiantamento) || 0, 0) : 0;
-  const diasAdiantamento = valorAdiantamento > 0 ? diasEntreISO(sc.dataAdiantamento, dataRecebimentoAdiantamento) : 0;
-  const custoAdiantamento = valorAdiantamento * custoDinheiroMensal * diasAdiantamento / 30;
   const custoDinheiroOperacao = custoDinheiroCompra + custoDinheiroFrete;
-  const custoDinheiroTotal = custoDinheiroOperacao + custoAdiantamento;
   const lucroLiquidoSemAdiantamento = lucro - custoDinheiroOperacao;
-  const lucroLiquido = lucro - custoDinheiroTotal;
-  const baseRentabilidade = investInicial || valorAdiantamento;
-  const rTliqSemAdiantamento = baseRentabilidade > 0 ? lucroLiquidoSemAdiantamento / baseRentabilidade * 100 : 0;
-  const rTliq = baseRentabilidade > 0 ? lucroLiquido / baseRentabilidade * 100 : 0;
-  const rMliqSemAdiantamento = mesesCapital > 0 ? (Math.pow(1 + rTliqSemAdiantamento / 100, 1 / mesesCapital) - 1) * 100 : 0;
-  const rMliq = mesesCapital > 0 ? (Math.pow(1 + rTliq / 100, 1 / mesesCapital) - 1) * 100 : 0;
-  const impactoAdiantamentoMensal = rMliq - rMliqSemAdiantamento;
+  const impactoFinanceiro = calcImpactoOperacaoFinanceira(sc, {
+    custoDinheiroMensal,
+    dataRecebimento: dataRecebimentoAdiantamento,
+    mesesCapital,
+    baseRentabilidade: investInicial,
+    lucroLiquidoSemOperacao: lucroLiquidoSemAdiantamento
+  });
+  const custoDinheiroTotal = custoDinheiroOperacao + impactoFinanceiro.custoAdiantamento;
   const fatorVP = custoDinheiroMensal > 0 ? Math.pow(1 + custoDinheiroMensal, mesesCapital) : 1;
   const vpArroba = precoVenda / fatorVP;
   const receitaVP = receita / fatorVP;
@@ -749,18 +809,7 @@ function calcCenario(lote, sc) {
     custoDinheiroOperacao,
     custoDinheiroCompra,
     custoDinheiroFrete,
-    valorAdiantamento,
-    dataAdiantamento: sc.dataAdiantamento || "",
-    dataRecebimentoAdiantamento,
-    diasAdiantamento,
-    custoAdiantamento,
-    lucroLiquidoSemAdiantamento,
-    rTliqSemAdiantamento,
-    rMliqSemAdiantamento,
-    lucroLiquido,
-    rTliq,
-    rMliq,
-    impactoAdiantamentoMensal,
+    ...impactoFinanceiro,
     precoCompraVpMax,
     resultadoVP,
     margemCompraVp,
@@ -781,6 +830,7 @@ var defaultSc = (i) => ({
   respFrete: i === 4 ? "confinamento" : "meu",
   freteNoAcerto: false,
   simularAdiantamento: false,
+  tipoAdiantamento: "capital",
   dataAdiantamento: isoHoje(),
   valorAdiantamento: "",
   recuperacao: "3",
@@ -825,6 +875,7 @@ var CAMPOS_MODELO_CONFINAMENTO = [
   "respFrete",
   "freteNoAcerto",
   "simularAdiantamento",
+  "tipoAdiantamento",
   "dataAdiantamento",
   "valorAdiantamento",
   "recuperacao",
@@ -1051,6 +1102,7 @@ function ScPanel({ sc, upd, sexo, custoDinheiro, resultado, confinamentos, model
   const isRev = sc.tipo === "revenda";
   const freteDeles = sc.respFrete === "confinamento";
   const isParceria = sc.modalidade === "parceria";
+  const antecipacaoRecebimento = sc.tipoAdiantamento === "recebimento";
   const dataSaida = addDiasISO(sc.dataEntrada, parseFloat(sc.diasCiclo) || 0);
   const dataRecebimento = addDiasISO(sc.dataEntrada, (isRev ? 0 : parseFloat(sc.diasCiclo) || 0) + (parseFloat(sc.diasPagamento) || 0));
   const contratoSugerido = contratoB3PorData(dataSaida);
@@ -1179,23 +1231,32 @@ function ScPanel({ sc, upd, sexo, custoDinheiro, resultado, confinamentos, model
       /* @__PURE__ */ jsx(F, { label: isRev ? "Prazo pagamento (dias)" : "Prazo pag. ap\xF3s abate (dias)", children: /* @__PURE__ */ jsx("input", { type: "number", value: sc.diasPagamento, onChange: u("diasPagamento") }) })
     ] }),
     /* @__PURE__ */ jsx("div", { className: "dvdr" }),
-    /* @__PURE__ */ jsx("div", { className: "sec-t nm", children: "Simula\xE7\xE3o de adiantamento" }),
-    /* @__PURE__ */ jsx(F, { label: "Avaliar dinheiro adiantado?", children: /* @__PURE__ */ jsx(Ck, { checked: sc.simularAdiantamento, onChange: u("simularAdiantamento"), label: "Sim \u2014 descontar o custo financeiro at\xE9 o recebimento" }) }),
+    /* @__PURE__ */ jsx("div", { className: "sec-t nm", children: "Simula\xE7\xE3o financeira" }),
+    /* @__PURE__ */ jsx(F, { label: "Avaliar uma opera\xE7\xE3o financeira?", children: /* @__PURE__ */ jsx(Ck, { checked: sc.simularAdiantamento, onChange: u("simularAdiantamento"), label: "Sim \u2014 comparar o efeito no resultado e na rentabilidade mensal" }) }),
     sc.simularAdiantamento && /* @__PURE__ */ jsxs(Fragment, { children: [
+      /* @__PURE__ */ jsx("div", { className: "g2", style: { marginTop: 14 }, children: /* @__PURE__ */ jsx(F, { label: "Tipo da opera\xE7\xE3o", hint: antecipacaoRecebimento ? "Parte do recebimento final volta antes e reduz o tempo do capital exposto" : "Dinheiro adicional colocado no neg\xF3cio; o custo reduz o resultado", children: /* @__PURE__ */ jsx(Tg, { opts: [
+        { v: "capital", l: "Adiantamento de capital" },
+        { v: "recebimento", l: "Antecipa\xE7\xE3o do recebimento" }
+      ], val: sc.tipoAdiantamento || "capital", set: u("tipoAdiantamento") }) }) }),
       /* @__PURE__ */ jsxs("div", { className: "g3", style: { marginTop: 14 }, children: [
-        /* @__PURE__ */ jsx(F, { label: "Data do adiantamento", children: /* @__PURE__ */ jsx("input", { type: "date", value: sc.dataAdiantamento || "", onChange: u("dataAdiantamento") }) }),
-        /* @__PURE__ */ jsx(F, { label: "Valor adiantado (R$)", children: /* @__PURE__ */ jsx("input", { type: "number", min: "0", step: "100", value: sc.valorAdiantamento || "", onChange: u("valorAdiantamento") }) }),
+        /* @__PURE__ */ jsx(F, { label: antecipacaoRecebimento ? "Data da antecipa\xE7\xE3o" : "Data do adiantamento", children: /* @__PURE__ */ jsx("input", { type: "date", value: sc.dataAdiantamento || "", onChange: u("dataAdiantamento") }) }),
+        /* @__PURE__ */ jsx(F, { label: antecipacaoRecebimento ? "Valor a receber antes (R$)" : "Valor adiantado (R$)", children: /* @__PURE__ */ jsx("input", { type: "number", min: "0", step: "100", value: sc.valorAdiantamento || "", onChange: u("valorAdiantamento") }) }),
         /* @__PURE__ */ jsx(F, { label: "Recebimento previsto", hint: "Calculado pela entrada, ciclo e prazo de recebimento", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: fmtData(dataRecebimento) }) })
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "warn", style: { marginTop: 12 }, children: [
         "Juros simples pr\xF3-rata pela taxa de ",
         custoDinheiro || "0",
-        "% a.m., somente sobre o valor adiantado e pelos dias efetivos. Use para dinheiro adicional ao capital j\xE1 informado; se for antecipa\xE7\xE3o da pr\xF3pria compra, ajuste o prazo de pagamento da compra."
+        antecipacaoRecebimento ? "% a.m. O valor informado entra antes como recebimento; o principal e o custo s\xE3o descontados do saldo no acerto final. A rentabilidade mensal \xE9 recalculada pelos fluxos de caixa datados." : "% a.m., somente sobre o valor adiantado e pelos dias efetivos. Neste modo o prazo do recebimento n\xE3o muda, por isso o custo reduz a rentabilidade."
       ] }),
       resultado && /* @__PURE__ */ jsxs("div", { className: "g3", style: { marginTop: 14 }, children: [
-        /* @__PURE__ */ jsx(F, { label: "Tempo do adiantamento", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: `${fN(resultado.diasAdiantamento, 0)} dias` }) }),
-        /* @__PURE__ */ jsx(F, { label: "Custo do adiantamento", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: fR(resultado.custoAdiantamento) }) }),
-        /* @__PURE__ */ jsx(F, { label: "Impacto na rentabilidade mensal", hint: "Antes do adiantamento \u2192 resultado mensal final", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: `${fP(resultado.rMliqSemAdiantamento ?? resultado.rMliq)} \u2192 ${fP(resultado.rMliq)} a.m. (${fN(resultado.impactoAdiantamentoMensal ?? 0, 2)} p.p.)` }) })
+        /* @__PURE__ */ jsx(F, { label: antecipacaoRecebimento ? "Tempo antecipado" : "Tempo do adiantamento", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: `${fN(resultado.diasAdiantamento, 0)} dias` }) }),
+        /* @__PURE__ */ jsx(F, { label: antecipacaoRecebimento ? "Custo da antecipa\xE7\xE3o" : "Custo do adiantamento", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: fR(resultado.custoAdiantamento) }) }),
+        /* @__PURE__ */ jsx(F, { label: "Impacto na rentabilidade mensal", hint: "Sem opera\xE7\xE3o \u2192 resultado mensal final", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: `${fP(resultado.rMliqSemAdiantamento ?? resultado.rMliq)} \u2192 ${fP(resultado.rMliq)} a.m. (${fN(resultado.impactoAdiantamentoMensal ?? 0, 2)} p.p.)` }) })
+      ] }),
+      resultado && antecipacaoRecebimento && /* @__PURE__ */ jsxs("div", { className: "g3", style: { marginTop: 14 }, children: [
+        /* @__PURE__ */ jsx(F, { label: "Recebido antecipadamente", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: fR(resultado.valorRecebidoAntecipado) }) }),
+        /* @__PURE__ */ jsx(F, { label: "Saldo no acerto final", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: fR(resultado.saldoRecebimentoFinal) }) }),
+        /* @__PURE__ */ jsx(F, { label: "Limite antecip\xE1vel neste cen\xE1rio", hint: resultado.valorAdiantamentoSolicitado > resultado.valorAdiantamento ? "O valor informado foi limitado para n\xE3o gerar saldo final negativo" : "Principal mais custo n\xE3o podem superar o valor final dispon\xEDvel", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: fR(resultado.valorMaximoAntecipacao) }) })
       ] })
     ] }),
     isRev && /* @__PURE__ */ jsxs(Fragment, { children: [
@@ -1607,7 +1668,7 @@ function RelatorioComparativo({ lote, cenarios, resultados }) {
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Capital", value: fR(r.investInicial) }),
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Lucro bruto / final", value: `${fR(r.lucro)} · ${fR(r.lucroLiquido)}` }),
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Rentabilidade", value: `${fP(r.rTliq)} total · ${fP(r.rMliq)} a.m.` }),
-            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Adiantamento", value: r.valorAdiantamento > 0 ? `${fR(r.valorAdiantamento)} · ${r.diasAdiantamento} dias · custo ${fR(r.custoAdiantamento)}` : "Não simulado" })
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Operação financeira", value: r.valorAdiantamento > 0 ? `${r.tipoAdiantamento === "recebimento" ? "Antecipação do recebimento" : "Adiantamento de capital"} · ${fR(r.valorAdiantamento)} · ${r.diasAdiantamento} dias · custo ${fR(r.custoAdiantamento)}${r.tipoAdiantamento === "recebimento" ? ` · saldo final ${fR(r.saldoRecebimentoFinal)}` : ""}` : "Não simulada" })
           ] }),
           sc.tipo !== "revenda" && /* @__PURE__ */ jsxs(Fragment, { children: [
             /* @__PURE__ */ jsx("h2", { children: "Evolução de custo e rentabilidade" }),
@@ -1682,12 +1743,15 @@ function Comparativo({ resultados, cenarios, lote }) {
     { l: "Lucro bruto / cab", fn: (r) => fR(r.lucro / r.N), cls: (r) => r.lucro >= 0 ? "pos" : "neg" },
     { l: "Custo financeiro da compra", fn: (r) => fR(r.custoDinheiroCompra), cls: () => "neg" },
     { l: "Custo financeiro do frete", fn: (r) => fR(r.custoDinheiroFrete), cls: () => "neg" },
-    { l: "Valor adiantado", fn: (r) => r.valorAdiantamento > 0 ? fR(r.valorAdiantamento) : "\u2014" },
-    { l: "Per\xEDodo do adiantamento", fn: (r) => r.valorAdiantamento > 0 ? `${fmtData(r.dataAdiantamento)} a ${fmtData(r.dataRecebimentoAdiantamento)} \xB7 ${fN(r.diasAdiantamento, 0)} dias` : "\u2014" },
-    { l: "Custo do adiantamento", fn: (r) => r.valorAdiantamento > 0 ? fR(r.custoAdiantamento) : "\u2014", cls: () => "neg" },
+    { l: "Opera\xE7\xE3o financeira", fn: (r) => r.valorAdiantamento > 0 ? r.tipoAdiantamento === "recebimento" ? "Antecipa\xE7\xE3o do recebimento" : "Adiantamento de capital" : "\u2014" },
+    { l: "Valor da opera\xE7\xE3o", fn: (r) => r.valorAdiantamento > 0 ? fR(r.valorAdiantamento) : "\u2014" },
+    { l: "Per\xEDodo da opera\xE7\xE3o", fn: (r) => r.valorAdiantamento > 0 ? `${fmtData(r.dataAdiantamento)} a ${fmtData(r.dataRecebimentoAdiantamento)} \xB7 ${fN(r.diasAdiantamento, 0)} dias` : "\u2014" },
+    { l: "Custo da opera\xE7\xE3o", fn: (r) => r.valorAdiantamento > 0 ? fR(r.custoAdiantamento) : "\u2014", cls: () => "neg" },
+    { l: "Valor recebido antecipadamente", fn: (r) => r.tipoAdiantamento === "recebimento" && r.valorAdiantamento > 0 ? fR(r.valorRecebidoAntecipado) : "\u2014", cls: () => "pos" },
+    { l: "Saldo previsto no acerto final", fn: (r) => r.tipoAdiantamento === "recebimento" && r.valorAdiantamento > 0 ? fR(r.saldoRecebimentoFinal) : "\u2014" },
     { l: "Custo do dinheiro total", fn: (r) => fR(r.custoDinheiroTotal), cls: () => "neg" },
-    { l: "Lucro l\xEDquido sem adiantamento", fn: (r) => fR(r.lucroLiquidoSemAdiantamento), cls: (r) => r.lucroLiquidoSemAdiantamento >= 0 ? "pos" : "neg" },
-    { l: "Resultado final com adiantamento", fn: (r) => fR(r.lucroLiquido), bold: true, cls: (r) => r.lucroLiquido >= 0 ? "pos" : "neg" },
+    { l: "Lucro l\xEDquido sem opera\xE7\xE3o financeira", fn: (r) => fR(r.lucroLiquidoSemAdiantamento), cls: (r) => r.lucroLiquidoSemAdiantamento >= 0 ? "pos" : "neg" },
+    { l: "Resultado final com opera\xE7\xE3o financeira", fn: (r) => fR(r.lucroLiquido), bold: true, cls: (r) => r.lucroLiquido >= 0 ? "pos" : "neg" },
     { l: "Lucro l\xEDquido / cab", fn: (r) => fR(r.lucroLiquido / r.N), cls: (r) => r.lucroLiquido >= 0 ? "pos" : "neg" },
     { l: "Resultado VP", fn: (r) => fR(r.resultadoVP), bold: true, cls: (r) => r.resultadoVP >= 0 ? "pos" : "neg" },
     { sep: true, l: "RENTABILIDADE" },
@@ -1701,10 +1765,10 @@ function Comparativo({ resultados, cenarios, lote }) {
     { l: "Tempo capital investido (meses)", fn: (r) => fN(r.mesesCapital, 1) },
     { l: "Rent. total (sem custo $)", fn: (r) => fP(r.rentTotal), cls: (r) => r.rentTotal >= 0 ? "pos" : "neg" },
     { l: "Rent. mensal (sem custo $)", fn: (r) => fP(r.rentMensal), cls: (r) => r.rentMensal >= 0 ? "pos" : "neg" },
-    { l: "Rent. total antes do adiantamento", fn: (r) => fP(r.rTliqSemAdiantamento), cls: (r) => r.rTliqSemAdiantamento >= 0 ? "pos" : "neg" },
+    { l: "Rent. total sem opera\xE7\xE3o financeira", fn: (r) => fP(r.rTliqSemAdiantamento), cls: (r) => r.rTliqSemAdiantamento >= 0 ? "pos" : "neg" },
     { l: "Rent. total final", fn: (r) => fP(r.rTliq), cls: (r) => r.rTliq >= 0 ? "pos" : "neg" },
-    { l: "Rent. mensal antes do adiantamento", fn: (r) => fP(r.rMliqSemAdiantamento ?? r.rMliq), bold: true, cls: (r) => (r.rMliqSemAdiantamento ?? r.rMliq) >= 0 ? "pos" : "neg" },
-    { l: "Impacto do adiantamento na rent. mensal", fn: (r) => `${fN(r.impactoAdiantamentoMensal ?? 0, 2)} p.p.`, cls: (r) => (r.impactoAdiantamentoMensal ?? 0) >= 0 ? "pos" : "neg" },
+    { l: "Rent. mensal sem opera\xE7\xE3o financeira", fn: (r) => fP(r.rMliqSemAdiantamento ?? r.rMliq), bold: true, cls: (r) => (r.rMliqSemAdiantamento ?? r.rMliq) >= 0 ? "pos" : "neg" },
+    { l: "Impacto da opera\xE7\xE3o na rent. mensal", fn: (r) => `${fN(r.impactoAdiantamentoMensal ?? 0, 2)} p.p.`, cls: (r) => (r.impactoAdiantamentoMensal ?? 0) >= 0 ? "pos" : "neg" },
     { l: "Rent. mensal final", fn: (r) => `${fP(r.rMliq)} a.m.`, bold: true, cls: (r) => r.rMliq >= 0 ? "pos" : "neg", best: true }
   ];
   return /* @__PURE__ */ jsxs("div", { className: "res-wrap", children: [
@@ -1734,7 +1798,7 @@ function Comparativo({ resultados, cenarios, lote }) {
           " meses"
         ] }),
         r.valorAdiantamento > 0 && /* @__PURE__ */ jsxs("div", { className: "rsub", style: { marginTop: 5 }, children: [
-          "adiant.: ",
+          r.tipoAdiantamento === "recebimento" ? "antecipa\xE7\xE3o: " : "adiantamento: ",
           fN(r.diasAdiantamento, 0),
           " dias \xB7 ",
           fR(r.custoAdiantamento),
