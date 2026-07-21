@@ -10,7 +10,7 @@ Fonte canônica: `confinex-app.latest.js` (funções citadas pelos nomes reais).
 - Carreta: 65 bois (macho) / 70 (fêmea) — `boisPorCarretaPadrao`.
 - Limite de capim padrão: 300 kg (abaixo disso não aplica desconto).
 - Funrural: 0,2% default no Confinex; 1,5% default no simulador do Boi Balança.
-- Finpec: campo separado no Confinex, com padrão de 1% sobre o faturamento bruto total da venda.
+- Finpec: campo separado no Confinex, com padrão de 0%. Informar 1% sobre o faturamento bruto total somente nos negócios em que houver a cobrança.
 
 ## Arrobas de compra e desconto de capim — `calcArrobas()` / `divisorCapim()`
 
@@ -51,7 +51,7 @@ Custo de compra: `custoCompra = arrobasCompra × precoCompra × N + baldeio`.
 
 - Preço bruto: balcão = `precoBalcao`; bolsa = `precoBolsa × (1−baseDesc%)`.
 - `faturamentoBruto = arrobasRef × precoVendaBruto × N`.
-- `valorFunrural = faturamentoBruto × pctFunrural`; `valorFinpec = faturamentoBruto × pctFinpec` (padrão 1%). Os encargos são calculados separadamente sobre a mesma base bruta, sem incidência em cascata.
+- `valorFunrural = faturamentoBruto × pctFunrural`; `valorFinpec = faturamentoBruto × pctFinpec` (padrão 0%; normalmente 1% quando aplicável). Os encargos são calculados separadamente sobre a mesma base bruta, sem incidência em cascata.
 - `receita = faturamentoBruto − valorFunrural − valorFinpec`; `custos = custoCompra + freteTotal + custoContTotal`; `lucro = receita − custos`.
 
 ## Capital, prazos e valor presente

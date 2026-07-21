@@ -609,7 +609,7 @@ function calcCenario(lote, sc) {
   }
   const custoContTotal = custoCont * N;
   const fur = pctInput(sc.funrural, 2e-3);
-  const finpec = pctInput(sc.finpec, 1e-2);
+  const finpec = pctInput(sc.finpec, 0);
   let precoVendaBruto;
   if (sc.modoPreco === "balcao") {
     precoVendaBruto = parseFloat(sc.precoBalcao) || 0;
@@ -784,7 +784,8 @@ var defaultSc = (i) => ({
   baseDesc: "0",
   precoBalcao: "300",
   funrural: "0.2",
-  finpec: "1.0",
+  finpec: "0.0",
+  finpecConfigurado: false,
   precoRevenda: "310",
   modoCapimVenda: "sem"
 });
@@ -828,6 +829,7 @@ var CAMPOS_MODELO_CONFINAMENTO = [
   "precoBalcao",
   "funrural",
   "finpec",
+  "finpecConfigurado",
   "precoRevenda",
   "modoCapimVenda"
 ];
@@ -892,6 +894,7 @@ function loadSavedState() {
       const next = { ...defaultSc(i), ...sc };
       if (!next.boisPorCarreta || next.boisPorCarreta === "35") next.boisPorCarreta = defaultBois;
       if (!next.funrural || next.funrural === "1.2") next.funrural = "0.2";
+      if (!next.finpecConfigurado) next.finpec = "0.0";
       return next;
     }) : fallback.cenarios.map((sc) => ({ ...sc, boisPorCarreta: defaultBois }));
     const confinamentos = Array.isArray(saved.confinamentos) ? saved.confinamentos : [];
@@ -1142,7 +1145,10 @@ function ScPanel({ sc, upd, sexo, custoDinheiro, resultado, confinamentos, model
         ] }) : /* @__PURE__ */ jsx(F, { label: "Pre\xE7o balc\xE3o (R$/@)", children: /* @__PURE__ */ jsx("input", { type: "number", value: sc.precoBalcao, onChange: u("precoBalcao") }) }),
         /* @__PURE__ */ jsxs("div", { className: "g2", style: { gridColumn: "1 / -1" }, children: [
           /* @__PURE__ */ jsx(F, { label: "Funrural (%)", hint: "Calculado sobre o faturamento bruto da venda", children: /* @__PURE__ */ jsx("input", { type: "number", step: ".1", min: "0", value: sc.funrural, onChange: u("funrural") }) }),
-          /* @__PURE__ */ jsx(F, { label: "Finpec (%)", hint: "Padrão 1% sobre o faturamento bruto da venda", children: /* @__PURE__ */ jsx("input", { type: "number", step: ".1", min: "0", value: sc.finpec, onChange: u("finpec") }) })
+          /* @__PURE__ */ jsx(F, { label: "Finpec (%)", hint: "Normalmente 0%; informe 1% somente quando houver cobrança", children: /* @__PURE__ */ jsx("input", { type: "number", step: ".1", min: "0", value: sc.finpec, onChange: (e) => {
+            upd("finpec", e.target.value);
+            upd("finpecConfigurado", true);
+          } }) })
         ] })
       ] })
     ] })
