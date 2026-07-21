@@ -37,9 +37,10 @@ Bundle esbuild legível de `src/confinex-entry.jsx` + `confinex_work.jsx` (fonte
 ### Persistência
 - localStorage: `confinex:last-state:v3` (auto-save), `confinex:restore-before-reset:v1` (snapshot antes de reset), `confinex:named-versions:v1` (até 80 versões), `confinex:sheets-backend-url`, `confinex:device-id:v1`; legado migrado: `confinex:last-state:v2`.
 - Google Sheets via Apps Script: leitura JSONP (`sheetsJsonp`, timeout 12s), escrita `sheetsPost` (ações `getState/saveState/getVersions/saveVersion/deleteVersion`) + `sheetsBeacon` no `pagehide`. Proteções: `cloudReadyRef` bloqueia auto-save até carregar a nuvem; debounce 10s; carimbo `clientUpdatedAt` → backend responde `error:"conflict"` se outro dispositivo salvou depois; merge por id em `carregarVersoesSheets`; "Salvar agora" força sobrescrita.
+- Supabase: `confinex_testes` recebe versões nomeadas quando há sessão autenticada. A ação **Iniciar negócio** exige código `CF-AA-NNN`, grupo do Telegram de origem e cenário calculado; a RPC `iniciar_negocio_confinex` cria `confinex_avaliacoes` e congela a versão original em `confinex_estimativas`. `confinex_consolidacoes` e `confinex_desvios` guardam realizado, desvios e comentários. Sheets permanece somente durante a transição.
 
 ### Estado
-`estadoAtual()` = `{lote, cenarios (até 5, o 5º nasce "Revenda"), confinamentos (modelos salvos), historico (testes de sensibilidade), scAtivo, resultados, data, versao:"1.2-sheets"}`. Defaults em `defaultLote` e `defaultSc(i)`.
+`estadoAtual()` = `{lote, cenarios (até 5, o 5º nasce "Revenda"), confinamentos (modelos salvos), historico (testes de sensibilidade), scAtivo, resultados, data, versao:"1.3-supabase"}`. Defaults em `defaultLote` e `defaultSc(i)`.
 
 ### Integrações
 - **Cotação B3**: `buscarPrecoB3PorContrato` — cascata API B3 (`InstrumentPriceFluctuation`) → `DailyFluctuationHistory` → Yahoo (`{contrato}.SA`) → CEPEA (scrape via proxy allorigins.win). Contrato sugerido por `contratoB3PorData` a partir da **data de saída** (`dataEntrada + diasCiclo`), códigos de mês F,G,H,J,K,M,N,Q,U,V,X,Z.
@@ -55,7 +56,7 @@ Bundle esbuild legível de `src/confinex-entry.jsx` + `confinex_work.jsx` (fonte
 2. Fonte JSX do bundle React fora do repo; o bundle legível e o pacote móvel gerado ficam versionados.
 3. O shell e os componentes principais são compartilhados; o Confinex ainda injeta CSS próprio dentro do bundle React, embora seus tokens visuais estejam alinhados ao DS.
 4. Credenciais Supabase e URL do Apps Script hardcoded em todas as páginas.
-5. Confinex usa persistência diferente (Sheets/localStorage) do resto (Supabase) — a "fonte única de verdade" prometida no footer da Central não vale para ele.
+5. Confinex ainda mantém Sheets/localStorage como compatibilidade temporária; negócios iniciados e testes autenticados já possuem modelo Supabase, mas a migração operacional precisa ser homologada antes de remover o Apps Script.
 6. JSONP + scrape CEPEA + heurística `extrairNumeroB3` (aceita 100–800) são frágeis.
 7. `rolar()`/`encerrar()`/`encerrarParcial()` sem transação (o parcial faz 3+ escritas sequenciais: update da posição, insert da parte fechada, rateio das alocações).
 8. Deploy publica tudo, inclusive `promissoria-skill.zip`.

@@ -53,6 +53,9 @@
 <h2>Fechamentos — previsto × realizado</h2>
 <div class="card scroll"><table id="tbFechamentos"></table></div>
 
+<h2>Consolidação Confinex — estimado × realizado</h2>
+<div class="card scroll"><table id="tbConfinex"></table></div>
+
 <h2>Eventos recentes (pesagens, dieta, manejo)</h2>
 <div class="card scroll"><table id="tbEventos"></table></div>
 
@@ -66,17 +69,28 @@ const STATUS_BADGE = {
   em_confinamento: '<span class="badge b-green">Em confinamento</span>',
   comprada:        '<span class="badge b-amber">Comprada</span>',
   abatida:         '<span class="badge">Abatida</span>',
-  cancelada:        '<span class="badge b-red">Cancelada</span>',
 };
+
+async function comentarDesvio(id, atualCodificado){
+  const atual = decodeURIComponent(atualCodificado || '');
+  const comentario = prompt('Comentário do desvio', atual);
+  if(comentario === null) return;
+  const {error} = await db.from('confinex_desvios').update({comentario_manual:comentario.trim()||null}).eq('id',id);
+  if(error){ alert('Não foi possível salvar o comentário: '+error.message); return; }
+  carregar();
+}
 
 async function carregar(){
   document.getElementById('subtitle').textContent = 'Carregando...';
-  const [ops, entradas, custos, eventos, fechamentos] = await Promise.all([
-    db.from('operacoes').select('id,codigo,status,sexo,modalidade,contrato_confinamento,resultado_previsto,confinamentos(id,nome,municipio,uf,modalidades)').not('confinamento_id','is',null),
+  const [ops, entradas, custos, eventos, fechamentos, avaliacoes, consolidacoes, desvios] = await Promise.all([
+    db.from('operacoes').select('id,codigo,status,sexo,modalidade,contrato_confinamento,resultado_previsto,confinamentos(id,nome,municipio,uf,modalidades)').not('confinamento_id','is',null).not('status','in','(cancelada,cancelado)'),
     db.from('entradas_confinamento').select('operacao_id,data_entrada,curral,cabecas,peso_embarque_kg,peso_chegada_kg,perda_transporte_pct,km_percorridos,gta,nf').order('data_entrada'),
     db.from('custos_operacao').select('operacao_id,data,categoria,descricao,valor').order('categoria'),
     db.from('eventos_operacao').select('operacao_id,data,tipo,descricao').order('data',{ascending:false}).limit(30),
-    db.from('fechamentos_operacao').select('operacao_id,previsto,realizado_bruto,realizado_liquido,hedge_creditado,desvio,explicacao')
+    db.from('fechamentos_operacao').select('operacao_id,previsto,realizado_bruto,realizado_liquido,hedge_creditado,desvio,explicacao'),
+    db.from('confinex_avaliacoes').select('id,codigo,nome,status,estimativa_versao_atual').neq('status','cancelado'),
+    db.from('confinex_consolidacoes').select('id,avaliacao_id,estimativa_versao,comentario_geral,consolidado_em'),
+    db.from('confinex_desvios').select('id,consolidacao_id,indicador,natureza,estimado,realizado,desvio,desvio_percentual,classificacao,comentario_automatico,comentario_manual,material').order('indicador')
   ]);
   const errs=[ops,entradas,custos,eventos,fechamentos].filter(r=>r.error);
   if(errs.length){ document.getElementById('subtitle').textContent='Erro: '+errs[0].error.message; return; }
@@ -156,13 +170,35 @@ async function carregar(){
   // ---- Fechamentos (previsto x realizado)
   const opsPorId = {}; ops.data.forEach(o=>opsPorId[o.id]=o);
   document.getElementById('tbFechamentos').innerHTML =
-    '<tr><th>Lote</th><th class="num">Previsto</th><th class="num">Realizado bruto</th><th class="num">Realizado líquido</th><th class="num">Hedge creditado</th><th class="num">Desvio</th></tr>'+
+    '<tr><th>Lote</th><th class="num">Previsto</th><th class="num">Realizado bruto</th><th class="num">Realizado líquido</th><th class="num">Hedge creditado</th><th class="num">Desvio</th><th>Comentário</th></tr>'+
     fechamentos.data.map(f=>{
       const o = opsPorId[f.operacao_id];
       return `<tr><td><b>${o?.codigo||'—'}</b></td><td class="num">${fmtR$(f.previsto)}</td>
       <td class="num">${fmtR$(f.realizado_bruto)}</td><td class="num">${fmtR$(f.realizado_liquido)}</td>
-      <td class="num">${fmtR$(f.hedge_creditado)}</td><td class="num ${cls(f.desvio)}">${fmtR$(f.desvio)}</td></tr>`;
-    }).join('') || '<tr><td colspan="6">Sem fechamentos registrados ainda — nenhum lote foi fechado nesta tabela até o momento.</td></tr>';
+      <td class="num">${fmtR$(f.hedge_creditado)}</td><td class="num ${cls(f.desvio)}">${fmtR$(f.desvio)}</td>
+      <td class="wrap">${esc(f.explicacao||'—')}</td></tr>`;
+    }).join('') || '<tr><td colspan="7">Sem fechamentos registrados ainda — nenhum lote foi fechado nesta tabela até o momento.</td></tr>';
+
+  // ---- Consolidação versionada do Confinex
+  const avaliacoesPorId = {}; (avaliacoes.data||[]).forEach(a=>avaliacoesPorId[a.id]=a);
+  const consolidacoesPorId = {}; (consolidacoes.data||[]).forEach(c=>consolidacoesPorId[c.id]=c);
+  document.getElementById('tbConfinex').innerHTML =
+    '<tr><th>Negócio</th><th>Indicador</th><th class="num">Estimado</th><th class="num">Realizado</th><th class="num">Desvio</th><th class="num">Desvio %</th><th>Status</th><th>Comentário</th><th></th></tr>'+
+    (desvios.data||[]).map(d=>{
+      const cons = consolidacoesPorId[d.consolidacao_id];
+      const av = avaliacoesPorId[cons?.avaliacao_id];
+      const classe = d.classificacao==='favoravel'?'pos':d.classificacao==='desfavoravel'?'neg':'';
+      const comentario = d.comentario_manual || d.comentario_automatico || '—';
+      const percentual = d.indicador.includes('(%)');
+      const moeda = ['custo','receita'].includes(d.natureza) || d.indicador.includes('Lucro');
+      const formatar = v => v==null?'—':moeda?fmtR$(v):percentual?fmtN(v,1)+'%':fmtN(v,1);
+      const formatarDesvio = v => v==null?'—':moeda?fmtR$(v):percentual?fmtN(v,1)+' p.p.':fmtN(v,1);
+      return `<tr><td><b>${esc(av?.codigo||'—')}</b><div class="hint">estimativa v${cons?.estimativa_versao||'—'}</div></td>
+      <td>${esc(d.indicador)}</td><td class="num">${formatar(d.estimado)}</td><td class="num">${formatar(d.realizado)}</td>
+      <td class="num ${classe}">${formatarDesvio(d.desvio)}</td><td class="num ${classe}">${d.desvio_percentual==null?'—':fmtN(d.desvio_percentual,1)+'%'}</td>
+      <td><span class="badge ${d.classificacao==='favoravel'?'b-green':d.classificacao==='desfavoravel'?'b-red':''}">${esc(d.classificacao||'neutro')}</span>${d.material?'<div class="hint">desvio material</div>':''}</td>
+      <td class="wrap">${esc(comentario)}</td><td><button class="btn mini sec" onclick="comentarDesvio('${d.id}','${encodeURIComponent(d.comentario_manual||'')}')">Comentar</button></td></tr>`;
+    }).join('') || '<tr><td colspan="9">Nenhuma consolidação Confinex registrada.</td></tr>';
 
   // ---- Eventos recentes
   document.getElementById('tbEventos').innerHTML =

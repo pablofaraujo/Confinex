@@ -138,7 +138,11 @@ function boisPorCarretaPadrao(sexo) {
   return sexo === "femea" ? "70" : "65";
 }
 function isoHoje() {
-  return (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  const agora = /* @__PURE__ */ new Date();
+  const ano = agora.getFullYear();
+  const mes = String(agora.getMonth() + 1).padStart(2, "0");
+  const dia = String(agora.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
 }
 function addDiasISO(dataISO, dias) {
   if (!dataISO) return "";
@@ -146,6 +150,13 @@ function addDiasISO(dataISO, dias) {
   if (Number.isNaN(data.getTime())) return "";
   data.setDate(data.getDate() + Math.max(0, Math.round(Number(dias) || 0)));
   return data.toISOString().slice(0, 10);
+}
+function diasEntreISO(dataInicial, dataFinal) {
+  if (!dataInicial || !dataFinal) return 0;
+  const inicio = new Date(`${dataInicial}T12:00:00`);
+  const fim = new Date(`${dataFinal}T12:00:00`);
+  if (Number.isNaN(inicio.getTime()) || Number.isNaN(fim.getTime())) return 0;
+  return Math.max(0, Math.round((fim.getTime() - inicio.getTime()) / 864e5));
 }
 function fmtData(dataISO) {
   if (!dataISO) return "\u2014";
@@ -473,15 +484,28 @@ function calcCenario(lote, sc) {
     const diasVenda = parseFloat(sc.diasPagamento) || 0;
     const diasTotal2 = Math.max(diasVenda, 1);
     const meses2 = Math.max(diasTotal2 / 30, 0.05);
-    const investInicial2 = custoCompra;
     const diasCapital2 = Math.max(diasTotal2 - prazoPagtoCompra, 0);
-    const mesesCapital2 = Math.max(diasCapital2 / 30, 0.05);
+    const freteCapital2 = sc.freteNoAcerto ? 0 : freteTotal;
+    const investInicial2 = custoCompra + freteCapital2;
+    const diasFreteCapital2 = freteCapital2 > 0 ? diasTotal2 : 0;
+    const diasCapitalPonderado2 = investInicial2 > 0 ? (custoCompra * diasCapital2 + freteCapital2 * diasFreteCapital2) / investInicial2 : 0;
+    const mesesCapital2 = Math.max(diasCapitalPonderado2 / 30, 0.05);
     const rT2 = investInicial2 > 0 ? lucro2 / investInicial2 * 100 : 0;
     const rM2 = mesesCapital2 > 0 ? (Math.pow(1 + rT2 / 100, 1 / mesesCapital2) - 1) * 100 : 0;
     const custoDinheiroMensal2 = pctInput(lote.custoDinheiro, 0);
-    const custoDinheiroTotal2 = investInicial2 * (Math.pow(1 + custoDinheiroMensal2, mesesCapital2) - 1);
+    const custoDinheiroCompra2 = custoCompra * (Math.pow(1 + custoDinheiroMensal2, diasCapital2 / 30) - 1);
+    const custoDinheiroFrete2 = freteCapital2 * (Math.pow(1 + custoDinheiroMensal2, diasFreteCapital2 / 30) - 1);
+    const dataRecebimento2 = addDiasISO(sc.dataEntrada, diasTotal2);
+    const valorAdiantamento2 = sc.simularAdiantamento ? Math.max(parseFloat(sc.valorAdiantamento) || 0, 0) : 0;
+    const diasAdiantamento2 = valorAdiantamento2 > 0 ? diasEntreISO(sc.dataAdiantamento, dataRecebimento2) : 0;
+    const custoAdiantamento2 = valorAdiantamento2 * custoDinheiroMensal2 * diasAdiantamento2 / 30;
+    const custoDinheiroOperacao2 = custoDinheiroCompra2 + custoDinheiroFrete2;
+    const custoDinheiroTotal2 = custoDinheiroOperacao2 + custoAdiantamento2;
+    const lucroLiquidoSemAdiantamento2 = lucro2 - custoDinheiroOperacao2;
     const lucroLiquido2 = lucro2 - custoDinheiroTotal2;
-    const rTliq2 = investInicial2 > 0 ? lucroLiquido2 / investInicial2 * 100 : 0;
+    const baseRentabilidade2 = investInicial2 || valorAdiantamento2;
+    const rTliqSemAdiantamento2 = baseRentabilidade2 > 0 ? lucroLiquidoSemAdiantamento2 / baseRentabilidade2 * 100 : 0;
+    const rTliq2 = baseRentabilidade2 > 0 ? lucroLiquido2 / baseRentabilidade2 * 100 : 0;
     const rMliq2 = mesesCapital2 > 0 ? (Math.pow(1 + rTliq2 / 100, 1 / mesesCapital2) - 1) * 100 : 0;
     const fatorVP2 = custoDinheiroMensal2 > 0 ? Math.pow(1 + custoDinheiroMensal2, mesesCapital2) : 1;
     const vpArroba2 = precoVenda2 / fatorVP2;
@@ -517,6 +541,8 @@ function calcCenario(lote, sc) {
       custos: custos2,
       lucro: lucro2,
       investInicial: investInicial2,
+      capitalCompra: custoCompra,
+      capitalFrete: freteCapital2,
       rentTotal: rT2,
       rentMensal: rM2,
       diasTotal: diasTotal2,
@@ -527,6 +553,16 @@ function calcCenario(lote, sc) {
       fretePorCab: fPorCab,
       ganhoTotal: 0,
       custoDinheiroTotal: custoDinheiroTotal2,
+      custoDinheiroOperacao: custoDinheiroOperacao2,
+      custoDinheiroCompra: custoDinheiroCompra2,
+      custoDinheiroFrete: custoDinheiroFrete2,
+      valorAdiantamento: valorAdiantamento2,
+      dataAdiantamento: sc.dataAdiantamento || "",
+      dataRecebimentoAdiantamento: dataRecebimento2,
+      diasAdiantamento: diasAdiantamento2,
+      custoAdiantamento: custoAdiantamento2,
+      lucroLiquidoSemAdiantamento: lucroLiquidoSemAdiantamento2,
+      rTliqSemAdiantamento: rTliqSemAdiantamento2,
       lucroLiquido: lucroLiquido2,
       rTliq: rTliq2,
       rMliq: rMliq2,
@@ -580,15 +616,28 @@ function calcCenario(lote, sc) {
   const lucro = receita - custos;
   const diasTotal = dias + diasPag;
   const meses = Math.max(diasTotal / 30, 0.05);
-  const investInicial = custoCompra;
   const diasCapital = Math.max(diasTotal - prazoPagtoCompra, 0);
-  const mesesCapital = Math.max(diasCapital / 30, 0.05);
+  const freteCapital = sc.freteNoAcerto ? 0 : freteTotal;
+  const investInicial = custoCompra + freteCapital;
+  const diasFreteCapital = freteCapital > 0 ? diasTotal : 0;
+  const diasCapitalPonderado = investInicial > 0 ? (custoCompra * diasCapital + freteCapital * diasFreteCapital) / investInicial : 0;
+  const mesesCapital = Math.max(diasCapitalPonderado / 30, 0.05);
   const rT = investInicial > 0 ? lucro / investInicial * 100 : 0;
   const rM = mesesCapital > 0 ? (Math.pow(1 + rT / 100, 1 / mesesCapital) - 1) * 100 : 0;
   const custoDinheiroMensal = pctInput(lote.custoDinheiro, 0);
-  const custoDinheiroTotal = investInicial * (Math.pow(1 + custoDinheiroMensal, mesesCapital) - 1);
+  const custoDinheiroCompra = custoCompra * (Math.pow(1 + custoDinheiroMensal, diasCapital / 30) - 1);
+  const custoDinheiroFrete = freteCapital * (Math.pow(1 + custoDinheiroMensal, diasFreteCapital / 30) - 1);
+  const dataRecebimentoAdiantamento = addDiasISO(sc.dataEntrada, diasTotal);
+  const valorAdiantamento = sc.simularAdiantamento ? Math.max(parseFloat(sc.valorAdiantamento) || 0, 0) : 0;
+  const diasAdiantamento = valorAdiantamento > 0 ? diasEntreISO(sc.dataAdiantamento, dataRecebimentoAdiantamento) : 0;
+  const custoAdiantamento = valorAdiantamento * custoDinheiroMensal * diasAdiantamento / 30;
+  const custoDinheiroOperacao = custoDinheiroCompra + custoDinheiroFrete;
+  const custoDinheiroTotal = custoDinheiroOperacao + custoAdiantamento;
+  const lucroLiquidoSemAdiantamento = lucro - custoDinheiroOperacao;
   const lucroLiquido = lucro - custoDinheiroTotal;
-  const rTliq = investInicial > 0 ? lucroLiquido / investInicial * 100 : 0;
+  const baseRentabilidade = investInicial || valorAdiantamento;
+  const rTliqSemAdiantamento = baseRentabilidade > 0 ? lucroLiquidoSemAdiantamento / baseRentabilidade * 100 : 0;
+  const rTliq = baseRentabilidade > 0 ? lucroLiquido / baseRentabilidade * 100 : 0;
   const rMliq = mesesCapital > 0 ? (Math.pow(1 + rTliq / 100, 1 / mesesCapital) - 1) * 100 : 0;
   const fatorVP = custoDinheiroMensal > 0 ? Math.pow(1 + custoDinheiroMensal, mesesCapital) : 1;
   const vpArroba = precoVenda / fatorVP;
@@ -627,6 +676,8 @@ function calcCenario(lote, sc) {
     custos,
     lucro,
     investInicial,
+    capitalCompra: custoCompra,
+    capitalFrete: freteCapital,
     rentTotal: rT,
     rentMensal: rM,
     diasTotal,
@@ -638,6 +689,16 @@ function calcCenario(lote, sc) {
     ganhoTotal,
     msTotalKgCab: sc.modalidade === "ms" ? msTotalKgCab : 0,
     custoDinheiroTotal,
+    custoDinheiroOperacao,
+    custoDinheiroCompra,
+    custoDinheiroFrete,
+    valorAdiantamento,
+    dataAdiantamento: sc.dataAdiantamento || "",
+    dataRecebimentoAdiantamento,
+    diasAdiantamento,
+    custoAdiantamento,
+    lucroLiquidoSemAdiantamento,
+    rTliqSemAdiantamento,
     lucroLiquido,
     rTliq,
     rMliq,
@@ -675,6 +736,9 @@ var defaultSc = (i) => ({
   perdaManual: "",
   respFrete: i === 4 ? "confinamento" : "meu",
   freteNoAcerto: false,
+  simularAdiantamento: false,
+  dataAdiantamento: isoHoje(),
+  valorAdiantamento: "",
   recuperacao: "3",
   modalidade: "parceria",
   rcEntrada: "50",
@@ -714,6 +778,9 @@ var CAMPOS_MODELO_CONFINAMENTO = [
   "perdaManual",
   "respFrete",
   "freteNoAcerto",
+  "simularAdiantamento",
+  "dataAdiantamento",
+  "valorAdiantamento",
   "recuperacao",
   "modalidade",
   "rcEntrada",
@@ -759,6 +826,9 @@ function scFromModelo(sc, modelo) {
   return next;
 }
 var defaultLote = {
+  codigoNegocio: "",
+  grupoOrigemNome: "Confinamento",
+  grupoOrigemId: "",
   origemNome: "Fazenda Ametista",
   sexo: "macho",
   qtd: "65",
@@ -842,12 +912,13 @@ function Ck({ checked, onChange, label }) {
     /* @__PURE__ */ jsx("span", { children: label })
   ] });
 }
-function ScPanel({ sc, upd, sexo, confinamentos, modeloSelecionado, setModeloSelecionado, aplicarModelo, salvarModelo, atualizarModelo, apagarModelo, atualizarB3, calcularDistancia, statusB3, statusDistancia }) {
+function ScPanel({ sc, upd, sexo, custoDinheiro, confinamentos, modeloSelecionado, setModeloSelecionado, aplicarModelo, salvarModelo, atualizarModelo, apagarModelo, atualizarB3, calcularDistancia, statusB3, statusDistancia }) {
   const u = (k) => (v) => upd(k, v && v.target ? v.target.value : v);
   const isRev = sc.tipo === "revenda";
   const freteDeles = sc.respFrete === "confinamento";
   const isParceria = sc.modalidade === "parceria";
   const dataSaida = addDiasISO(sc.dataEntrada, parseFloat(sc.diasCiclo) || 0);
+  const dataRecebimento = addDiasISO(sc.dataEntrada, (isRev ? 0 : parseFloat(sc.diasCiclo) || 0) + (parseFloat(sc.diasPagamento) || 0));
   const contratoSugerido = contratoB3PorData(dataSaida);
   useEffect(() => {
     if (contratoSugerido && sc.contratoB3 && sc.contratoB3 !== contratoSugerido) {
@@ -970,6 +1041,21 @@ function ScPanel({ sc, upd, sexo, confinamentos, modeloSelecionado, setModeloSel
       !freteDeles && /* @__PURE__ */ jsx(F, { label: "Frete pago no acerto?", children: /* @__PURE__ */ jsx(Ck, { checked: sc.freteNoAcerto, onChange: u("freteNoAcerto"), label: "Sim \u2014 pago s\xF3 no acerto final" }) }),
       !isRev && !isParceria && /* @__PURE__ */ jsx(F, { label: "Recupera\xE7\xE3o peso 7d (%)", hint: "% da perda de transporte recuperada", children: /* @__PURE__ */ jsx("input", { type: "number", value: sc.recuperacao, onChange: u("recuperacao") }) }),
       /* @__PURE__ */ jsx(F, { label: isRev ? "Prazo pagamento (dias)" : "Prazo pag. ap\xF3s abate (dias)", children: /* @__PURE__ */ jsx("input", { type: "number", value: sc.diasPagamento, onChange: u("diasPagamento") }) })
+    ] }),
+    /* @__PURE__ */ jsx("div", { className: "dvdr" }),
+    /* @__PURE__ */ jsx("div", { className: "sec-t nm", children: "Simula\xE7\xE3o de adiantamento" }),
+    /* @__PURE__ */ jsx(F, { label: "Avaliar dinheiro adiantado?", children: /* @__PURE__ */ jsx(Ck, { checked: sc.simularAdiantamento, onChange: u("simularAdiantamento"), label: "Sim \u2014 descontar o custo financeiro at\xE9 o recebimento" }) }),
+    sc.simularAdiantamento && /* @__PURE__ */ jsxs(Fragment, { children: [
+      /* @__PURE__ */ jsxs("div", { className: "g3", style: { marginTop: 14 }, children: [
+        /* @__PURE__ */ jsx(F, { label: "Data do adiantamento", children: /* @__PURE__ */ jsx("input", { type: "date", value: sc.dataAdiantamento || "", onChange: u("dataAdiantamento") }) }),
+        /* @__PURE__ */ jsx(F, { label: "Valor adiantado (R$)", children: /* @__PURE__ */ jsx("input", { type: "number", min: "0", step: "100", value: sc.valorAdiantamento || "", onChange: u("valorAdiantamento") }) }),
+        /* @__PURE__ */ jsx(F, { label: "Recebimento previsto", hint: "Calculado pela entrada, ciclo e prazo de recebimento", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: fmtData(dataRecebimento) }) })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "warn", style: { marginTop: 12 }, children: [
+        "Juros simples pr\xF3-rata pela taxa de ",
+        custoDinheiro || "0",
+        "% a.m., somente sobre o valor adiantado e pelos dias efetivos. Use para dinheiro adicional ao capital j\xE1 informado; se for antecipa\xE7\xE3o da pr\xF3pria compra, ajuste o prazo de pagamento da compra."
+      ] })
     ] }),
     isRev && /* @__PURE__ */ jsxs(Fragment, { children: [
       /* @__PURE__ */ jsx("div", { className: "warn", style: { marginTop: 12 }, children: "Revenda: receita = arrobas venda (desconto abaixo) \xD7 pre\xE7o de revenda." }),
@@ -1268,7 +1354,7 @@ function SensPanel({ lote, cenarios, resultados, historico = [], setHistorico = 
 function Comparativo({ resultados, cenarios, lote }) {
   const ativos = cenarios.map((sc, i) => ({ sc, r: resultados[i], i })).filter((x) => x.r);
   if (!ativos.length) return null;
-  const ranked = [...ativos].sort((a, b) => b.r.rentMensal - a.r.rentMensal);
+  const ranked = [...ativos].sort((a, b) => b.r.rTliq - a.r.rTliq || b.r.lucroLiquido - a.r.lucroLiquido || b.r.rMliq - a.r.rMliq || a.i - b.i);
   const semCustoFrete = (r) => r.respFrete === "confinamento" || r.freteTotal === 0 && r.fretePorCab === 0;
   const otimos = ativos.reduce((acc, { sc }) => {
     acc[sc.id] = calcPontoOtimoDias(lote, sc);
@@ -1292,6 +1378,7 @@ function Comparativo({ resultados, cenarios, lote }) {
     { l: "Qtde carretas", fn: (r) => semCustoFrete(r) ? "\u2014" : r.qtdCarretas > 0 ? fN(r.qtdCarretas, 0) : "\u2014" },
     { l: "Frete por carreta", fn: (r) => semCustoFrete(r) ? fR(0) : r.qtdCarretas > 0 ? fR(r.fretePorCarreta) : "\u2014" },
     { l: "Frete total", fn: (r) => fR(r.freteTotal) },
+    { l: "Frete incorporado ao capital", fn: (r) => fR(r.capitalFrete), hint: "Zero quando o frete for pago somente no acerto final" },
     { l: "Frete por cabe\xE7a", fn: (r) => fR(r.fretePorCab) },
     { l: "Consumo MS (kg/dia/cab)", fn: (r, sc) => sc?.modalidade === "ms" ? fN(r.msTotalKgCab / (parseFloat(sc?.diasCiclo) || 110), 1) : "\u2014" },
     { l: "Custo confinamento", fn: (r) => r.tipo === "revenda" ? "\u2014" : fR(r.custoCont) },
@@ -1301,12 +1388,20 @@ function Comparativo({ resultados, cenarios, lote }) {
     { l: "Receita a valor presente", fn: (r) => fR(r.receitaVP), cls: () => "pos" },
     { l: "Lucro bruto", fn: (r) => fR(r.lucro), bold: true, cls: (r) => r.lucro >= 0 ? "pos" : "neg", best: true },
     { l: "Lucro bruto / cab", fn: (r) => fR(r.lucro / r.N), cls: (r) => r.lucro >= 0 ? "pos" : "neg" },
-    { l: "Custo do dinheiro", fn: (r) => fR(r.custoDinheiroTotal), cls: () => "neg" },
-    { l: "Lucro l\xEDquido", fn: (r) => fR(r.lucroLiquido), bold: true, cls: (r) => r.lucroLiquido >= 0 ? "pos" : "neg" },
+    { l: "Custo financeiro da compra", fn: (r) => fR(r.custoDinheiroCompra), cls: () => "neg" },
+    { l: "Custo financeiro do frete", fn: (r) => fR(r.custoDinheiroFrete), cls: () => "neg" },
+    { l: "Valor adiantado", fn: (r) => r.valorAdiantamento > 0 ? fR(r.valorAdiantamento) : "\u2014" },
+    { l: "Per\xEDodo do adiantamento", fn: (r) => r.valorAdiantamento > 0 ? `${fmtData(r.dataAdiantamento)} a ${fmtData(r.dataRecebimentoAdiantamento)} \xB7 ${fN(r.diasAdiantamento, 0)} dias` : "\u2014" },
+    { l: "Custo do adiantamento", fn: (r) => r.valorAdiantamento > 0 ? fR(r.custoAdiantamento) : "\u2014", cls: () => "neg" },
+    { l: "Custo do dinheiro total", fn: (r) => fR(r.custoDinheiroTotal), cls: () => "neg" },
+    { l: "Lucro l\xEDquido sem adiantamento", fn: (r) => fR(r.lucroLiquidoSemAdiantamento), cls: (r) => r.lucroLiquidoSemAdiantamento >= 0 ? "pos" : "neg" },
+    { l: "Resultado final com adiantamento", fn: (r) => fR(r.lucroLiquido), bold: true, cls: (r) => r.lucroLiquido >= 0 ? "pos" : "neg" },
     { l: "Lucro l\xEDquido / cab", fn: (r) => fR(r.lucroLiquido / r.N), cls: (r) => r.lucroLiquido >= 0 ? "pos" : "neg" },
     { l: "Resultado VP", fn: (r) => fR(r.resultadoVP), bold: true, cls: (r) => r.resultadoVP >= 0 ? "pos" : "neg" },
     { sep: true, l: "RENTABILIDADE" },
-    { l: "Capital compra dos bois", fn: (r) => fR(r.investInicial), bold: true },
+    { l: "Capital compra dos bois", fn: (r) => fR(r.capitalCompra), bold: true },
+    { l: "Capital frete pago \xE0 vista", fn: (r) => fR(r.capitalFrete), bold: true },
+    { l: "Capital total investido", fn: (r) => fR(r.investInicial), bold: true },
     { l: "Ciclo (dias)", fn: (r) => r.tipo === "revenda" ? "\u2014" : fN(r.diasTotal - r.diasPag, 0) },
     { l: "Prazo compra (dias)", fn: () => fN(parseFloat(lote.prazoPagtoCompra) || 0, 0) },
     { l: "Prazo recebimento (dias)", fn: (r) => fN(r.diasPag, 0) },
@@ -1314,6 +1409,7 @@ function Comparativo({ resultados, cenarios, lote }) {
     { l: "Tempo capital investido (meses)", fn: (r) => fN(r.mesesCapital, 1) },
     { l: "Rent. total (sem custo $)", fn: (r) => fP(r.rentTotal), bold: true, cls: (r) => r.rentTotal >= 0 ? "pos" : "neg" },
     { l: "Rent. mensal (sem custo $)", fn: (r) => fP(r.rentMensal), bold: true, cls: (r) => r.rentMensal >= 0 ? "pos" : "neg", best: true },
+    { l: "Rent. total antes do adiantamento", fn: (r) => fP(r.rTliqSemAdiantamento), bold: true, cls: (r) => r.rTliqSemAdiantamento >= 0 ? "pos" : "neg" },
     { l: "Rent. total (com custo $)", fn: (r) => fP(r.rTliq), bold: true, cls: (r) => r.rTliq >= 0 ? "pos" : "neg" },
     { l: "Rent. mensal (com custo $)", fn: (r) => fP(r.rMliq), bold: true, cls: (r) => r.rMliq >= 0 ? "pos" : "neg" },
     { sep: true, l: "PONTO \xD3TIMO \u2014 MANTENDO DEMAIS PREMISSAS" },
@@ -1338,12 +1434,12 @@ function Comparativo({ resultados, cenarios, lote }) {
         /* @__PURE__ */ jsx("div", { className: "rn", children: pos + 1 }),
         /* @__PURE__ */ jsx("div", { className: "rname", children: sc.nome }),
         /* @__PURE__ */ jsx("div", { className: "rtype", children: r.tipo === "revenda" ? "Revenda" : sc.modalidade }),
-        /* @__PURE__ */ jsxs("div", { className: `rval ${r.rentMensal >= 0 ? "pos" : "neg"}`, children: [
-          fP(r.rentMensal),
-          " a.m."
+        /* @__PURE__ */ jsxs("div", { className: `rval ${r.rTliq >= 0 ? "pos" : "neg"}`, children: [
+          fP(r.rTliq),
+          " total"
         ] }),
         /* @__PURE__ */ jsxs("div", { className: "rsub", children: [
-          "l\xEDq: ",
+          "rent. l\xEDq: ",
           fP(r.rMliq),
           " a.m. \xB7 ",
           fN(r.meses, 1),
@@ -1375,20 +1471,20 @@ function Comparativo({ resultados, cenarios, lote }) {
     /* @__PURE__ */ jsx("div", { className: "sec", style: { padding: 0 }, children: /* @__PURE__ */ jsx("div", { className: "tbl-wrap", children: /* @__PURE__ */ jsxs("table", { className: "cmp-tbl", children: [
       /* @__PURE__ */ jsx("thead", { children: /* @__PURE__ */ jsxs("tr", { children: [
         /* @__PURE__ */ jsx("th", { style: { textAlign: "left" }, children: "Item" }),
-        ativos.map(({ sc, i }) => /* @__PURE__ */ jsx("th", { className: "sc-th", style: { "--c": T.sc[i] }, children: sc.nome }, sc.id))
+        ranked.map(({ sc, i }, pos) => /* @__PURE__ */ jsx("th", { className: "sc-th", style: { "--c": T.sc[i] }, children: `${pos + 1}\xBA \xB7 ${sc.nome}` }, sc.id))
       ] }) }),
       /* @__PURE__ */ jsx("tbody", { children: rows.map((row, ri) => {
-        if (row.sep) return /* @__PURE__ */ jsx("tr", { className: "grp", children: /* @__PURE__ */ jsx("td", { colSpan: ativos.length + 1, children: row.l }) }, ri);
+        if (row.sep) return /* @__PURE__ */ jsx("tr", { className: "grp", children: /* @__PURE__ */ jsx("td", { colSpan: ranked.length + 1, children: row.l }) }, ri);
         let nums = null;
         if (row.best) {
-          nums = ativos.map(({ r }) => {
+          nums = ranked.map(({ r }) => {
             const s = row.fn(r).replace(/[R$\s%@\u00a0]/g, "").replace(/\./g, "").replace(",", ".");
             return parseFloat(s);
           });
         }
         return /* @__PURE__ */ jsxs("tr", { className: row.bold ? "tot" : "", children: [
           /* @__PURE__ */ jsx("td", { children: row.l }),
-          ativos.map(({ r, sc, i }, ai) => {
+          ranked.map(({ r, sc, i }, ai) => {
             const cls = row.cls ? row.cls(r, sc) : "";
             const isBest = row.best && nums && Math.max(...nums.filter((n) => !isNaN(n))) === nums[ai];
             return /* @__PURE__ */ jsx(
@@ -1420,6 +1516,7 @@ function Confinex() {
   const [statusDistancia, setStatusDistancia] = useState("");
   const [backendUrl, setBackendUrl] = useState(getStoredSheetsBackendUrl);
   const [statusSheets, setStatusSheets] = useState(backendUrl ? "Backend Sheets configurado." : "Sem backend Sheets: salvando apenas neste navegador.");
+  const [statusSupabase, setStatusSupabase] = useState("Supabase: aguardando um negócio ser iniciado.");
   const [versoesSalvas, setVersoesSalvas] = useState(carregarVersoesNomeadas);
   const [versaoSelecionada, setVersaoSelecionada] = useState("");
   useEffect(() => {
@@ -1444,7 +1541,7 @@ function Confinex() {
     scAtivo,
     resultados,
     data: (/* @__PURE__ */ new Date()).toISOString(),
-    versao: "1.2-sheets"
+    versao: "1.3-supabase"
   });
   const aplicarEstado = (state) => {
     if (state.lote) setLote({ ...defaultLote, ...state.lote });
@@ -1547,6 +1644,25 @@ function Confinex() {
     const lista = [versao, ...versoesSalvas].slice(0, 80);
     persistirVersoes(lista);
     setVersaoSelecionada(versao.id);
+    const db = window.CFAgro?.db;
+    if (db) {
+      try {
+        const { data: sessao } = await db.auth.getSession();
+        if (sessao?.session) {
+          const { error } = await db.from("confinex_testes").insert({
+            nome: versao.nome,
+            dispositivo: confinexDeviceId(),
+            estado: versao.state
+          });
+          if (error) throw error;
+          setStatusSupabase(`Teste salvo no Supabase: ${versao.nome}.`);
+        } else {
+          setStatusSupabase("Teste salvo localmente; entre no ecossistema para sincronizar com o Supabase.");
+        }
+      } catch (err) {
+        setStatusSupabase(`Teste salvo localmente; Supabase indisponível (${err?.message || "erro"}).`);
+      }
+    }
     const url = backendUrl.trim();
     if (!url) {
       setStatusSheets(`Versao salva localmente: ${versao.nome}.`);
@@ -1803,7 +1919,7 @@ function Confinex() {
     setModeloSelecionado("");
   };
   const exportarJSON = () => {
-    const dados = { lote, cenarios, confinamentos, historico, versao: "1.2-sheets", data: (/* @__PURE__ */ new Date()).toISOString() };
+    const dados = { lote, cenarios, confinamentos, historico, versao: "1.3-supabase", data: (/* @__PURE__ */ new Date()).toISOString() };
     const blob = new Blob([JSON.stringify(dados, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -1850,6 +1966,50 @@ function Confinex() {
       }
     });
     setResultados(res);
+  };
+  const iniciarNegocioSupabase = async () => {
+    const codigo = String(lote.codigoNegocio || "").trim().toUpperCase();
+    const grupoNome = String(lote.grupoOrigemNome || "").trim();
+    const resultado = resultados[scAtivo];
+    const cenario = cenarios[scAtivo];
+    if (!/^CF-\d{2}-\d{3,}$/.test(codigo)) {
+      setStatusSupabase("Informe um código no padrão CF-26-012.");
+      return;
+    }
+    if (!grupoNome) {
+      setStatusSupabase("Informe o grupo do Telegram de origem antes de iniciar o negócio.");
+      return;
+    }
+    if (!resultado || !cenario) {
+      setStatusSupabase("Calcule os cenários e selecione o cenário aprovado antes de iniciar.");
+      return;
+    }
+    const db = window.CFAgro?.db;
+    if (!db) {
+      setStatusSupabase("Supabase indisponível nesta página.");
+      return;
+    }
+    try {
+      const { data: sessao } = await db.auth.getSession();
+      if (!sessao?.session) {
+        setStatusSupabase("Entre em um módulo do ecossistema e volte ao Confinex para registrar o negócio.");
+        return;
+      }
+      if (!window.confirm(`Iniciar ${codigo} com a estimativa do cenário “${cenario.nome}”? A estimativa original ficará congelada.`)) return;
+      setStatusSupabase(`Registrando ${codigo} no Supabase...`);
+      const { data, error } = await db.rpc("iniciar_negocio_confinex", {
+        p_codigo: codigo,
+        p_nome: `${codigo} — ${lote.origemNome || cenario.nome}`,
+        p_grupo_origem_id: String(lote.grupoOrigemId || "").trim() || null,
+        p_grupo_origem_nome: grupoNome,
+        p_premissas: { lote, cenario },
+        p_resultado: resultado
+      });
+      if (error) throw error;
+      setStatusSupabase(`${codigo} iniciado. Estimativa original salva e congelada no Supabase (${data}).`);
+    } catch (err) {
+      setStatusSupabase(`Não consegui iniciar o negócio (${err?.message || "erro"}). Nada foi alterado localmente.`);
+    }
   };
   const arrobasPrev = calcArrobas({
     peso: parseFloat(lote.pesoMedio) || 0,
@@ -1930,7 +2090,7 @@ function Confinex() {
         ] })
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "sec", style: { padding: "14px 18px" }, children: [
-        /* @__PURE__ */ jsx("div", { className: "sec-t nm", children: "Backend Google Sheets" }),
+        /* @__PURE__ */ jsx("div", { className: "sec-t nm", children: "Sincroniza\xE7\xE3o tempor\xE1ria \u2014 Google Sheets" }),
         /* @__PURE__ */ jsxs("div", { className: "g4", children: [
           /* @__PURE__ */ jsx(F, { label: "URL Apps Script", span: 2, children: /* @__PURE__ */ jsx("input", { value: backendUrl, placeholder: "https://script.google.com/macros/s/.../exec", onChange: (e) => setBackendUrl(e.target.value) }) }),
           /* @__PURE__ */ jsx(F, { label: "Carregar Sheets", children: /* @__PURE__ */ jsx("button", { className: "tb", style: { width: "100%", padding: "10px 13px" }, onClick: carregarSheets, children: "Carregar" }) }),
@@ -1961,6 +2121,12 @@ function Confinex() {
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "sec", children: [
         /* @__PURE__ */ jsx("div", { className: "sec-t", children: "01 \u2014 Dados do Lote (base comum a todos os cen\xE1rios)" }),
+        /* @__PURE__ */ jsxs("div", { className: "g3", children: [
+          /* @__PURE__ */ jsx(F, { label: "C\xF3digo do neg\xF3cio", hint: "Obrigat\xF3rio ao iniciar. Ex.: CF-26-012", children: /* @__PURE__ */ jsx("input", { value: lote.codigoNegocio || "", placeholder: "CF-26-012", onChange: (e) => updLote("codigoNegocio", e.target.value.toUpperCase()) }) }),
+          /* @__PURE__ */ jsx(F, { label: "Grupo Telegram de origem", hint: "Define o contexto operacional do lote", children: /* @__PURE__ */ jsx("input", { value: lote.grupoOrigemNome || "", placeholder: "Confinamento", onChange: (e) => updLote("grupoOrigemNome", e.target.value) }) }),
+          /* @__PURE__ */ jsx(F, { label: "ID do grupo Telegram", hint: "Opcional na tela; recomendado para concilia\xE7\xE3o autom\xE1tica", children: /* @__PURE__ */ jsx("input", { value: lote.grupoOrigemId || "", placeholder: "-100...", onChange: (e) => updLote("grupoOrigemId", e.target.value) }) })
+        ] }),
+        /* @__PURE__ */ jsx("div", { className: "dvdr" }),
         /* @__PURE__ */ jsxs("div", { className: "g4", children: [
           /* @__PURE__ */ jsx(F, { label: "Origem", children: /* @__PURE__ */ jsx("input", { value: lote.origemNome, onChange: (e) => updLote("origemNome", e.target.value) }) }),
           /* @__PURE__ */ jsx(F, { label: "Sexo", children: /* @__PURE__ */ jsx(
@@ -2090,6 +2256,7 @@ function Confinex() {
               sc: cenarios[scAtivo],
               upd: (k, v) => updSc(scAtivo, k, v),
               sexo: lote.sexo,
+              custoDinheiro: lote.custoDinheiro,
               confinamentos,
               modeloSelecionado,
               setModeloSelecionado,
@@ -2113,6 +2280,15 @@ function Confinex() {
         cenarios.length === 1 ? "CEN\xC1RIO" : "CEN\xC1RIOS"
       ] }),
       resultados.length > 0 && /* @__PURE__ */ jsx(Comparativo, { resultados, cenarios, lote }),
+      resultados.length > 0 && /* @__PURE__ */ jsxs("div", { className: "sec", style: { marginTop: 18 }, children: [
+        /* @__PURE__ */ jsx("div", { className: "sec-t", children: "Iniciar neg\xF3cio \u2014 Supabase" }),
+        /* @__PURE__ */ jsxs("div", { className: "g3", children: [
+          /* @__PURE__ */ jsx(F, { label: "Cen\xE1rio selecionado", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: cenarios[scAtivo]?.nome || "\u2014" }) }),
+          /* @__PURE__ */ jsx(F, { label: "Estimativa original", hint: "Ser\xE1 congelada e n\xE3o poder\xE1 ser sobrescrita", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: resultados[scAtivo] ? `${fP(resultados[scAtivo].rTliq)} \xB7 ${fR(resultados[scAtivo].lucroLiquido)}` : "\u2014" }) }),
+          /* @__PURE__ */ jsx(F, { label: "Confirmar abertura", children: /* @__PURE__ */ jsx("button", { className: "tb on", style: { width: "100%", padding: "10px 13px" }, onClick: iniciarNegocioSupabase, children: "Iniciar neg\xF3cio" }) })
+        ] }),
+        /* @__PURE__ */ jsx("div", { className: "hint", style: { marginTop: 10 }, children: statusSupabase })
+      ] }),
       resultados.length > 0 && /* @__PURE__ */ jsx(SensPanel, { lote, cenarios, resultados, historico, setHistorico })
     ] })
   ] });
