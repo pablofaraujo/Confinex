@@ -1528,46 +1528,6 @@ function Comparativo({ resultados, cenarios, lote }) {
     ] }) }) })
   ] });
 }
-function AprovacoesSupabase({ avaliacoes, carregando, status, atualizar, revisar, aprovar }) {
-  return /* @__PURE__ */ jsxs("div", { className: "sec", style: { marginTop: 18 }, children: [
-    /* @__PURE__ */ jsxs("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }, children: [
-      /* @__PURE__ */ jsx("div", { className: "sec-t nm", style: { marginBottom: 0, flex: 1 }, children: "Aprova\xE7\xF5es recebidas do Supabase" }),
-      /* @__PURE__ */ jsx("button", { className: "tb", onClick: atualizar, disabled: carregando, children: carregando ? "Atualizando..." : "Atualizar" })
-    ] }),
-    avaliacoes.length === 0 ? /* @__PURE__ */ jsx("div", { className: "hint", children: status || "Nenhum neg\xF3cio aguardando aprova\xE7\xE3o." }) : /* @__PURE__ */ jsx("div", { className: "tbl-wrap", children: /* @__PURE__ */ jsxs("table", { className: "cmp-tbl", children: [
-      /* @__PURE__ */ jsx("thead", { children: /* @__PURE__ */ jsxs("tr", { children: [
-        /* @__PURE__ */ jsx("th", { children: "Neg\xF3cio" }),
-        /* @__PURE__ */ jsx("th", { children: "Origem" }),
-        /* @__PURE__ */ jsx("th", { children: "Rent. mensal final" }),
-        /* @__PURE__ */ jsx("th", { children: "Antes do adiantamento" }),
-        /* @__PURE__ */ jsx("th", { children: "Adiantamento" }),
-        /* @__PURE__ */ jsx("th", { children: "A\xE7\xE3o" })
-      ] }) }),
-      /* @__PURE__ */ jsx("tbody", { children: avaliacoes.map((avaliacao) => {
-        const resultado = avaliacao.estimativa?.resultado || {};
-        const temAdiantamento = Number(resultado.valorAdiantamento || 0) > 0;
-        return /* @__PURE__ */ jsxs("tr", { children: [
-          /* @__PURE__ */ jsxs("td", { children: [
-            /* @__PURE__ */ jsx("strong", { children: avaliacao.codigo }),
-            /* @__PURE__ */ jsx("div", { className: "hint", children: avaliacao.nome })
-          ] }),
-          /* @__PURE__ */ jsxs("td", { children: [
-            avaliacao.grupo_origem_nome,
-            /* @__PURE__ */ jsx("div", { className: "hint", children: avaliacao.grupo_origem_id || "ID n\xE3o informado" })
-          ] }),
-          /* @__PURE__ */ jsx("td", { className: Number(resultado.rMliq) >= 0 ? "pos hi" : "neg hi", children: `${fP(resultado.rMliq)} a.m.` }),
-          /* @__PURE__ */ jsx("td", { children: `${fP(resultado.rMliqSemAdiantamento ?? resultado.rMliq)} a.m.` }),
-          /* @__PURE__ */ jsx("td", { children: temAdiantamento ? `${fN(resultado.diasAdiantamento, 0)} dias \xB7 ${fR(resultado.custoAdiantamento)}` : "\u2014" }),
-          /* @__PURE__ */ jsxs("td", { children: [
-            /* @__PURE__ */ jsx("button", { className: "tb", style: { marginRight: 6 }, onClick: () => revisar(avaliacao), children: "Revisar" }),
-            /* @__PURE__ */ jsx("button", { className: "tb on", onClick: () => aprovar(avaliacao), children: "Aprovar" })
-          ] })
-        ] }, avaliacao.id);
-      }) })
-    ] }) }),
-    avaliacoes.length > 0 && /* @__PURE__ */ jsx("div", { className: "hint", style: { marginTop: 10 }, children: status })
-  ] });
-}
 function Confinex() {
   const [initialState] = useState(loadSavedState);
   const [lote, setLote] = useState(initialState.lote);
@@ -1583,15 +1543,8 @@ function Confinex() {
   const [backendUrl, setBackendUrl] = useState(getStoredSheetsBackendUrl);
   const [statusSheets, setStatusSheets] = useState(backendUrl ? "Backend Sheets configurado." : "Sem backend Sheets: salvando apenas neste navegador.");
   const [statusSupabase, setStatusSupabase] = useState("Supabase: aguardando um negócio ser iniciado.");
-  const [avaliacoesPendentes, setAvaliacoesPendentes] = useState([]);
-  const [carregandoAprovacoes, setCarregandoAprovacoes] = useState(false);
-  const [statusAprovacoes, setStatusAprovacoes] = useState("Buscando negócios aguardando aprovação...");
   const [versoesSalvas, setVersoesSalvas] = useState(carregarVersoesNomeadas);
   const [versaoSelecionada, setVersaoSelecionada] = useState("");
-  useEffect(() => {
-    const timer = setTimeout(() => carregarAprovacoesSupabase(), 0);
-    return () => clearTimeout(timer);
-  }, []);
   useEffect(() => {
     try {
       localStorage.setItem(APP_STORAGE_KEY, JSON.stringify({
@@ -2040,75 +1993,6 @@ function Confinex() {
     });
     setResultados(res);
   };
-  const carregarAprovacoesSupabase = async () => {
-    const db = window.CFAgro?.db;
-    if (!db) {
-      setStatusAprovacoes("Supabase indisponível nesta página.");
-      return;
-    }
-    setCarregandoAprovacoes(true);
-    try {
-      const { data: sessao } = await db.auth.getSession();
-      if (!sessao?.session) {
-        setAvaliacoesPendentes([]);
-        setStatusAprovacoes("Entre em um módulo do ecossistema para consultar e aprovar negócios.");
-        return;
-      }
-      const { data, error } = await db.from("confinex_avaliacoes").select("id,codigo,nome,grupo_origem_id,grupo_origem_nome,status,estimativa_versao_atual,criado_em,confinex_estimativas(versao,tipo,premissas,resultado)").eq("status", "rascunho").order("criado_em", { ascending: false }).limit(20);
-      if (error) throw error;
-      const normalizadas = (data || []).map((avaliacao) => ({
-        ...avaliacao,
-        estimativa: (avaliacao.confinex_estimativas || []).find((item) => item.versao === avaliacao.estimativa_versao_atual) || avaliacao.confinex_estimativas?.[0] || null
-      }));
-      setAvaliacoesPendentes(normalizadas);
-      setStatusAprovacoes(normalizadas.length ? `${normalizadas.length} negócio(s) aguardando sua aprovação.` : "Nenhum negócio aguardando aprovação.");
-    } catch (err) {
-      setAvaliacoesPendentes([]);
-      setStatusAprovacoes(`Não consegui carregar as aprovações (${err?.message || "erro"}).`);
-    } finally {
-      setCarregandoAprovacoes(false);
-    }
-  };
-  const revisarAvaliacaoSupabase = (avaliacao) => {
-    const estimativa = avaliacao.estimativa;
-    if (!estimativa) {
-      setStatusAprovacoes(`${avaliacao.codigo} não possui estimativa para revisão.`);
-      return;
-    }
-    const premissas = estimativa.premissas || {};
-    const loteRecebido = premissas.lote || premissas;
-    const cenarioRecebido = premissas.cenario || premissas;
-    const loteRevisao = {
-      ...defaultLote,
-      ...loteRecebido,
-      codigoNegocio: avaliacao.codigo,
-      grupoOrigemId: avaliacao.grupo_origem_id || loteRecebido.grupoOrigemId || "",
-      grupoOrigemNome: avaliacao.grupo_origem_nome || loteRecebido.grupoOrigemNome || "Confinamento"
-    };
-    const cenarioRevisao = { ...defaultSc(0), ...cenarioRecebido, id: Date.now() };
-    setLote(loteRevisao);
-    setCenarios([cenarioRevisao]);
-    setScAtivo(0);
-    setResultados([estimativa.resultado || calcCenario(loteRevisao, cenarioRevisao)]);
-    setStatusAprovacoes(`${avaliacao.codigo} carregado no simulador para revisão. A aprovação continua pendente.`);
-  };
-  const aprovarAvaliacaoSupabase = async (avaliacao) => {
-    const db = window.CFAgro?.db;
-    if (!db) {
-      setStatusAprovacoes("Supabase indisponível nesta página.");
-      return;
-    }
-    if (!window.confirm(`Aprovar ${avaliacao.codigo} e iniciar o negócio com a estimativa original versão ${avaliacao.estimativa_versao_atual}?`)) return;
-    setStatusAprovacoes(`Aprovando ${avaliacao.codigo}...`);
-    try {
-      const { data, error } = await db.rpc("aprovar_negocio_confinex", { p_avaliacao_id: avaliacao.id });
-      if (error) throw error;
-      setStatusSupabase(`${avaliacao.codigo} aprovado e iniciado no Supabase (${data}).`);
-      await carregarAprovacoesSupabase();
-    } catch (err) {
-      setStatusAprovacoes(`Não consegui aprovar ${avaliacao.codigo} (${err?.message || "erro"}).`);
-    }
-  };
   const iniciarNegocioSupabase = async () => {
     const codigo = String(lote.codigoNegocio || "").trim().toUpperCase();
     const grupoNome = String(lote.grupoOrigemNome || "").trim();
@@ -2353,17 +2237,6 @@ function Confinex() {
           " (divisor). Abaixo do limite: peso/2/15."
         ] })
       ] }),
-      /* @__PURE__ */ jsx(
-        AprovacoesSupabase,
-        {
-          avaliacoes: avaliacoesPendentes,
-          carregando: carregandoAprovacoes,
-          status: statusAprovacoes,
-          atualizar: carregarAprovacoesSupabase,
-          revisar: revisarAvaliacaoSupabase,
-          aprovar: aprovarAvaliacaoSupabase
-        }
-      ),
       /* @__PURE__ */ jsxs("div", { className: "sec", style: { padding: 0 }, children: [
         /* @__PURE__ */ jsx("div", { style: { padding: "18px 22px 0" }, children: /* @__PURE__ */ jsx("div", { className: "sec-t", children: "02 \u2014 Cen\xE1rios (at\xE9 5)" }) }),
         /* @__PURE__ */ jsxs("div", { className: "sc-bar", children: [
