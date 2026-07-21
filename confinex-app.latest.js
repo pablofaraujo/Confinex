@@ -165,6 +165,14 @@ function fmtData(dataISO) {
 }
 var B3_MONTH_CODES = ["F", "G", "H", "J", "K", "M", "N", "Q", "U", "V", "X", "Z"];
 var B3_MONTH_LABELS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+function compararContratosB3(a, b) {
+  const contratoA = String(a || "").toUpperCase().match(/^BGI([FGHJKMNQUVXZ])(\d{2})$/);
+  const contratoB = String(b || "").toUpperCase().match(/^BGI([FGHJKMNQUVXZ])(\d{2})$/);
+  if (!contratoA || !contratoB) return String(a || "").localeCompare(String(b || ""), "pt-BR");
+  const ordemA = parseInt(contratoA[2], 10) * 12 + B3_MONTH_CODES.indexOf(contratoA[1]);
+  const ordemB = parseInt(contratoB[2], 10) * 12 + B3_MONTH_CODES.indexOf(contratoB[1]);
+  return ordemA - ordemB;
+}
 function contratoB3PorData(dataISO) {
   if (!dataISO) return "";
   const data = new Date(`${dataISO}T12:00:00`);
@@ -1811,7 +1819,7 @@ function Confinex() {
   const [statusSupabase, setStatusSupabase] = useState("Supabase: aguardando um negócio ser iniciado.");
   const [versoesSalvas, setVersoesSalvas] = useState(carregarVersoesNomeadas);
   const [versaoSelecionada, setVersaoSelecionada] = useState("");
-  const contratosB3Estudo = [...new Set([...cenarios.map(contratoB3DoCenario).filter(Boolean), ...contratosB3DaEvolucao(cenarios)])].sort();
+  const contratosB3Estudo = [...new Set([...cenarios.map(contratoB3DoCenario).filter(Boolean), ...contratosB3DaEvolucao(cenarios)])].sort(compararContratosB3);
   useEffect(() => {
     try {
       localStorage.setItem(APP_STORAGE_KEY, JSON.stringify({
