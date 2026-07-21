@@ -141,8 +141,11 @@ canvas{max-height:300px}
   @page{size:A4 landscape;margin:10mm}
   body{display:block!important;background:#fff!important;color:#172536!important}
   body *{visibility:hidden!important}
+  .shell-content{margin:0!important;padding:0!important;max-width:none!important;width:100%!important}
+  #root,.app{margin:0!important;padding:0!important;max-width:none!important;width:100%!important}
+  .app>*:not(.report-print){display:none!important}
   .report-print,.report-print *{visibility:visible!important}
-  .report-print{display:block!important;position:absolute;left:0;top:0;width:100%;font-family:var(--font);font-size:10px;color:#172536;background:#fff}
+  .report-print{display:block!important;position:static!important;width:100%;font-family:var(--font);font-size:10px;color:#172536;background:#fff}
   .shell-top,.shell-side,.no-print{display:none!important}
   .report-page{break-after:page;page-break-after:always;min-height:180mm}
   .report-page:last-child{break-after:auto;page-break-after:auto}

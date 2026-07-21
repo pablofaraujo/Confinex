@@ -61,7 +61,7 @@ Larguras: padrão 1280px; `<body data-w="md">` = 1100px; `<body data-w="sm">` = 
 | Topbar | `.topbar > .ident / .acoes`, `.logo-img` | cabeçalho de página |
 | Grids | `.grid.g6`, `.grid2`, `.simgrid` | layouts de form/painel |
 | Mini-resultado | `.res > .r > .l/.v` | saída de simuladores |
-| Relatório para PDF | `.report-print .report-page .report-grid .report-item .report-table` | relatório comparativo oculto na tela e formatado em A4 paisagem na impressão |
+| Relatório para PDF | `.report-print .report-page .report-grid .report-item .report-table` | relatório comparativo oculto na tela, isolado do restante da página e formatado em A4 paisagem sem folhas vazias |
 | Hub | `.head .apps .app .ico .status .st .hub-sub` | cards da Central |
 | Visão Geral | `.kpis-overview .ecossistema-card .eco-section .eco-row .eco-progress .eco-metricas` | resumo de rebanho e cobertura por área |
 | Aviso | `.aviso` | banner de atenção |
