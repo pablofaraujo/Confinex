@@ -52,7 +52,7 @@ Push na `main` → workflow `deploy.yml` publica o repositório inteiro no GitHu
 - Fonte padrão: Inter (via tokens.css). Identidade visual global: cabeçalho azul-marinho, amarelo do logo como destaque, superfícies brancas e sem gradientes. Dark mode preparado em `[data-theme=dark]`, sem toggle ainda.
 - Botão flutuante "⌂ Central" (`.voltar-central`) em toda página-satélite.
 - Ações destrutivas com `confirm()`/`prompt()` nativos.
-- Constantes de domínio: **1 @ = 15 kg**; **1 contrato BGI = 330 @**; RC padrão 50–53%; 65 bois/carreta (macho) / 70 (fêmea); limite de capim padrão 300 kg; Funrural 0,2% default (Confinex e simulador do bb — alinhados desde jul/2026).
+- Constantes de domínio: **1 @ = 15 kg**; **1 contrato BGI = 330 @**; RC padrão 50–53%; 65 bois/carreta (macho) / 70 (fêmea); limite de capim padrão 300 kg; Funrural 0,2% default (Confinex e simulador do bb — alinhados desde jul/2026); Finpec separado, padrão 1% sobre o faturamento bruto da venda no Confinex.
 
 ## Armadilhas conhecidas
 

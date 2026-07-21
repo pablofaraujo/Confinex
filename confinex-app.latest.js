@@ -531,6 +531,9 @@ function calcCenario(lote, sc) {
       pctPerda: pctPerda * 100,
       precoVendaLiq: precoVenda2,
       vpArroba: vpArroba2,
+      faturamentoBruto: receita2,
+      valorFunrural: 0,
+      valorFinpec: 0,
       receita: receita2,
       receitaVP: receitaVP2,
       custoCompra,
@@ -606,16 +609,21 @@ function calcCenario(lote, sc) {
   }
   const custoContTotal = custoCont * N;
   const fur = pctInput(sc.funrural, 2e-3);
-  let precoVenda;
+  const finpec = pctInput(sc.finpec, 1e-2);
+  let precoVendaBruto;
   if (sc.modoPreco === "balcao") {
-    precoVenda = (parseFloat(sc.precoBalcao) || 0) * (1 - fur);
+    precoVendaBruto = parseFloat(sc.precoBalcao) || 0;
   } else {
     const bolsa = parseFloat(sc.precoBolsa) || 0;
     const basePct = parseFloat(sc.baseDesc) || 0;
-    precoVenda = bolsa * (1 - basePct / 100) * (1 - fur);
+    precoVendaBruto = bolsa * (1 - basePct / 100);
   }
   const arrobasRef = sc.modalidade === "parceria" ? arrobasEntrada : arrobasAbate;
-  const receita = arrobasRef * precoVenda * N;
+  const faturamentoBruto = arrobasRef * precoVendaBruto * N;
+  const valorFunrural = faturamentoBruto * fur;
+  const valorFinpec = faturamentoBruto * finpec;
+  const receita = faturamentoBruto - valorFunrural - valorFinpec;
+  const precoVenda = arrobasRef > 0 && N > 0 ? receita / (arrobasRef * N) : 0;
   const custos = custoCompra + freteTotal + custoContTotal;
   const lucro = receita - custos;
   const diasTotal = dias + diasPag;
@@ -670,6 +678,9 @@ function calcCenario(lote, sc) {
     pctPerda: pctPerda * 100,
     precoVendaLiq: precoVenda,
     vpArroba,
+    faturamentoBruto,
+    valorFunrural,
+    valorFinpec,
     receita,
     receitaVP,
     custoCompra,
@@ -773,6 +784,7 @@ var defaultSc = (i) => ({
   baseDesc: "0",
   precoBalcao: "300",
   funrural: "0.2",
+  finpec: "1.0",
   precoRevenda: "310",
   modoCapimVenda: "sem"
 });
@@ -815,6 +827,7 @@ var CAMPOS_MODELO_CONFINAMENTO = [
   "baseDesc",
   "precoBalcao",
   "funrural",
+  "finpec",
   "precoRevenda",
   "modoCapimVenda"
 ];
@@ -1127,7 +1140,10 @@ function ScPanel({ sc, upd, sexo, custoDinheiro, resultado, confinamentos, model
           ] }) }),
           /* @__PURE__ */ jsx(F, { label: "Diferencial de base (%)", hint: "0 a 12,5% \u2014 desconto sobre BGI", children: /* @__PURE__ */ jsx("input", { type: "number", step: ".5", min: "0", max: "12.5", value: sc.baseDesc, onChange: u("baseDesc") }) })
         ] }) : /* @__PURE__ */ jsx(F, { label: "Pre\xE7o balc\xE3o (R$/@)", children: /* @__PURE__ */ jsx("input", { type: "number", value: sc.precoBalcao, onChange: u("precoBalcao") }) }),
-        /* @__PURE__ */ jsx(F, { label: "Funrural+Finpec (%)", children: /* @__PURE__ */ jsx("input", { type: "number", step: ".1", value: sc.funrural, onChange: u("funrural") }) })
+        /* @__PURE__ */ jsxs("div", { className: "g2", style: { gridColumn: "1 / -1" }, children: [
+          /* @__PURE__ */ jsx(F, { label: "Funrural (%)", hint: "Calculado sobre o faturamento bruto da venda", children: /* @__PURE__ */ jsx("input", { type: "number", step: ".1", min: "0", value: sc.funrural, onChange: u("funrural") }) }),
+          /* @__PURE__ */ jsx(F, { label: "Finpec (%)", hint: "Padrão 1% sobre o faturamento bruto da venda", children: /* @__PURE__ */ jsx("input", { type: "number", step: ".1", min: "0", value: sc.finpec, onChange: u("finpec") }) })
+        ] })
       ] })
     ] })
   ] });
@@ -1396,7 +1412,10 @@ function Comparativo({ resultados, cenarios, lote }) {
     { l: "Custo confinamento", fn: (r) => r.tipo === "revenda" ? "\u2014" : fR(r.custoCont) },
     { l: "Total custos", fn: (r) => fR(r.custos), bold: true },
     { sep: true, l: "RESULTADO \u2014 TOTAL DO LOTE" },
-    { l: "Receita total", fn: (r) => fR(r.receita), cls: () => "pos" },
+    { l: "Faturamento bruto da venda", fn: (r) => fR(r.faturamentoBruto ?? r.receita), cls: () => "pos" },
+    { l: "Funrural", fn: (r) => r.tipo === "revenda" ? "\u2014" : fR(r.valorFunrural || 0), cls: () => "neg" },
+    { l: "Finpec", fn: (r) => r.tipo === "revenda" ? "\u2014" : fR(r.valorFinpec || 0), cls: () => "neg" },
+    { l: "Receita líquida", fn: (r) => fR(r.receita), cls: () => "pos" },
     { l: "Receita a valor presente", fn: (r) => fR(r.receitaVP), cls: () => "pos" },
     { l: "Lucro bruto", fn: (r) => fR(r.lucro), bold: true, cls: (r) => r.lucro >= 0 ? "pos" : "neg", best: true },
     { l: "Lucro bruto / cab", fn: (r) => fR(r.lucro / r.N), cls: (r) => r.lucro >= 0 ? "pos" : "neg" },
