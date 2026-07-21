@@ -506,7 +506,9 @@ function calcCenario(lote, sc) {
     const baseRentabilidade2 = investInicial2 || valorAdiantamento2;
     const rTliqSemAdiantamento2 = baseRentabilidade2 > 0 ? lucroLiquidoSemAdiantamento2 / baseRentabilidade2 * 100 : 0;
     const rTliq2 = baseRentabilidade2 > 0 ? lucroLiquido2 / baseRentabilidade2 * 100 : 0;
+    const rMliqSemAdiantamento2 = mesesCapital2 > 0 ? (Math.pow(1 + rTliqSemAdiantamento2 / 100, 1 / mesesCapital2) - 1) * 100 : 0;
     const rMliq2 = mesesCapital2 > 0 ? (Math.pow(1 + rTliq2 / 100, 1 / mesesCapital2) - 1) * 100 : 0;
+    const impactoAdiantamentoMensal2 = rMliq2 - rMliqSemAdiantamento2;
     const fatorVP2 = custoDinheiroMensal2 > 0 ? Math.pow(1 + custoDinheiroMensal2, mesesCapital2) : 1;
     const vpArroba2 = precoVenda2 / fatorVP2;
     const receitaVP2 = receita2 / fatorVP2;
@@ -563,9 +565,11 @@ function calcCenario(lote, sc) {
       custoAdiantamento: custoAdiantamento2,
       lucroLiquidoSemAdiantamento: lucroLiquidoSemAdiantamento2,
       rTliqSemAdiantamento: rTliqSemAdiantamento2,
+      rMliqSemAdiantamento: rMliqSemAdiantamento2,
       lucroLiquido: lucroLiquido2,
       rTliq: rTliq2,
       rMliq: rMliq2,
+      impactoAdiantamentoMensal: impactoAdiantamentoMensal2,
       precoCompraVpMax: precoCompraVpMax2,
       resultadoVP: resultadoVP2,
       margemCompraVp: margemCompraVp2,
@@ -638,7 +642,9 @@ function calcCenario(lote, sc) {
   const baseRentabilidade = investInicial || valorAdiantamento;
   const rTliqSemAdiantamento = baseRentabilidade > 0 ? lucroLiquidoSemAdiantamento / baseRentabilidade * 100 : 0;
   const rTliq = baseRentabilidade > 0 ? lucroLiquido / baseRentabilidade * 100 : 0;
+  const rMliqSemAdiantamento = mesesCapital > 0 ? (Math.pow(1 + rTliqSemAdiantamento / 100, 1 / mesesCapital) - 1) * 100 : 0;
   const rMliq = mesesCapital > 0 ? (Math.pow(1 + rTliq / 100, 1 / mesesCapital) - 1) * 100 : 0;
+  const impactoAdiantamentoMensal = rMliq - rMliqSemAdiantamento;
   const fatorVP = custoDinheiroMensal > 0 ? Math.pow(1 + custoDinheiroMensal, mesesCapital) : 1;
   const vpArroba = precoVenda / fatorVP;
   const receitaVP = receita / fatorVP;
@@ -699,9 +705,11 @@ function calcCenario(lote, sc) {
     custoAdiantamento,
     lucroLiquidoSemAdiantamento,
     rTliqSemAdiantamento,
+    rMliqSemAdiantamento,
     lucroLiquido,
     rTliq,
     rMliq,
+    impactoAdiantamentoMensal,
     precoCompraVpMax,
     resultadoVP,
     margemCompraVp,
@@ -912,7 +920,7 @@ function Ck({ checked, onChange, label }) {
     /* @__PURE__ */ jsx("span", { children: label })
   ] });
 }
-function ScPanel({ sc, upd, sexo, custoDinheiro, confinamentos, modeloSelecionado, setModeloSelecionado, aplicarModelo, salvarModelo, atualizarModelo, apagarModelo, atualizarB3, calcularDistancia, statusB3, statusDistancia }) {
+function ScPanel({ sc, upd, sexo, custoDinheiro, resultado, confinamentos, modeloSelecionado, setModeloSelecionado, aplicarModelo, salvarModelo, atualizarModelo, apagarModelo, atualizarB3, calcularDistancia, statusB3, statusDistancia }) {
   const u = (k) => (v) => upd(k, v && v.target ? v.target.value : v);
   const isRev = sc.tipo === "revenda";
   const freteDeles = sc.respFrete === "confinamento";
@@ -1055,6 +1063,11 @@ function ScPanel({ sc, upd, sexo, custoDinheiro, confinamentos, modeloSelecionad
         "Juros simples pr\xF3-rata pela taxa de ",
         custoDinheiro || "0",
         "% a.m., somente sobre o valor adiantado e pelos dias efetivos. Use para dinheiro adicional ao capital j\xE1 informado; se for antecipa\xE7\xE3o da pr\xF3pria compra, ajuste o prazo de pagamento da compra."
+      ] }),
+      resultado && /* @__PURE__ */ jsxs("div", { className: "g3", style: { marginTop: 14 }, children: [
+        /* @__PURE__ */ jsx(F, { label: "Tempo do adiantamento", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: `${fN(resultado.diasAdiantamento, 0)} dias` }) }),
+        /* @__PURE__ */ jsx(F, { label: "Custo do adiantamento", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: fR(resultado.custoAdiantamento) }) }),
+        /* @__PURE__ */ jsx(F, { label: "Impacto na rentabilidade mensal", hint: "Antes do adiantamento \u2192 resultado mensal final", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: `${fP(resultado.rMliqSemAdiantamento ?? resultado.rMliq)} \u2192 ${fP(resultado.rMliq)} a.m. (${fN(resultado.impactoAdiantamentoMensal ?? 0, 2)} p.p.)` }) })
       ] })
     ] }),
     isRev && /* @__PURE__ */ jsxs(Fragment, { children: [
@@ -1354,7 +1367,7 @@ function SensPanel({ lote, cenarios, resultados, historico = [], setHistorico = 
 function Comparativo({ resultados, cenarios, lote }) {
   const ativos = cenarios.map((sc, i) => ({ sc, r: resultados[i], i })).filter((x) => x.r);
   if (!ativos.length) return null;
-  const ranked = [...ativos].sort((a, b) => b.r.rTliq - a.r.rTliq || b.r.lucroLiquido - a.r.lucroLiquido || b.r.rMliq - a.r.rMliq || a.i - b.i);
+  const ranked = [...ativos].sort((a, b) => b.r.rMliq - a.r.rMliq || b.r.lucroLiquido - a.r.lucroLiquido || b.r.rTliq - a.r.rTliq || a.i - b.i);
   const semCustoFrete = (r) => r.respFrete === "confinamento" || r.freteTotal === 0 && r.fretePorCab === 0;
   const otimos = ativos.reduce((acc, { sc }) => {
     acc[sc.id] = calcPontoOtimoDias(lote, sc);
@@ -1407,11 +1420,13 @@ function Comparativo({ resultados, cenarios, lote }) {
     { l: "Prazo recebimento (dias)", fn: (r) => fN(r.diasPag, 0) },
     { l: "Prazo total (dias)", fn: (r) => fN(r.diasTotal, 0), bold: true },
     { l: "Tempo capital investido (meses)", fn: (r) => fN(r.mesesCapital, 1) },
-    { l: "Rent. total (sem custo $)", fn: (r) => fP(r.rentTotal), bold: true, cls: (r) => r.rentTotal >= 0 ? "pos" : "neg" },
-    { l: "Rent. mensal (sem custo $)", fn: (r) => fP(r.rentMensal), bold: true, cls: (r) => r.rentMensal >= 0 ? "pos" : "neg", best: true },
-    { l: "Rent. total antes do adiantamento", fn: (r) => fP(r.rTliqSemAdiantamento), bold: true, cls: (r) => r.rTliqSemAdiantamento >= 0 ? "pos" : "neg" },
-    { l: "Rent. total (com custo $)", fn: (r) => fP(r.rTliq), bold: true, cls: (r) => r.rTliq >= 0 ? "pos" : "neg" },
-    { l: "Rent. mensal (com custo $)", fn: (r) => fP(r.rMliq), bold: true, cls: (r) => r.rMliq >= 0 ? "pos" : "neg" },
+    { l: "Rent. total (sem custo $)", fn: (r) => fP(r.rentTotal), cls: (r) => r.rentTotal >= 0 ? "pos" : "neg" },
+    { l: "Rent. mensal (sem custo $)", fn: (r) => fP(r.rentMensal), cls: (r) => r.rentMensal >= 0 ? "pos" : "neg" },
+    { l: "Rent. total antes do adiantamento", fn: (r) => fP(r.rTliqSemAdiantamento), cls: (r) => r.rTliqSemAdiantamento >= 0 ? "pos" : "neg" },
+    { l: "Rent. total final", fn: (r) => fP(r.rTliq), cls: (r) => r.rTliq >= 0 ? "pos" : "neg" },
+    { l: "Rent. mensal antes do adiantamento", fn: (r) => fP(r.rMliqSemAdiantamento ?? r.rMliq), bold: true, cls: (r) => (r.rMliqSemAdiantamento ?? r.rMliq) >= 0 ? "pos" : "neg" },
+    { l: "Impacto do adiantamento na rent. mensal", fn: (r) => `${fN(r.impactoAdiantamentoMensal ?? 0, 2)} p.p.`, cls: (r) => (r.impactoAdiantamentoMensal ?? 0) >= 0 ? "pos" : "neg" },
+    { l: "Rent. mensal final", fn: (r) => `${fP(r.rMliq)} a.m.`, bold: true, cls: (r) => r.rMliq >= 0 ? "pos" : "neg", best: true },
     { sep: true, l: "PONTO \xD3TIMO \u2014 MANTENDO DEMAIS PREMISSAS" },
     { l: "Melhor ciclo (dias)", fn: (r, sc) => otimos[sc.id] ? fN(otimos[sc.id].dias, 0) : "\u2014", bold: true },
     { l: "Rent. no ponto \xF3timo", fn: (r, sc) => otimos[sc.id] ? fP(otimos[sc.id].rMliq) + " a.m." : "\u2014", bold: true, cls: (r, sc) => otimos[sc.id]?.rMliq >= 0 ? "pos" : "neg" },
@@ -1434,16 +1449,27 @@ function Comparativo({ resultados, cenarios, lote }) {
         /* @__PURE__ */ jsx("div", { className: "rn", children: pos + 1 }),
         /* @__PURE__ */ jsx("div", { className: "rname", children: sc.nome }),
         /* @__PURE__ */ jsx("div", { className: "rtype", children: r.tipo === "revenda" ? "Revenda" : sc.modalidade }),
-        /* @__PURE__ */ jsxs("div", { className: `rval ${r.rTliq >= 0 ? "pos" : "neg"}`, children: [
-          fP(r.rTliq),
-          " total"
+        /* @__PURE__ */ jsxs("div", { className: `rval ${r.rMliq >= 0 ? "pos" : "neg"}`, style: { fontSize: 22, fontWeight: 700 }, children: [
+          fP(r.rMliq),
+          " a.m."
         ] }),
         /* @__PURE__ */ jsxs("div", { className: "rsub", children: [
-          "rent. l\xEDq: ",
-          fP(r.rMliq),
-          " a.m. \xB7 ",
+          "rent. total: ",
+          fP(r.rTliq),
+          " \xB7 ",
           fN(r.meses, 1),
           " meses"
+        ] }),
+        r.valorAdiantamento > 0 && /* @__PURE__ */ jsxs("div", { className: "rsub", style: { marginTop: 5 }, children: [
+          "adiant.: ",
+          fN(r.diasAdiantamento, 0),
+          " dias \xB7 ",
+          fR(r.custoAdiantamento),
+          " \xB7 ",
+          fP(r.rMliqSemAdiantamento ?? r.rMliq),
+          " \u2192 ",
+          fP(r.rMliq),
+          " a.m."
         ] }),
         /* @__PURE__ */ jsxs("div", { className: "rsub", children: [
           "\xF3timo: ",
@@ -1502,6 +1528,46 @@ function Comparativo({ resultados, cenarios, lote }) {
     ] }) }) })
   ] });
 }
+function AprovacoesSupabase({ avaliacoes, carregando, status, atualizar, revisar, aprovar }) {
+  return /* @__PURE__ */ jsxs("div", { className: "sec", style: { marginTop: 18 }, children: [
+    /* @__PURE__ */ jsxs("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }, children: [
+      /* @__PURE__ */ jsx("div", { className: "sec-t nm", style: { marginBottom: 0, flex: 1 }, children: "Aprova\xE7\xF5es recebidas do Supabase" }),
+      /* @__PURE__ */ jsx("button", { className: "tb", onClick: atualizar, disabled: carregando, children: carregando ? "Atualizando..." : "Atualizar" })
+    ] }),
+    avaliacoes.length === 0 ? /* @__PURE__ */ jsx("div", { className: "hint", children: status || "Nenhum neg\xF3cio aguardando aprova\xE7\xE3o." }) : /* @__PURE__ */ jsx("div", { className: "tbl-wrap", children: /* @__PURE__ */ jsxs("table", { className: "cmp-tbl", children: [
+      /* @__PURE__ */ jsx("thead", { children: /* @__PURE__ */ jsxs("tr", { children: [
+        /* @__PURE__ */ jsx("th", { children: "Neg\xF3cio" }),
+        /* @__PURE__ */ jsx("th", { children: "Origem" }),
+        /* @__PURE__ */ jsx("th", { children: "Rent. mensal final" }),
+        /* @__PURE__ */ jsx("th", { children: "Antes do adiantamento" }),
+        /* @__PURE__ */ jsx("th", { children: "Adiantamento" }),
+        /* @__PURE__ */ jsx("th", { children: "A\xE7\xE3o" })
+      ] }) }),
+      /* @__PURE__ */ jsx("tbody", { children: avaliacoes.map((avaliacao) => {
+        const resultado = avaliacao.estimativa?.resultado || {};
+        const temAdiantamento = Number(resultado.valorAdiantamento || 0) > 0;
+        return /* @__PURE__ */ jsxs("tr", { children: [
+          /* @__PURE__ */ jsxs("td", { children: [
+            /* @__PURE__ */ jsx("strong", { children: avaliacao.codigo }),
+            /* @__PURE__ */ jsx("div", { className: "hint", children: avaliacao.nome })
+          ] }),
+          /* @__PURE__ */ jsxs("td", { children: [
+            avaliacao.grupo_origem_nome,
+            /* @__PURE__ */ jsx("div", { className: "hint", children: avaliacao.grupo_origem_id || "ID n\xE3o informado" })
+          ] }),
+          /* @__PURE__ */ jsx("td", { className: Number(resultado.rMliq) >= 0 ? "pos hi" : "neg hi", children: `${fP(resultado.rMliq)} a.m.` }),
+          /* @__PURE__ */ jsx("td", { children: `${fP(resultado.rMliqSemAdiantamento ?? resultado.rMliq)} a.m.` }),
+          /* @__PURE__ */ jsx("td", { children: temAdiantamento ? `${fN(resultado.diasAdiantamento, 0)} dias \xB7 ${fR(resultado.custoAdiantamento)}` : "\u2014" }),
+          /* @__PURE__ */ jsxs("td", { children: [
+            /* @__PURE__ */ jsx("button", { className: "tb", style: { marginRight: 6 }, onClick: () => revisar(avaliacao), children: "Revisar" }),
+            /* @__PURE__ */ jsx("button", { className: "tb on", onClick: () => aprovar(avaliacao), children: "Aprovar" })
+          ] })
+        ] }, avaliacao.id);
+      }) })
+    ] }) }),
+    avaliacoes.length > 0 && /* @__PURE__ */ jsx("div", { className: "hint", style: { marginTop: 10 }, children: status })
+  ] });
+}
 function Confinex() {
   const [initialState] = useState(loadSavedState);
   const [lote, setLote] = useState(initialState.lote);
@@ -1517,8 +1583,15 @@ function Confinex() {
   const [backendUrl, setBackendUrl] = useState(getStoredSheetsBackendUrl);
   const [statusSheets, setStatusSheets] = useState(backendUrl ? "Backend Sheets configurado." : "Sem backend Sheets: salvando apenas neste navegador.");
   const [statusSupabase, setStatusSupabase] = useState("Supabase: aguardando um negócio ser iniciado.");
+  const [avaliacoesPendentes, setAvaliacoesPendentes] = useState([]);
+  const [carregandoAprovacoes, setCarregandoAprovacoes] = useState(false);
+  const [statusAprovacoes, setStatusAprovacoes] = useState("Buscando negócios aguardando aprovação...");
   const [versoesSalvas, setVersoesSalvas] = useState(carregarVersoesNomeadas);
   const [versaoSelecionada, setVersaoSelecionada] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => carregarAprovacoesSupabase(), 0);
+    return () => clearTimeout(timer);
+  }, []);
   useEffect(() => {
     try {
       localStorage.setItem(APP_STORAGE_KEY, JSON.stringify({
@@ -1967,6 +2040,75 @@ function Confinex() {
     });
     setResultados(res);
   };
+  const carregarAprovacoesSupabase = async () => {
+    const db = window.CFAgro?.db;
+    if (!db) {
+      setStatusAprovacoes("Supabase indisponível nesta página.");
+      return;
+    }
+    setCarregandoAprovacoes(true);
+    try {
+      const { data: sessao } = await db.auth.getSession();
+      if (!sessao?.session) {
+        setAvaliacoesPendentes([]);
+        setStatusAprovacoes("Entre em um módulo do ecossistema para consultar e aprovar negócios.");
+        return;
+      }
+      const { data, error } = await db.from("confinex_avaliacoes").select("id,codigo,nome,grupo_origem_id,grupo_origem_nome,status,estimativa_versao_atual,criado_em,confinex_estimativas(versao,tipo,premissas,resultado)").eq("status", "rascunho").order("criado_em", { ascending: false }).limit(20);
+      if (error) throw error;
+      const normalizadas = (data || []).map((avaliacao) => ({
+        ...avaliacao,
+        estimativa: (avaliacao.confinex_estimativas || []).find((item) => item.versao === avaliacao.estimativa_versao_atual) || avaliacao.confinex_estimativas?.[0] || null
+      }));
+      setAvaliacoesPendentes(normalizadas);
+      setStatusAprovacoes(normalizadas.length ? `${normalizadas.length} negócio(s) aguardando sua aprovação.` : "Nenhum negócio aguardando aprovação.");
+    } catch (err) {
+      setAvaliacoesPendentes([]);
+      setStatusAprovacoes(`Não consegui carregar as aprovações (${err?.message || "erro"}).`);
+    } finally {
+      setCarregandoAprovacoes(false);
+    }
+  };
+  const revisarAvaliacaoSupabase = (avaliacao) => {
+    const estimativa = avaliacao.estimativa;
+    if (!estimativa) {
+      setStatusAprovacoes(`${avaliacao.codigo} não possui estimativa para revisão.`);
+      return;
+    }
+    const premissas = estimativa.premissas || {};
+    const loteRecebido = premissas.lote || premissas;
+    const cenarioRecebido = premissas.cenario || premissas;
+    const loteRevisao = {
+      ...defaultLote,
+      ...loteRecebido,
+      codigoNegocio: avaliacao.codigo,
+      grupoOrigemId: avaliacao.grupo_origem_id || loteRecebido.grupoOrigemId || "",
+      grupoOrigemNome: avaliacao.grupo_origem_nome || loteRecebido.grupoOrigemNome || "Confinamento"
+    };
+    const cenarioRevisao = { ...defaultSc(0), ...cenarioRecebido, id: Date.now() };
+    setLote(loteRevisao);
+    setCenarios([cenarioRevisao]);
+    setScAtivo(0);
+    setResultados([estimativa.resultado || calcCenario(loteRevisao, cenarioRevisao)]);
+    setStatusAprovacoes(`${avaliacao.codigo} carregado no simulador para revisão. A aprovação continua pendente.`);
+  };
+  const aprovarAvaliacaoSupabase = async (avaliacao) => {
+    const db = window.CFAgro?.db;
+    if (!db) {
+      setStatusAprovacoes("Supabase indisponível nesta página.");
+      return;
+    }
+    if (!window.confirm(`Aprovar ${avaliacao.codigo} e iniciar o negócio com a estimativa original versão ${avaliacao.estimativa_versao_atual}?`)) return;
+    setStatusAprovacoes(`Aprovando ${avaliacao.codigo}...`);
+    try {
+      const { data, error } = await db.rpc("aprovar_negocio_confinex", { p_avaliacao_id: avaliacao.id });
+      if (error) throw error;
+      setStatusSupabase(`${avaliacao.codigo} aprovado e iniciado no Supabase (${data}).`);
+      await carregarAprovacoesSupabase();
+    } catch (err) {
+      setStatusAprovacoes(`Não consegui aprovar ${avaliacao.codigo} (${err?.message || "erro"}).`);
+    }
+  };
   const iniciarNegocioSupabase = async () => {
     const codigo = String(lote.codigoNegocio || "").trim().toUpperCase();
     const grupoNome = String(lote.grupoOrigemNome || "").trim();
@@ -2211,6 +2353,17 @@ function Confinex() {
           " (divisor). Abaixo do limite: peso/2/15."
         ] })
       ] }),
+      /* @__PURE__ */ jsx(
+        AprovacoesSupabase,
+        {
+          avaliacoes: avaliacoesPendentes,
+          carregando: carregandoAprovacoes,
+          status: statusAprovacoes,
+          atualizar: carregarAprovacoesSupabase,
+          revisar: revisarAvaliacaoSupabase,
+          aprovar: aprovarAvaliacaoSupabase
+        }
+      ),
       /* @__PURE__ */ jsxs("div", { className: "sec", style: { padding: 0 }, children: [
         /* @__PURE__ */ jsx("div", { style: { padding: "18px 22px 0" }, children: /* @__PURE__ */ jsx("div", { className: "sec-t", children: "02 \u2014 Cen\xE1rios (at\xE9 5)" }) }),
         /* @__PURE__ */ jsxs("div", { className: "sc-bar", children: [
@@ -2257,6 +2410,7 @@ function Confinex() {
               upd: (k, v) => updSc(scAtivo, k, v),
               sexo: lote.sexo,
               custoDinheiro: lote.custoDinheiro,
+              resultado: resultados[scAtivo],
               confinamentos,
               modeloSelecionado,
               setModeloSelecionado,
@@ -2284,7 +2438,7 @@ function Confinex() {
         /* @__PURE__ */ jsx("div", { className: "sec-t", children: "Iniciar neg\xF3cio \u2014 Supabase" }),
         /* @__PURE__ */ jsxs("div", { className: "g3", children: [
           /* @__PURE__ */ jsx(F, { label: "Cen\xE1rio selecionado", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: cenarios[scAtivo]?.nome || "\u2014" }) }),
-          /* @__PURE__ */ jsx(F, { label: "Estimativa original", hint: "Ser\xE1 congelada e n\xE3o poder\xE1 ser sobrescrita", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: resultados[scAtivo] ? `${fP(resultados[scAtivo].rTliq)} \xB7 ${fR(resultados[scAtivo].lucroLiquido)}` : "\u2014" }) }),
+          /* @__PURE__ */ jsx(F, { label: "Estimativa original", hint: "Ser\xE1 congelada e n\xE3o poder\xE1 ser sobrescrita", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: resultados[scAtivo] ? `${fP(resultados[scAtivo].rMliq)} a.m. \xB7 ${fP(resultados[scAtivo].rTliq)} total \xB7 ${fR(resultados[scAtivo].lucroLiquido)}` : "\u2014" }) }),
           /* @__PURE__ */ jsx(F, { label: "Confirmar abertura", children: /* @__PURE__ */ jsx("button", { className: "tb on", style: { width: "100%", padding: "10px 13px" }, onClick: iniciarNegocioSupabase, children: "Iniciar neg\xF3cio" }) })
         ] }),
         /* @__PURE__ */ jsx("div", { className: "hint", style: { marginTop: 10 }, children: statusSupabase })

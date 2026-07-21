@@ -37,7 +37,12 @@ Bundle esbuild legível de `src/confinex-entry.jsx` + `confinex_work.jsx` (fonte
 ### Persistência
 - localStorage: `confinex:last-state:v3` (auto-save), `confinex:restore-before-reset:v1` (snapshot antes de reset), `confinex:named-versions:v1` (até 80 versões), `confinex:sheets-backend-url`, `confinex:device-id:v1`; legado migrado: `confinex:last-state:v2`.
 - Google Sheets via Apps Script: leitura JSONP (`sheetsJsonp`, timeout 12s), escrita `sheetsPost` (ações `getState/saveState/getVersions/saveVersion/deleteVersion`) + `sheetsBeacon` no `pagehide`. Proteções: `cloudReadyRef` bloqueia auto-save até carregar a nuvem; debounce 10s; carimbo `clientUpdatedAt` → backend responde `error:"conflict"` se outro dispositivo salvou depois; merge por id em `carregarVersoesSheets`; "Salvar agora" força sobrescrita.
-- Supabase: `confinex_testes` recebe versões nomeadas quando há sessão autenticada. A ação **Iniciar negócio** exige código `CF-AA-NNN`, grupo do Telegram de origem e cenário calculado; a RPC `iniciar_negocio_confinex` cria `confinex_avaliacoes` e congela a versão original em `confinex_estimativas`. `confinex_consolidacoes` e `confinex_desvios` guardam realizado, desvios e comentários. Sheets permanece somente durante a transição.
+- Supabase: `confinex_testes` recebe versões nomeadas quando há sessão autenticada. Integrações externas e agentes usam `submeter_negocio_confinex`, que cria uma avaliação `rascunho` e congela a estimativa original. A fila **Aprovações recebidas do Supabase** permite revisar a simulação e chama `aprovar_negocio_confinex` para mudar o negócio para `iniciado`. A ação direta **Iniciar negócio** continua disponível na própria tela para uma decisão já confirmada. `confinex_consolidacoes` e `confinex_desvios` guardam realizado, desvios e comentários. Sheets permanece somente durante a transição.
+
+### Comparação de rentabilidade
+- Cenários são classificados pela rentabilidade mensal líquida (`rMliq`), com lucro líquido e rentabilidade total como desempates.
+- A rentabilidade mensal final é o número de maior destaque nos cartões. A rentabilidade total é complementar.
+- Quando há adiantamento, a tela mostra o período em dias, o custo financeiro e a mudança de `rMliqSemAdiantamento` para `rMliq`.
 
 ### Estado
 `estadoAtual()` = `{lote, cenarios (até 5, o 5º nasce "Revenda"), confinamentos (modelos salvos), historico (testes de sensibilidade), scAtivo, resultados, data, versao:"1.3-supabase"}`. Defaults em `defaultLote` e `defaultSc(i)`.

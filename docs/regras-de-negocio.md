@@ -59,7 +59,8 @@ Custo de compra: `custoCompra = arrobasCompra × precoCompra × N + baldeio`.
 - `rentTotal = lucro/investInicial`; `rentMensal = (1+rT)^(1/mesesCapital) − 1` (composto).
 - Custo do dinheiro da compra e do frete é calculado separadamente conforme o prazo de cada desembolso.
 - Adiantamento opcional: `diasAdiantamento = recebimento − dataAdiantamento`; `custoAdiantamento = valorAdiantamento × i × diasAdiantamento/30` (juros simples pró-rata). O custo reduz o resultado; o principal adiantado não é contado novamente como despesa.
-- Ranking dos cenários: `rTliq` decrescente; desempates por lucro líquido, rentabilidade mensal líquida e ordem original. Cartões e tabela usam a mesma sequência.
+- O efeito do adiantamento é comparado também na métrica principal: `rMliqSemAdiantamento` versus `rMliq`; `impactoAdiantamentoMensal = rMliq − rMliqSemAdiantamento`, em pontos percentuais ao mês.
+- Ranking dos cenários: `rMliq` decrescente; desempates por lucro líquido, rentabilidade total líquida e ordem original. Cartões e tabela usam a mesma sequência. A rentabilidade mensal final recebe o destaque visual principal; a total permanece como informação complementar.
 - Valor presente: `fatorVP = (1+i)^mesesCapital`; `vpArroba = precoVenda/fatorVP`; **`precoCompraVpMax`** = maior R$/@ de compra que empata em VP = `(receitaVP − freteTotal − custoContTotal − baldeio)/arrobasCompraTotal`; `margemCompraVp = precoCompraVpMax − precoCompra`.
 - `calcPontoOtimoDias` varre diasCiclo ~30–240 e maximiza `rMliq`.
 
