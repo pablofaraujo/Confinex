@@ -74,6 +74,9 @@ Custo de compra: `custoCompra = arrobasCompra × precoCompra × N + baldeio`.
 ## Contratos B3 / BGI
 
 - Código do contrato: `BGI` + letra do mês (F,G,H,J,K,M,N,Q,U,V,X,Z) + ano 2 dígitos, sugerido pela **data de saída** (`dataEntrada + diasCiclo`); re-sugerido quando a data muda (commit `39686ee`).
+- A cotação é única por **contrato/vencimento dentro do estudo**, não única para todos os cenários: cenários que usam o mesmo código BGI compartilham obrigatoriamente o mesmo índice e a mesma fonte/data de consulta.
+- A seção geral **Mercado BGI** reúne os vencimentos usados e atualiza a curva em um único lote de consulta. O diferencial de base continua individual por cenário.
+- Na modalidade `parceria`, o contrato é definido automaticamente pelo mês da saída. Em `ms` e nas demais modalidades não-parceria, o usuário pode escolher outro vencimento; se ele ainda não tiver cotação no estudo, o preço fica vazio até atualização ou preenchimento na seção geral, evitando reaproveitar a cotação de outro mês.
 - Encerramento (`encerrar` no bgi.html): `resultado = mult × (preco_entrada − preco_saida) × contratos_qtd × 330` (mult = +1 vendido, −1 comprado), rateado pró-rata nas `alocacoes_hedge`.
 - Rolagem (`rolar`): encerra com resultado, cria nova posição (`obs:'rolagem de X'`, `rolada_para`), replica alocações.
 - Basis = preço físico (`FISICO`) − futuro.

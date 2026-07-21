@@ -819,10 +819,6 @@ var CAMPOS_MODELO_CONFINAMENTO = [
   "diasCiclo",
   "diasPagamento",
   "modoPreco",
-  "precoBolsa",
-  "contratoB3",
-  "cotacaoB3Fonte",
-  "cotacaoB3AtualizadaEm",
   "origemFrete",
   "destinoFrete",
   "baseDesc",
@@ -862,12 +858,54 @@ var defaultLote = {
   descBezerro: false,
   limBezerro: "280",
   prazoPagtoCompra: "0",
-  custoDinheiro: "2.0"
+  custoDinheiro: "2.0",
+  cotacoesB3: {},
+  cotacoesB3AtualizadasEm: ""
 };
+function contratoB3DoCenario(sc) {
+  if (!sc || sc.tipo === "revenda" || sc.modoPreco !== "bolsa") return "";
+  const dataSaida = addDiasISO(sc.dataEntrada, parseFloat(sc.diasCiclo) || 0);
+  const sugerido = contratoB3PorData(dataSaida);
+  return sc.modalidade === "parceria" ? sugerido : sc.contratoB3 || sugerido;
+}
+function normalizarMercadoB3(loteInformado, cenariosInformados) {
+  const loteNovo = {
+    ...defaultLote,
+    ...loteInformado || {},
+    cotacoesB3: { ...loteInformado?.cotacoesB3 || {} }
+  };
+  const cenariosNovos = (cenariosInformados || []).map((sc) => ({ ...sc }));
+  cenariosNovos.forEach((sc) => {
+    const contrato = contratoB3DoCenario(sc);
+    if (!contrato) return;
+    if (sc.modalidade === "parceria") sc.contratoB3 = contrato;
+    const existente = loteNovo.cotacoesB3[contrato];
+    const atualizadaEm = sc.cotacaoB3AtualizadaEm || "";
+    if (!existente || atualizadaEm > (existente.atualizadaEm || "")) {
+      loteNovo.cotacoesB3[contrato] = {
+        preco: String(sc.precoBolsa || existente?.preco || "350"),
+        fonte: sc.cotacaoB3Fonte || existente?.fonte || "Valor migrado do cenário",
+        atualizadaEm
+      };
+    }
+  });
+  cenariosNovos.forEach((sc) => {
+    const contrato = contratoB3DoCenario(sc);
+    const cotacao = loteNovo.cotacoesB3[contrato];
+    if (!contrato || !cotacao) return;
+    sc.contratoB3 = contrato;
+    sc.precoBolsa = String(cotacao.preco);
+    sc.cotacaoB3Fonte = cotacao.fonte || "";
+    sc.cotacaoB3AtualizadaEm = cotacao.atualizadaEm || "";
+  });
+  return { lote: loteNovo, cenarios: cenariosNovos };
+}
 function estadoPadraoLimpo() {
+  const cenarios = [defaultSc(0)];
+  const normalizado = normalizarMercadoB3({ ...defaultLote, cotacoesB3: {} }, cenarios);
   return {
-    lote: { ...defaultLote },
-    cenarios: [defaultSc(0)],
+    lote: normalizado.lote,
+    cenarios: normalizado.cenarios,
     confinamentos: [],
     historico: [],
     scAtivo: 0,
@@ -888,7 +926,7 @@ function loadSavedState() {
     const raw = localStorage.getItem(APP_STORAGE_KEY) || LEGACY_STORAGE_KEYS.map((k) => localStorage.getItem(k)).find(Boolean);
     if (!raw) return fallback;
     const saved = JSON.parse(raw);
-    const savedLote = { ...defaultLote, ...saved.lote || {} };
+    const savedLote = { ...defaultLote, ...saved.lote || {}, cotacoesB3: { ...saved.lote?.cotacoesB3 || {} } };
     const defaultBois = boisPorCarretaPadrao(savedLote.sexo);
     const savedCenarios = Array.isArray(saved.cenarios) && saved.cenarios.length ? saved.cenarios.slice(0, 5).map((sc, i) => {
       const next = { ...defaultSc(i), ...sc };
@@ -897,19 +935,20 @@ function loadSavedState() {
       if (!next.finpecConfigurado) next.finpec = "0.0";
       return next;
     }) : fallback.cenarios.map((sc) => ({ ...sc, boisPorCarreta: defaultBois }));
+    const mercadoNormalizado = normalizarMercadoB3(savedLote, savedCenarios);
     const confinamentos = Array.isArray(saved.confinamentos) ? saved.confinamentos : [];
     const historico = Array.isArray(saved.historico) ? saved.historico : [];
-    const resultados = Array.isArray(saved.resultados) && saved.resultados.length ? savedCenarios.map((sc) => {
+    const resultados = Array.isArray(saved.resultados) && saved.resultados.length ? mercadoNormalizado.cenarios.map((sc) => {
       try {
-        return calcCenario(savedLote, sc);
+        return calcCenario(mercadoNormalizado.lote, sc);
       } catch {
         return null;
       }
     }) : [];
     LEGACY_STORAGE_KEYS.forEach((k) => localStorage.removeItem(k));
     return {
-      lote: savedLote,
-      cenarios: savedCenarios,
+      lote: mercadoNormalizado.lote,
+      cenarios: mercadoNormalizado.cenarios,
       confinamentos,
       historico,
       scAtivo: Math.min(Math.max(parseInt(saved.scAtivo, 10) || 0, 0), savedCenarios.length - 1),
@@ -935,7 +974,7 @@ function Ck({ checked, onChange, label }) {
     /* @__PURE__ */ jsx("span", { children: label })
   ] });
 }
-function ScPanel({ sc, upd, sexo, custoDinheiro, resultado, confinamentos, modeloSelecionado, setModeloSelecionado, aplicarModelo, salvarModelo, atualizarModelo, apagarModelo, atualizarB3, calcularDistancia, statusB3, statusDistancia }) {
+function ScPanel({ sc, upd, sexo, custoDinheiro, resultado, confinamentos, modeloSelecionado, setModeloSelecionado, aplicarModelo, salvarModelo, atualizarModelo, apagarModelo, calcularDistancia, statusDistancia }) {
   const u = (k) => (v) => upd(k, v && v.target ? v.target.value : v);
   const isRev = sc.tipo === "revenda";
   const freteDeles = sc.respFrete === "confinamento";
@@ -944,10 +983,12 @@ function ScPanel({ sc, upd, sexo, custoDinheiro, resultado, confinamentos, model
   const dataRecebimento = addDiasISO(sc.dataEntrada, (isRev ? 0 : parseFloat(sc.diasCiclo) || 0) + (parseFloat(sc.diasPagamento) || 0));
   const contratoSugerido = contratoB3PorData(dataSaida);
   useEffect(() => {
-    if (contratoSugerido && sc.contratoB3 && sc.contratoB3 !== contratoSugerido) {
+    if (isParceria && contratoSugerido && sc.contratoB3 !== contratoSugerido) {
+      upd("contratoB3", contratoSugerido);
+    } else if (!isParceria && contratoSugerido && !sc.contratoB3) {
       upd("contratoB3", contratoSugerido);
     }
-  }, [contratoSugerido]);
+  }, [contratoSugerido, isParceria]);
   return /* @__PURE__ */ jsxs("div", { children: [
     !isRev && /* @__PURE__ */ jsxs(Fragment, { children: [
       /* @__PURE__ */ jsx("div", { className: "sec-t nm", children: "Base Salva do Confinamento" }),
@@ -1133,14 +1174,11 @@ function ScPanel({ sc, upd, sexo, custoDinheiro, resultado, confinamentos, model
           }
         ) }),
         sc.modoPreco === "bolsa" ? /* @__PURE__ */ jsxs(Fragment, { children: [
-          /* @__PURE__ */ jsx(F, { label: "Contrato B3 sugerido", hint: `Sa\xEDda ${mesSaidaLabel(dataSaida)}`, children: /* @__PURE__ */ jsxs("div", { style: { display: "flex", gap: 6 }, children: [
+          /* @__PURE__ */ jsx(F, { label: isParceria ? "Contrato B3 automático" : "Contrato B3 escolhido", hint: isParceria ? `Definido pela sa\xEDda em ${mesSaidaLabel(dataSaida)}` : `Sugest\xE3o pela sa\xEDda: ${contratoSugerido || "\u2014"}`, children: isParceria ? /* @__PURE__ */ jsx("input", { readOnly: true, value: contratoSugerido || "" }) : /* @__PURE__ */ jsxs("div", { style: { display: "flex", gap: 6 }, children: [
             /* @__PURE__ */ jsx("input", { value: sc.contratoB3 || contratoSugerido, onChange: u("contratoB3"), style: { flex: 1 } }),
-            /* @__PURE__ */ jsx("button", { className: "tb", style: { padding: "10px 13px" }, onClick: () => u("contratoB3")(contratoSugerido), children: "Usar" })
+            /* @__PURE__ */ jsx("button", { className: "tb", style: { padding: "10px 13px" }, onClick: () => u("contratoB3")(contratoSugerido), children: "Usar sugest\xE3o" })
           ] }) }),
-          /* @__PURE__ */ jsx(F, { label: "BGI Futuro (R$/@)", hint: statusB3 || (sc.cotacaoB3Fonte ? `${sc.cotacaoB3Fonte} \xB7 ${fmtData((sc.cotacaoB3AtualizadaEm || "").slice(0, 10))}` : "Atualize pela bolsa ou edite manualmente"), children: /* @__PURE__ */ jsxs("div", { style: { display: "flex", gap: 6 }, children: [
-            /* @__PURE__ */ jsx("input", { type: "number", value: sc.precoBolsa, onChange: u("precoBolsa"), style: { flex: 1 } }),
-            /* @__PURE__ */ jsx("button", { className: "tb", style: { padding: "10px 13px" }, onClick: atualizarB3, children: "Atualizar" })
-          ] }) }),
+          /* @__PURE__ */ jsx(F, { label: "BGI Futuro compartilhado (R$/@)", hint: sc.cotacaoB3Fonte ? `${sc.cotacaoB3Fonte} \xB7 ${fmtData((sc.cotacaoB3AtualizadaEm || "").slice(0, 10))}` : "Atualize o contrato na se\xE7\xE3o Mercado BGI acima", children: /* @__PURE__ */ jsx("input", { type: "number", readOnly: true, value: sc.precoBolsa }) }),
           /* @__PURE__ */ jsx(F, { label: "Diferencial de base (%)", hint: "0 a 12,5% \u2014 desconto sobre BGI", children: /* @__PURE__ */ jsx("input", { type: "number", step: ".5", min: "0", max: "12.5", value: sc.baseDesc, onChange: u("baseDesc") }) })
         ] }) : /* @__PURE__ */ jsx(F, { label: "Pre\xE7o balc\xE3o (R$/@)", children: /* @__PURE__ */ jsx("input", { type: "number", value: sc.precoBalcao, onChange: u("precoBalcao") }) }),
         /* @__PURE__ */ jsxs("div", { className: "g2", style: { gridColumn: "1 / -1" }, children: [
@@ -1569,6 +1607,7 @@ function Confinex() {
   const [statusSupabase, setStatusSupabase] = useState("Supabase: aguardando um negócio ser iniciado.");
   const [versoesSalvas, setVersoesSalvas] = useState(carregarVersoesNomeadas);
   const [versaoSelecionada, setVersaoSelecionada] = useState("");
+  const contratosB3Estudo = [...new Set(cenarios.map(contratoB3DoCenario).filter(Boolean))].sort();
   useEffect(() => {
     try {
       localStorage.setItem(APP_STORAGE_KEY, JSON.stringify({
@@ -1594,9 +1633,12 @@ function Confinex() {
     versao: "1.3-supabase"
   });
   const aplicarEstado = (state) => {
-    if (state.lote) setLote({ ...defaultLote, ...state.lote });
+    const cenariosBase = Array.isArray(state.cenarios) && state.cenarios.length ? state.cenarios.slice(0, 5).map((sc, i) => ({ ...defaultSc(i), ...sc })) : cenarios;
+    const loteBase = state.lote ? { ...defaultLote, ...state.lote, cotacoesB3: { ...state.lote.cotacoesB3 || {} } } : lote;
+    const mercadoNormalizado = normalizarMercadoB3(loteBase, cenariosBase);
+    if (state.lote) setLote(mercadoNormalizado.lote);
     if (Array.isArray(state.cenarios) && state.cenarios.length) {
-      setCenarios(state.cenarios.slice(0, 5).map((sc, i) => ({ ...defaultSc(i), ...sc })));
+      setCenarios(mercadoNormalizado.cenarios);
       setScAtivo(Math.min(Math.max(parseInt(state.scAtivo, 10) || 0, 0), Math.min(state.cenarios.length, 5) - 1));
     }
     if (Array.isArray(state.confinamentos)) setConfinamentos(state.confinamentos);
@@ -1870,7 +1912,16 @@ function Confinex() {
   const addSc = () => {
     if (cenarios.length >= 5) return;
     const idx = cenarios.length;
-    setCenarios((p) => [...p, defaultSc(idx)]);
+    const novo = defaultSc(idx);
+    const contrato = contratoB3DoCenario(novo);
+    const cotacao = lote.cotacoesB3?.[contrato];
+    if (cotacao) {
+      novo.contratoB3 = contrato;
+      novo.precoBolsa = String(cotacao.preco);
+      novo.cotacaoB3Fonte = cotacao.fonte || "";
+      novo.cotacaoB3AtualizadaEm = cotacao.atualizadaEm || "";
+    }
+    setCenarios((p) => [...p, novo]);
     setScAtivo(idx);
     setResultados([]);
   };
@@ -1882,35 +1933,87 @@ function Confinex() {
     setResultados([]);
   };
   const updSc = (i, k, v) => {
-    setCenarios((p) => p.map((s, j) => j === i ? { ...s, [k]: v } : s));
+    setCenarios((p) => p.map((s, j) => {
+      if (j !== i) return s;
+      const valor = k === "contratoB3" ? String(v || "").trim().toUpperCase() : v;
+      const next = { ...s, [k]: valor };
+      const contrato = contratoB3DoCenario(next);
+      const cotacao = lote.cotacoesB3?.[contrato];
+      return cotacao ? {
+        ...next,
+        contratoB3: contrato,
+        precoBolsa: String(cotacao.preco),
+        cotacaoB3Fonte: cotacao.fonte || "",
+        cotacaoB3AtualizadaEm: cotacao.atualizadaEm || ""
+      } : k === "contratoB3" ? {
+        ...next,
+        precoBolsa: "",
+        cotacaoB3Fonte: "",
+        cotacaoB3AtualizadaEm: ""
+      } : next;
+    }));
     setResultados([]);
   };
   const patchScAtivo = (patch) => {
     setCenarios((p) => p.map((s, j) => j === scAtivo ? { ...s, ...patch } : s));
     setResultados([]);
   };
-  const atualizarB3 = async () => {
-    const sc = cenarios[scAtivo];
-    const dataSaida = addDiasISO(sc.dataEntrada, parseFloat(sc.diasCiclo) || 0);
-    const contrato = sc.contratoB3 || contratoB3PorData(dataSaida);
-    if (!contrato) {
-      setStatusB3("Informe data de entrada e ciclo para sugerir o contrato.");
+  const definirCotacaoB3 = (contrato, preco) => {
+    const valor = String(preco || "");
+    const agora = (/* @__PURE__ */ new Date()).toISOString();
+    const registro = { preco: valor, fonte: "Valor informado manualmente", atualizadaEm: agora };
+    setLote((p) => ({
+      ...p,
+      cotacoesB3: { ...p.cotacoesB3 || {}, [contrato]: registro },
+      cotacoesB3AtualizadasEm: agora
+    }));
+    setCenarios((p) => p.map((sc) => contratoB3DoCenario(sc) === contrato ? {
+      ...sc,
+      contratoB3: contrato,
+      precoBolsa: valor,
+      cotacaoB3Fonte: registro.fonte,
+      cotacaoB3AtualizadaEm: agora
+    } : sc));
+    setResultados([]);
+  };
+  const atualizarMercadoB3 = async () => {
+    if (!contratosB3Estudo.length) {
+      setStatusB3("Nenhum contrato BGI usado nos cenários atuais.");
       return;
     }
-    setStatusB3(`Buscando ${contrato}...`);
-    patchScAtivo({ contratoB3: contrato });
-    try {
-      const cotacao = await buscarPrecoB3PorContrato(contrato);
-      patchScAtivo({
-        contratoB3: contrato,
-        precoBolsa: String(Math.round(cotacao.preco * 100) / 100),
-        cotacaoB3Fonte: cotacao.fonte,
-        cotacaoB3AtualizadaEm: cotacao.data
+    setStatusB3(`Atualizando ${contratosB3Estudo.length} contrato(s) em conjunto...`);
+    const respostas = await Promise.allSettled(contratosB3Estudo.map(async (contrato) => ({ contrato, cotacao: await buscarPrecoB3PorContrato(contrato) })));
+    const agora = (/* @__PURE__ */ new Date()).toISOString();
+    const obtidas = respostas.filter((r) => r.status === "fulfilled").map((r) => r.value);
+    const falhas = respostas.length - obtidas.length;
+    if (obtidas.length) {
+      const novosRegistros = {};
+      obtidas.forEach(({ contrato, cotacao }) => {
+        novosRegistros[contrato] = {
+          preco: String(Math.round(cotacao.preco * 100) / 100),
+          fonte: cotacao.fonte,
+          atualizadaEm: cotacao.data || agora
+        };
       });
-      setStatusB3(`${contrato}: ${fR(cotacao.preco)}/@ (${cotacao.fonte})`);
-    } catch (err) {
-      setStatusB3(`Nao encontrei cotacao automatica para ${contrato}; mantenha o valor manual ou informe fonte externa.`);
+      setLote((p) => ({
+        ...p,
+        cotacoesB3: { ...p.cotacoesB3 || {}, ...novosRegistros },
+        cotacoesB3AtualizadasEm: agora
+      }));
+      setCenarios((p) => p.map((sc) => {
+        const contrato = contratoB3DoCenario(sc);
+        const cotacao = novosRegistros[contrato];
+        return cotacao ? {
+          ...sc,
+          contratoB3: contrato,
+          precoBolsa: cotacao.preco,
+          cotacaoB3Fonte: cotacao.fonte,
+          cotacaoB3AtualizadaEm: cotacao.atualizadaEm
+        } : sc;
+      }));
+      setResultados([]);
     }
+    setStatusB3(falhas ? `${obtidas.length} contrato(s) atualizado(s); ${falhas} sem cotação automática.` : `${obtidas.length} contrato(s) atualizado(s) no mesmo lote de consulta.`);
   };
   const calcularDistancia = async () => {
     const sc = cenarios[scAtivo];
@@ -1992,13 +2095,7 @@ function Confinex() {
     reader.onload = (ev) => {
       try {
         const dados = JSON.parse(ev.target.result);
-        if (dados.lote) setLote(dados.lote);
-        if (dados.cenarios) {
-          setCenarios(dados.cenarios);
-          setScAtivo(0);
-        }
-        if (Array.isArray(dados.confinamentos)) setConfinamentos(dados.confinamentos);
-        if (Array.isArray(dados.historico)) setHistorico(dados.historico);
+        aplicarEstado({ ...dados, scAtivo: 0, resultados: [] });
         setResultados([]);
       } catch {
         alert("Arquivo inv\xE1lido \u2014 use um JSON exportado pelo Confinex.");
@@ -2260,6 +2357,19 @@ function Confinex() {
           " (divisor). Abaixo do limite: peso/2/15."
         ] })
       ] }),
+      /* @__PURE__ */ jsxs("div", { className: "sec", children: [
+        /* @__PURE__ */ jsx("div", { className: "sec-t", children: "Mercado BGI \u2014 cota\xE7\xF5es por contrato" }),
+        /* @__PURE__ */ jsxs("div", { className: "g4", children: [
+          contratosB3Estudo.map((contrato) => {
+            const registro = lote.cotacoesB3?.[contrato];
+            const cenarioReferencia = cenarios.find((sc) => contratoB3DoCenario(sc) === contrato);
+            return /* @__PURE__ */ jsx(F, { label: contrato, hint: registro?.fonte || "Valor inicial do estudo", children: /* @__PURE__ */ jsx("input", { type: "number", value: registro?.preco ?? cenarioReferencia?.precoBolsa ?? "", onChange: (e) => definirCotacaoB3(contrato, e.target.value) }) }, contrato);
+          }),
+          /* @__PURE__ */ jsx(F, { label: "Atualizar a curva usada", hint: "Consulta todos os vencimentos acima no mesmo lote", children: /* @__PURE__ */ jsx("button", { className: "tb on", style: { width: "100%", padding: "10px 13px" }, onClick: atualizarMercadoB3, children: "Atualizar cota\xE7\xF5es BGI" }) })
+        ] }),
+        /* @__PURE__ */ jsx("div", { className: "hint", style: { marginTop: 10 }, children: statusB3 || "Cada contrato tem uma única cotação compartilhada. Parceria usa o vencimento da saída automaticamente; nas demais modalidades você pode escolher o contrato." }),
+        lote.cotacoesB3AtualizadasEm && /* @__PURE__ */ jsx("div", { className: "hint", style: { marginTop: 4 }, children: `Última alteração conjunta: ${(/* @__PURE__ */ new Date(lote.cotacoesB3AtualizadasEm)).toLocaleString("pt-BR")}` })
+      ] }),
       /* @__PURE__ */ jsxs("div", { className: "sec", style: { padding: 0 }, children: [
         /* @__PURE__ */ jsx("div", { style: { padding: "18px 22px 0" }, children: /* @__PURE__ */ jsx("div", { className: "sec-t", children: "02 \u2014 Cen\xE1rios (at\xE9 5)" }) }),
         /* @__PURE__ */ jsxs("div", { className: "sc-bar", children: [
@@ -2314,9 +2424,7 @@ function Confinex() {
               salvarModelo,
               atualizarModelo,
               apagarModelo,
-              atualizarB3,
               calcularDistancia,
-              statusB3,
               statusDistancia
             },
             cenarios[scAtivo].id
