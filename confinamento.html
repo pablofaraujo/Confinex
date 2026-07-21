@@ -91,6 +91,16 @@ async function aprovarAvaliacao(id, codigo, versao){
   carregar();
 }
 
+async function recusarAvaliacao(id, codigo){
+  if(!confirm(`Recusar ${codigo}? A avaliação sairá da fila e ficará preservada no histórico para auditoria.`)) return;
+  const motivo = prompt('Motivo da recusa (opcional)', '');
+  if(motivo === null) return;
+  const {error} = await db.rpc('recusar_negocio_confinex',{p_avaliacao_id:id,p_motivo:motivo.trim()||null});
+  if(error){ alert('Não foi possível recusar '+codigo+': '+error.message); return; }
+  alert(codigo+' recusado.');
+  carregar();
+}
+
 async function carregar(){
   document.getElementById('subtitle').textContent = 'Carregando...';
   const [ops, entradas, custos, eventos, fechamentos, avaliacoes, consolidacoes, desvios] = await Promise.all([
@@ -145,7 +155,7 @@ async function carregar(){
       <td>${esc(a.grupo_origem_nome||'—')}<div class="hint">${esc(a.grupo_origem_id||'ID não informado')}</div></td>
       <td class="num ${cls(mensal)}"><b>${Number.isFinite(mensal)?fmtN(mensal,1)+'% a.m.':'—'}</b></td>
       <td class="num">${Number.isFinite(mensalAntes)?fmtN(mensalAntes,1)+'% a.m.':'—'}</td>
-      <td>${adiantamento}</td><td><button class="btn mini" onclick="aprovarAvaliacao('${a.id}','${esc(a.codigo)}',${Number(a.estimativa_versao_atual)||1})">Aprovar</button></td></tr>`;
+      <td>${adiantamento}</td><td><button class="btn mini" onclick="aprovarAvaliacao('${a.id}','${esc(a.codigo)}',${Number(a.estimativa_versao_atual)||1})">Aprovar</button> <button class="btn mini warn" onclick="recusarAvaliacao('${a.id}','${esc(a.codigo)}')">Recusar</button></td></tr>`;
     }).join('') || '<tr><td colspan="6">Nenhuma avaliação aguardando aprovação.</td></tr>');
 
   // ---- Confinamentos (parceiros)
