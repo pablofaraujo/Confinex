@@ -44,6 +44,9 @@
 <h2>Avaliações aguardando aprovação</h2>
 <div class="card scroll"><table id="tbAprovacoes"></table></div>
 
+<h2>Negócios Confinex em andamento</h2>
+<div class="card scroll"><table id="tbEmAndamento"></table></div>
+
 <h2>Confinamentos (parceiros)</h2>
 <div class="card scroll"><table id="tbConf"></table></div>
 
@@ -101,9 +104,29 @@ async function recusarAvaliacao(id, codigo){
   carregar();
 }
 
+async function ajustarPrazo(id, codigo, prazoAtual){
+  const informado = prompt(`Novo prazo de confinamento para ${codigo} (dias)`, String(prazoAtual||''));
+  if(informado === null) return;
+  const dias = Number(informado);
+  if(!Number.isInteger(dias) || dias<=0){ alert('Informe o novo prazo em dias inteiros, maior que zero.'); return; }
+  if(dias===Number(prazoAtual)){ alert('O novo prazo é igual ao prazo operacional atual.'); return; }
+  const motivo = prompt('Motivo do ajuste de prazo (obrigatório)', 'Reprogramação operacional');
+  if(motivo === null) return;
+  if(!motivo.trim()){ alert('Informe o motivo para preservar o histórico da alteração.'); return; }
+  if(!confirm(`Alterar ${codigo} de ${prazoAtual} para ${dias} dias? A estimativa original será preservada.`)) return;
+  const {error} = await db.rpc('ajustar_prazo_confinex',{
+    p_avaliacao_id:id,
+    p_dias_novo:dias,
+    p_motivo:motivo.trim()
+  });
+  if(error){ alert('Não foi possível ajustar o prazo de '+codigo+': '+error.message); return; }
+  alert(`${codigo} atualizado para ${dias} dias. A alteração ficou registrada no histórico.`);
+  carregar();
+}
+
 async function carregar(){
   document.getElementById('subtitle').textContent = 'Carregando...';
-  const [ops, entradas, custos, eventos, fechamentos, avaliacoes, consolidacoes, desvios] = await Promise.all([
+  const [ops, entradas, custos, eventos, fechamentos, avaliacoes, consolidacoes, desvios, ajustesPrazo] = await Promise.all([
     db.from('operacoes').select('id,codigo,status,sexo,modalidade,contrato_confinamento,resultado_previsto,confinamentos(id,nome,municipio,uf,modalidades)').not('confinamento_id','is',null).not('status','in','(cancelada,cancelado)'),
     db.from('entradas_confinamento').select('operacao_id,data_entrada,curral,cabecas,peso_embarque_kg,peso_chegada_kg,perda_transporte_pct,km_percorridos,gta,nf').order('data_entrada'),
     db.from('custos_operacao').select('operacao_id,data,categoria,descricao,valor').order('categoria'),
@@ -111,7 +134,8 @@ async function carregar(){
     db.from('fechamentos_operacao').select('operacao_id,previsto,realizado_bruto,realizado_liquido,hedge_creditado,desvio,explicacao'),
     db.from('confinex_avaliacoes').select('id,codigo,nome,status,grupo_origem_nome,estimativa_versao_atual,criado_em,confinex_estimativas(versao,tipo,premissas,resultado)').neq('status','cancelado'),
     db.from('confinex_consolidacoes').select('id,avaliacao_id,estimativa_versao,comentario_geral,consolidado_em'),
-    db.from('confinex_desvios').select('id,consolidacao_id,indicador,natureza,estimado,realizado,desvio,desvio_percentual,classificacao,comentario_automatico,comentario_manual,material').order('indicador')
+    db.from('confinex_desvios').select('id,consolidacao_id,indicador,natureza,estimado,realizado,desvio,desvio_percentual,classificacao,comentario_automatico,comentario_manual,material').order('indicador'),
+    db.from('confinex_ajustes_prazo').select('id,avaliacao_id,dias_anterior,dias_novo,data_saida_anterior,data_saida_nova,motivo,ajustado_em').order('ajustado_em',{ascending:false})
   ]);
   const errs=[ops,entradas,custos,eventos,fechamentos,avaliacoes,consolidacoes,desvios].filter(r=>r.error);
   if(errs.length){ document.getElementById('subtitle').textContent='Erro: '+errs[0].error.message; return; }
@@ -157,6 +181,41 @@ async function carregar(){
       <td class="num">${Number.isFinite(mensalAntes)?fmtN(mensalAntes,1)+'% a.m.':'—'}</td>
       <td>${adiantamento}</td><td><button class="btn mini" onclick="aprovarAvaliacao('${a.id}','${esc(a.codigo)}',${Number(a.estimativa_versao_atual)||1})">Aprovar</button> <button class="btn mini warn" onclick="recusarAvaliacao('${a.id}','${esc(a.codigo)}')">Recusar</button></td></tr>`;
     }).join('') || '<tr><td colspan="6">Nenhuma avaliação aguardando aprovação.</td></tr>');
+
+  // ---- Negócios iniciados e prazo operacional atual
+  const ajustesDisponiveis = !ajustesPrazo.error;
+  const ajustesPorAvaliacao = {};
+  (ajustesPrazo.data||[]).forEach(a=>(ajustesPorAvaliacao[a.avaliacao_id] ||= []).push(a));
+  const emAndamento = (avaliacoes.data||[]).filter(a=>a.status==='iniciado').map(a=>{
+    const estimativa = (a.confinex_estimativas||[]).find(e=>e.versao===a.estimativa_versao_atual) || a.confinex_estimativas?.[0] || null;
+    const premissas = estimativa?.premissas||{};
+    const resultado = estimativa?.resultado||{};
+    const cenario = premissas.cenario||premissas;
+    const diasOriginal = Number(cenario.diasCiclo || Math.max(Number(resultado.diasTotal||0)-Number(resultado.diasPag||0),0));
+    const dataEntrada = cenario.dataEntrada||null;
+    const historico = ajustesPorAvaliacao[a.id]||[];
+    const ultimo = historico[0]||null;
+    return {
+      ...a, estimativa, diasOriginal, dataEntrada, historico,
+      diasAtual: Number(ultimo?.dias_novo||diasOriginal),
+      saidaAtual: ultimo?.data_saida_nova || (dataEntrada&&diasOriginal?addDias(dataEntrada,diasOriginal):null),
+      ultimo
+    };
+  }).sort((a,b)=>String(a.saidaAtual||'9999').localeCompare(String(b.saidaAtual||'9999')) || a.codigo.localeCompare(b.codigo));
+  document.getElementById('tbEmAndamento').innerHTML =
+    '<tr><th>Negócio</th><th>Origem</th><th>Entrada</th><th class="num">Prazo original</th><th class="num">Prazo atual</th><th>Saída prevista atual</th><th>Último ajuste</th><th>Ação</th></tr>'+
+    (emAndamento.map(a=>{
+      const alterado = a.diasAtual!==a.diasOriginal;
+      const ultimo = a.ultimo;
+      return `<tr><td><b>${esc(a.codigo)}</b><div class="hint">estimativa v${Number(a.estimativa_versao_atual)||1}</div></td>
+      <td>${esc(a.grupo_origem_nome||'—')}</td><td>${a.dataEntrada?fmtD(a.dataEntrada):'—'}</td>
+      <td class="num">${a.diasOriginal?fmtN(a.diasOriginal)+' dias':'—'}</td>
+      <td class="num ${alterado?'pos':''}"><b>${a.diasAtual?fmtN(a.diasAtual)+' dias':'—'}</b>${a.historico.length?`<div class="hint">${a.historico.length} ajuste(s)</div>`:''}</td>
+      <td>${a.saidaAtual?fmtD(a.saidaAtual):'—'}</td>
+      <td class="wrap">${ultimo?`${esc(ultimo.motivo)}<div class="hint">${fmtDT(ultimo.ajustado_em)}</div>`:'—'}</td>
+      <td>${ajustesDisponiveis&&a.diasAtual?`<button class="btn mini" onclick="ajustarPrazo('${a.id}','${esc(a.codigo)}',${a.diasAtual})">Ajustar prazo</button>`:'—'}</td></tr>`;
+    }).join('') || '<tr><td colspan="8">Nenhum negócio Confinex em andamento.</td></tr>')+
+    (!ajustesDisponiveis?'<tr><td colspan="8"><span class="badge b-amber">Migração pendente</span> Aplique a migração de ajustes de prazo para habilitar esta ação.</td></tr>':'');
 
   // ---- Confinamentos (parceiros)
   const porConfinamento = {};

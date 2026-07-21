@@ -79,6 +79,7 @@ Custo de compra: `custoCompra = arrobasCompra × precoCompra × N + baldeio`.
 - Valor presente: `fatorVP = (1+i)^mesesCapital`; `vpArroba = precoVenda/fatorVP`; **`precoCompraVpMax`** = maior R$/@ de compra que empata em VP = `(receitaVP − freteTotal − custoContTotal − baldeio)/arrobasCompraTotal`; `margemCompraVp = precoCompraVpMax − precoCompra`.
 - A antiga indicação isolada de “ponto ótimo” foi removida. Ela não respeitava o mínimo produtivo e mantinha a mesma cotação ao mudar o mês de saída.
 - A evolução temporal compara 60 a 240 dias em intervalos de 15 dias, incluindo também o ciclo atual quando estiver dentro dessa faixa. Cada prazo recalcula a saída e usa a cotação do contrato BGI daquele mês; sem cotação, o ponto fica pendente e não gera resultado enganoso.
+- Depois da aprovação, o prazo operacional pode ser ajustado repetidamente em **Operações → Confinamento**. A estimativa original permanece congelada; cada ajuste exige motivo e registra prazo anterior, novo prazo, saída anterior, nova saída, autor e horário. O prazo atual é sempre o último ajuste válido.
 
 ## Análise de sensibilidade — `SensPanel` / `calcComOverride`
 
