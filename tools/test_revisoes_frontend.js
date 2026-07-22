@@ -18,7 +18,7 @@ const context = {
   console,
 };
 vm.createContext(context);
-new vm.Script(`${scripts[0]}\nglobalThis.__revisoes={buildPromocaoPreview,promotionValidationState,promotionInputElement,aplicarEstadoPromocao,businessFieldIndex,promotionHistoryData,promotionHistoryHtml,statusPrincipal,dadosItem,labelStatus};`, {filename: 'revisoes.html'}).runInContext(context);
+new vm.Script(`${scripts[0]}\nglobalThis.__revisoes={buildPromocaoPreview,promotionValidationState,promotionInputElement,aplicarEstadoPromocao,businessFieldIndex,businessTargetPath,promotionMissingLinks,irParaCampoObrigatorio,validarNegocioOperacional,promotionHistoryData,promotionHistoryHtml,statusPrincipal,dadosItem,labelStatus};`, {filename: 'revisoes.html'}).runInContext(context);
 
 const api = context.__revisoes;
 
@@ -35,9 +35,26 @@ const vendaSemRecebimento = api.buildPromocaoPreview({data_abate:'2026-07-22',ca
 const estadoVenda = api.promotionValidationState('vendas', vendaSemRecebimento);
 assert.equal(estadoVenda.blocked, true);
 assert.deepEqual([...estadoVenda.labels], ['Previsão de recebimento']);
+const vendaCompleta = api.buildPromocaoPreview({data_abate:'2026-07-22',cabecas:18,peso_carcaca_total:5228.785,valor_bruto:115033.27,prazo_recebimento:'2026-08-21'}, 'vendas');
+assert.equal(api.promotionValidationState('vendas', vendaCompleta).blocked, false);
 
-assert.deepEqual([...api.promotionValidationState('pesagens_caderno', {}).labels], ['Contexto', 'Data da folha', 'Peso kg']);
-assert.deepEqual([...api.promotionValidationState('abates', {}).labels], ['Data do abate', 'Lote', 'Cabeças', 'Peso líquido kg']);
+const pesagemIncompleta = api.buildPromocaoPreview({}, 'pesagens_caderno');
+assert.deepEqual([...api.promotionValidationState('pesagens_caderno', pesagemIncompleta).labels], ['Contexto', 'Data da folha', 'Peso kg']);
+const pesagemCompleta = api.buildPromocaoPreview({contexto_operacional:'Confinamento',data_folha:'2026-07-22',peso_kg:5228.785}, 'pesagens_caderno');
+assert.equal(api.promotionValidationState('pesagens_caderno', pesagemCompleta).blocked, false);
+
+const abateIncompleto = api.buildPromocaoPreview({}, 'abates');
+assert.deepEqual([...api.promotionValidationState('abates', abateIncompleto).labels], ['Data do abate', 'Lote', 'Cabeças', 'Peso líquido kg']);
+const abateCompleto = api.buildPromocaoPreview({data_abate:'2026-07-22',lote:'L-5',cabecas:18,peso_liquido_kg:5228.785}, 'abates');
+assert.equal(api.promotionValidationState('abates', abateCompleto).blocked, false);
+
+assert.equal(api.businessTargetPath('vendas', 'data_compra|data_abate|data_folha|data', {}), 'data_abate');
+assert.equal(api.businessTargetPath('pesagens_caderno', 'peso_total_kg|peso_liquido_kg|peso_kg', {}), 'peso_kg');
+assert.equal(api.businessTargetPath('abates', 'peso_total_kg|peso_liquido_kg|peso_kg', {}), 'peso_liquido_kg');
+assert.doesNotThrow(() => api.validarNegocioOperacional({}, 'vendas'));
+assert.doesNotThrow(() => api.validarNegocioOperacional({}, 'pesagens_caderno'));
+assert.doesNotThrow(() => api.validarNegocioOperacional({}, 'abates'));
+assert.throws(() => api.validarNegocioOperacional({}, 'compras'), /Selecione um negócio existente/);
 
 class Classes {
   constructor() { this.values = new Set(); }
@@ -49,30 +66,64 @@ const containers = [];
 const fields = new Map();
 function makeField(selector) {
   const container = {classList:new Classes()};
-  const field = {closest() { return container; }};
+  const attributes = new Map();
+  const field = {
+    focused:false,
+    scrolled:false,
+    closest() { return container; },
+    setAttribute(name, value) { attributes.set(name, value); },
+    removeAttribute(name) { attributes.delete(name); },
+    getAttribute(name) { return attributes.get(name); },
+    focus() { this.focused = true; },
+    scrollIntoView() { this.scrolled = true; },
+  };
   fields.set(selector, field);
   containers.push(container);
 }
-makeField('#negocioSelect');
-for (const field of ['data_compra','quantidade','valor_total']) makeField(`[data-biz="${api.businessFieldIndex(field)}"]`);
+const requiredSelectors = new Set(['#negocioSelect','#ctx']);
+for (const field of ['data_compra','quantidade','valor_total','data_abate','cabecas','peso_carcaca_total','valor_bruto','prazo_recebimento','data_folha','peso_kg','lote','peso_liquido_kg']) {
+  requiredSelectors.add(`[data-biz="${api.businessFieldIndex(field)}"]`);
+}
+requiredSelectors.forEach(makeField);
 const alerta = {hidden:true,innerHTML:''};
 const preparar = {disabled:false,title:''};
 const salvar = {disabled:false};
 context.document.getElementById = id => ({promotionAlert:alerta,btnPrepararPromocao:preparar,btnSalvarAjustes:salvar})[id] || null;
 context.document.querySelector = selector => fields.get(selector) || null;
-context.document.querySelectorAll = selector => selector === '.campo-incompleto' ? containers.filter(node => node.classList.contains('campo-incompleto')) : [];
+context.document.querySelectorAll = selector => {
+  if (selector === '.campo-incompleto') return containers.filter(node => node.classList.contains('campo-incompleto'));
+  if (selector === '[aria-invalid="true"]') return [...fields.values()].filter(node => node.getAttribute('aria-invalid') === 'true');
+  return [];
+};
 
-api.aplicarEstadoPromocao('compras', compraIncompleta);
-assert.equal(alerta.hidden, false);
-assert.match(alerta.innerHTML, /Revise os campos destacados/);
-assert.equal(containers.filter(node => node.classList.contains('campo-incompleto')).length, 4);
-assert.equal(preparar.disabled, true);
-assert.equal(salvar.disabled, false, 'Salvar ajustes deve continuar permitido');
+const simulacoesVisuais = [
+  ['compras', compraIncompleta, compraCompleta, 4, ['Negócio selecionado','Data','Cabeças','Valor total']],
+  ['vendas', vendaSemRecebimento, vendaCompleta, 1, ['Previsão de recebimento']],
+  ['pesagens_caderno', pesagemIncompleta, pesagemCompleta, 3, ['Contexto','Data da folha','Peso kg']],
+  ['abates', abateIncompleto, abateCompleto, 4, ['Data do abate','Lote','Cabeças','Peso líquido kg']],
+];
+for (const [target,incompleto,completo,totalFaltante,labels] of simulacoesVisuais) {
+  api.aplicarEstadoPromocao(target, incompleto);
+  assert.equal(alerta.hidden, false);
+  assert.match(alerta.innerHTML, /Complete os campos indicados/);
+  for (const label of labels) assert.match(alerta.innerHTML, new RegExp(label));
+  assert.equal(containers.filter(node => node.classList.contains('campo-incompleto')).length, totalFaltante);
+  assert.equal([...fields.values()].filter(node => node.getAttribute('aria-invalid') === 'true').length, totalFaltante);
+  assert.equal(preparar.disabled, true);
+  assert.equal(salvar.disabled, false, 'Salvar ajustes deve continuar permitido');
 
-api.aplicarEstadoPromocao('compras', compraCompleta);
-assert.equal(alerta.hidden, true);
-assert.equal(preparar.disabled, false);
-assert.equal(containers.filter(node => node.classList.contains('campo-incompleto')).length, 0);
+  api.aplicarEstadoPromocao(target, completo);
+  assert.equal(alerta.hidden, true);
+  assert.equal(preparar.disabled, false);
+  assert.equal(containers.filter(node => node.classList.contains('campo-incompleto')).length, 0);
+  assert.equal([...fields.values()].filter(node => node.getAttribute('aria-invalid') === 'true').length, 0);
+}
+
+const campoRecebimento = api.promotionInputElement('vendas', 'prazo_recebimento');
+assert.equal(api.irParaCampoObrigatorio('vendas', 'prazo_recebimento'), true);
+assert.equal(campoRecebimento.focused, true);
+assert.equal(campoRecebimento.scrolled, true);
+assert.match(api.promotionMissingLinks('vendas', ['prazo_recebimento']), /data-key="prazo_recebimento"/);
 
 assert.match(html, /id="btnSalvarAjustes"[^>]*onclick="salvarAjustes\('em_revisao'\)"/);
 assert.doesNotMatch(html.match(/<button[^>]*id="btnSalvarAjustes"[^>]*>/)?.[0] || '', /disabled/);
