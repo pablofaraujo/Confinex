@@ -13,6 +13,9 @@ class FakeClient:
         self.operational_inserts = []
         self.audit_inserts = []
         self.updates = []
+        self.claim_succeeds = True
+        self.fail_operational_insert = False
+        self.fail_audit_insert = False
 
     def select(self, table, **params):
         if table == "pending_actions" and params.get("id") == f"eq.{self.action['id']}":
@@ -20,15 +23,21 @@ class FakeClient:
         return []
 
     def insert_operational(self, table, payload):
+        if self.fail_operational_insert:
+            raise RuntimeError("insert indisponivel")
         self.operational_inserts.append((table, payload))
         return {"id": "operacional-1", **payload}
 
     def insert(self, table, payload):
+        if self.fail_audit_insert:
+            raise RuntimeError("auditoria indisponivel")
         self.audit_inserts.append((table, payload))
         return {"id": "evento-1", **payload}
 
     def update(self, table, filters, payload):
         self.updates.append((table, filters, payload))
+        if table == "pending_actions" and payload.get("status") == "em_execucao" and not self.claim_succeeds:
+            return []
         return [{**payload, "id": filters["id"].replace("eq.", "")}]
 
 
@@ -179,8 +188,45 @@ class PromocaoOperacionalTests(unittest.TestCase):
         self.assertTrue(result["executado"])
         self.assertEqual(client.operational_inserts[0][0], "compras")
         self.assertEqual(client.updates[0][0], "pending_actions")
+        self.assertEqual(client.updates[0][2]["status"], "em_execucao")
         self.assertEqual(client.updates[1][0], "operation_drafts")
+        self.assertEqual(client.updates[2][2]["status"], "executado")
         self.assertEqual(client.audit_inserts[0][1]["tipo"], "promocao_operacional_executada")
+
+    def test_execute_rejects_when_another_worker_claimed_action(self):
+        client = FakeClient(action_for())
+        client.claim_succeeds = False
+        with self.assertRaisesRegex(Exception, "outra execucao"):
+            execute_promotion(
+                client, "pa-1", usuario="pablo", executar=True,
+                confirmacao=expected_confirmation("pa-1"),
+                origem_conversa_id="grupo-1", origem_mensagem_id="msg-nova",
+            )
+        self.assertEqual(client.operational_inserts, [])
+
+    def test_failure_before_insert_returns_action_to_error_queue(self):
+        client = FakeClient(action_for())
+        client.fail_operational_insert = True
+        with self.assertRaisesRegex(Exception, "insert indisponivel"):
+            execute_promotion(
+                client, "pa-1", usuario="pablo", executar=True,
+                confirmacao=expected_confirmation("pa-1"),
+                origem_conversa_id="grupo-1", origem_mensagem_id="msg-nova",
+            )
+        self.assertEqual(client.updates[-1][2]["status"], "erro")
+
+    def test_failure_after_insert_blocks_retry_and_preserves_record_id(self):
+        client = FakeClient(action_for())
+        client.fail_audit_insert = True
+        with self.assertRaisesRegex(Exception, "nao repita"):
+            execute_promotion(
+                client, "pa-1", usuario="pablo", executar=True,
+                confirmacao=expected_confirmation("pa-1"),
+                origem_conversa_id="grupo-1", origem_mensagem_id="msg-nova",
+            )
+        self.assertEqual(len(client.operational_inserts), 1)
+        self.assertEqual(client.updates[-1][2]["status"], "erro_pos_gravacao")
+        self.assertEqual(client.updates[-1][2]["resultado"]["target_record_id"], "operacional-1")
 
 
 if __name__ == "__main__":

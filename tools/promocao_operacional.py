@@ -259,7 +259,33 @@ def execute_promotion(
         raise ConfinexError(f"confirmacao invalida; use exatamente: {expected}")
     validate_execution_origin(payload, origem_conversa_id, origem_mensagem_id)
 
-    inserted = client.insert_operational(target, record)
+    claimed = client.update(
+        "pending_actions",
+        {"id": f"eq.{action_id}", "status": f"eq.{action.get('status')}"},
+        {
+            "status": "em_execucao",
+            "atualizado_em": now,
+            "confirmado_por": usuario,
+            "confirmado_em": now,
+        },
+    )
+    if len(claimed) != 1:
+        raise ConfinexError("pendencia ja foi assumida ou alterada por outra execucao")
+
+    try:
+        inserted = client.insert_operational(target, record)
+    except Exception as exc:
+        client.update(
+            "pending_actions",
+            {"id": f"eq.{action_id}", "status": "eq.em_execucao"},
+            {
+                "status": "erro",
+                "atualizado_em": utc_now(),
+                "erro": f"Falha antes da gravacao operacional: {exc}"[:1000],
+            },
+        )
+        raise
+
     payload = {
         **payload,
         "promovido_para_operacional": True,
@@ -271,56 +297,82 @@ def execute_promotion(
         "confirmacao_origem_conversa_id": origem_conversa_id,
         "confirmacao_origem_mensagem_id": origem_mensagem_id,
     }
-    client.update(
-        "pending_actions",
-        {"id": f"eq.{action_id}"},
-        {
-            "status": "executado",
-            "atualizado_em": now,
-            "confirmado_por": usuario,
-            "confirmado_em": now,
-            "payload": payload,
-            "resultado": {
-                "target_table": target,
-                "target_record_id": inserted.get("id"),
-                "promovido_para_operacional": True,
-            },
-        },
-    )
     source_draft_id = payload.get("source_draft_id")
-    if source_draft_id:
-        client.update(
-            "operation_drafts",
-            {"id": f"eq.{source_draft_id}"},
+    try:
+        event = client.insert(
+            "eventos",
             {
-                "status": "realizado",
-                "atualizado_em": now,
-                "entidade_final_tipo": target,
-                "entidade_final_id": inserted.get("id"),
+                "tipo": "promocao_operacional_executada",
+                "agente": "confinex",
+                "usuario": usuario,
+                "entidade_tipo": target,
+                "entidade_id": inserted.get("id"),
+                "entidade_codigo": action.get("entidade_codigo"),
+                "origem": "confinex_promocao_operacional",
+                "status": "registrado",
+                "dados": {
+                    "pending_action_id": action_id,
+                    "source_draft_id": source_draft_id,
+                    "target_table": target,
+                    "target_record_id": inserted.get("id"),
+                    "record": record,
+                    "promovido_para_operacional": True,
+                },
+                "observacao": "Promocao operacional executada por rotina controlada de backend.",
             },
         )
-    event = client.insert(
-        "eventos",
-        {
-            "tipo": "promocao_operacional_executada",
-            "agente": "confinex",
-            "usuario": usuario,
-            "entidade_tipo": target,
-            "entidade_id": inserted.get("id"),
-            "entidade_codigo": action.get("entidade_codigo"),
-            "origem": "confinex_promocao_operacional",
-            "status": "registrado",
-            "dados": {
-                "pending_action_id": action_id,
-                "source_draft_id": source_draft_id,
-                "target_table": target,
-                "target_record_id": inserted.get("id"),
-                "record": record,
-                "promovido_para_operacional": True,
+        if source_draft_id:
+            client.update(
+                "operation_drafts",
+                {"id": f"eq.{source_draft_id}"},
+                {
+                    "status": "realizado",
+                    "atualizado_em": now,
+                    "entidade_final_tipo": target,
+                    "entidade_final_id": inserted.get("id"),
+                },
+            )
+        completed = client.update(
+            "pending_actions",
+            {"id": f"eq.{action_id}", "status": "eq.em_execucao"},
+            {
+                "status": "executado",
+                "atualizado_em": now,
+                "payload": payload,
+                "erro": None,
+                "resultado": {
+                    "target_table": target,
+                    "target_record_id": inserted.get("id"),
+                    "promovido_para_operacional": True,
+                },
             },
-            "observacao": "Promocao operacional executada por rotina controlada de backend.",
-        },
-    )
+        )
+        if len(completed) != 1:
+            raise ConfinexError("nao foi possivel encerrar a pendencia assumida")
+    except Exception as exc:
+        client.update(
+            "pending_actions",
+            {"id": f"eq.{action_id}", "status": "eq.em_execucao"},
+            {
+                "status": "erro_pos_gravacao",
+                "atualizado_em": utc_now(),
+                "payload": payload,
+                "erro": (
+                    f"Registro {target}/{inserted.get('id')} criado; "
+                    f"nao repetir a promocao. Falha ao finalizar auditoria: {exc}"
+                )[:1000],
+                "resultado": {
+                    "target_table": target,
+                    "target_record_id": inserted.get("id"),
+                    "promovido_para_operacional": True,
+                    "requer_reconciliacao": True,
+                },
+            },
+        )
+        raise ConfinexError(
+            f"registro operacional {target}/{inserted.get('id')} foi criado, "
+            "mas a finalizacao falhou; nao repita a promocao"
+        ) from exc
     result.update({"executado": True, "target_record_id": inserted.get("id"), "evento_id": event.get("id")})
     return result
 

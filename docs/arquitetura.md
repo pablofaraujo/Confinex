@@ -27,7 +27,7 @@ Tabelas/views por app:
 - **bgi**: `v_exposicao_hedge`, `posicoes_hedge` (+ `alocacoes_hedge` com `resultado_creditado` rateado), `cotacoes_bgi` (contrato ou `FISICO`; basis = físico − futuro).
 - **painel**: as anteriores + `v_estoque_atual`, `acertos`, `fluxo_caixa`; `posicoes_hedge.categoria` distingue hedge × `especulacao`; filtro `.or('status.in.(aberta,rolada),origem.eq.bgi-portfolio')` importa posições do app bgi-portfolio.
 - **ops**: `ecossistema_inventario`, `ecossistema_status`, `vps_briefings`.
-- **revisões/promoções**: `operation_drafts` e `pending_actions` guardam rascunhos e ordens auditáveis; `revisoes.html` prepara a promoção e `tools/promocao_operacional.py` executa a gravação em `compras`, `vendas`, `pesagens_caderno` ou `abates` somente após confirmação `PROMOVER <id>`.
+- **revisões/promoções**: `operation_drafts` e `pending_actions` guardam rascunhos e ordens auditáveis; `revisoes.html` prepara a promoção e `tools/promocao_operacional.py` executa a gravação em `compras`, `vendas`, `pesagens_caderno` ou `abates` somente após confirmação `PROMOVER <id>`. Antes do insert, a pendência é assumida por compare-and-set (`em_execucao`), impedindo dois workers; falhas posteriores ao insert preservam o ID operacional em `erro_pos_gravacao` e exigem reconciliação, nunca repetição automática.
 - **abate**: `abates` (cabeçalho), `abate_animais` (romaneio por animal — schema alinhado jul/2026: `seq`, `descricao`, `classificacao`, `meia_esq`/`meia_dir`, `peso_kg` = carcaça, `vlr_kg`/`vlr_arroba`/`vlr_total`, `bonus`, `penalizacao`, `condenacao`; não guarda peso vivo/balança nem hora de passagem).
 - **promissórias** (skill): tabela `promissorias` (numero pk `NNN/AAAA`, credor, cpf, valor, vencimento, praça, negocio_id, status aberta/quitada).
 

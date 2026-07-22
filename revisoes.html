@@ -53,7 +53,7 @@ const REQUIRED_CONTEXT_LABELS = {contexto_operacional:'contexto operacional',gru
 const TELEGRAM_GROUP_NAMES = {'-5593693732':'Boi Balança','telegram:-5593693732':'Boi Balança','-4865454316':'Confinamento','telegram:-4865454316':'Confinamento','-5048725956':'Ceci e Juan','telegram:-5048725956':'Ceci e Juan','arquitetura-memoria-2026-07-20':'Arquitetura / memória','auditoria_compras_telegram_20260722':'Auditoria compras Telegram','grupo-router':'Teste roteador','grupo-a':'Teste executor','teste-codex':'Teste Codex','sem_contexto':'Sem contexto','boi_balanca':'Boi Balança','confinamento':'Confinamento','parceria':'Parceria'};
 const NEGOCIO_TIPOS = [{v:'boi_balanca',l:'Boi Balança'},{v:'confinamento',l:'Confinamento'},{v:'parceria',l:'Parceria'},{v:'fazenda',l:'Fazenda'},{v:'outros',l:'Outros'}];
 const OPEN_DRAFT_STATUS = new Set(['rascunho','aguardando_confirmacao','confirmado_telegram','em_revisao','erro']);
-const OPEN_ACTION_STATUS = new Set(['aguardando_confirmacao','confirmado_telegram','em_revisao','erro']);
+const OPEN_ACTION_STATUS = new Set(['aguardando_confirmacao','confirmado_telegram','em_revisao','erro','em_execucao','erro_pos_gravacao']);
 const BUSINESS_FIELDS = [
   ['operacao_codigo|codigo_sugerido|codigo|negocio_codigo','Operação / negócio','text','negocio'],
   ['fornecedor|vendedor|comprador|nome_fornecedor|produtor','Fornecedor / contraparte','text','negocio'],
