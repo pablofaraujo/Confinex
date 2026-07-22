@@ -32,7 +32,7 @@ Todos são single-file (um arquivo por app), sem framework de build. Visual e in
 
 - **Frontend:** HTML/JS puro, sem build. Cada página carrega o Design System (`design/tokens.css` + `design/components.css`), o núcleo (`js/cfagro-core.js`) e a navegação (`js/cfagro-shell.js`).
 - **Backend:** Supabase (Postgres + login por email/senha, RLS protege os dados). Usado pela maior parte dos módulos operacionais, incluindo Visão Geral, Boi Balança, BGI, confinamentos, fazenda, abate, parcerias, OCR Pesagem e Ops.
-- **Exceção:** a **Confinex** usa Google Sheets + localStorage (não o Supabase) e roda em React.
+- **Exceção:** a **Confinex** roda em React e mantém Google Sheets + localStorage como compatibilidade; recursos autenticados usam Supabase, carregado somente depois da interface para não bloquear o acesso móvel.
 - **Agentes/automação:** um agente na VPS ("Juan") executa tarefas e grava no banco. O app **Ops** deposita missões na fila (Ponte VPS) que o agente consome. Detalhes de infra ficam nos docs privados.
 
 ## Publicar uma mudança (deploy)
