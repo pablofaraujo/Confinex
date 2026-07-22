@@ -64,6 +64,23 @@ class PromocaoOperacionalTests(unittest.TestCase):
         self.assertEqual(record["valor_total"], 115033.27)
         self.assertNotIn("campo_estranho", record)
 
+    def test_pesagens_caderno_maps_legacy_preview_fields_to_real_schema(self):
+        record = clean_record("pesagens_caderno", {
+            "contexto_operacional": "boi_balanca",
+            "data_pesagem": "2026-07-22",
+            "peso_total_kg": "5228,785",
+            "origem_mensagem_id": "msg-1",
+            "observacao": "romaneio teste",
+            "quantidade": "18",
+        })
+        self.assertEqual(record["contexto"], "boi_balanca")
+        self.assertEqual(record["data_folha"], "2026-07-22")
+        self.assertEqual(record["peso_kg"], 5228.785)
+        self.assertEqual(record["foto_ref"], "msg-1")
+        self.assertEqual(record["origem"], "confinex_revisoes")
+        self.assertTrue(record["conferido"])
+        self.assertNotIn("quantidade", record)
+
     def test_validate_rejects_wrong_action_type(self):
         action = action_for()
         action["acao_tipo"] = "outra_coisa"

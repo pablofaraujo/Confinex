@@ -29,8 +29,9 @@ TARGET_COLUMNS = {
         "prazo_recebimento", "nf_venda", "romaneio", "recebido", "outros_custos", "custos_obs",
     },
     "pesagens_caderno": {
-        "contexto_operacional", "grupo_telegram", "data_pesagem", "quantidade",
-        "peso_total_kg", "origem_mensagem_id", "observacao",
+        "contexto", "data_folha", "brinco", "peso_kg", "dente", "conf_brinco",
+        "conf_peso", "conf_dente", "conferido", "foto_ref", "origem", "lote_id",
+        "operacao_id", "obs",
     },
     "abates": {
         "data_abate", "lote", "cabecas", "peso_liquido_kg", "valor_liquido",
@@ -43,6 +44,7 @@ NUMERIC_FIELDS = {
     "preco_por_cabeca", "valor_total", "prazo_dias", "cabecas",
     "peso_carcaca_total", "rendimento_pct", "valor_bruto", "funrural", "finpec",
     "prazo_recebimento", "outros_custos", "peso_liquido_kg", "valor_liquido",
+    "peso_kg", "conf_brinco", "conf_peso", "conf_dente",
 }
 
 
@@ -71,9 +73,28 @@ def normalize_number(value: Any) -> Any:
     return float(number)
 
 
+
+def normalize_pesagens_caderno(proposed: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(proposed)
+    if "contexto" not in normalized and normalized.get("contexto_operacional"):
+        normalized["contexto"] = normalized.get("contexto_operacional")
+    if "data_folha" not in normalized and normalized.get("data_pesagem"):
+        normalized["data_folha"] = normalized.get("data_pesagem")
+    if "peso_kg" not in normalized:
+        normalized["peso_kg"] = normalized.get("peso_kg") or normalized.get("peso_total_kg")
+    if "foto_ref" not in normalized and normalized.get("origem_mensagem_id"):
+        normalized["foto_ref"] = str(normalized.get("origem_mensagem_id"))
+    if "obs" not in normalized:
+        normalized["obs"] = normalized.get("observacao") or normalized.get("resumo")
+    normalized.setdefault("origem", "confinex_revisoes")
+    normalized.setdefault("conferido", True)
+    return normalized
+
 def clean_record(target: str, proposed: dict[str, Any]) -> dict[str, Any]:
     if target not in TARGET_COLUMNS:
         raise ConfinexError(f"destino operacional nao permitido: {target}")
+    if target == "pesagens_caderno":
+        proposed = normalize_pesagens_caderno(proposed)
     clean: dict[str, Any] = {}
     for key, value in proposed.items():
         if key not in TARGET_COLUMNS[target]:
