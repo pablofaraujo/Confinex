@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Revisões — Confinex</title>
+<link rel="icon" type="image/png" href="./confinex-logo.jpg">
+<link rel="apple-touch-icon" href="./confinex-logo.jpg">
+<link rel="stylesheet" href="./design/tokens.css?v=20260720-1">
+<link rel="stylesheet" href="./design/components.css?v=20260720-1">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="./js/cfagro-core.js?v=20260720-1"></script>
+<script src="./js/cfagro-shell.js?v=20260720-1" defer></script>
+<style>
+body{max-width:1480px}.toolbar{display:grid;grid-template-columns:1.2fr .8fr .8fr auto;gap:10px;align-items:end;margin-top:16px}.review-layout{display:grid;grid-template-columns:minmax(360px,.95fr) minmax(420px,1.25fr);gap:14px;margin-top:14px}.review-list{display:grid;gap:8px;max-height:72vh;overflow:auto}.review-item{width:100%;text-align:left;background:var(--card);border:1px solid var(--border);border-left:4px solid var(--yellow);border-radius:var(--r-sm);padding:12px;cursor:pointer}.review-item:hover,.review-item.active{background:var(--field);border-color:var(--yellow)}.review-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.review-title{font-weight:700;color:var(--navy);font-size:14px}.review-meta{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.5}.detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.detail-grid .wide{grid-column:1/-1}.context-ok{border-left-color:var(--green)}.context-bad{border-left-color:var(--red)}.pill-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.muted{color:var(--muted)}textarea.json{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;min-height:190px}.empty{padding:28px;text-align:center;color:var(--muted)}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.danger{background:var(--red)}.danger:hover{background:#9f1d24}.small-note{font-size:12px;color:var(--muted);line-height:1.5;margin-top:8px}.locked{background:var(--amberbg);color:var(--amber-text);border:1px solid #ead59b;border-radius:var(--r-sm);padding:10px;font-size:12px;margin-top:10px}@media(max-width:980px){.toolbar,.review-layout{grid-template-columns:1fr}.review-list{max-height:none}.detail-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="login" class="login-box card">
+  <img src="./confinex-logo.jpg" alt="Logo" style="width:72px;height:72px;border-radius:50%;object-fit:cover;margin-bottom:10px">
+  <h1>Revisões <span>— CONFINEX</span></h1>
+  <div class="sub" style="margin-bottom:18px;letter-spacing:2px;text-transform:uppercase;font-size:10px">Rascunhos · pendências · contexto</div>
+  <input type="email" id="email" placeholder="seu email" autocomplete="username">
+  <input type="password" id="senha" placeholder="senha" autocomplete="current-password">
+  <button class="btn" style="width:100%" onclick="entrar()">Entrar</button>
+  <div class="err" id="loginErr"></div>
+</div>
+
+<div id="app">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:12px">
+      <img src="./confinex-logo.jpg" alt="Logo" style="width:48px;height:48px;border-radius:50%;object-fit:cover">
+      <div>
+        <h1>Revisões <span>— RASCUNHOS DOS AGENTES</span></h1>
+        <div class="sub" id="subtitle">Ajuste seguro antes de virar dado operacional.</div>
+      </div>
+    </div>
+    <div class="acoes">
+      <button class="btn sec" onclick="carregar()">Atualizar</button>
+      <button class="btn sec" onclick="sair()">Sair</button>
+    </div>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="toolbar card">
+    <div class="fld"><label>Busca</label><input id="busca" placeholder="Fornecedor, CF, grupo, resumo..." oninput="renderLista()"></div>
+    <div class="fld"><label>Contexto</label><select id="fContexto" onchange="renderLista()"><option value="">Todos</option></select></div>
+    <div class="fld"><label>Status</label><select id="fStatus" onchange="renderLista()"><option value="abertos">Abertos</option><option value="todos">Todos</option><option value="aguardando_confirmacao">Aguardando confirmação</option><option value="confirmado_telegram">Confirmado Telegram</option><option value="em_revisao">Em revisão</option><option value="rejeitado">Rejeitado</option><option value="cancelado">Cancelado</option><option value="realizado">Realizado</option></select></div>
+    <button class="btn" onclick="carregar()">Carregar</button>
+  </div>
+
+  <div class="review-layout">
+    <section>
+      <h2>Fila de revisão</h2>
+      <div class="review-list" id="lista"></div>
+    </section>
+    <section>
+      <h2>Detalhe e ajustes</h2>
+      <div class="card" id="detalhe"><div class="empty">Selecione um item da fila.</div></div>
+    </section>
+  </div>
+  <div class="footer">Revisões Confinex · esta tela ajusta rascunhos e pendências, sem gravar compra/venda/lote definitivo.</div>
+</div>
+
+<script>
+const REQUIRED_CONTEXT = ['contexto_operacional','grupo_telegram','grupo_telegram_id','origem_canal','origem_conversa_id','origem_mensagem_id','agente','status_confirmacao'];
+const OPEN_DRAFT_STATUS = new Set(['rascunho','aguardando_confirmacao','confirmado_telegram','em_revisao','erro']);
+const OPEN_ACTION_STATUS = new Set(['aguardando_confirmacao','confirmado_telegram','em_revisao','erro']);
+let drafts = [], actions = [], itens = [], selecionado = null;
+const el = id => document.getElementById(id);
+const jfmt = obj => JSON.stringify(obj || {}, null, 2);
+const attr = t => esc(t).replace(/"/g, '&quot;');
+const arrLines = arr => Array.isArray(arr) ? arr.join('\n') : '';
+const linesArr = txt => String(txt || '').split('\n').map(s => s.trim()).filter(Boolean);
+function statusBadge(status){
+  const cls = ['realizado','executado','aprovado_confinex'].includes(status) ? 'b-green' : (['rejeitado','cancelado','erro'].includes(status) ? 'b-red' : (['em_revisao','confirmado_telegram'].includes(status) ? 'b-blue' : 'b-amber'));
+  return `<span class="badge ${cls}">${esc(status || 'sem status')}</span>`;
+}
+function resumoItem(item){
+  const d = item.draft || {}, a = item.action || {}, dados = d.dados_extraidos || a.payload || {};
+  return a.resumo || dados.resumo || dados.descricao || d.tipo_operacao || 'Rascunho sem resumo';
+}
+function contextoDe(item){
+  const d = item.draft || {}, a = item.action || {}, dados = d.dados_extraidos || a.payload || {};
+  return dados.contexto_operacional || dados.contexto || dados.grupo_telegram || d.origem_conversa_id || a.conversa_id || 'sem_contexto';
+}
+function contextMissing(item){
+  const d = item.draft || {}, dados = d.dados_extraidos || {};
+  return REQUIRED_CONTEXT.filter(k => dados[k] === undefined || dados[k] === null || String(dados[k]).trim() === '');
+}
+function asText(v){ return String(v ?? '').toLowerCase(); }
+async function carregar(){
+  el('subtitle').textContent = 'Carregando revisões...';
+  const [rd, ra] = await Promise.all([
+    db.from('operation_drafts').select('*').order('criado_em', {ascending:false}).limit(200),
+    db.from('pending_actions').select('*').order('criado_em', {ascending:false}).limit(200)
+  ]);
+  const err = rd.error || ra.error;
+  if(err){ el('subtitle').textContent = 'Erro ao carregar: '+err.message; return; }
+  drafts = rd.data || []; actions = ra.data || [];
+  montarItens(); montarContextos(); renderLista(); renderKpis();
+  el('subtitle').textContent = `Atualizado ${fmtDT(new Date().toISOString())} · ${itens.length} itens encontrados`;
+}
+function montarItens(){
+  const actionById = Object.fromEntries(actions.map(a => [a.id, a]));
+  const used = new Set();
+  itens = drafts.map(d => { const a = d.pending_action_id ? actionById[d.pending_action_id] : null; if(a) used.add(a.id); return {id:d.id, draft:d, action:a}; });
+  actions.forEach(a => { if(!used.has(a.id)) itens.push({id:'pa:'+a.id, draft:null, action:a}); });
+}
+function montarContextos(){
+  const atual = el('fContexto').value;
+  const ctxs = [...new Set(itens.map(contextoDe))].sort();
+  el('fContexto').innerHTML = '<option value="">Todos</option>' + ctxs.map(c => `<option value="${attr(c)}">${esc(c)}</option>`).join('');
+  el('fContexto').value = ctxs.includes(atual) ? atual : '';
+}
+function passaFiltro(item){
+  const busca = asText(el('busca').value);
+  const ctx = el('fContexto').value;
+  const st = el('fStatus').value;
+  const d = item.draft || {}, a = item.action || {};
+  const dados = d.dados_extraidos || a.payload || {};
+  if(ctx && contextoDe(item) !== ctx) return false;
+  if(st === 'abertos'){
+    if(!OPEN_DRAFT_STATUS.has(d.status) && !OPEN_ACTION_STATUS.has(a.status)) return false;
+  } else if(st !== 'todos' && d.status !== st && a.status !== st) return false;
+  if(!busca) return true;
+  return [resumoItem(item), contextoDe(item), d.codigo_sugerido, d.tipo_operacao, a.entidade_codigo, JSON.stringify(dados)].some(v => asText(v).includes(busca));
+}
+function renderKpis(){
+  const abertos = itens.filter(i => OPEN_DRAFT_STATUS.has(i.draft?.status) || OPEN_ACTION_STATUS.has(i.action?.status)).length;
+  const ctxs = new Set(itens.map(contextoDe));
+  const incompletos = itens.filter(i => i.draft && contextMissing(i).length).length;
+  const revisao = itens.filter(i => i.draft?.status === 'em_revisao' || i.action?.status === 'em_revisao').length;
+  el('kpis').innerHTML = [
+    ['Abertos', abertos, 'rascunhos e pendências'],
+    ['Contextos', ctxs.size, 'grupos separados'],
+    ['Sem contexto completo', incompletos, 'precisam ajuste'],
+    ['Em revisão', revisao, 'sob análise no Confinex']
+  ].map(k => `<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="d">${k[2]}</div></div>`).join('');
+}
+function renderLista(){
+  const filtrados = itens.filter(passaFiltro);
+  if(!filtrados.length){ el('lista').innerHTML = '<div class="card empty">Nenhum item nesse filtro.</div>'; return; }
+  el('lista').innerHTML = filtrados.map(item => {
+    const d = item.draft || {}, a = item.action || {}, missing = contextMissing(item);
+    return `<button class="review-item ${missing.length ? 'context-bad':'context-ok'} ${selecionado === item.id ? 'active':''}" onclick="selecionar('${item.id}')">
+      <div class="review-top"><div class="review-title">${esc(resumoItem(item))}</div><div>${statusBadge(d.status || a.status)}</div></div>
+      <div class="review-meta">${esc(contextoDe(item))} · ${esc(d.codigo_sugerido || a.entidade_codigo || d.tipo_operacao || a.acao_tipo || 'sem código')}<br>${fmtDT(d.criado_em || a.criado_em)} · ${esc(d.agente || a.agente || 'agente não informado')}</div>
+      <div class="pill-row">${missing.length ? `<span class="badge b-red">contexto incompleto</span>` : `<span class="badge b-green">contexto completo</span>`}${d.pending_action_id ? `<span class="badge b-blue">pendência ligada</span>` : ''}</div>
+    </button>`;
+  }).join('');
+}
+function selecionar(id){ selecionado = id; renderLista(); const item = itens.find(i => i.id === id); renderDetalhe(item); }
+function renderDetalhe(item){
+  if(!item){ el('detalhe').innerHTML = '<div class="empty">Selecione um item da fila.</div>'; return; }
+  const d = item.draft || {}, a = item.action || {}, dados = d.dados_extraidos || a.payload || {}, missing = contextMissing(item);
+  el('detalhe').innerHTML = `
+    <div class="review-top"><div><b>${esc(resumoItem(item))}</b><div class="small-note">${esc(contextoDe(item))} · origem ${esc(d.origem_canal || a.canal || '—')} / ${esc(d.origem_conversa_id || a.conversa_id || '—')} / ${esc(d.origem_mensagem_id || a.mensagem_id || '—')}</div></div><div>${statusBadge(d.status || a.status)}</div></div>
+    ${missing.length ? `<div class="locked">Faltam campos obrigatórios de contexto: ${esc(missing.join(', '))}</div>` : ''}
+    <div class="detail-grid" style="margin-top:14px">
+      <div class="fld"><label>Status do rascunho</label><select id="draftStatus"><option>rascunho</option><option>aguardando_confirmacao</option><option>confirmado_telegram</option><option>em_revisao</option><option>realizado</option><option>rejeitado</option><option>cancelado</option><option>erro</option></select></div>
+      <div class="fld"><label>Status da pendência</label><select id="actionStatus"><option>aguardando_confirmacao</option><option>confirmado_telegram</option><option>em_revisao</option><option>aprovado_confinex</option><option>executado</option><option>rejeitado</option><option>expirado</option><option>erro</option><option>cancelado</option></select></div>
+      <div class="fld"><label>Código sugerido</label><input id="codigo" value="${attr(d.codigo_sugerido || a.entidade_codigo || '')}"></div>
+      <div class="fld"><label>Entidade final</label><input id="entidadeTipo" value="${attr(d.entidade_final_tipo || a.entidade_tipo || '')}"></div>
+      <div class="fld wide"><label>Resumo</label><input id="resumo" value="${attr(resumoItem(item))}"></div>
+      <div class="fld wide"><label>Campos pendentes, um por linha</label><textarea id="campos" rows="4">${esc(arrLines(d.campos_pendentes))}</textarea></div>
+      <div class="fld wide"><label>Dados estruturados</label><textarea id="dados" class="json">${esc(jfmt(dados))}</textarea></div>
+      <div class="fld wide"><label>Inferências</label><textarea id="inferencias" class="json">${esc(jfmt(d.inferencias || {}))}</textarea></div>
+      <div class="fld wide"><label>Motivo do ajuste</label><input id="motivo" placeholder="Ex.: corrigido contexto, fornecedor, peso, valor ou CF"></div>
+    </div>
+    <div class="actions"><button class="btn" onclick="salvarAjustes()">Salvar ajustes</button><button class="btn sec" onclick="marcarRevisao()">Manter em revisão</button><button class="btn danger" onclick="rejeitarItem()">Rejeitar / cancelar</button></div>
+    <div class="small-note">Aprovar aqui significa organizar a revisão. A promoção para tabela operacional definitiva continua separada e auditável.</div>`;
+  el('draftStatus').value = d.status || 'rascunho';
+  el('actionStatus').value = a.status || 'aguardando_confirmacao';
+}
+function parseJsonField(id){
+  try { return JSON.parse(el(id).value || '{}'); }
+  catch(e){ throw new Error(`JSON inválido em ${id}: ${e.message}`); }
+}
+function requireSelected(){ const item = itens.find(i => i.id === selecionado); if(!item) throw new Error('Selecione um item.'); return item; }
+function validarContexto(dados){
+  const missing = REQUIRED_CONTEXT.filter(k => dados[k] === undefined || dados[k] === null || String(dados[k]).trim() === '');
+  if(missing.length) throw new Error('Complete o contexto antes de salvar: '+missing.join(', '));
+}
+async function registrarEvento(tipo, item, dados){
+  const d = item.draft || {}, a = item.action || {};
+  const payload = {draft_id:d.id, pending_action_id:a.id, motivo:el('motivo')?.value || null, promovido_para_operacional:false, dados_revisados:dados};
+  await db.from('eventos').insert({tipo, agente:d.agente || a.agente || 'confinex', usuario:'pablo', entidade_tipo:d.id ? 'operation_draft' : 'pending_action', entidade_id:d.id || a.id, entidade_codigo:el('codigo')?.value || d.codigo_sugerido || a.entidade_codigo, origem:'confinex_revisoes', origem_canal:d.origem_canal || a.canal, origem_conversa_id:d.origem_conversa_id || a.conversa_id, origem_mensagem_id:d.origem_mensagem_id || a.mensagem_id, status:'registrado', dados:payload, observacao:'Revisão ajustada no Confinex sem promoção automática para tabela operacional.'});
+}
+async function salvarAjustes(){
+  try{
+    const item = requireSelected(), d = item.draft, a = item.action;
+    const dados = parseJsonField('dados'), inferencias = parseJsonField('inferencias');
+    validarContexto(dados);
+    const campos = linesArr(el('campos').value), now = new Date().toISOString();
+    if(d){
+      const {error} = await db.from('operation_drafts').update({atualizado_em:now,status:el('draftStatus').value,codigo_sugerido:el('codigo').value || null,entidade_final_tipo:el('entidadeTipo').value || null,dados_extraidos:dados,campos_pendentes:campos,inferencias}).eq('id', d.id);
+      if(error) throw error;
+    }
+    if(a){
+      const payload = Object.assign({}, a.payload || {}, {dados_extraidos:dados, campos_pendentes:campos, inferencias, revisao_confinex:{atualizado_em:now, motivo:el('motivo').value || null}});
+      const {error} = await db.from('pending_actions').update({atualizado_em:now,status:el('actionStatus').value,entidade_codigo:el('codigo').value || null,entidade_tipo:el('entidadeTipo').value || a.entidade_tipo,resumo:el('resumo').value || a.resumo,payload}).eq('id', a.id);
+      if(error) throw error;
+    }
+    await registrarEvento('revisao_confinex_ajustada', item, dados);
+    alert('Ajustes salvos. Nada foi promovido automaticamente para dado operacional.');
+    await carregar(); selecionar(item.id);
+  }catch(e){ alert(e.message || e); }
+}
+async function marcarRevisao(){ el('draftStatus').value = 'em_revisao'; el('actionStatus').value = 'em_revisao'; await salvarAjustes(); }
+async function rejeitarItem(){
+  if(!confirm('Rejeitar/cancelar este item de revisão?')) return;
+  try{
+    const item = requireSelected(), d = item.draft, a = item.action, now = new Date().toISOString();
+    const dados = parseJsonField('dados');
+    if(d){ const {error} = await db.from('operation_drafts').update({atualizado_em:now,status:'cancelado'}).eq('id', d.id); if(error) throw error; }
+    if(a){ const {error} = await db.from('pending_actions').update({atualizado_em:now,status:'rejeitado',erro:el('motivo').value || 'Rejeitado no Confinex'}).eq('id', a.id); if(error) throw error; }
+    await registrarEvento('revisao_confinex_rejeitada', item, dados);
+    alert('Item rejeitado/cancelado.'); await carregar(); el('detalhe').innerHTML = '<div class="empty">Selecione um item da fila.</div>';
+  }catch(e){ alert(e.message || e); }
+}
+CFAgro.authInit(carregar);
+</script>
+</body>
+</html>
