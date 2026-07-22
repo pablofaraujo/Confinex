@@ -64,6 +64,41 @@ class PromocaoOperacionalTests(unittest.TestCase):
         self.assertEqual(record["valor_total"], 115033.27)
         self.assertNotIn("campo_estranho", record)
 
+    def test_compras_maps_telegram_review_fields_to_real_schema(self):
+        record = clean_record("compras", {
+            "data_compra": "2026-07-22",
+            "cabecas": "18",
+            "valor_bruto": "R$ 115.033,27",
+            "vencimento": "2026-08-08",
+            "origem_mensagem_id": "msg-compra",
+            "observacao": "compra conferida",
+            "campo_estranho": "ignorar",
+        })
+        self.assertEqual(record["data"], "2026-07-22")
+        self.assertEqual(record["quantidade"], 18)
+        self.assertEqual(record["valor_total"], 115033.27)
+        self.assertEqual(record["data_pagamento"], "2026-08-08")
+        self.assertEqual(record["telegram_msg_id"], "msg-compra")
+        self.assertEqual(record["obs"], "compra conferida")
+        self.assertEqual(record["origem_registro"], "confinex_revisoes")
+        self.assertNotIn("campo_estranho", record)
+
+    def test_vendas_maps_review_fields_without_using_days_as_receipt_date(self):
+        record = clean_record("vendas", {
+            "quantidade": "18",
+            "peso_liquido_kg": "5228,785",
+            "valor_bruto": "R$ 115.033,27",
+            "vencimento": "2026-08-08",
+            "prazo_dias": "30",
+            "documento": "Romaneio Frical lote 5",
+        })
+        self.assertEqual(record["cabecas"], 18)
+        self.assertEqual(record["peso_carcaca_total"], 5228.785)
+        self.assertEqual(record["valor_bruto"], 115033.27)
+        self.assertEqual(record["prazo_recebimento"], "2026-08-08")
+        self.assertEqual(record["romaneio"], "Romaneio Frical lote 5")
+        self.assertNotEqual(record["prazo_recebimento"], 30)
+
     def test_pesagens_caderno_maps_legacy_preview_fields_to_real_schema(self):
         record = clean_record("pesagens_caderno", {
             "contexto_operacional": "boi_balanca",

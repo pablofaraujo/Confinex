@@ -74,6 +74,65 @@ def normalize_number(value: Any) -> Any:
 
 
 
+def first_present(data: dict[str, Any], *keys: str) -> Any:
+    for key in keys:
+        value = data.get(key)
+        if value not in (None, ""):
+            return value
+    return None
+
+
+def normalize_compras(proposed: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(proposed)
+    if "data" not in normalized:
+        value = first_present(normalized, "data_compra", "data_pesagem", "data_folha")
+        if value is not None:
+            normalized["data"] = value
+    if "quantidade" not in normalized:
+        value = first_present(normalized, "cabecas", "qtd_cabecas")
+        if value is not None:
+            normalized["quantidade"] = value
+    if "valor_total" not in normalized:
+        value = first_present(normalized, "valor_bruto", "valor_total_base")
+        if value is not None:
+            normalized["valor_total"] = value
+    if "telegram_msg_id" not in normalized:
+        value = first_present(normalized, "origem_mensagem_id", "mensagem_id", "foto_ref")
+        if value is not None:
+            normalized["telegram_msg_id"] = str(value)
+    if "data_pagamento" not in normalized:
+        value = first_present(normalized, "vencimento", "data_vencimento")
+        if value is not None:
+            normalized["data_pagamento"] = value
+    if "obs" not in normalized:
+        value = first_present(normalized, "observacao", "resumo", "situacao")
+        if value is not None:
+            normalized["obs"] = value
+    normalized.setdefault("origem_registro", "confinex_revisoes")
+    return normalized
+
+
+def normalize_vendas(proposed: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(proposed)
+    if "cabecas" not in normalized:
+        value = first_present(normalized, "quantidade", "qtd_cabecas")
+        if value is not None:
+            normalized["cabecas"] = value
+    if "peso_carcaca_total" not in normalized:
+        value = first_present(normalized, "peso_liquido_kg", "peso_total_kg")
+        if value is not None:
+            normalized["peso_carcaca_total"] = value
+    if "prazo_recebimento" not in normalized:
+        value = first_present(normalized, "vencimento", "data_recebimento", "data_vencimento")
+        if value is not None:
+            normalized["prazo_recebimento"] = value
+    if "romaneio" not in normalized:
+        value = first_present(normalized, "documento", "tipo_documento")
+        if value is not None:
+            normalized["romaneio"] = value
+    return normalized
+
+
 def normalize_pesagens_caderno(proposed: dict[str, Any]) -> dict[str, Any]:
     normalized = dict(proposed)
     if "contexto" not in normalized and normalized.get("contexto_operacional"):
@@ -93,7 +152,11 @@ def normalize_pesagens_caderno(proposed: dict[str, Any]) -> dict[str, Any]:
 def clean_record(target: str, proposed: dict[str, Any]) -> dict[str, Any]:
     if target not in TARGET_COLUMNS:
         raise ConfinexError(f"destino operacional nao permitido: {target}")
-    if target == "pesagens_caderno":
+    if target == "compras":
+        proposed = normalize_compras(proposed)
+    elif target == "vendas":
+        proposed = normalize_vendas(proposed)
+    elif target == "pesagens_caderno":
         proposed = normalize_pesagens_caderno(proposed)
     clean: dict[str, Any] = {}
     for key, value in proposed.items():
