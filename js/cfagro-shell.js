@@ -35,6 +35,7 @@ var NAV = [
   { href:'./parceria-xande.html',  rotulo:'Xande',   icone:'🐄' },
   { sec:'Gestão' },
   { href:'./#pendencias',   rotulo:'Pendências',    icone:'📋' },
+  { href:'./revisoes.html', rotulo:'Revisões',      icone:'✎' },
   { href:'./#eventos',      rotulo:'Eventos',       icone:'📅' },
   { sec:'Sistema' },
   { href:'./ops.html',      rotulo:'Agentes / Ops', icone:'⚙️' }
