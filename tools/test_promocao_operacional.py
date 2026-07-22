@@ -39,6 +39,10 @@ def action_for(target="compras"):
             "source_draft_id": "draft-1",
             "target_table": target,
             "promovido_para_operacional": False,
+            "dados_revisados": {
+                "origem_conversa_id": "grupo-1",
+                "origem_mensagem_id": "msg-original",
+            },
             "proposed_record": {
                 "quantidade": "18",
                 "valor_total": "R$ 115.033,27",
@@ -74,9 +78,48 @@ class PromocaoOperacionalTests(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "confirmacao invalida"):
             execute_promotion(client, "pa-1", usuario="pablo", executar=True, confirmacao="sim")
 
+    def test_execute_requires_confirmation_message_id(self):
+        client = FakeClient(action_for())
+        with self.assertRaisesRegex(Exception, "origem_mensagem_id"):
+            execute_promotion(client, "pa-1", usuario="pablo", executar=True, confirmacao=expected_confirmation("pa-1"))
+
+    def test_execute_rejects_same_source_message(self):
+        client = FakeClient(action_for())
+        with self.assertRaisesRegex(Exception, "nova mensagem"):
+            execute_promotion(
+                client,
+                "pa-1",
+                usuario="pablo",
+                executar=True,
+                confirmacao=expected_confirmation("pa-1"),
+                origem_conversa_id="grupo-1",
+                origem_mensagem_id="msg-original",
+            )
+
+    def test_execute_rejects_different_group(self):
+        client = FakeClient(action_for())
+        with self.assertRaisesRegex(Exception, "contexto/grupo diferente"):
+            execute_promotion(
+                client,
+                "pa-1",
+                usuario="pablo",
+                executar=True,
+                confirmacao=expected_confirmation("pa-1"),
+                origem_conversa_id="grupo-2",
+                origem_mensagem_id="msg-nova",
+            )
+
     def test_execute_writes_operational_and_audit(self):
         client = FakeClient(action_for())
-        result = execute_promotion(client, "pa-1", usuario="pablo", executar=True, confirmacao=expected_confirmation("pa-1"))
+        result = execute_promotion(
+            client,
+            "pa-1",
+            usuario="pablo",
+            executar=True,
+            confirmacao=expected_confirmation("pa-1"),
+            origem_conversa_id="grupo-1",
+            origem_mensagem_id="msg-nova",
+        )
         self.assertTrue(result["executado"])
         self.assertEqual(client.operational_inserts[0][0], "compras")
         self.assertEqual(client.updates[0][0], "pending_actions")
