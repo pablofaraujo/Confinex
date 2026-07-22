@@ -60,6 +60,10 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--yellow-soft);bor
 .fld label{display:block;font-size:var(--fs-11);color:var(--muted);text-transform:uppercase;margin-bottom:4px;font-weight:600}
 .err{color:var(--red);font-size:var(--fs-13);margin-top:8px}
 .msg{font-size:var(--fs-12);margin-top:8px;color:var(--green);font-weight:600}
+.aviso-validacao{background:var(--amberbg);border:1px solid var(--amber);color:var(--amber-text);border-radius:var(--r-sm);padding:10px 12px;font-size:var(--fs-12);line-height:1.5;margin-bottom:10px}
+.fld.campo-incompleto label{color:var(--red-text)}
+.fld.campo-incompleto input,.fld.campo-incompleto select,.fld.campo-incompleto textarea{border-color:var(--red);background:var(--redbg)}
+.btn:disabled{opacity:.55;cursor:not-allowed}
 
 /* ---------- Login ---------- */
 .login-box{max-width:360px;margin:80px auto;text-align:center}
