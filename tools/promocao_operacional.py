@@ -43,7 +43,7 @@ NUMERIC_FIELDS = {
     "quantidade", "peso_medio_arroba", "peso_total_kg", "preco_arroba",
     "preco_por_cabeca", "valor_total", "prazo_dias", "cabecas",
     "peso_carcaca_total", "rendimento_pct", "valor_bruto", "funrural", "finpec",
-    "prazo_recebimento", "outros_custos", "peso_liquido_kg", "valor_liquido",
+    "outros_custos", "peso_liquido_kg", "valor_liquido",
     "peso_kg", "conf_brinco", "conf_peso", "conf_dente",
 }
 
