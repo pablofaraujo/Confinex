@@ -12,14 +12,14 @@
 <script src="./js/cfagro-core.js?v=20260720-1"></script>
 <script src="./js/cfagro-shell.js?v=20260720-1" defer></script>
 <style>
-body{max-width:1480px}.toolbar{display:grid;grid-template-columns:1.2fr .8fr .8fr auto;gap:10px;align-items:end;margin-top:16px}.review-layout{display:grid;grid-template-columns:minmax(360px,.95fr) minmax(420px,1.25fr);gap:14px;margin-top:14px}.review-list{display:grid;gap:8px;max-height:72vh;overflow:auto}.review-item{width:100%;text-align:left;background:var(--card);border:1px solid var(--border);border-left:4px solid var(--yellow);border-radius:var(--r-sm);padding:12px;cursor:pointer}.review-item:hover,.review-item.active{background:var(--field);border-color:var(--yellow)}.review-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.review-title{font-weight:700;color:var(--navy);font-size:14px}.review-meta{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.5}.detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.detail-grid .wide{grid-column:1/-1}.context-ok{border-left-color:var(--green)}.context-bad{border-left-color:var(--red)}.pill-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.muted{color:var(--muted)}textarea.json{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;min-height:190px}.empty{padding:28px;text-align:center;color:var(--muted)}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.danger{background:var(--red)}.danger:hover{background:#9f1d24}.small-note{font-size:12px;color:var(--muted);line-height:1.5;margin-top:8px}.locked{background:var(--amberbg);color:var(--amber-text);border:1px solid #ead59b;border-radius:var(--r-sm);padding:10px;font-size:12px;margin-top:10px}@media(max-width:980px){.toolbar,.review-layout{grid-template-columns:1fr}.review-list{max-height:none}.detail-grid{grid-template-columns:1fr}}
+body{max-width:1480px}.toolbar{display:grid;grid-template-columns:1.2fr .8fr .8fr auto;gap:10px;align-items:end;margin-top:16px}.review-layout{display:grid;grid-template-columns:minmax(340px,.9fr) minmax(520px,1.35fr);gap:14px;margin-top:14px}.review-list{display:grid;gap:8px;max-height:72vh;overflow:auto}.review-item{width:100%;text-align:left;background:var(--card);border:1px solid var(--border);border-left:4px solid var(--yellow);border-radius:var(--r-sm);padding:12px;cursor:pointer}.review-item:hover,.review-item.active{background:var(--field);border-color:var(--yellow)}.review-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.review-title{font-weight:700;color:var(--navy);font-size:14px;white-space:normal;line-height:1.35}.review-meta{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.5;white-space:normal}.section{border-top:1px solid var(--border-soft);padding-top:14px;margin-top:14px}.section:first-child{border-top:none;padding-top:0;margin-top:0}.section-title{font-size:12px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}.form-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.form-grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}.form-grid .wide{grid-column:1/-1}.confirm-box{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.confirm-box .mini-card{background:var(--field);border:1px solid var(--border-soft);border-radius:var(--r-sm);padding:10px;min-height:66px}.mini-card .l{font-size:10px;text-transform:uppercase;color:var(--muted);font-weight:700}.mini-card .v{font-size:15px;font-weight:700;color:var(--navy);margin-top:4px;overflow-wrap:anywhere}.context-ok{border-left-color:var(--green)}.context-bad{border-left-color:var(--red)}.pill-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.empty{padding:28px;text-align:center;color:var(--muted)}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.danger{background:var(--red)}.danger:hover{background:#9f1d24}.small-note{font-size:12px;color:var(--muted);line-height:1.5;margin-top:8px}.locked{background:var(--amberbg);color:var(--amber-text);border:1px solid #ead59b;border-radius:var(--r-sm);padding:10px;font-size:12px;margin-top:10px}.tech summary{color:var(--muted)}textarea{min-height:82px}textarea.json{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;min-height:180px}.readonly{background:#fff}.decision{background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px}@media(max-width:1100px){.confirm-box,.form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:920px){.toolbar,.review-layout,.form-grid,.form-grid.two,.confirm-box{grid-template-columns:1fr}.review-list{max-height:none}}
 </style>
 </head>
 <body>
 <div id="login" class="login-box card">
   <img src="./confinex-logo.jpg" alt="Logo" style="width:72px;height:72px;border-radius:50%;object-fit:cover;margin-bottom:10px">
   <h1>Revisões <span>— CONFINEX</span></h1>
-  <div class="sub" style="margin-bottom:18px;letter-spacing:2px;text-transform:uppercase;font-size:10px">Rascunhos · pendências · contexto</div>
+  <div class="sub" style="margin-bottom:18px;letter-spacing:2px;text-transform:uppercase;font-size:10px">Conferência · ajuste · aprovação</div>
   <input type="email" id="email" placeholder="seu email" autocomplete="username">
   <input type="password" id="senha" placeholder="senha" autocomplete="current-password">
   <button class="btn" style="width:100%" onclick="entrar()">Entrar</button>
@@ -27,199 +27,68 @@ body{max-width:1480px}.toolbar{display:grid;grid-template-columns:1.2fr .8fr .8f
 </div>
 
 <div id="app">
-  <div class="topbar">
-    <div style="display:flex;align-items:center;gap:12px">
-      <img src="./confinex-logo.jpg" alt="Logo" style="width:48px;height:48px;border-radius:50%;object-fit:cover">
-      <div>
-        <h1>Revisões <span>— RASCUNHOS DOS AGENTES</span></h1>
-        <div class="sub" id="subtitle">Ajuste seguro antes de virar dado operacional.</div>
-      </div>
-    </div>
-    <div class="acoes">
-      <button class="btn sec" onclick="carregar()">Atualizar</button>
-      <button class="btn sec" onclick="sair()">Sair</button>
-    </div>
-  </div>
-
+  <div class="topbar"><div style="display:flex;align-items:center;gap:12px"><img src="./confinex-logo.jpg" alt="Logo" style="width:48px;height:48px;border-radius:50%;object-fit:cover"><div><h1>Revisões <span>— CONFERÊNCIA DE INFORMAÇÕES</span></h1><div class="sub" id="subtitle">Revise, ajuste e aprove antes de virar dado operacional.</div></div></div><div class="acoes"><button class="btn sec" onclick="carregar()">Atualizar</button><button class="btn sec" onclick="sair()">Sair</button></div></div>
   <div class="kpis" id="kpis"></div>
-
-  <div class="toolbar card">
-    <div class="fld"><label>Busca</label><input id="busca" placeholder="Fornecedor, CF, grupo, resumo..." oninput="renderLista()"></div>
-    <div class="fld"><label>Contexto</label><select id="fContexto" onchange="renderLista()"><option value="">Todos</option></select></div>
-    <div class="fld"><label>Status</label><select id="fStatus" onchange="renderLista()"><option value="abertos">Abertos</option><option value="todos">Todos</option><option value="aguardando_confirmacao">Aguardando confirmação</option><option value="confirmado_telegram">Confirmado Telegram</option><option value="em_revisao">Em revisão</option><option value="rejeitado">Rejeitado</option><option value="cancelado">Cancelado</option><option value="realizado">Realizado</option></select></div>
-    <button class="btn" onclick="carregar()">Carregar</button>
-  </div>
-
-  <div class="review-layout">
-    <section>
-      <h2>Fila de revisão</h2>
-      <div class="review-list" id="lista"></div>
-    </section>
-    <section>
-      <h2>Detalhe e ajustes</h2>
-      <div class="card" id="detalhe"><div class="empty">Selecione um item da fila.</div></div>
-    </section>
-  </div>
-  <div class="footer">Revisões Confinex · esta tela ajusta rascunhos e pendências, sem gravar compra/venda/lote definitivo.</div>
+  <div class="toolbar card"><div class="fld"><label>Busca</label><input id="busca" placeholder="Fornecedor, CF, grupo, resumo..." oninput="renderLista()"></div><div class="fld"><label>Contexto</label><select id="fContexto" onchange="renderLista()"><option value="">Todos</option></select></div><div class="fld"><label>Status</label><select id="fStatus" onchange="renderLista()"><option value="abertos">Abertos</option><option value="todos">Todos</option><option value="aguardando_confirmacao">Aguardando confirmação</option><option value="confirmado_telegram">Confirmado Telegram</option><option value="em_revisao">Em revisão</option><option value="rejeitado">Rejeitado</option><option value="cancelado">Cancelado</option><option value="realizado">Realizado</option></select></div><button class="btn" onclick="carregar()">Carregar</button></div>
+  <div class="review-layout"><section><h2>Fila de revisão</h2><div class="review-list" id="lista"></div></section><section><h2>Conferência e aprovação</h2><div class="card" id="detalhe"><div class="empty">Selecione um item da fila.</div></div></section></div>
+  <div class="footer">Revisões Confinex · ajuste de rascunhos e pendências, sem gravar compra/venda/lote definitivo automaticamente.</div>
 </div>
 
 <script>
 const REQUIRED_CONTEXT = ['contexto_operacional','grupo_telegram','grupo_telegram_id','origem_canal','origem_conversa_id','origem_mensagem_id','agente','status_confirmacao'];
 const OPEN_DRAFT_STATUS = new Set(['rascunho','aguardando_confirmacao','confirmado_telegram','em_revisao','erro']);
 const OPEN_ACTION_STATUS = new Set(['aguardando_confirmacao','confirmado_telegram','em_revisao','erro']);
+const BUSINESS_FIELDS = [
+  ['operacao_codigo|codigo_sugerido|codigo|negocio_codigo','Operação / negócio','text'],
+  ['fornecedor|vendedor|comprador|nome_fornecedor|produtor','Fornecedor / contraparte','text'],
+  ['quantidade|cabecas|dados_lidos.cabecas|valores_base.quantidade','Cabeças','number'],
+  ['categoria|tipo_gado|classe_animal','Categoria','text'],
+  ['preco_arroba|valor_arroba|valores_base.preco_arroba','Preço por @','number'],
+  ['peso_total_kg|peso_liquido_kg|dados_lidos.peso_liquido_kg|valores_base.peso_total_kg','Peso total kg','number'],
+  ['valor_total|valor_total_base|valor_bruto|dados_lidos.valor_bruto|valores_base.valor_total_base','Valor bruto / total','number'],
+  ['valor_liquido|dados_lidos.valor_liquido','Valor líquido','number'],
+  ['data_compra|data_abate|data|dados_lidos.data_abate','Data','date'],
+  ['vencimento|dados_lidos.vencimento','Vencimento','date'],
+  ['prazo_dias|valores_base.prazo_dias','Prazo dias','number'],
+  ['documento|tipo_documento','Documento','text'],
+  ['situacao','Situação encontrada','textarea'],
+  ['divergencia','Divergência / alerta','textarea'],
+  ['acao_recomendada','Ação recomendada','textarea'],
+  ['evidencia|evidencias','Evidência no Telegram/documento','textarea']
+];
 let drafts = [], actions = [], itens = [], selecionado = null;
 const el = id => document.getElementById(id);
-const jfmt = obj => JSON.stringify(obj || {}, null, 2);
 const attr = t => esc(t).replace(/"/g, '&quot;');
+const jfmt = obj => JSON.stringify(obj || {}, null, 2);
 const arrLines = arr => Array.isArray(arr) ? arr.join('\n') : '';
 const linesArr = txt => String(txt || '').split('\n').map(s => s.trim()).filter(Boolean);
-function statusBadge(status){
-  const cls = ['realizado','executado','aprovado_confinex'].includes(status) ? 'b-green' : (['rejeitado','cancelado','erro'].includes(status) ? 'b-red' : (['em_revisao','confirmado_telegram'].includes(status) ? 'b-blue' : 'b-amber'));
-  return `<span class="badge ${cls}">${esc(status || 'sem status')}</span>`;
-}
-function resumoItem(item){
-  const d = item.draft || {}, a = item.action || {}, dados = d.dados_extraidos || a.payload || {};
-  return a.resumo || dados.resumo || dados.descricao || d.tipo_operacao || 'Rascunho sem resumo';
-}
-function contextoDe(item){
-  const d = item.draft || {}, a = item.action || {}, dados = d.dados_extraidos || a.payload || {};
-  return dados.contexto_operacional || dados.contexto || dados.grupo_telegram || d.origem_conversa_id || a.conversa_id || 'sem_contexto';
-}
-function contextMissing(item){
-  const d = item.draft || {}, dados = d.dados_extraidos || {};
-  return REQUIRED_CONTEXT.filter(k => dados[k] === undefined || dados[k] === null || String(dados[k]).trim() === '');
-}
-function asText(v){ return String(v ?? '').toLowerCase(); }
-async function carregar(){
-  el('subtitle').textContent = 'Carregando revisões...';
-  const [rd, ra] = await Promise.all([
-    db.from('operation_drafts').select('*').order('criado_em', {ascending:false}).limit(200),
-    db.from('pending_actions').select('*').order('criado_em', {ascending:false}).limit(200)
-  ]);
-  const err = rd.error || ra.error;
-  if(err){ el('subtitle').textContent = 'Erro ao carregar: '+err.message; return; }
-  drafts = rd.data || []; actions = ra.data || [];
-  montarItens(); montarContextos(); renderLista(); renderKpis();
-  el('subtitle').textContent = `Atualizado ${fmtDT(new Date().toISOString())} · ${itens.length} itens encontrados`;
-}
-function montarItens(){
-  const actionById = Object.fromEntries(actions.map(a => [a.id, a]));
-  const used = new Set();
-  itens = drafts.map(d => { const a = d.pending_action_id ? actionById[d.pending_action_id] : null; if(a) used.add(a.id); return {id:d.id, draft:d, action:a}; });
-  actions.forEach(a => { if(!used.has(a.id)) itens.push({id:'pa:'+a.id, draft:null, action:a}); });
-}
-function montarContextos(){
-  const atual = el('fContexto').value;
-  const ctxs = [...new Set(itens.map(contextoDe))].sort();
-  el('fContexto').innerHTML = '<option value="">Todos</option>' + ctxs.map(c => `<option value="${attr(c)}">${esc(c)}</option>`).join('');
-  el('fContexto').value = ctxs.includes(atual) ? atual : '';
-}
-function passaFiltro(item){
-  const busca = asText(el('busca').value);
-  const ctx = el('fContexto').value;
-  const st = el('fStatus').value;
-  const d = item.draft || {}, a = item.action || {};
-  const dados = d.dados_extraidos || a.payload || {};
-  if(ctx && contextoDe(item) !== ctx) return false;
-  if(st === 'abertos'){
-    if(!OPEN_DRAFT_STATUS.has(d.status) && !OPEN_ACTION_STATUS.has(a.status)) return false;
-  } else if(st !== 'todos' && d.status !== st && a.status !== st) return false;
-  if(!busca) return true;
-  return [resumoItem(item), contextoDe(item), d.codigo_sugerido, d.tipo_operacao, a.entidade_codigo, JSON.stringify(dados)].some(v => asText(v).includes(busca));
-}
-function renderKpis(){
-  const abertos = itens.filter(i => OPEN_DRAFT_STATUS.has(i.draft?.status) || OPEN_ACTION_STATUS.has(i.action?.status)).length;
-  const ctxs = new Set(itens.map(contextoDe));
-  const incompletos = itens.filter(i => i.draft && contextMissing(i).length).length;
-  const revisao = itens.filter(i => i.draft?.status === 'em_revisao' || i.action?.status === 'em_revisao').length;
-  el('kpis').innerHTML = [
-    ['Abertos', abertos, 'rascunhos e pendências'],
-    ['Contextos', ctxs.size, 'grupos separados'],
-    ['Sem contexto completo', incompletos, 'precisam ajuste'],
-    ['Em revisão', revisao, 'sob análise no Confinex']
-  ].map(k => `<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="d">${k[2]}</div></div>`).join('');
-}
-function renderLista(){
-  const filtrados = itens.filter(passaFiltro);
-  if(!filtrados.length){ el('lista').innerHTML = '<div class="card empty">Nenhum item nesse filtro.</div>'; return; }
-  el('lista').innerHTML = filtrados.map(item => {
-    const d = item.draft || {}, a = item.action || {}, missing = contextMissing(item);
-    return `<button class="review-item ${missing.length ? 'context-bad':'context-ok'} ${selecionado === item.id ? 'active':''}" onclick="selecionar('${item.id}')">
-      <div class="review-top"><div class="review-title">${esc(resumoItem(item))}</div><div>${statusBadge(d.status || a.status)}</div></div>
-      <div class="review-meta">${esc(contextoDe(item))} · ${esc(d.codigo_sugerido || a.entidade_codigo || d.tipo_operacao || a.acao_tipo || 'sem código')}<br>${fmtDT(d.criado_em || a.criado_em)} · ${esc(d.agente || a.agente || 'agente não informado')}</div>
-      <div class="pill-row">${missing.length ? `<span class="badge b-red">contexto incompleto</span>` : `<span class="badge b-green">contexto completo</span>`}${d.pending_action_id ? `<span class="badge b-blue">pendência ligada</span>` : ''}</div>
-    </button>`;
-  }).join('');
-}
-function selecionar(id){ selecionado = id; renderLista(); const item = itens.find(i => i.id === id); renderDetalhe(item); }
-function renderDetalhe(item){
-  if(!item){ el('detalhe').innerHTML = '<div class="empty">Selecione um item da fila.</div>'; return; }
-  const d = item.draft || {}, a = item.action || {}, dados = d.dados_extraidos || a.payload || {}, missing = contextMissing(item);
-  el('detalhe').innerHTML = `
-    <div class="review-top"><div><b>${esc(resumoItem(item))}</b><div class="small-note">${esc(contextoDe(item))} · origem ${esc(d.origem_canal || a.canal || '—')} / ${esc(d.origem_conversa_id || a.conversa_id || '—')} / ${esc(d.origem_mensagem_id || a.mensagem_id || '—')}</div></div><div>${statusBadge(d.status || a.status)}</div></div>
-    ${missing.length ? `<div class="locked">Faltam campos obrigatórios de contexto: ${esc(missing.join(', '))}</div>` : ''}
-    <div class="detail-grid" style="margin-top:14px">
-      <div class="fld"><label>Status do rascunho</label><select id="draftStatus"><option>rascunho</option><option>aguardando_confirmacao</option><option>confirmado_telegram</option><option>em_revisao</option><option>realizado</option><option>rejeitado</option><option>cancelado</option><option>erro</option></select></div>
-      <div class="fld"><label>Status da pendência</label><select id="actionStatus"><option>aguardando_confirmacao</option><option>confirmado_telegram</option><option>em_revisao</option><option>aprovado_confinex</option><option>executado</option><option>rejeitado</option><option>expirado</option><option>erro</option><option>cancelado</option></select></div>
-      <div class="fld"><label>Código sugerido</label><input id="codigo" value="${attr(d.codigo_sugerido || a.entidade_codigo || '')}"></div>
-      <div class="fld"><label>Entidade final</label><input id="entidadeTipo" value="${attr(d.entidade_final_tipo || a.entidade_tipo || '')}"></div>
-      <div class="fld wide"><label>Resumo</label><input id="resumo" value="${attr(resumoItem(item))}"></div>
-      <div class="fld wide"><label>Campos pendentes, um por linha</label><textarea id="campos" rows="4">${esc(arrLines(d.campos_pendentes))}</textarea></div>
-      <div class="fld wide"><label>Dados estruturados</label><textarea id="dados" class="json">${esc(jfmt(dados))}</textarea></div>
-      <div class="fld wide"><label>Inferências</label><textarea id="inferencias" class="json">${esc(jfmt(d.inferencias || {}))}</textarea></div>
-      <div class="fld wide"><label>Motivo do ajuste</label><input id="motivo" placeholder="Ex.: corrigido contexto, fornecedor, peso, valor ou CF"></div>
-    </div>
-    <div class="actions"><button class="btn" onclick="salvarAjustes()">Salvar ajustes</button><button class="btn sec" onclick="marcarRevisao()">Manter em revisão</button><button class="btn danger" onclick="rejeitarItem()">Rejeitar / cancelar</button></div>
-    <div class="small-note">Aprovar aqui significa organizar a revisão. A promoção para tabela operacional definitiva continua separada e auditável.</div>`;
-  el('draftStatus').value = d.status || 'rascunho';
-  el('actionStatus').value = a.status || 'aguardando_confirmacao';
-}
-function parseJsonField(id){
-  try { return JSON.parse(el(id).value || '{}'); }
-  catch(e){ throw new Error(`JSON inválido em ${id}: ${e.message}`); }
-}
-function requireSelected(){ const item = itens.find(i => i.id === selecionado); if(!item) throw new Error('Selecione um item.'); return item; }
-function validarContexto(dados){
-  const missing = REQUIRED_CONTEXT.filter(k => dados[k] === undefined || dados[k] === null || String(dados[k]).trim() === '');
-  if(missing.length) throw new Error('Complete o contexto antes de salvar: '+missing.join(', '));
-}
-async function registrarEvento(tipo, item, dados){
-  const d = item.draft || {}, a = item.action || {};
-  const payload = {draft_id:d.id, pending_action_id:a.id, motivo:el('motivo')?.value || null, promovido_para_operacional:false, dados_revisados:dados};
-  await db.from('eventos').insert({tipo, agente:d.agente || a.agente || 'confinex', usuario:'pablo', entidade_tipo:d.id ? 'operation_draft' : 'pending_action', entidade_id:d.id || a.id, entidade_codigo:el('codigo')?.value || d.codigo_sugerido || a.entidade_codigo, origem:'confinex_revisoes', origem_canal:d.origem_canal || a.canal, origem_conversa_id:d.origem_conversa_id || a.conversa_id, origem_mensagem_id:d.origem_mensagem_id || a.mensagem_id, status:'registrado', dados:payload, observacao:'Revisão ajustada no Confinex sem promoção automática para tabela operacional.'});
-}
-async function salvarAjustes(){
-  try{
-    const item = requireSelected(), d = item.draft, a = item.action;
-    const dados = parseJsonField('dados'), inferencias = parseJsonField('inferencias');
-    validarContexto(dados);
-    const campos = linesArr(el('campos').value), now = new Date().toISOString();
-    if(d){
-      const {error} = await db.from('operation_drafts').update({atualizado_em:now,status:el('draftStatus').value,codigo_sugerido:el('codigo').value || null,entidade_final_tipo:el('entidadeTipo').value || null,dados_extraidos:dados,campos_pendentes:campos,inferencias}).eq('id', d.id);
-      if(error) throw error;
-    }
-    if(a){
-      const payload = Object.assign({}, a.payload || {}, {dados_extraidos:dados, campos_pendentes:campos, inferencias, revisao_confinex:{atualizado_em:now, motivo:el('motivo').value || null}});
-      const {error} = await db.from('pending_actions').update({atualizado_em:now,status:el('actionStatus').value,entidade_codigo:el('codigo').value || null,entidade_tipo:el('entidadeTipo').value || a.entidade_tipo,resumo:el('resumo').value || a.resumo,payload}).eq('id', a.id);
-      if(error) throw error;
-    }
-    await registrarEvento('revisao_confinex_ajustada', item, dados);
-    alert('Ajustes salvos. Nada foi promovido automaticamente para dado operacional.');
-    await carregar(); selecionar(item.id);
-  }catch(e){ alert(e.message || e); }
-}
-async function marcarRevisao(){ el('draftStatus').value = 'em_revisao'; el('actionStatus').value = 'em_revisao'; await salvarAjustes(); }
-async function rejeitarItem(){
-  if(!confirm('Rejeitar/cancelar este item de revisão?')) return;
-  try{
-    const item = requireSelected(), d = item.draft, a = item.action, now = new Date().toISOString();
-    const dados = parseJsonField('dados');
-    if(d){ const {error} = await db.from('operation_drafts').update({atualizado_em:now,status:'cancelado'}).eq('id', d.id); if(error) throw error; }
-    if(a){ const {error} = await db.from('pending_actions').update({atualizado_em:now,status:'rejeitado',erro:el('motivo').value || 'Rejeitado no Confinex'}).eq('id', a.id); if(error) throw error; }
-    await registrarEvento('revisao_confinex_rejeitada', item, dados);
-    alert('Item rejeitado/cancelado.'); await carregar(); el('detalhe').innerHTML = '<div class="empty">Selecione um item da fila.</div>';
-  }catch(e){ alert(e.message || e); }
-}
+const asText = v => String(v ?? '').toLowerCase();
+function getPath(obj,path){return path.split('.').reduce((a,k)=>a&&a[k]!==undefined?a[k]:undefined,obj)}
+function setPath(obj,path,value){const parts=path.split('.');let cur=obj;parts.slice(0,-1).forEach(k=>{if(!cur[k]||typeof cur[k]!=='object'||Array.isArray(cur[k]))cur[k]={};cur=cur[k]});cur[parts.at(-1)]=value}
+function firstVal(obj,paths){for(const p of paths.split('|')){const v=getPath(obj,p);if(v!==undefined&&v!==null&&String(v)!=='')return Array.isArray(v)?v.join('\n'):v}return ''}
+function targetPath(obj,paths){return paths.split('|').find(p=>getPath(obj,p)!==undefined) || paths.split('|')[0]}
+function parseByType(value,type){if(type==='number'&&String(value).trim()!==''){const n=Number(String(value).replace(/\./g,'').replace(',','.'));return Number.isFinite(n)?n:value}return value}
+function statusBadge(status){const cls=['realizado','executado','aprovado_confinex'].includes(status)?'b-green':(['rejeitado','cancelado','erro'].includes(status)?'b-red':(['em_revisao','confirmado_telegram'].includes(status)?'b-blue':'b-amber'));return `<span class="badge ${cls}">${labelStatus(status||'sem status')}</span>`}
+function labelStatus(s){return ({rascunho:'Rascunho',aguardando_confirmacao:'Aguardando confirmação',confirmado_telegram:'Confirmado no Telegram',em_revisao:'Em revisão',aprovado_confinex:'Aprovado no Confinex',executado:'Executado',realizado:'Realizado',rejeitado:'Rejeitado',cancelado:'Cancelado',erro:'Erro',expirado:'Expirado'})[s]||esc(s)}
+function resumoItem(item){const d=item.draft||{},a=item.action||{},dados=d.dados_extraidos||a.payload||{};return a.resumo||dados.resumo||dados.descricao||d.tipo_operacao||'Rascunho sem resumo'}
+function contextoDe(item){const d=item.draft||{},a=item.action||{},dados=d.dados_extraidos||a.payload||{};return dados.contexto_operacional||dados.contexto||dados.grupo_telegram||d.origem_conversa_id||a.conversa_id||'sem_contexto'}
+function contextMissing(item){const d=item.draft||{},dados=d.dados_extraidos||{};return REQUIRED_CONTEXT.filter(k=>dados[k]===undefined||dados[k]===null||String(dados[k]).trim()==='')}
+async function carregar(){el('subtitle').textContent='Carregando revisões...';const [rd,ra]=await Promise.all([db.from('operation_drafts').select('*').order('criado_em',{ascending:false}).limit(200),db.from('pending_actions').select('*').order('criado_em',{ascending:false}).limit(200)]);const err=rd.error||ra.error;if(err){el('subtitle').textContent='Erro ao carregar: '+err.message;return}drafts=rd.data||[];actions=ra.data||[];montarItens();montarContextos();renderLista();renderKpis();el('subtitle').textContent=`Atualizado ${fmtDT(new Date().toISOString())} · ${itens.length} itens encontrados`}
+function montarItens(){const actionById=Object.fromEntries(actions.map(a=>[a.id,a]));const used=new Set();itens=drafts.map(d=>{const a=d.pending_action_id?actionById[d.pending_action_id]:null;if(a)used.add(a.id);return{id:d.id,draft:d,action:a}});actions.forEach(a=>{if(!used.has(a.id))itens.push({id:'pa:'+a.id,draft:null,action:a})})}
+function montarContextos(){const atual=el('fContexto').value;const ctxs=[...new Set(itens.map(contextoDe))].sort();el('fContexto').innerHTML='<option value="">Todos</option>'+ctxs.map(c=>`<option value="${attr(c)}">${esc(c)}</option>`).join('');el('fContexto').value=ctxs.includes(atual)?atual:''}
+function passaFiltro(item){const busca=asText(el('busca').value),ctx=el('fContexto').value,st=el('fStatus').value,d=item.draft||{},a=item.action||{},dados=d.dados_extraidos||a.payload||{};if(ctx&&contextoDe(item)!==ctx)return false;if(st==='abertos'){if(!OPEN_DRAFT_STATUS.has(d.status)&&!OPEN_ACTION_STATUS.has(a.status))return false}else if(st!=='todos'&&d.status!==st&&a.status!==st)return false;if(!busca)return true;return[resumoItem(item),contextoDe(item),d.codigo_sugerido,d.tipo_operacao,a.entidade_codigo,JSON.stringify(dados)].some(v=>asText(v).includes(busca))}
+function renderKpis(){const abertos=itens.filter(i=>OPEN_DRAFT_STATUS.has(i.draft?.status)||OPEN_ACTION_STATUS.has(i.action?.status)).length,ctxs=new Set(itens.map(contextoDe)),incompletos=itens.filter(i=>i.draft&&contextMissing(i).length).length,revisao=itens.filter(i=>i.draft?.status==='em_revisao'||i.action?.status==='em_revisao').length;el('kpis').innerHTML=[['Abertos',abertos,'itens para tratar'],['Contextos',ctxs.size,'grupos separados'],['Sem contexto completo',incompletos,'corrigir antes de aprovar'],['Em revisão',revisao,'aguardando decisão']].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="d">${k[2]}</div></div>`).join('')}
+function renderLista(){const filtrados=itens.filter(passaFiltro);if(!filtrados.length){el('lista').innerHTML='<div class="card empty">Nenhum item nesse filtro.</div>';return}el('lista').innerHTML=filtrados.map(item=>{const d=item.draft||{},a=item.action||{},dados=d.dados_extraidos||a.payload||{},missing=contextMissing(item);return `<button class="review-item ${missing.length?'context-bad':'context-ok'} ${selecionado===item.id?'active':''}" onclick="selecionar('${item.id}')"><div class="review-top"><div class="review-title">${esc(resumoItem(item))}</div><div>${statusBadge(d.status||a.status)}</div></div><div class="review-meta">${esc(contextoDe(item))} · ${esc(firstVal(dados,'operacao_codigo|codigo_sugerido')||d.codigo_sugerido||a.entidade_codigo||'sem código')}<br>${fmtDT(d.criado_em||a.criado_em)} · ${esc(dados.grupo_telegram||d.origem_conversa_id||a.conversa_id||'origem não informada')}</div><div class="pill-row">${missing.length?`<span class="badge b-red">contexto incompleto</span>`:`<span class="badge b-green">contexto completo</span>`}${d.pending_action_id?`<span class="badge b-blue">pendência ligada</span>`:''}</div></button>`}).join('')}
+function selecionar(id){selecionado=id;renderLista();renderDetalhe(itens.find(i=>i.id===id))}
+function fieldHtml(i,paths,label,type,dados){const val=firstVal(dados,paths);const wide=type==='textarea'?' wide':'';return `<div class="fld${wide}"><label>${label}</label>${type==='textarea'?`<textarea data-biz="${i}" rows="3">${esc(val)}</textarea>`:`<input data-biz="${i}" type="${type==='date'?'date':'text'}" inputmode="${type==='number'?'decimal':'text'}" value="${attr(val)}">`}</div>`}
+function renderDetalhe(item){if(!item){el('detalhe').innerHTML='<div class="empty">Selecione um item da fila.</div>';return}const d=item.draft||{},a=item.action||{},dados=d.dados_extraidos||a.payload||{},missing=contextMissing(item);el('detalhe').innerHTML=`<div class="section"><div class="review-top"><div><div class="review-title">${esc(resumoItem(item))}</div><div class="small-note">Criado em ${fmtDT(d.criado_em||a.criado_em)} · agente ${esc(d.agente||a.agente||dados.agente||'não informado')}</div></div><div>${statusBadge(d.status||a.status)}</div></div>${missing.length?`<div class="locked">Complete estes dados de contexto antes de salvar: ${esc(missing.join(', '))}</div>`:''}</div><div class="section"><div class="section-title">Resumo para confirmação</div><div class="confirm-box"><div class="mini-card"><div class="l">Contexto</div><div class="v">${esc(contextoDe(item))}</div></div><div class="mini-card"><div class="l">Grupo</div><div class="v">${esc(dados.grupo_telegram||'—')}</div></div><div class="mini-card"><div class="l">Operação</div><div class="v">${esc(firstVal(dados,'operacao_codigo|codigo_sugerido')||d.codigo_sugerido||'—')}</div></div><div class="mini-card"><div class="l">Status</div><div class="v">${labelStatus(d.status||a.status)}</div></div></div></div><div class="section"><div class="section-title">Dados para revisar e ajustar</div><div class="form-grid">${BUSINESS_FIELDS.map((f,i)=>fieldHtml(i,f[0],f[1],f[2],dados)).join('')}</div></div><div class="section"><div class="section-title">Contexto e origem</div><div class="form-grid"><div class="fld"><label>Contexto operacional</label><input id="ctx" value="${attr(dados.contexto_operacional||'')}"></div><div class="fld"><label>Grupo Telegram</label><input id="grupo" value="${attr(dados.grupo_telegram||'')}"></div><div class="fld"><label>ID do grupo</label><input id="grupoId" value="${attr(dados.grupo_telegram_id||'')}"></div><div class="fld"><label>Canal de origem</label><input id="origemCanal" value="${attr(dados.origem_canal||d.origem_canal||a.canal||'')}"></div><div class="fld"><label>Conversa origem</label><input id="origemConversa" value="${attr(dados.origem_conversa_id||d.origem_conversa_id||a.conversa_id||'')}"></div><div class="fld"><label>Mensagem origem</label><input id="origemMensagem" value="${attr(dados.origem_mensagem_id||d.origem_mensagem_id||a.mensagem_id||'')}"></div></div></div><div class="section"><div class="section-title">Pendências e decisão</div><div class="form-grid two"><div class="fld"><label>Status da revisão</label><select id="draftStatus"><option value="rascunho">Rascunho</option><option value="aguardando_confirmacao">Aguardando confirmação</option><option value="confirmado_telegram">Confirmado no Telegram</option><option value="em_revisao">Em revisão</option><option value="realizado">Realizado</option><option value="rejeitado">Rejeitado</option><option value="cancelado">Cancelado</option><option value="erro">Erro</option></select></div><div class="fld"><label>Status da pendência</label><select id="actionStatus"><option value="aguardando_confirmacao">Aguardando confirmação</option><option value="confirmado_telegram">Confirmado no Telegram</option><option value="em_revisao">Em revisão</option><option value="aprovado_confinex">Aprovado no Confinex</option><option value="executado">Executado</option><option value="rejeitado">Rejeitado</option><option value="expirado">Expirado</option><option value="erro">Erro</option><option value="cancelado">Cancelado</option></select></div><div class="fld wide"><label>O que ainda falta conferir</label><textarea id="campos" rows="4">${esc(arrLines(d.campos_pendentes))}</textarea></div><div class="fld wide"><label>Motivo do ajuste ou decisão</label><input id="motivo" placeholder="Ex.: corrigido fornecedor, quantidade, peso, valor, CF ou contexto"></div></div><div class="decision small-note">Salvar ajustes mantém o item em revisão. Aprovar no Confinex marca a pendência como aprovada, mas ainda não cria compra/venda/lote definitivo.</div></div><details class="section tech"><summary>Dados técnicos avançados</summary><div class="form-grid two" style="margin-top:10px"><div class="fld wide"><label>Dados completos</label><textarea id="dadosJson" class="json">${esc(jfmt(dados))}</textarea></div><div class="fld wide"><label>Inferências</label><textarea id="inferencias" class="json">${esc(jfmt(d.inferencias||{}))}</textarea></div></div></details><div class="actions"><button class="btn" onclick="salvarAjustes('em_revisao')">Salvar ajustes</button><button class="btn" onclick="salvarAjustes('aprovado_confinex')">Aprovar no Confinex</button><button class="btn sec" onclick="salvarAjustes('aguardando_confirmacao')">Voltar para confirmação</button><button class="btn danger" onclick="rejeitarItem()">Rejeitar / cancelar</button></div>`;el('draftStatus').value=d.status||'rascunho';el('actionStatus').value=a.status||'aguardando_confirmacao'}
+function dadosDaTela(){let dados;try{dados=JSON.parse(el('dadosJson').value||'{}')}catch(e){throw new Error('Dados técnicos inválidos. Abra Dados técnicos avançados e corrija o JSON.')}BUSINESS_FIELDS.forEach((f,i)=>{const input=document.querySelector(`[data-biz="${i}"]`);if(!input)return;const value=input.value;if(String(value).trim()!=='')setPath(dados,targetPath(dados,f[0]),parseByType(value,f[2]))});Object.assign(dados,{contexto_operacional:el('ctx').value.trim(),grupo_telegram:el('grupo').value.trim(),grupo_telegram_id:el('grupoId').value.trim(),origem_canal:el('origemCanal').value.trim(),origem_conversa_id:el('origemConversa').value.trim(),origem_mensagem_id:el('origemMensagem').value.trim(),agente:dados.agente||'juan',status_confirmacao:el('draftStatus').value});return dados}
+function parseJsonField(id){try{return JSON.parse(el(id).value||'{}')}catch(e){throw new Error('Inferências inválidas. Abra Dados técnicos avançados e corrija o JSON.')}}
+function requireSelected(){const item=itens.find(i=>i.id===selecionado);if(!item)throw new Error('Selecione um item.');return item}
+function validarContexto(dados){const missing=REQUIRED_CONTEXT.filter(k=>dados[k]===undefined||dados[k]===null||String(dados[k]).trim()==='');if(missing.length)throw new Error('Complete o contexto antes de salvar: '+missing.join(', '))}
+async function registrarEvento(tipo,item,dados,modo){const d=item.draft||{},a=item.action||{};await db.from('eventos').insert({tipo,agente:d.agente||a.agente||dados.agente||'confinex',usuario:'pablo',entidade_tipo:d.id?'operation_draft':'pending_action',entidade_id:d.id||a.id,entidade_codigo:firstVal(dados,'operacao_codigo|codigo_sugerido')||d.codigo_sugerido||a.entidade_codigo,origem:'confinex_revisoes',origem_canal:dados.origem_canal,origem_conversa_id:dados.origem_conversa_id,origem_mensagem_id:dados.origem_mensagem_id,status:'registrado',dados:{draft_id:d.id,pending_action_id:a.id,motivo:el('motivo')?.value||null,modo,promovido_para_operacional:false,dados_revisados:dados},observacao:'Revisão ajustada no Confinex sem promoção automática para tabela operacional.'})}
+async function salvarAjustes(modo){try{const item=requireSelected(),d=item.draft,a=item.action,dados=dadosDaTela(),inferencias=parseJsonField('inferencias');validarContexto(dados);const campos=linesArr(el('campos').value),now=new Date().toISOString();let draftStatus=el('draftStatus').value,actionStatus=el('actionStatus').value;if(modo==='em_revisao'){draftStatus='em_revisao';actionStatus=a?'em_revisao':actionStatus}else if(modo==='aprovado_confinex'){draftStatus='confirmado_telegram';actionStatus='aprovado_confinex';dados.status_confirmacao='aprovado_confinex'}else if(modo==='aguardando_confirmacao'){draftStatus='aguardando_confirmacao';actionStatus='aguardando_confirmacao';dados.status_confirmacao='aguardando_confirmacao'}if(d){const {error}=await db.from('operation_drafts').update({atualizado_em:now,status:draftStatus,codigo_sugerido:firstVal(dados,'operacao_codigo|codigo_sugerido')||d.codigo_sugerido,entidade_final_tipo:d.entidade_final_tipo||a?.entidade_tipo||'revisao',dados_extraidos:dados,campos_pendentes:campos,inferencias}).eq('id',d.id);if(error)throw error}if(a){const payload=Object.assign({},a.payload||{},{dados_extraidos:dados,campos_pendentes:campos,inferencias,revisao_confinex:{atualizado_em:now,motivo:el('motivo').value||null,modo}});const {error}=await db.from('pending_actions').update({atualizado_em:now,status:actionStatus,entidade_codigo:firstVal(dados,'operacao_codigo|codigo_sugerido')||a.entidade_codigo,entidade_tipo:d?.entidade_final_tipo||a.entidade_tipo||'revisao',resumo:resumoItem(item),payload}).eq('id',a.id);if(error)throw error}await registrarEvento(modo==='aprovado_confinex'?'revisao_confinex_aprovada':'revisao_confinex_ajustada',item,dados,modo);alert(modo==='aprovado_confinex'?'Aprovado no Confinex. Ainda não foi promovido automaticamente para dado operacional.':'Ajustes salvos.');await carregar();selecionar(item.id)}catch(e){alert(e.message||e)}}
+async function rejeitarItem(){if(!confirm('Rejeitar/cancelar este item de revisão?'))return;try{const item=requireSelected(),d=item.draft,a=item.action,now=new Date().toISOString(),dados=dadosDaTela();if(d){const {error}=await db.from('operation_drafts').update({atualizado_em:now,status:'cancelado'}).eq('id',d.id);if(error)throw error}if(a){const {error}=await db.from('pending_actions').update({atualizado_em:now,status:'rejeitado',erro:el('motivo').value||'Rejeitado no Confinex'}).eq('id',a.id);if(error)throw error}await registrarEvento('revisao_confinex_rejeitada',item,dados,'rejeitado');alert('Item rejeitado/cancelado.');await carregar();el('detalhe').innerHTML='<div class="empty">Selecione um item da fila.</div>'}catch(e){alert(e.message||e)}}
 CFAgro.authInit(carregar);
 </script>
 </body>
