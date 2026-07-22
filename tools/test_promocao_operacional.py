@@ -1,0 +1,88 @@
+import unittest
+
+from promocao_operacional import clean_record, expected_confirmation, execute_promotion, validate_action
+
+
+class FakeClient:
+    def __init__(self, action):
+        self.action = action
+        self.operational_inserts = []
+        self.audit_inserts = []
+        self.updates = []
+
+    def select(self, table, **params):
+        if table == "pending_actions" and params.get("id") == f"eq.{self.action['id']}":
+            return [self.action]
+        return []
+
+    def insert_operational(self, table, payload):
+        self.operational_inserts.append((table, payload))
+        return {"id": "operacional-1", **payload}
+
+    def insert(self, table, payload):
+        self.audit_inserts.append((table, payload))
+        return {"id": "evento-1", **payload}
+
+    def update(self, table, filters, payload):
+        self.updates.append((table, filters, payload))
+        return [{**payload, "id": filters["id"].replace("eq.", "")}]
+
+
+def action_for(target="compras"):
+    return {
+        "id": "pa-1",
+        "acao_tipo": "promover_revisao_operacional",
+        "status": "aguardando_confirmacao",
+        "entidade_tipo": target,
+        "entidade_codigo": "CF-TESTE",
+        "payload": {
+            "source_draft_id": "draft-1",
+            "target_table": target,
+            "promovido_para_operacional": False,
+            "proposed_record": {
+                "quantidade": "18",
+                "valor_total": "R$ 115.033,27",
+                "origem_registro": "confinex_revisoes",
+                "campo_estranho": "ignorar",
+            },
+        },
+    }
+
+
+class PromocaoOperacionalTests(unittest.TestCase):
+    def test_clean_record_filters_columns_and_normalizes_numbers(self):
+        record = clean_record("compras", {"quantidade": "18", "valor_total": "R$ 115.033,27", "campo_estranho": "x"})
+        self.assertEqual(record["quantidade"], 18)
+        self.assertEqual(record["valor_total"], 115033.27)
+        self.assertNotIn("campo_estranho", record)
+
+    def test_validate_rejects_wrong_action_type(self):
+        action = action_for()
+        action["acao_tipo"] = "outra_coisa"
+        with self.assertRaisesRegex(Exception, "nao e uma promocao"):
+            validate_action(action)
+
+    def test_default_mode_only_previews(self):
+        client = FakeClient(action_for())
+        result = execute_promotion(client, "pa-1", usuario="pablo", executar=False, confirmacao=None)
+        self.assertFalse(result["executado"])
+        self.assertEqual(client.operational_inserts, [])
+        self.assertEqual(result["confirmacao_esperada"], "PROMOVER pa-1")
+
+    def test_execute_requires_exact_confirmation(self):
+        client = FakeClient(action_for())
+        with self.assertRaisesRegex(Exception, "confirmacao invalida"):
+            execute_promotion(client, "pa-1", usuario="pablo", executar=True, confirmacao="sim")
+
+    def test_execute_writes_operational_and_audit(self):
+        client = FakeClient(action_for())
+        result = execute_promotion(client, "pa-1", usuario="pablo", executar=True, confirmacao=expected_confirmation("pa-1"))
+        self.assertTrue(result["executado"])
+        self.assertEqual(client.operational_inserts[0][0], "compras")
+        self.assertEqual(client.updates[0][0], "pending_actions")
+        self.assertEqual(client.updates[1][0], "operation_drafts")
+        self.assertEqual(client.audit_inserts[0][1]["tipo"], "promocao_operacional_executada")
+
+
+if __name__ == "__main__":
+    unittest.main()
