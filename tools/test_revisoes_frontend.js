@@ -18,7 +18,7 @@ const context = {
   console,
 };
 vm.createContext(context);
-new vm.Script(`${scripts[0]}\nglobalThis.__revisoes={buildPromocaoPreview,promotionValidationState,promotionInputElement,aplicarEstadoPromocao,businessFieldIndex,businessTargetPath,promotionMissingLinks,irParaCampoObrigatorio,validarNegocioOperacional,promotionHistoryData,promotionHistoryHtml,statusPrincipal,dadosItem,labelStatus};`, {filename: 'revisoes.html'}).runInContext(context);
+new vm.Script(`${scripts[0]}\nglobalThis.__revisoes={buildPromocaoPreview,promotionValidationState,promotionInputElement,aplicarEstadoPromocao,businessFieldIndex,businessTargetPath,promotionMissingLinks,irParaCampoObrigatorio,validarNegocioOperacional,planoDecisao,montarEventoDecisao,montarAtualizacaoRascunho,registrarEvento,promotionHistoryData,promotionHistoryHtml,statusPrincipal,dadosItem,labelStatus};`, {filename: 'revisoes.html'}).runInContext(context);
 
 const api = context.__revisoes;
 
@@ -128,6 +128,37 @@ assert.match(api.promotionMissingLinks('vendas', ['prazo_recebimento']), /data-k
 assert.match(html, /id="btnSalvarAjustes"[^>]*onclick="salvarAjustes\('em_revisao'\)"/);
 assert.doesNotMatch(html.match(/<button[^>]*id="btnSalvarAjustes"[^>]*>/)?.[0] || '', /disabled/);
 
+assert.throws(() => api.planoDecisao('rejeitado', '   '), /Informe o motivo/);
+const rejeicao = api.planoDecisao('rejeitado', 'Documento pertence a outro lote');
+assert.equal(rejeicao.draftStatus, 'cancelado');
+assert.equal(rejeicao.actionStatus, 'rejeitado');
+assert.equal(rejeicao.eventoStatus, 'rejeitada');
+const itemDecisao = {draft:{id:'draft-1',agente:'juan',codigo_sugerido:'CF-1'},action:{id:'action-1'}};
+const dadosDecisao = {contexto_operacional:'Confinamento',quantidade:18,origem_canal:'telegram',origem_conversa_id:'grupo-1',origem_mensagem_id:'msg-1'};
+const eventoRejeicao = api.montarEventoDecisao(rejeicao, itemDecisao, dadosDecisao);
+assert.equal(eventoRejeicao.tipo, 'revisao_rejeitada');
+assert.equal(eventoRejeicao.status, 'rejeitada');
+assert.equal(eventoRejeicao.dados.motivo, 'Documento pertence a outro lote');
+assert.match(eventoRejeicao.observacao, /Documento pertence a outro lote/);
+
+const devolucao = api.planoDecisao('aguardando_confirmacao', 'Quantidade corrigida');
+assert.equal(devolucao.draftStatus, 'aguardando_confirmacao');
+assert.equal(devolucao.actionStatus, 'aguardando_confirmacao');
+const atualizacaoDevolucao = api.montarAtualizacaoRascunho(devolucao,dadosDecisao,{origem:'telegram'},['confirmar quantidade'],'2026-07-22T12:00:00Z',itemDecisao.draft,itemDecisao.action);
+assert.equal(atualizacaoDevolucao.dados_extraidos, dadosDecisao, 'Voltar para confirmação deve manter os dados ajustados');
+assert.equal(atualizacaoDevolucao.status, 'aguardando_confirmacao');
+const eventoDevolucao = api.montarEventoDecisao(devolucao,itemDecisao,dadosDecisao);
+assert.equal(eventoDevolucao.tipo, 'revisao_devolvida_para_confirmacao');
+assert.equal(eventoDevolucao.dados.motivo, 'Quantidade corrigida');
+
+const ajustes = api.planoDecisao('em_revisao', 'Peso conferido');
+assert.equal(ajustes.draftStatus, 'em_revisao');
+assert.equal(ajustes.actionStatus, 'em_revisao');
+assert.equal(api.montarEventoDecisao(ajustes,itemDecisao,dadosDecisao).tipo, 'ajustes_salvos_na_revisao');
+assert.match(html, /onclick="voltarParaConfirmacao\(\)"/);
+assert.match(html, /Obrigatório para rejeitar/);
+assert.doesNotMatch(html, /Dados técnicos avançados|class="json"/);
+
 const basePromocao = {
   acao_tipo:'promover_revisao_operacional',
   criado_em:'2026-07-22T10:00:00Z',
@@ -158,4 +189,13 @@ assert.equal(concluida.destino, 'Compra de gado');
 assert.equal(api.statusPrincipal({draft:{status:'em_revisao'},action:estados[2][0]}), 'executado');
 assert.equal(api.dadosItem({}, basePromocao).contexto_operacional, 'Boi Balança');
 assert.doesNotMatch(html, /Dados técnicos avançados|class="json"/);
-console.log('Simulações da fila de revisões: OK');
+const eventosInseridos = [];
+context.db = {from(table) { assert.equal(table, 'eventos'); return {insert(record) { eventosInseridos.push(record); return {error:null}; }}; }};
+api.registrarEvento(rejeicao,itemDecisao,dadosDecisao).then(() => {
+  assert.equal(eventosInseridos.length, 1, 'Rejeição com motivo deve registrar evento');
+  assert.equal(eventosInseridos[0].status, 'rejeitada');
+  console.log('Simulações da fila de revisões: OK');
+}).catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
