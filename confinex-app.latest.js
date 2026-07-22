@@ -93,6 +93,15 @@ select option{background:white}
 .cmp-tbl tr:last-child td{border-bottom:none}
 .cmp-tbl tr.grp td{padding-top:14px;border-top:2px solid ${T.border};color:${T.accent};font-weight:600;font-size:10px;letter-spacing:.8px;text-transform:uppercase;font-family:'Plus Jakarta Sans',sans-serif;background:${T.bg}}
 .cmp-tbl tr.tot td{font-size:13px;font-weight:700;background:#F9FAFB}
+.cmp-tbl.evolucao-table{min-width:780px;table-layout:fixed}
+.cmp-tbl.evolucao-table th{padding:8px 6px;white-space:normal;line-height:1.15;letter-spacing:.45px;vertical-align:bottom}
+.cmp-tbl.evolucao-table td{padding:8px 6px;font-size:11px}
+.cmp-tbl.evolucao-table th:first-child{min-width:0;width:122px}
+.cmp-tbl.evolucao-table th:nth-child(2){width:112px}
+.cmp-tbl.evolucao-table th:nth-child(3),.cmp-tbl.evolucao-table th:nth-child(4),.cmp-tbl.evolucao-table th:nth-child(5),.cmp-tbl.evolucao-table th:nth-child(6),.cmp-tbl.evolucao-table th:nth-child(7){width:72px}
+.cmp-tbl.evolucao-table th:nth-child(8){width:78px}
+.cmp-tbl.evolucao-table th:nth-child(9){width:100px}
+.cmp-tbl.evolucao-table td:first-child{font-size:10px}
 .pos{color:${T.green}}
 .neg{color:${T.red}}
 .hi{font-weight:700}
@@ -1566,17 +1575,17 @@ function EvolucaoTempo({ lote, cenarios }) {
       const diasAtual = Math.round(parseFloat(sc.diasCiclo) || 0);
       return /* @__PURE__ */ jsxs("div", { style: { marginBottom: 24 }, children: [
         /* @__PURE__ */ jsxs("div", { className: "sec-t nm", style: { marginBottom: 8 }, children: [sc.nome, " · ", sc.modalidade, " · ciclo atual ", diasAtual, " dias"] }),
-        /* @__PURE__ */ jsx("div", { className: "tbl-wrap", children: /* @__PURE__ */ jsxs("table", { className: "cmp-tbl", children: [
+        /* @__PURE__ */ jsx("div", { className: "tbl-wrap", children: /* @__PURE__ */ jsxs("table", { className: "cmp-tbl evolucao-table", children: [
           /* @__PURE__ */ jsx("thead", { children: /* @__PURE__ */ jsxs("tr", { children: [
-            /* @__PURE__ */ jsx("th", { children: "Prazo / saída" }),
-            /* @__PURE__ */ jsx("th", { children: "BGI do mês" }),
-            /* @__PURE__ */ jsx("th", { children: "@ produzidas / cab" }),
-            /* @__PURE__ */ jsx("th", { children: "Custo @ produzida" }),
-            /* @__PURE__ */ jsx("th", { children: "Custo marginal @" }),
-            /* @__PURE__ */ jsx("th", { children: "Frete / @ produzida" }),
-            /* @__PURE__ */ jsx("th", { children: "Produção + frete / @" }),
-            /* @__PURE__ */ jsx("th", { children: "Rent. mensal" }),
-            /* @__PURE__ */ jsx("th", { children: "Resultado final" })
+            /* @__PURE__ */ jsxs("th", { children: ["Prazo /", /* @__PURE__ */ jsx("br", {}), "saída"] }),
+            /* @__PURE__ */ jsxs("th", { children: ["BGI do", /* @__PURE__ */ jsx("br", {}), "mês"] }),
+            /* @__PURE__ */ jsxs("th", { children: ["@ produzidas", /* @__PURE__ */ jsx("br", {}), "por cab."] }),
+            /* @__PURE__ */ jsxs("th", { children: ["Custo da @", /* @__PURE__ */ jsx("br", {}), "produzida"] }),
+            /* @__PURE__ */ jsxs("th", { children: ["Custo da @", /* @__PURE__ */ jsx("br", {}), "marginal"] }),
+            /* @__PURE__ */ jsxs("th", { children: ["Frete por @", /* @__PURE__ */ jsx("br", {}), "produzida"] }),
+            /* @__PURE__ */ jsxs("th", { children: ["Produção + frete", /* @__PURE__ */ jsx("br", {}), "por @"] }),
+            /* @__PURE__ */ jsxs("th", { children: ["Rent.", /* @__PURE__ */ jsx("br", {}), "mensal"] }),
+            /* @__PURE__ */ jsxs("th", { children: ["Resultado", /* @__PURE__ */ jsx("br", {}), "final"] })
           ] }) }),
           /* @__PURE__ */ jsx("tbody", { children: evolucao.map((ponto) => {
             const r = ponto.resultado;

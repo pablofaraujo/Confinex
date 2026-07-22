@@ -20,7 +20,7 @@
         var box = document.getElementById('boot-status');
         if (box) {
           box.style.display = 'block';
-          box.innerHTML = '<b>Erro ao abrir o Confinex</b><br>' + (event.message || 'Falha ao carregar o aplicativo.') + '<br><a href="./confinex.html?v=20260721-12">Tentar novamente</a><br><small>Build 20260721-12</small>';
+          box.innerHTML = '<b>Erro ao abrir o Confinex</b><br>' + (event.message || 'Falha ao carregar o aplicativo.') + '<br><a href="./confinex.html?v=20260721-13">Tentar novamente</a><br><small>Build 20260721-13</small>';
         }
       });
       window.addEventListener('unhandledrejection', function (event) {
@@ -29,7 +29,7 @@
         if (box) {
           var motivo = event.reason && event.reason.message ? event.reason.message : 'Falha inesperada durante a abertura.';
           box.style.display = 'block';
-          box.innerHTML = '<b>Erro ao abrir o Confinex</b><br>' + motivo + '<br><a href="./confinex.html?v=20260721-12">Tentar novamente</a><br><small>Build 20260721-12</small>';
+          box.innerHTML = '<b>Erro ao abrir o Confinex</b><br>' + motivo + '<br><a href="./confinex.html?v=20260721-13">Tentar novamente</a><br><small>Build 20260721-13</small>';
         }
       });
       setTimeout(function () {
@@ -37,7 +37,7 @@
         var box = document.getElementById('boot-status');
         if (box) {
           box.style.display = 'block';
-          box.innerHTML = '<b>O aplicativo não terminou de carregar.</b><br><a href="./confinex.html?v=20260721-12">Tentar novamente</a><br><small>Build 20260721-12</small>';
+          box.innerHTML = '<b>O aplicativo não terminou de carregar.</b><br><a href="./confinex.html?v=20260721-13">Tentar novamente</a><br><small>Build 20260721-13</small>';
         }
       }, 12000);
     </script>
@@ -47,7 +47,7 @@
     </style>
   </head>
   <body>
-    <div id="boot-status">Abrindo Confinex… <small>Build 20260721-12</small></div>
+    <div id="boot-status">Abrindo Confinex… <small>Build 20260721-13</small></div>
     <div id="root"></div>
     <script>
       (function () {
@@ -62,7 +62,7 @@
         observer.observe(root, { childList: true });
       })();
     </script>
-    <script defer src="./confinex-app.mobile.js?v=20260721-12"></script>
+    <script defer src="./confinex-app.mobile.js?v=20260721-13"></script>
     <script>
       (function () {
         function carregarSupabaseSemBloquear() {
