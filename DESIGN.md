@@ -57,6 +57,7 @@ Larguras: padrão 1280px; `<body data-w="md">` = 1100px; `<body data-w="sm">` = 
 | Botão | `.btn` (+ `.sec .mini .warn`) | ações; funciona em `<a>` |
 | Campo | `.fld > label + input/select/textarea` | formulários |
 | Feedback | `.err` (erro) `.msg` (sucesso inline) | abaixo de forms |
+| Validação guiada | `.aviso-validacao`, `.fld.campo-incompleto`, `.btn:disabled` | aviso de campos faltantes, destaque no formulário e bloqueio pontual da ação dependente |
 | Login | `.login-box` | tela de entrada padrão |
 | Topbar | `.topbar > .ident / .acoes`, `.logo-img` | cabeçalho de página |
 | Grids | `.grid.g6`, `.grid2`, `.simgrid` | layouts de form/painel |
