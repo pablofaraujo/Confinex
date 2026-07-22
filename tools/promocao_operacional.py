@@ -117,7 +117,46 @@ def fetch_action(client: ConfinexClient, action_id: str) -> dict[str, Any]:
     return rows[0]
 
 
-def execute_promotion(client: ConfinexClient, action_id: str, *, usuario: str, executar: bool, confirmacao: str | None) -> dict[str, Any]:
+def source_value(payload: dict[str, Any], *keys: str) -> str | None:
+    for key in keys:
+        current: Any = payload
+        ok = True
+        for part in key.split("."):
+            if isinstance(current, dict) and part in current:
+                current = current[part]
+            else:
+                ok = False
+                break
+        if ok and current not in (None, ""):
+            return str(current)
+    return None
+
+
+def validate_execution_origin(
+    payload: dict[str, Any],
+    origem_conversa_id: str | None,
+    origem_mensagem_id: str | None,
+) -> None:
+    src_chat = source_value(payload, "dados_revisados.origem_conversa_id", "origem_conversa_id")
+    src_msg = source_value(payload, "dados_revisados.origem_mensagem_id", "origem_mensagem_id")
+    if not origem_mensagem_id:
+        raise ConfinexError("origem_mensagem_id da confirmacao e obrigatoria para executar")
+    if src_msg and str(origem_mensagem_id) == src_msg:
+        raise ConfinexError("a confirmacao deve vir de uma nova mensagem")
+    if src_chat and origem_conversa_id and str(origem_conversa_id) != src_chat:
+        raise ConfinexError("confirmacao veio de contexto/grupo diferente da origem")
+
+
+def execute_promotion(
+    client: ConfinexClient,
+    action_id: str,
+    *,
+    usuario: str,
+    executar: bool,
+    confirmacao: str | None,
+    origem_conversa_id: str | None = None,
+    origem_mensagem_id: str | None = None,
+) -> dict[str, Any]:
     action = fetch_action(client, action_id)
     target, payload, record = validate_action(action)
     now = utc_now()
@@ -134,6 +173,7 @@ def execute_promotion(client: ConfinexClient, action_id: str, *, usuario: str, e
     expected = expected_confirmation(action_id)
     if confirmacao != expected:
         raise ConfinexError(f"confirmacao invalida; use exatamente: {expected}")
+    validate_execution_origin(payload, origem_conversa_id, origem_mensagem_id)
 
     inserted = client.insert_operational(target, record)
     payload = {
@@ -144,6 +184,8 @@ def execute_promotion(client: ConfinexClient, action_id: str, *, usuario: str, e
         "target_table": target,
         "target_record_id": inserted.get("id"),
         "record_executed": record,
+        "confirmacao_origem_conversa_id": origem_conversa_id,
+        "confirmacao_origem_mensagem_id": origem_mensagem_id,
     }
     client.update(
         "pending_actions",
@@ -205,6 +247,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--usuario", default="pablo")
     parser.add_argument("--executar", action="store_true", help="Grava a tabela operacional e encerra a pendencia")
     parser.add_argument("--confirmacao", help="Frase exata: PROMOVER <pending_action_id>")
+    parser.add_argument("--origem-conversa-id")
+    parser.add_argument("--origem-mensagem-id")
     return parser
 
 
@@ -212,7 +256,17 @@ def main() -> int:
     args = build_parser().parse_args()
     try:
         client = ConfinexClient()
-        emit(execute_promotion(client, args.pending_action_id, usuario=args.usuario, executar=args.executar, confirmacao=args.confirmacao))
+        emit(
+            execute_promotion(
+                client,
+                args.pending_action_id,
+                usuario=args.usuario,
+                executar=args.executar,
+                confirmacao=args.confirmacao,
+                origem_conversa_id=args.origem_conversa_id,
+                origem_mensagem_id=args.origem_mensagem_id,
+            )
+        )
         return 0
     except ConfinexError as exc:
         print(json.dumps({"erro": str(exc)}, ensure_ascii=False), file=sys.stderr)
