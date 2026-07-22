@@ -1,5 +1,8 @@
-import sys, unittest
-sys.path.insert(0,'/root/juan-severino/handlers')
+import sys
+import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from promocao_confirmacao_router import parse_promote, route_confirmation
 
 class FakeClient:

@@ -2,8 +2,13 @@
 """Roteia confirmacoes textuais de promocao operacional vindas do Telegram."""
 from __future__ import annotations
 import argparse,json,re,sys
+from pathlib import Path
 from typing import Any
-sys.path.insert(0,'/root/ponte/tools')
+HERE = Path(__file__).resolve().parent
+for path in (HERE, Path('/root/ponte/tools')):
+    path_text = str(path)
+    if path.exists() and path_text not in sys.path:
+        sys.path.insert(0, path_text)
 from confinex_client import ConfinexClient, ConfinexError
 from promocao_operacional import execute_promotion, expected_confirmation
 

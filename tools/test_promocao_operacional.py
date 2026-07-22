@@ -1,4 +1,8 @@
+import sys
 import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from promocao_operacional import clean_record, expected_confirmation, execute_promotion, validate_action
 
