@@ -18,7 +18,7 @@ const context = {
   console,
 };
 vm.createContext(context);
-new vm.Script(`${scripts[0]}\nglobalThis.__revisoes={buildPromocaoPreview,promotionValidationState,promotionInputElement,aplicarEstadoPromocao,businessFieldIndex,businessTargetPath,promotionMissingLinks,irParaCampoObrigatorio,validarNegocioOperacional,planoDecisao,montarEventoDecisao,montarAtualizacaoRascunho,registrarEvento,promotionHistoryData,promotionHistoryHtml,statusPrincipal,dadosItem,labelStatus,painelFila,itemMatchesStatus,camposObrigatoriosFaltantes,filtrosRapidosHtml,contextosResumoHtml,contextoDe,grupoNome,dadosComGrupoNome,contextoPersistivel,incluirContextoSeDisponivel,inferPromotionTarget};`, {filename: 'revisoes.html'}).runInContext(context);
+new vm.Script(`${scripts[0]}\nglobalThis.__revisoes={buildPromocaoPreview,promotionValidationState,promotionInputElement,aplicarEstadoPromocao,businessFieldIndex,businessTargetPath,promotionMissingLinks,irParaCampoObrigatorio,validarNegocioOperacional,planoDecisao,montarEventoDecisao,montarAtualizacaoRascunho,registrarEvento,promotionHistoryData,promotionHistoryHtml,statusPrincipal,dadosItem,labelStatus,painelFila,itemMatchesStatus,camposObrigatoriosFaltantes,filtrosRapidosHtml,contextosResumoHtml,contextoDe,grupoNome,dadosComGrupoNome,contextoPersistivel,incluirContextoSeDisponivel,inferPromotionTarget,prioridadeItem,compararPrioridade,orientacaoCampoFaltante,orientacoesCamposHtml};`, {filename: 'revisoes.html'}).runInContext(context);
 
 const api = context.__revisoes;
 
@@ -185,6 +185,28 @@ assert.deepEqual(
   ['Peso carcaça total', 'Valor bruto', 'Previsão de recebimento'],
 );
 assert.equal(api.itemMatchesStatus(rascunhoVendaAbateReal, 'campos_faltantes'), true);
+assert.equal(api.itemMatchesStatus(rascunhoVendaAbateReal, 'prioridade_alta'), true);
+assert.equal(api.prioridadeItem(rascunhoVendaAbateReal).rotulo, 'Prioridade alta');
+const pendenciaVendaSemRascunho = {
+  draft:null,
+  action:{
+    status:'em_revisao',
+    acao_tipo:'revisar_romaneio',
+    entidade_tipo:'venda_abate',
+    mensagem_id:'mensagem-auditada',
+    payload:{dados_extraidos:contextoCompleto('Boi Balança','mensagem-auditada')},
+  },
+};
+assert.equal(api.prioridadeItem(pendenciaVendaSemRascunho).nivel, 'alta');
+api.aplicarEstadoPromocao(
+  'vendas',
+  api.buildPromocaoPreview(dadosVendaAbateReal, 'vendas'),
+);
+assert.equal(preparar.disabled, true);
+assert.equal(salvar.disabled, false);
+assert.match(alerta.innerHTML, /Falta peso para calcular e conferir a venda/);
+assert.match(alerta.innerHTML, /Confira o valor bruto antes de promover/);
+assert.match(alerta.innerHTML, /Falta previsão de recebimento/);
 assert.doesNotMatch(
   api.contextosResumoHtml(api.painelFila([rascunhoVendaAbateReal])),
   /9999999999|telegram:grupo/,
@@ -222,6 +244,7 @@ assert.equal(painel.promocoesExecutando, 1);
 assert.equal(painel.promocoesExecutadas, 1);
 assert.equal(painel.errosPosGravacao, 1);
 assert.equal(painel.rejeitadosCancelados, 2);
+assert.equal(painel.prioridadeAlta, 0);
 assert.equal(api.camposObrigatoriosFaltantes(itensPainel[0]).length, 4);
 assert.equal(api.camposObrigatoriosFaltantes(itensPainel[1]).length, 0);
 assert.equal(itensPainel.filter(item => api.itemMatchesStatus(item,'promocao_aguardando')).length, 1);
@@ -244,8 +267,16 @@ assert.doesNotMatch(
 );
 assert.doesNotMatch(api.contextosResumoHtml(api.painelFila([{id:'ctx',draft:{status:'em_revisao',contexto_nome:'Grupo Operacional',dados_extraidos:{...contextoCompleto('Grupo Operacional','msg'),origem_conversa_id:'-9999999999'}},action:null}])), /9999999999/);
 assert.match(api.filtrosRapidosHtml(painel), /data-filter="campos_faltantes"/);
+assert.match(api.filtrosRapidosHtml(painel), /data-filter="prioridade_alta"/);
 assert.match(api.contextosResumoHtml(painel), /Boi Balança/);
 assert.doesNotMatch(api.contextosResumoHtml(painel), /9999999999|telegram:-/);
+const ordenadosPorPrioridade = [
+  itensPainel[0],
+  rascunhoVendaAbateReal,
+  itensPainel[6],
+].sort(api.compararPrioridade);
+assert.equal(ordenadosPorPrioridade[0], rascunhoVendaAbateReal);
+assert.equal(ordenadosPorPrioridade[2], itensPainel[6], 'Item encerrado deve ficar depois dos abertos');
 
 assert.throws(() => api.planoDecisao('rejeitado', '   '), /Informe o motivo/);
 const rejeicao = api.planoDecisao('rejeitado', 'Documento pertence a outro lote');
