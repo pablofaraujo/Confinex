@@ -55,6 +55,36 @@ class FakeClient:
 
 
 class ContextoCanonicoTests(unittest.TestCase):
+    def test_contexto_escopo_e_consultado_somente_em_memorias(self):
+        class Client:
+            def __init__(self):
+                self.selects = {}
+
+            def select(self, table, **params):
+                self.selects[table] = params["select"]
+                return []
+
+        from normalizar_contextos import select_rows
+
+        client = Client()
+        for table in (
+            "operation_drafts",
+            "pending_actions",
+            "eventos",
+            "memorias_agentes",
+        ):
+            select_rows(client, table)
+        self.assertNotIn(
+            "contexto_escopo", client.selects["operation_drafts"].split(",")
+        )
+        self.assertNotIn(
+            "contexto_escopo", client.selects["pending_actions"].split(",")
+        )
+        self.assertNotIn("contexto_escopo", client.selects["eventos"].split(","))
+        self.assertIn(
+            "contexto_escopo", client.selects["memorias_agentes"].split(",")
+        )
+
     def test_preserva_id_tecnico_e_separa_nome(self):
         context = montar_contexto(
             contexto_nome="Grupo Operacional",

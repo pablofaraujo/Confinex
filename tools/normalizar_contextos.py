@@ -43,7 +43,6 @@ SELECTS = {
 CONTEXT_COLUMNS = (
     "contexto_canonico", "contexto_nome", "origem_canal",
     "origem_conversa_id", "origem_mensagem_id", "agente", "escopo",
-    "contexto_escopo",
 )
 CONFIRM_PREFIX = "NORMALIZAR CONTEXTOS"
 CANDIDATE_NAMESPACE = uuid.UUID("e5f19b87-58be-43a7-a94f-518755cdf460")
@@ -112,8 +111,11 @@ def normalized_payload(row: dict[str, Any], spec: dict[str, str], mapped: dict[s
 
 
 def select_rows(client: Any, table: str) -> list[dict[str, Any]]:
+    context_columns = CONTEXT_COLUMNS + (
+        ("contexto_escopo",) if table == "memorias_agentes" else ()
+    )
     expanded = SELECTS[table] + "," + ",".join(
-        column for column in CONTEXT_COLUMNS if column not in SELECTS[table].split(",")
+        column for column in context_columns if column not in SELECTS[table].split(",")
     )
     try:
         return client.select(table, select=expanded, order="id.asc", limit="5000")
