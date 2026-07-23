@@ -30,6 +30,8 @@ Ao receber um documento de compra de gado, Juan segue esta ordem:
 
 Reconhecer, extrair, confirmar ou calcular nunca autoriza escrita em `compras`, `operation_drafts` ou qualquer outra tabela. O rascunho depende de aceite explícito posterior e continua sujeito à revisão visual e à promoção controlada.
 
+Desde 23/07/2026, `compra_documento_ocr.py` tem fallback local com Tesseract para foto/PDF quando o provedor visual externo estiver indisponível. O fallback extrai compra, vendedor, cabeças, preço por arroba, peso total ou médio, desconto de barriga, data e pagamento quando legíveis; calcula arrobas e valor quando houver dados suficientes; e registra apenas `ocr_fallback_motivo=provedor_visual_indisponivel`, sem guardar erro técnico bruto do provedor.
+
 ### Teste operacional validado na VPS
 
 Um documento controlado de compra confirmou o seguinte comportamento, com os dados comerciais sensíveis omitidos deste repositório público:
