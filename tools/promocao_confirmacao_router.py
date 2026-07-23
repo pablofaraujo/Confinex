@@ -5,9 +5,18 @@ import argparse,json,re,sys
 from pathlib import Path
 from typing import Any
 HERE = Path(__file__).resolve().parent
+
+
+def path_exists(path: Path) -> bool:
+    try:
+        return path.exists()
+    except PermissionError:
+        return False
+
+
 for path in (HERE, Path('/root/ponte/tools')):
     path_text = str(path)
-    if path.exists() and path_text not in sys.path:
+    if path_exists(path) and path_text not in sys.path:
         sys.path.insert(0, path_text)
 from confinex_client import ConfinexClient, ConfinexError
 from promocao_operacional import execute_promotion, expected_confirmation

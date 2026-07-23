@@ -37,11 +37,14 @@ STATUS_EVENTO_VALIDOS = {"cancelado", "corrigido", "pendente", "registrado"}
 
 def carregar_env() -> dict[str, str]:
     env = dict(os.environ)
-    if ENV_FILE.exists():
-        for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
-            if "=" in line and not line.lstrip().startswith("#"):
-                key, value = line.split("=", 1)
-                env.setdefault(key, value)
+    try:
+        env_text = ENV_FILE.read_text(encoding="utf-8")
+    except (FileNotFoundError, PermissionError):
+        return env
+    for line in env_text.splitlines():
+        if "=" in line and not line.lstrip().startswith("#"):
+            key, value = line.split("=", 1)
+            env.setdefault(key, value)
     return env
 
 

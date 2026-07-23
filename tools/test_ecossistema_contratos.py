@@ -4,7 +4,7 @@ import re
 import unittest
 from argparse import Namespace
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from test_ecossistema import (
     FalhaValidacao,
@@ -102,6 +102,21 @@ class ContratosEcossistemaTests(unittest.TestCase):
         self.assertIn("python3 tools/test_ecossistema.py", workflow)
         self.assertRegex(workflow, r"(?m)^\s+schedule:")
         self.assertIn("timeout-minutes:", workflow)
+
+
+    def test_imports_de_ci_ignoram_caminhos_privados_sem_permissao(self):
+        import promocao_confirmacao_router
+        import test_juan_vps
+
+        privado = Mock()
+        privado.exists.side_effect = PermissionError("sem acesso")
+        self.assertFalse(promocao_confirmacao_router.path_exists(privado))
+
+        env_file = Mock()
+        env_file.read_text.side_effect = PermissionError("sem acesso")
+        with patch.object(test_juan_vps, "ENV_FILE", env_file):
+            env = test_juan_vps.carregar_env()
+        self.assertIsInstance(env, dict)
 
     def test_verificador_vps_exige_roteador_antes_da_midia(self):
         source = (TOOLS / "test_juan_vps.py").read_text(encoding="utf-8")
