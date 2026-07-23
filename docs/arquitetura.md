@@ -1,6 +1,6 @@
 # Arquitetura do ecossistema CFAgro
 
-Atualizado em 2026-07-22.
+Atualizado em 2026-07-23.
 
 ## Apps e navegação
 
@@ -35,7 +35,9 @@ Tabelas/views por app:
 
 O fluxo seguro é: Telegram/Juan → rascunho separado pelo nome do contexto → revisão visual → correção guiada → aprovação → preparação de uma pendência → confirmação em nova mensagem no mesmo contexto → promoção controlada → dado operacional → evento de auditoria → histórico consultável. Preparar ou aprovar não grava dado operacional.
 
-Para foto ou PDF de compra, Juan classifica a compra antes de aplicar o fluxo de OCR de pesagem. Ele tenta extrair e montar o extrato primeiro, apresenta o que leu, calcula apenas quando houver base suficiente e lista objetivamente os dados ausentes. Nenhuma leitura gera escrita automática; a criação de rascunho em `operation_drafts` é apenas uma opção oferecida ao final da conversa.
+Para foto ou PDF, a presença de `MediaPath` ou `MediaPaths` obriga Juan a chamar primeiro `arquivo_grupo_router.py`; as ferramentas internas de PDF, imagem e OCR de pesagem não podem anteceder o roteador. O roteador classifica a compra antes de aplicar o fluxo de pesagem, combina o texto da mensagem com os campos visuais e tenta montar o extrato completo. Ele apresenta o que leu, calcula apenas quando houver base suficiente e lista objetivamente os dados ausentes.
+
+O processo do agente permanece em sandbox com escrita limitada à pasta de trabalho. Como esse ambiente não acessa o OCR externo, `compra_documento_ocr.py` entrega a leitura a um trabalhador local supervisionado, que usa OpenClaw/OpenAI fora do sandbox, processa páginas de PDF em paralelo e mantém cache identificado pelo conteúdo do arquivo. O retorno volta ao mesmo roteador; uma indisponibilidade ainda permite tentativa local com Tesseract. O runtime não pede autorização preliminar para esse comando local já confinado. Nenhuma leitura gera escrita automática; a criação de rascunho em `operation_drafts` é apenas uma opção oferecida ao final da conversa.
 
 `operation_drafts` contém o material revisável; `pending_actions` contém a ordem de promoção e seu estado; `eventos` preserva decisões e resultados legíveis. A promoção admite somente `compras`, `vendas`, `pesagens_caderno` e `abates`. O executor assume a pendência por comparação de estado antes da inserção. Uma falha antes da inserção termina em `erro`; uma falha depois dela termina em `erro_pos_gravacao`, conserva o ID operacional e nunca deve ser executada novamente sem reconciliação.
 

@@ -1,6 +1,6 @@
 # Fila de revisões e promoção operacional
 
-Atualizado em 2026-07-22. Este documento é o roteiro operacional da versão atual da fila de revisões/Juan.
+Atualizado em 2026-07-23. Este documento é o roteiro operacional da versão atual da fila de revisões/Juan.
 
 ## Fluxo final
 
@@ -20,31 +20,36 @@ Nenhuma compra é promovida automaticamente. Preparar, aprovar, simular e reconc
 
 Ao receber um documento de compra de gado, Juan segue esta ordem:
 
-1. identifica a intenção de compra antes de encaminhar o arquivo ao OCR de pesagem;
-2. tenta extrair os dados e montar um extrato sem perguntar antes se deve fazer a leitura;
-3. apresenta os campos reconhecidos para confirmação;
-4. calcula os valores derivados quando houver peso suficiente;
-5. se faltarem peso, data ou condição/data de pagamento, informa que o cálculo não fecha e lista cada pendência de forma objetiva;
-6. declara que nada foi salvo automaticamente;
-7. somente no final oferece criar um rascunho na fila de Revisões.
+1. ao encontrar `MediaPath` ou `MediaPaths`, chama `arquivo_grupo_router.py` antes de qualquer ferramenta interna de PDF, imagem ou pesagem;
+2. identifica a intenção de compra antes de encaminhar o arquivo ao OCR de pesagem;
+3. tenta extrair os dados e montar um extrato sem perguntar antes se deve fazer a leitura;
+4. apresenta os campos reconhecidos para confirmação;
+5. calcula os valores derivados quando houver peso suficiente;
+6. se faltarem peso, data ou condição/data de pagamento, informa que o cálculo não fecha e lista cada pendência de forma objetiva;
+7. declara que nada foi salvo automaticamente;
+8. somente no final oferece criar um rascunho na fila de Revisões.
 
 Reconhecer, extrair, confirmar ou calcular nunca autoriza escrita em `compras`, `operation_drafts` ou qualquer outra tabela. O rascunho depende de aceite explícito posterior e continua sujeito à revisão visual e à promoção controlada.
 
-Desde 23/07/2026, `compra_documento_ocr.py` usa primeiro o canal OpenClaw/OpenAI já autenticado por OAuth (`openclaw infer image describe`) para ler foto/PDF de compra. O fallback local com Tesseract permanece para indisponibilidade do canal visual. O fluxo extrai compra, vendedor, cabeças, preço por arroba, peso total ou médio, desconto de barriga, data e pagamento quando legíveis; calcula peso total, arrobas e valor quando houver dados suficientes; e registra apenas `ocr_fallback_motivo=openclaw_visual_indisponivel` quando cair para OCR local, sem guardar erro técnico bruto.
+Desde 23/07/2026, `compra_documento_ocr.py` usa primeiro o canal OpenClaw/OpenAI já autenticado por OAuth (`openclaw infer image describe`) para ler foto/PDF de compra. Como o sandbox do Juan não possui rede externa, o pedido passa por uma fila privada na pasta de trabalho e é atendido por um trabalhador local supervisionado. PDFs têm até oito páginas processadas em paralelo; resultados são armazenados por assinatura do conteúdo para evitar releitura do mesmo anexo. O fallback local com Tesseract permanece para indisponibilidade do trabalhador ou do canal visual. O fluxo extrai compra, vendedor, cabeças, preço por arroba, peso total ou médio, desconto de barriga, data e pagamento quando legíveis; calcula peso total, arrobas e valor quando houver dados suficientes; e marca claramente quando precisou do fallback.
+
+O runtime do Juan mantém o sandbox em `workspace-write`, mas não interrompe esse comando local com pedido de autorização. Alterar essa política sem repetir os testes do agente pode fazer Juan voltar a perguntar antes de ler o documento.
 
 ### Teste operacional validado na VPS
 
-Documentos controlados de compra em foto e PDF confirmaram o seguinte comportamento, com os dados comerciais sensíveis omitidos deste repositório público:
+Arquivos reais recebidos pelo Telegram, um em foto e outro em PDF de duas páginas, confirmaram o seguinte comportamento, com os dados comerciais sensíveis omitidos deste repositório público:
 
 - fornecedor, quantidade, preço por arroba e condição de desconto foram reconhecidos;
 - foto e PDF foram lidos pelo canal OpenClaw/OpenAI;
+- a primeira leitura do PDF terminou dentro do limite da ferramenta após o processamento paralelo;
+- a trajetória do agente registrou `arquivo_grupo_router.py` como ferramenta de mídia, sem chamada à ferramenta interna de PDF ou imagem;
 - peso médio foi convertido em peso total quando necessário;
 - Juan calculou arrobas e valor quando havia peso suficiente;
 - quando peso, data ou pagamento estavam ausentes, as pendências foram apresentadas objetivamente;
 - Juan informou que nenhum dado havia sido salvo;
 - a criação de rascunho foi oferecida somente ao final.
 
-Na mesma validação, a compilação Python e a validação da configuração OpenClaw foram aprovadas. A leitura de conectividade com limite zero passou para `operation_drafts`, `pending_actions`, `eventos`, `compras`, `vendas`, `pesagens_caderno` e `abates`; não houve escrita no Supabase. Depois do ajuste, o gateway foi reiniciado e permaneceu ativo.
+Na mesma validação, a compilação Python, 15 testes automatizados do Juan e a validação da configuração OpenClaw foram aprovados. As assinaturas dos IDs de `operation_drafts`, `pending_actions`, `eventos`, `compras`, `vendas`, `pesagens_caderno` e `abates` foram comparadas antes e depois e permaneceram idênticas: não houve escrita no Supabase. O gateway e o trabalhador de OCR foram reiniciados e permaneceram ativos.
 
 ## Tabelas e responsabilidades
 
@@ -168,11 +173,15 @@ Com credenciais protegidas disponíveis, a prévia `promocao_operacional.py --pe
 
 1. Conferir o commit implantado e os hashes das três ferramentas locais e da VPS.
 2. Rodar os testes Python no ambiente da Ponte antes de reiniciar qualquer processo.
-3. Preparar uma promoção controlada no Confinex e anotar os IDs do rascunho, da pendência e do evento.
-4. Executar primeiro o roteador com `--preview`, usando uma nova mensagem do mesmo grupo.
-5. Confirmar que nenhum registro operacional apareceu na prévia.
-6. Somente então testar a mensagem real `PROMOVER <id>` pelo caminho normal de Juan.
-7. Confirmar no Supabase: uma pendência `executado`, um rascunho `realizado`, um evento de execução e exatamente um registro operacional com o mesmo `target_record_id`.
+3. Para anexos, confirmar que o trabalhador de OCR está ativo e que a configuração OpenClaw é válida.
+4. Executar `compra_documento_ocr.py` e `arquivo_grupo_router.py --dry-run` com foto e PDF reais da pasta de entrada.
+5. Simular mensagens do agente com `MediaPath` e `MediaPaths`; conferir na trajetória que a primeira ferramenta de mídia é `arquivo_grupo_router.py` e que não houve chamada interna de PDF/imagem.
+6. Comparar os IDs das sete tabelas antes e depois para provar que o teste de leitura não escreveu no Supabase.
+7. Para promoção, preparar um caso controlado no Confinex e anotar os IDs do rascunho, da pendência e do evento.
+8. Executar primeiro o roteador com `--preview`, usando uma nova mensagem do mesmo grupo.
+9. Confirmar que nenhum registro operacional apareceu na prévia.
+10. Somente então testar a mensagem real `PROMOVER <id>` pelo caminho normal de Juan.
+11. Confirmar no Supabase: uma pendência `executado`, um rascunho `realizado`, um evento de execução e exatamente um registro operacional com o mesmo `target_record_id`.
 
 Não é necessário alterar a VPS em uma mudança apenas de frontend ou documentação.
 
@@ -222,6 +231,8 @@ O push em `main` aciona o GitHub Pages. Depois, abra `revisoes.html`, recarregue
 4. restaure somente o arquivo afetado em `/root/ponte/tools`, mantendo proprietário e permissões;
 5. compare o hash com o commit desejado, rode os testes Python na VPS e só então retome o processo;
 6. registre qual arquivo, backup, commit, horário e responsável participaram da reversão.
+
+Se a mudança envolver leitura de anexos, reverta em conjunto o roteador, o extrator, o trabalhador de OCR, a instrução efetiva do workspace e a política de aprovação do runtime. Recarregue as unidades supervisionadas, valide a configuração OpenClaw e repita um PDF e uma foto em `--dry-run`; restaurar somente um desses componentes pode reintroduzir pergunta preliminar, OCR interno ou estouro de tempo.
 
 Se não houver backup validado, copie a versão do commit conhecido no clone canônico. Não improvise uma versão a partir de histórico de terminal.
 
