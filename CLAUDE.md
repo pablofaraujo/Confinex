@@ -8,6 +8,7 @@ Leia conforme a tarefa:
 
 - `docs/arquitetura.md` — apps, backend, deploy, convenções e dívidas técnicas
 - `docs/fila-revisoes.md` — fluxo Juan → revisão → promoção, roteiro de testes, limpeza e reversão
+- `docs/testes-ecossistema.md` — bateria contínua local, Supabase e VPS/Juan
 - `docs/regras-de-negocio.md` — fórmulas e regras de cálculo (arrobas, capim, frete, GMD, Funrural, B3, VP)
 - `docs/historico.md` — evolução do projeto (fases do git log)
 - `docs/privado/contexto-negocio.md` — negócio, parcerias, pessoas, frigoríficos (NÃO commitar — ver abaixo)

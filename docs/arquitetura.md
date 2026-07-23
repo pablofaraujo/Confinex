@@ -45,6 +45,23 @@ O processo do agente permanece em sandbox com escrita limitada à pasta de traba
 
 O contrato das tabelas, o significado dos estados, as ferramentas, os testes e o procedimento de reversão estão em [`docs/fila-revisoes.md`](fila-revisoes.md).
 
+## Validação contínua
+
+`tools/test_ecossistema.py` é a entrada única da bateria permanente. No modo
+padrão, reúne testes Python, contratos de segurança, simulações da fila,
+verificação sintática do JavaScript de `revisoes.html` e `git diff --check`.
+Opcionalmente, compara contagem e assinatura dos IDs das tabelas auditadas no
+Supabase antes e depois de uma leitura e executa na VPS o verificador efêmero
+`tools/test_juan_vps.py`.
+
+O verificador da VPS não é instalado no servidor e não cria rascunho nem
+lançamento. Ele compila os handlers, roda seus testes, valida a configuração
+OpenClaw e os serviços, processa foto e PDF reais em `--dry-run` e, quando
+solicitado, inspeciona a trajetória do agente para provar que o primeiro acesso
+ao anexo foi pelo roteador. A assinatura de nove tabelas — inclusive memória e
+continuidade — deve permanecer idêntica. Comandos e cobertura detalhada estão
+em [`docs/testes-ecossistema.md`](testes-ecossistema.md).
+
 ## Confinex (confinex-app.latest.js, ~110 KB / 2.120 linhas)
 
 Bundle esbuild legível de `src/confinex-entry.jsx` + `confinex_work.jsx` (fonte NÃO está no repo). React com hooks, JSX pré-compilado, CSS injetado via template string (tema em `var T`). Raiz: componente `Confinex()`.
