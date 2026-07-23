@@ -20,13 +20,19 @@ Nenhuma compra é promovida automaticamente. Preparar, aprovar, simular e reconc
 
 Ao receber um documento de compra de gado, Juan segue esta ordem:
 
-1. ao encontrar `MediaPath` ou `MediaPaths`, chama `arquivo_grupo_router.py` antes de qualquer ferramenta interna de PDF, imagem ou pesagem;
+1. ao encontrar `MediaPath`, `MediaPaths`, `media://inbound/...`,
+   `media:/inbound/...` ou `inbound/...`, chama `arquivo_grupo_router.py` antes
+   de qualquer ferramenta interna de PDF, imagem ou pesagem; as URIs são
+   normalizadas somente para `/root/.openclaw/media/inbound/NOME`, com bloqueio
+   de traversal;
 2. identifica a intenção de compra antes de encaminhar o arquivo ao OCR de pesagem;
 3. tenta extrair os dados e montar um extrato sem perguntar antes se deve fazer a leitura;
 4. apresenta os campos reconhecidos para confirmação;
 5. calcula os valores derivados quando houver peso suficiente;
 6. se faltarem peso, data ou condição/data de pagamento, informa que o cálculo não fecha e lista cada pendência de forma objetiva;
-7. declara que nada foi salvo automaticamente;
+7. declara que nada foi salvo automaticamente; se o roteador falhar, encerra a
+   leitura com erro técnico rastreável, sem tentar `pdf`, `image`, `file_fetch`
+   ou OCR interno e sem pedir reenvio genérico;
 8. somente no final oferece criar um rascunho na fila de Revisões.
 
 Reconhecer, extrair, confirmar ou calcular nunca autoriza escrita em `compras`, `operation_drafts` ou qualquer outra tabela. O rascunho depende de aceite explícito posterior e continua sujeito à revisão visual e à promoção controlada.

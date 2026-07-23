@@ -20,11 +20,13 @@ não se sobrepõem.
 
 ## O que a bateria protege
 
-- **Telegram e anexos:** `MediaPath` e `MediaPaths` devem chegar primeiro a
-  `arquivo_grupo_router.py`; foto e PDF são aceitos; ferramenta interna de
-  imagem/PDF não pode anteceder o roteador; compra usa OCR OpenClaw/OpenAI,
-  calcula somente com base suficiente e informa peso, data ou pagamento
-  ausentes sem inventar.
+- **Telegram e anexos:** `MediaPath`, `MediaPaths`, `media://inbound/...`,
+  `media:/inbound/...` e `inbound/...` devem chegar primeiro a
+  `arquivo_grupo_router.py`. As URIs resolvem somente dentro de
+  `/root/.openclaw/media/inbound`, sem traversal. Foto e PDF são aceitos;
+  `pdf`, `image`, `file_fetch` e OCR interno não podem ser usados antes nem
+  depois do roteador. Compra usa OCR OpenClaw/OpenAI, calcula somente com base
+  suficiente e informa peso, data ou pagamento ausentes sem inventar.
 - **Fila de Revisões:** rascunhos permanecem separados pelo nome do contexto;
   IDs de grupo e JSON não aparecem na apresentação; cada campo obrigatório
   ausente recebe aviso e destaque; salvar ajustes não promove; preparação fica
@@ -84,9 +86,12 @@ o agente e a configuração padrão do ambiente.
 O orquestrador envia o conteúdo versionado de `tools/test_juan_vps.py`
 diretamente ao Python remoto, sem deixar script instalado. Para cada arquivo
 real, ele exige `ocr_origem=openclaw_openai`, executa o roteador em `--dry-run`
-e valida pendências ou cálculo. Com `--testar-agente`, simula uma mensagem com
-`MediaPath` e `MediaPaths` e lê a trajetória: a primeira ferramenta que toca o
-anexo precisa ser o roteador, também em `--dry-run`.
+pelos caminhos absoluto, `media://`, `media:/` e `inbound/`, e valida pendências
+ou cálculo. Com `--testar-agente`, simula na mesma sessão duas mensagens usando
+a URI entregue pelo runtime e uma terceira com `MediaPath`/`MediaPaths`. As três
+tentativas precisam chamar o roteador em `--dry-run`; `pdf`, `image`,
+`file_fetch`, `pdftotext`, `pdftoppm` e OCR interno são proibidos em qualquer
+ponto da trajetória.
 
 Antes e depois, o teste compara a assinatura das nove tabelas. Ao terminar,
 mesmo em caso de falha, remove somente sessões marcadas pelo próprio teste,

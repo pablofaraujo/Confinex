@@ -176,15 +176,18 @@ class ContratosEcossistemaTests(unittest.TestCase):
     def test_verificador_vps_exige_roteador_antes_da_midia(self):
         source = (TOOLS / "test_juan_vps.py").read_text(encoding="utf-8")
         for contract in (
-            "MediaPath:",
-            "MediaPaths:",
+            "media://inbound/",
+            "media:/inbound/",
+            "inbound/",
             "arquivo_grupo_router.py",
             "--dry-run",
-            '"name": "pdf"',
-            '"name": "image"',
+            "FERRAMENTAS_MIDIA_INTERNAS",
+            "minimo_roteador=3",
+            "auditar_chamadas_midia",
         ):
             self.assertIn(contract, source)
         self.assertIn('{".pdf", ".jpg", ".jpeg", ".png", ".webp"}', source)
+        self.assertIn('{"pdf", "image", "file_fetch"}', source)
 
     def test_verificador_vps_compara_todas_as_tabelas_criticas(self):
         source = (TOOLS / "test_juan_vps.py").read_text(encoding="utf-8")

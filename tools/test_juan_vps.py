@@ -33,6 +33,7 @@ TABLES = (
     "vendas",
 )
 STATUS_EVENTO_VALIDOS = {"cancelado", "corrigido", "pendente", "registrado"}
+FERRAMENTAS_MIDIA_INTERNAS = {"pdf", "image", "file_fetch"}
 
 
 def carregar_env() -> dict[str, str]:
@@ -140,7 +141,15 @@ def validar_prompt() -> None:
     effective = (WORKSPACE / "AGENTS.md").read_text(encoding="utf-8")
     skill = (WORKSPACE / "skills/pesagem-ocr/SKILL.md").read_text(encoding="utf-8")
     combined = effective + "\n" + skill
-    for required in ("MediaPath", "MediaPaths", "arquivo_grupo_router.py"):
+    for required in (
+        "MediaPath",
+        "MediaPaths",
+        "media://",
+        "arquivo_grupo_router.py",
+        "file_fetch",
+        "antes ou depois",
+        "Falha técnica ao processar o anexo",
+    ):
         if required not in combined:
             raise RuntimeError(f"instrução efetiva não contém {required}")
     texto = combined.lower()
@@ -172,22 +181,38 @@ def validar_arquivo(path_text: str, legenda: str, grupo_id: str) -> dict[str, An
             if ocr.get(field) in (None, ""):
                 raise RuntimeError(f"compra lida sem {field}")
 
-    route = json_output(
-        [
-            sys.executable,
-            str(HANDLERS / "arquivo_grupo_router.py"),
-            str(path),
-            "--grupo-id",
-            grupo_id,
-            "--mensagem-id",
-            f"teste-ecossistema-{uuid.uuid4().hex}",
-            "--texto",
-            legenda,
-            "--dry-run",
-        ]
-    )
-    if route.get("dry_run") is not True or "rascunho" in route:
-        raise RuntimeError("roteador real não permaneceu em dry-run")
+    referencias = [str(path)]
+    if path.parent == Path("/root/.openclaw/media/inbound"):
+        referencias.extend(
+            [
+                f"media://inbound/{path.name}",
+                f"media:/inbound/{path.name}",
+                f"inbound/{path.name}",
+            ]
+        )
+    rotas = []
+    for referencia in referencias:
+        route = json_output(
+            [
+                sys.executable,
+                str(HANDLERS / "arquivo_grupo_router.py"),
+                referencia,
+                "--grupo-id",
+                grupo_id,
+                "--mensagem-id",
+                f"teste-ecossistema-{uuid.uuid4().hex}",
+                "--texto",
+                legenda,
+                "--dry-run",
+            ]
+        )
+        if route.get("dry_run") is not True or "rascunho" in route:
+            raise RuntimeError("roteador real não permaneceu em dry-run")
+        if route.get("arquivo") != str(path.resolve()):
+            raise RuntimeError(
+                f"referência {referencia} não resolveu para o anexo real"
+            )
+        rotas.append(referencia)
     routed = route.get("routed") or {}
     if routed.get("classe") == "compra_extraida":
         dados = routed.get("dados") or {}
@@ -206,6 +231,7 @@ def validar_arquivo(path_text: str, legenda: str, grupo_id: str) -> dict[str, An
         "formato": path.suffix.lower(),
         "classe": routed.get("classe"),
         "ocr": ocr.get("ocr_origem"),
+        "rotas_validadas": rotas,
     }
 
 
@@ -219,6 +245,55 @@ def calls_from_trajectory(path: Path) -> list[dict[str, Any]]:
         if event.get("type") == "tool.call":
             calls.append(event.get("data") or {})
     return calls
+
+
+def auditar_chamadas_midia(
+    calls: list[dict[str, Any]],
+    referencia: str,
+    *,
+    minimo_roteador: int = 1,
+) -> dict[str, Any]:
+    indices_roteador = []
+    primeiro_indice_midia = None
+    for index, call in enumerate(calls):
+        name = str(call.get("name") or "")
+        args = json.dumps(call.get("arguments") or {}, ensure_ascii=False)
+        args_lower = args.lower()
+        toca_midia = (
+            referencia in args
+            or "media://inbound/" in args_lower
+            or name in FERRAMENTAS_MIDIA_INTERNAS
+            or "arquivo_grupo_router.py" in args
+        )
+        if toca_midia and primeiro_indice_midia is None:
+            primeiro_indice_midia = index
+        if name in FERRAMENTAS_MIDIA_INTERNAS:
+            raise RuntimeError(
+                f"ferramenta interna de mídia usada na trajetória: {name}"
+            )
+        if any(
+            token in args_lower
+            for token in ("pdftotext", "pdftoppm", "pesagem-ocr.sh")
+        ):
+            raise RuntimeError("fallback interno de mídia usado na trajetória")
+        if name == "bash" and "arquivo_grupo_router.py" in args:
+            if "--dry-run" not in args:
+                raise RuntimeError("roteador foi chamado fora de dry-run")
+            indices_roteador.append(index)
+
+    if len(indices_roteador) < minimo_roteador:
+        raise RuntimeError(
+            f"esperadas {minimo_roteador} chamadas do roteador; "
+            f"encontradas {len(indices_roteador)}"
+        )
+    if primeiro_indice_midia != indices_roteador[0]:
+        raise RuntimeError("a primeira ferramenta de mídia não foi o roteador")
+    return {
+        "primeira_ferramenta_midia": "arquivo_grupo_router.py",
+        "chamadas_roteador": len(indices_roteador),
+        "ferramentas_internas": [],
+        "dry_run": True,
+    }
 
 
 def limpar_sessao(marker: str) -> None:
@@ -295,31 +370,49 @@ def validar_indice_sessoes() -> None:
         )
 
 
-def validar_agente(path_text: str, legenda: str, grupo_id: str) -> None:
+def validar_agente(
+    path_text: str,
+    legenda: str,
+    grupo_id: str,
+) -> dict[str, Any]:
     marker = f"teste-ecossistema-{uuid.uuid4().hex}"
-    message = (
-        f"[Telegram grupo {grupo_id} mensagem {marker}] {legenda} "
-        f"MediaPath: {path_text} MediaPaths: {path_text}"
+    path = Path(path_text)
+    referencia = (
+        f"media://inbound/{path.name}"
+        if path.parent == Path("/root/.openclaw/media/inbound")
+        else path_text
     )
+    mensagens = [
+        f"[media attached: {referencia}]",
+        f"[media attached: {referencia}]",
+        f"MediaPath: {path_text} MediaPaths: {path_text}",
+    ]
     try:
-        run(
-            [
-                "openclaw",
-                "agent",
-                "--agent",
-                "juan",
-                "--session-id",
-                marker,
-                "--message",
-                message,
-                "--thinking",
-                "low",
-                "--timeout",
-                "600",
-                "--json",
-            ],
-            timeout=700,
-        )
+        for tentativa, anexo in enumerate(mensagens, start=1):
+            message = (
+                f"[Telegram grupo {grupo_id} mensagem {marker}-{tentativa}] "
+                f"{legenda} {anexo} "
+                "Teste técnico em dry-run: processe pelo fluxo normal, "
+                "não entregue em canal externo e não grave nada."
+            )
+            run(
+                [
+                    "openclaw",
+                    "agent",
+                    "--agent",
+                    "juan",
+                    "--session-id",
+                    marker,
+                    "--message",
+                    message,
+                    "--thinking",
+                    "low",
+                    "--timeout",
+                    "600",
+                    "--json",
+                ],
+                timeout=700,
+            )
         trajectory = SESSIONS / f"{marker}.trajectory.jsonl"
         if not trajectory.exists():
             matches = [
@@ -331,26 +424,11 @@ def validar_agente(path_text: str, legenda: str, grupo_id: str) -> None:
                 raise RuntimeError("trajetória do teste do agente não foi encontrada")
             trajectory = matches[0]
         calls = calls_from_trajectory(trajectory)
-        media_index = None
-        for index, call in enumerate(calls):
-            name = str(call.get("name") or "")
-            args = json.dumps(call.get("arguments") or {}, ensure_ascii=False)
-            if path_text in args or name in {"pdf", "image"}:
-                media_index = index
-                if (
-                    name != "bash"
-                    or "arquivo_grupo_router.py" not in args
-                    or "--dry-run" not in args
-                ):
-                    raise RuntimeError(
-                        "a primeira ferramenta de mídia não foi o roteador em dry-run"
-                    )
-                break
-        if media_index is None:
-            raise RuntimeError("o Juan não processou MediaPath/MediaPaths")
-        before = json.dumps(calls[:media_index], ensure_ascii=False).lower()
-        if any(token in before for token in ("pdftoppm", '"name": "pdf"', '"name": "image"')):
-            raise RuntimeError("ferramenta interna foi usada antes do roteador")
+        return auditar_chamadas_midia(
+            calls,
+            referencia,
+            minimo_roteador=3,
+        )
     finally:
         limpar_sessao(marker)
 
@@ -379,6 +457,7 @@ def main() -> int:
     before = snapshot()
     cache_antes = snapshot_cache_ocr()
     evidencias: list[dict[str, Any]] = []
+    evidencias_agente: list[dict[str, Any]] = []
     try:
         py_files = sorted(str(path) for path in HANDLERS.glob("*.py"))
         run([sys.executable, "-m", "py_compile", *py_files])
@@ -419,7 +498,9 @@ def main() -> int:
                 continue
             evidencias.append(validar_arquivo(str(path), str(legenda), grupo_id))
             if CONFIG.get("testar_agente"):
-                validar_agente(str(path), str(legenda), grupo_id)
+                evidencias_agente.append(
+                    validar_agente(str(path), str(legenda), grupo_id)
+                )
 
         after = snapshot()
         if before != after:
@@ -438,6 +519,7 @@ def main() -> int:
                     "agente_simulado": bool(
                         CONFIG.get("testar_agente") and evidencias
                     ),
+                    "trajetorias_agente": evidencias_agente,
                     "supabase_inalterado": True,
                 },
                 ensure_ascii=False,
