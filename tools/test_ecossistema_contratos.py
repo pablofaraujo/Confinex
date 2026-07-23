@@ -54,11 +54,14 @@ class ContratosEcossistemaTests(unittest.TestCase):
     def test_frontend_nao_expoe_id_de_grupo_ou_json(self):
         source = (TOOLS / "test_revisoes_frontend.js").read_text(encoding="utf-8")
         html = (ROOT / "revisoes.html").read_text(encoding="utf-8")
+        js = (ROOT / "revisoes.js").read_text(encoding="utf-8")
+        tela = f"{html}\n{js}"
         self.assertIn("Contexto não identificado", source)
         self.assertIn("doesNotMatch(api.contextosResumoHtml", source)
         self.assertIn("Dados técnicos avançados", source)
-        self.assertNotRegex(html, r"TELEGRAM_GROUP_NAMES\s*=\s*\{[^}]*telegram:-\d+")
-        self.assertIn("origem_conversa_id:dados.origem_conversa_id||''", html)
+        self.assertIn("./revisoes.js?v=20260723-1", html)
+        self.assertNotRegex(tela, r"TELEGRAM_GROUP_NAMES\s*=\s*\{[^}]*telegram:-\d+")
+        self.assertIn("origem_conversa_id:dados.origem_conversa_id||''", js)
 
     def test_normalizacao_e_dry_run_nao_promovem_dados(self):
         source = (TOOLS / "normalizar_contextos.py").read_text(encoding="utf-8")
@@ -94,14 +97,14 @@ class ContratosEcossistemaTests(unittest.TestCase):
         self.assertIn('payload["contexto_escopo"] = payload.pop("escopo")', normalizer)
 
     def test_eventos_da_fila_usam_status_validos(self):
-        html = (ROOT / "revisoes.html").read_text(encoding="utf-8")
+        js = (ROOT / "revisoes.js").read_text(encoding="utf-8")
         statuses = set(
             re.findall(
                 r"db\.from\('eventos'\)\.insert\(\{[\s\S]{0,900}?status:'([^']+)'",
-                html,
+                js,
             )
         )
-        statuses.add("registrado" if "status:'registrado'" in html else "")
+        statuses.add("registrado" if "status:'registrado'" in js else "")
         self.assertTrue(statuses)
         self.assertLessEqual(
             statuses - {""},

@@ -7,8 +7,12 @@ const vm = require('node:vm');
 const path = require('node:path');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'revisoes.html'), 'utf8');
-const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)].map(match => match[1]).filter(Boolean);
-assert.equal(scripts.length, 1, 'revisoes.html deve ter um script inline');
+const js = fs.readFileSync(path.join(__dirname, '..', 'revisoes.js'), 'utf8');
+const inlineScripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)]
+  .map(match => match[1].trim())
+  .filter(Boolean);
+assert.equal(inlineScripts.length, 0, 'revisoes.html nao deve manter script inline');
+assert.match(html, /<script src="\.\/revisoes\.js\?v=20260723-1"><\/script>/);
 
 const context = {
   CFAgro: {authInit() {}},
@@ -18,7 +22,7 @@ const context = {
   console,
 };
 vm.createContext(context);
-new vm.Script(`${scripts[0]}\nglobalThis.__revisoes={buildPromocaoPreview,promotionValidationState,promotionInputElement,aplicarEstadoPromocao,businessFieldIndex,businessTargetPath,promotionMissingLinks,irParaCampoObrigatorio,validarNegocioOperacional,planoDecisao,montarEventoDecisao,montarAtualizacaoRascunho,registrarEvento,promotionHistoryData,promotionHistoryHtml,statusPrincipal,dadosItem,labelStatus,painelFila,itemMatchesStatus,camposObrigatoriosFaltantes,filtrosRapidosHtml,contextosResumoHtml,contextoDe,grupoNome,dadosComGrupoNome,contextoPersistivel,incluirContextoSeDisponivel,inferPromotionTarget,prioridadeItem,compararPrioridade,orientacaoCampoFaltante,orientacoesCamposHtml};`, {filename: 'revisoes.html'}).runInContext(context);
+new vm.Script(`${js}\nglobalThis.__revisoes={buildPromocaoPreview,promotionValidationState,promotionInputElement,aplicarEstadoPromocao,businessFieldIndex,businessTargetPath,promotionMissingLinks,irParaCampoObrigatorio,validarNegocioOperacional,planoDecisao,montarEventoDecisao,montarAtualizacaoRascunho,registrarEvento,promotionHistoryData,promotionHistoryHtml,statusPrincipal,dadosItem,labelStatus,painelFila,itemMatchesStatus,camposObrigatoriosFaltantes,filtrosRapidosHtml,contextosResumoHtml,contextoDe,grupoNome,dadosComGrupoNome,contextoPersistivel,incluirContextoSeDisponivel,inferPromotionTarget,prioridadeItem,compararPrioridade,orientacaoCampoFaltante,orientacoesCamposHtml};`, {filename: 'revisoes.js'}).runInContext(context);
 
 const api = context.__revisoes;
 
@@ -125,8 +129,8 @@ assert.equal(campoRecebimento.focused, true);
 assert.equal(campoRecebimento.scrolled, true);
 assert.match(api.promotionMissingLinks('vendas', ['prazo_recebimento']), /data-key="prazo_recebimento"/);
 
-assert.match(html, /id="btnSalvarAjustes"[^>]*onclick="salvarAjustes\('em_revisao'\)"/);
-assert.doesNotMatch(html.match(/<button[^>]*id="btnSalvarAjustes"[^>]*>/)?.[0] || '', /disabled/);
+assert.match(js, /id="btnSalvarAjustes"[^>]*onclick="salvarAjustes\('em_revisao'\)"/);
+assert.doesNotMatch(js.match(/<button[^>]*id="btnSalvarAjustes"[^>]*>/)?.[0] || '', /disabled/);
 
 const contextoCompleto = (grupo,mensagem) => ({
   contexto_operacional:grupo,
@@ -309,9 +313,9 @@ const eventoAjustes = api.montarEventoDecisao(ajustes,itemDecisao,dadosDecisao);
 assert.equal(eventoAjustes.tipo, 'ajustes_salvos_na_revisao');
 assert.equal(eventoAjustes.status, 'registrado');
 assert.equal(eventoAjustes.dados.status_decisao, 'ajustes_salvos');
-assert.match(html, /onclick="voltarParaConfirmacao\(\)"/);
-assert.match(html, /Obrigatório para rejeitar/);
-assert.doesNotMatch(html, /Dados técnicos avançados|class="json"/);
+assert.match(js, /onclick="voltarParaConfirmacao\(\)"/);
+assert.match(js, /Obrigatório para rejeitar/);
+assert.doesNotMatch(`${html}\n${js}`, /Dados técnicos avançados|class="json"/);
 
 const basePromocao = {
   acao_tipo:'promover_revisao_operacional',
@@ -342,7 +346,7 @@ assert.equal(concluida.agente, 'juan');
 assert.equal(concluida.destino, 'Compra de gado');
 assert.equal(api.statusPrincipal({draft:{status:'em_revisao'},action:estados[2][0]}), 'executado');
 assert.equal(api.dadosItem({}, basePromocao).contexto_operacional, 'Boi Balança');
-assert.doesNotMatch(html, /Dados técnicos avançados|class="json"/);
+assert.doesNotMatch(`${html}\n${js}`, /Dados técnicos avançados|class="json"/);
 const eventosInseridos = [];
 context.db = {from(table) { assert.equal(table, 'eventos'); return {insert(record) { eventosInseridos.push(record); return {error:null}; }}; }};
 api.registrarEvento(rejeicao,itemDecisao,dadosDecisao).then(() => {
