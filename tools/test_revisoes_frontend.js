@@ -18,7 +18,7 @@ const context = {
   console,
 };
 vm.createContext(context);
-new vm.Script(`${scripts[0]}\nglobalThis.__revisoes={buildPromocaoPreview,promotionValidationState,promotionInputElement,aplicarEstadoPromocao,businessFieldIndex,businessTargetPath,promotionMissingLinks,irParaCampoObrigatorio,validarNegocioOperacional,planoDecisao,montarEventoDecisao,montarAtualizacaoRascunho,registrarEvento,promotionHistoryData,promotionHistoryHtml,statusPrincipal,dadosItem,labelStatus,painelFila,itemMatchesStatus,camposObrigatoriosFaltantes,filtrosRapidosHtml,contextosResumoHtml,contextoDe,grupoNome,dadosComGrupoNome,contextoPersistivel,incluirContextoSeDisponivel};`, {filename: 'revisoes.html'}).runInContext(context);
+new vm.Script(`${scripts[0]}\nglobalThis.__revisoes={buildPromocaoPreview,promotionValidationState,promotionInputElement,aplicarEstadoPromocao,businessFieldIndex,businessTargetPath,promotionMissingLinks,irParaCampoObrigatorio,validarNegocioOperacional,planoDecisao,montarEventoDecisao,montarAtualizacaoRascunho,registrarEvento,promotionHistoryData,promotionHistoryHtml,statusPrincipal,dadosItem,labelStatus,painelFila,itemMatchesStatus,camposObrigatoriosFaltantes,filtrosRapidosHtml,contextosResumoHtml,contextoDe,grupoNome,dadosComGrupoNome,contextoPersistivel,incluirContextoSeDisponivel,inferPromotionTarget};`, {filename: 'revisoes.html'}).runInContext(context);
 
 const api = context.__revisoes;
 
@@ -136,6 +136,59 @@ const contextoCompleto = (grupo,mensagem) => ({
   agente:'juan',
   status_confirmacao:'pendente',
 });
+const rascunhoVendaAbateReal = {
+  id:'rascunho-venda-abate',
+  draft:{
+    id:'rascunho-venda-abate',
+    status:'rascunho',
+    tipo_operacao:'venda_abate_para_revisao',
+    entidade_final_tipo:'vendas',
+    contexto_nome:'Fazenda Operacional',
+    contexto_canonico:'telegram:grupo:-9999999999',
+    origem_canal:'telegram',
+    origem_conversa_id:'-9999999999',
+    origem_mensagem_id:'mensagem-auditada',
+    agente:'juan',
+    campos_pendentes:[
+      'conferir o peso total após as correções dos animais',
+      'confirmar valor bruto',
+      'confirmar previsão de recebimento',
+    ],
+    dados_extraidos:{
+      contexto_nome:'Fazenda Operacional',
+      contexto_canonico:'telegram:grupo:-9999999999',
+      origem_canal:'telegram',
+      origem_conversa_id:'-9999999999',
+      origem_mensagem_id:'mensagem-auditada',
+      agente:'juan',
+      cabecas:13,
+      data_abate:'2026-07-03',
+    },
+  },
+  action:{status:'em_revisao',acao_tipo:'revisar_venda_abate'},
+};
+const dadosVendaAbateReal = api.dadosComGrupoNome(
+  rascunhoVendaAbateReal.draft,
+  rascunhoVendaAbateReal.action,
+  rascunhoVendaAbateReal.draft.dados_extraidos,
+);
+assert.equal(api.contextoDe(rascunhoVendaAbateReal), 'Fazenda Operacional');
+assert.equal(
+  api.inferPromotionTarget(rascunhoVendaAbateReal.draft, dadosVendaAbateReal),
+  'vendas',
+);
+assert.deepEqual(
+  [...api.promotionValidationState(
+    'vendas',
+    api.buildPromocaoPreview(dadosVendaAbateReal, 'vendas'),
+  ).labels],
+  ['Peso carcaça total', 'Valor bruto', 'Previsão de recebimento'],
+);
+assert.equal(api.itemMatchesStatus(rascunhoVendaAbateReal, 'campos_faltantes'), true);
+assert.doesNotMatch(
+  api.contextosResumoHtml(api.painelFila([rascunhoVendaAbateReal])),
+  /9999999999|telegram:grupo/,
+);
 const promocaoSimulada = (status,grupo,id) => ({
   id:`pa-${id}`,
   draft:null,

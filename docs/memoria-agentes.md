@@ -48,3 +48,16 @@ automaticamente.
 Na auditoria de 2026-07-23, 12 das 16 memórias ficaram conformes. Quatro
 registros do tipo `contexto` também apresentaram sinais de fato operacional e
 foram mantidos para revisão, sem alteração.
+
+Quando uma memória operacional já estiver representada por rascunho,
+pendência ou evento, a regularização não cria uma cópia. Primeiro é conferido
+o vínculo existente; depois, sob autorização, a memória pode ser marcada como
+`substituida` com referência ao registro durável. Evidências fiscais ficam em
+eventos ligados ao negócio, enquanto preço, peso, quantidade e pagamento
+continuam no rascunho ou na tabela operacional após confirmação.
+
+Um handoff com resultado de cálculo, backlog de insumos e correções pendentes
+deve ser decomposto antes de ser encerrado. Resultados conferidos viram
+eventos; operações incompletas seguem para rascunhos; tarefas ainda em curso
+permanecem no handoff. Um fato isolado não vira regra permanente sem
+confirmação de que será reutilizável.
