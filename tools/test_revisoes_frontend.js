@@ -18,7 +18,7 @@ const context = {
   console,
 };
 vm.createContext(context);
-new vm.Script(`${scripts[0]}\nglobalThis.__revisoes={buildPromocaoPreview,promotionValidationState,promotionInputElement,aplicarEstadoPromocao,businessFieldIndex,businessTargetPath,promotionMissingLinks,irParaCampoObrigatorio,validarNegocioOperacional,planoDecisao,montarEventoDecisao,montarAtualizacaoRascunho,registrarEvento,promotionHistoryData,promotionHistoryHtml,statusPrincipal,dadosItem,labelStatus};`, {filename: 'revisoes.html'}).runInContext(context);
+new vm.Script(`${scripts[0]}\nglobalThis.__revisoes={buildPromocaoPreview,promotionValidationState,promotionInputElement,aplicarEstadoPromocao,businessFieldIndex,businessTargetPath,promotionMissingLinks,irParaCampoObrigatorio,validarNegocioOperacional,planoDecisao,montarEventoDecisao,montarAtualizacaoRascunho,registrarEvento,promotionHistoryData,promotionHistoryHtml,statusPrincipal,dadosItem,labelStatus,painelFila,itemMatchesStatus,camposObrigatoriosFaltantes,filtrosRapidosHtml,contextosResumoHtml,contextoDe,grupoNome};`, {filename: 'revisoes.html'}).runInContext(context);
 
 const api = context.__revisoes;
 
@@ -127,6 +127,58 @@ assert.match(api.promotionMissingLinks('vendas', ['prazo_recebimento']), /data-k
 
 assert.match(html, /id="btnSalvarAjustes"[^>]*onclick="salvarAjustes\('em_revisao'\)"/);
 assert.doesNotMatch(html.match(/<button[^>]*id="btnSalvarAjustes"[^>]*>/)?.[0] || '', /disabled/);
+
+const contextoCompleto = (grupo,mensagem) => ({
+  contexto_operacional:grupo,
+  grupo_telegram:grupo,
+  origem_canal:'telegram',
+  origem_mensagem_id:mensagem,
+  agente:'juan',
+  status_confirmacao:'pendente',
+});
+const promocaoSimulada = (status,grupo,id) => ({
+  id:`pa-${id}`,
+  draft:null,
+  action:{
+    id:`a-${id}`,
+    acao_tipo:'promover_revisao_operacional',
+    status,
+    entidade_tipo:'compras',
+    payload:{
+      target_table:'compras',
+      dados_revisados:contextoCompleto(grupo,`msg-${id}`),
+      proposed_record:{operacao_id:'op-1',data:'2026-07-22',quantidade:18,valor_total:115033.27},
+    },
+  },
+});
+const itensPainel = [
+  {id:'d-incompleto',draft:{id:'d-incompleto',status:'em_revisao',tipo_operacao:'compra',dados_extraidos:contextoCompleto('Boi Balança','msg-1')},action:null},
+  {id:'d-completo',draft:{id:'d-completo',status:'em_revisao',tipo_operacao:'compra',dados_extraidos:{...contextoCompleto('Confinamento','msg-2'),operacao_id:'op-1',data_compra:'2026-07-22',quantidade:18,valor_total:115033.27}},action:null},
+  promocaoSimulada('aguardando_confirmacao','Boi Balança','aguarda'),
+  promocaoSimulada('em_execucao','Confinamento','executa'),
+  promocaoSimulada('executado','Boi Balança','executado'),
+  promocaoSimulada('erro_pos_gravacao','Confinamento','erro'),
+  {id:'d-cancelado',draft:{id:'d-cancelado',status:'cancelado',tipo_operacao:'compra',dados_extraidos:contextoCompleto('telegram:-9999999999','msg-7')},action:null},
+  {id:'pa-rejeitada',draft:null,action:{id:'a-rejeitada',status:'rejeitado',acao_tipo:'revisar_compra',payload:{dados_revisados:contextoCompleto('Ceci e Juan','msg-8')}}},
+];
+const painel = api.painelFila(itensPainel);
+assert.equal(painel.aguardandoRevisao, 2);
+assert.equal(painel.camposFaltantes, 1);
+assert.equal(painel.promocoesAguardando, 1);
+assert.equal(painel.promocoesExecutando, 1);
+assert.equal(painel.promocoesExecutadas, 1);
+assert.equal(painel.errosPosGravacao, 1);
+assert.equal(painel.rejeitadosCancelados, 2);
+assert.equal(api.camposObrigatoriosFaltantes(itensPainel[0]).length, 4);
+assert.equal(api.camposObrigatoriosFaltantes(itensPainel[1]).length, 0);
+assert.equal(itensPainel.filter(item => api.itemMatchesStatus(item,'promocao_aguardando')).length, 1);
+assert.equal(itensPainel.filter(item => api.itemMatchesStatus(item,'campos_faltantes')).length, 1);
+assert.equal(itensPainel.filter(item => api.itemMatchesStatus(item,'rejeitados_cancelados')).length, 2);
+assert.equal(api.grupoNome('telegram:-9999999999'), 'Contexto não identificado');
+assert.doesNotMatch(JSON.stringify(painel.contextos), /9999999999/);
+assert.match(api.filtrosRapidosHtml(painel), /data-filter="campos_faltantes"/);
+assert.match(api.contextosResumoHtml(painel), /Boi Balança/);
+assert.doesNotMatch(api.contextosResumoHtml(painel), /9999999999|telegram:-/);
 
 assert.throws(() => api.planoDecisao('rejeitado', '   '), /Informe o motivo/);
 const rejeicao = api.planoDecisao('rejeitado', 'Documento pertence a outro lote');
