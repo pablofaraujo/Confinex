@@ -51,6 +51,14 @@ class ContratosEcossistemaTests(unittest.TestCase):
         self.assertEqual(client.select.call_count, 2)
         self.assertEqual(client.select.call_args_list[1].kwargs["offset"], "2")
 
+
+    def test_orquestrador_valida_revisoes_js_externo(self):
+        source = (TOOLS / "test_ecossistema.py").read_text(encoding="utf-8")
+        self.assertIn('revisoes.html não deve manter script inline', source)
+        self.assertIn("./revisoes.js?v=20260723-1", source)
+        self.assertIn('["node", "--check", "revisoes.js"]', source)
+        self.assertNotIn("NamedTemporaryFile", source)
+
     def test_frontend_nao_expoe_id_de_grupo_ou_json(self):
         source = (TOOLS / "test_revisoes_frontend.js").read_text(encoding="utf-8")
         html = (ROOT / "revisoes.html").read_text(encoding="utf-8")

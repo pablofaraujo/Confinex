@@ -8,9 +8,10 @@ python3 tools/test_ecossistema.py
 
 O comando padrão é local, determinístico e não acessa nem altera o Supabase.
 Ele roda todos os testes Python de `tools/`, a simulação da fila em
-`tools/test_revisoes_frontend.js`, a verificação sintática do JavaScript
-embutido em `revisoes.html` e `git diff --check`. O mesmo comando roda em cada
-push e pull request pelo GitHub Actions.
+`tools/test_revisoes_frontend.js`, a verificação sintática de `revisoes.js`,
+confirma que `revisoes.html` não voltou a ter script inline e executa
+`git diff --check`. O mesmo comando roda em cada push e pull request pelo GitHub
+Actions.
 
 O workflow também executa a bateria local toda segunda-feira às 10:17 UTC
 (07:17 em Brasília). A execução agendada não recebe credenciais e não acessa a

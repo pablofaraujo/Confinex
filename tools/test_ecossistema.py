@@ -15,7 +15,6 @@ import json
 import os
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -111,20 +110,11 @@ def validar_local() -> None:
 
     html = (ROOT / "revisoes.html").read_text(encoding="utf-8")
     scripts = scripts_inline(html)
-    if len(scripts) != 1:
-        raise FalhaValidacao("revisoes.html deve ter exatamente um script inline")
-    with tempfile.NamedTemporaryFile(
-        mode="w",
-        suffix=".js",
-        encoding="utf-8",
-        delete=False,
-    ) as temporario:
-        temporario.write(scripts[0])
-        caminho_temporario = Path(temporario.name)
-    try:
-        executar(["node", "--check", str(caminho_temporario)])
-    finally:
-        caminho_temporario.unlink(missing_ok=True)
+    if scripts:
+        raise FalhaValidacao("revisoes.html não deve manter script inline")
+    if './revisoes.js?v=20260723-1' not in html:
+        raise FalhaValidacao("revisoes.html deve carregar revisoes.js versionado")
+    executar(["node", "--check", "revisoes.js"])
 
     executar(["git", "diff", "--check"])
 
