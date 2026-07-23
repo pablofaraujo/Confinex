@@ -35,6 +35,8 @@ Tabelas/views por app:
 
 O fluxo seguro é: Telegram/Juan → rascunho separado pelo nome do contexto → revisão visual → correção guiada → aprovação → preparação de uma pendência → confirmação em nova mensagem no mesmo contexto → promoção controlada → dado operacional → evento de auditoria → histórico consultável. Preparar ou aprovar não grava dado operacional.
 
+Para foto ou PDF de compra, Juan classifica a compra antes de aplicar o fluxo de OCR de pesagem. Ele tenta extrair e montar o extrato primeiro, apresenta o que leu, calcula apenas quando houver base suficiente e lista objetivamente os dados ausentes. Nenhuma leitura gera escrita automática; a criação de rascunho em `operation_drafts` é apenas uma opção oferecida ao final da conversa.
+
 `operation_drafts` contém o material revisável; `pending_actions` contém a ordem de promoção e seu estado; `eventos` preserva decisões e resultados legíveis. A promoção admite somente `compras`, `vendas`, `pesagens_caderno` e `abates`. O executor assume a pendência por comparação de estado antes da inserção. Uma falha antes da inserção termina em `erro`; uma falha depois dela termina em `erro_pos_gravacao`, conserva o ID operacional e nunca deve ser executada novamente sem reconciliação.
 
 `memorias_agentes` e `contexto_handoff` dão continuidade ao contexto de Juan e à passagem entre agentes, mas não aprovam promoções nem substituem os registros de auditoria. O vínculo operacional é feito pelos IDs do rascunho, da pendência, do evento e do registro de destino; na interface, a referência humana é sempre o nome do grupo.

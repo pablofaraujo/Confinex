@@ -16,6 +16,33 @@ Atualizado em 2026-07-22. Este documento é o roteiro operacional da versão atu
 
 Nenhuma compra é promovida automaticamente. Preparar, aprovar, simular e reconciliar auditorias não equivalem a gravar um lançamento.
 
+## Foto ou PDF de compra no Juan
+
+Ao receber um documento de compra de gado, Juan segue esta ordem:
+
+1. identifica a intenção de compra antes de encaminhar o arquivo ao OCR de pesagem;
+2. tenta extrair os dados e montar um extrato sem perguntar antes se deve fazer a leitura;
+3. apresenta os campos reconhecidos para confirmação;
+4. calcula os valores derivados quando houver peso suficiente;
+5. se faltarem peso, data ou condição/data de pagamento, informa que o cálculo não fecha e lista cada pendência de forma objetiva;
+6. declara que nada foi salvo automaticamente;
+7. somente no final oferece criar um rascunho na fila de Revisões.
+
+Reconhecer, extrair, confirmar ou calcular nunca autoriza escrita em `compras`, `operation_drafts` ou qualquer outra tabela. O rascunho depende de aceite explícito posterior e continua sujeito à revisão visual e à promoção controlada.
+
+### Teste operacional validado na VPS
+
+Um documento controlado de compra confirmou o seguinte comportamento, com os dados comerciais sensíveis omitidos deste repositório público:
+
+- fornecedor, quantidade, preço por arroba e condição de desconto foram reconhecidos;
+- peso, data e pagamento estavam ausentes;
+- Juan informou que não era possível fechar o valor sem o peso;
+- as três pendências foram apresentadas objetivamente;
+- Juan informou que nenhum dado havia sido salvo;
+- a criação de rascunho foi oferecida somente ao final.
+
+Na mesma validação, a compilação Python e a validação da configuração OpenClaw foram aprovadas. A leitura de conectividade com limite zero passou para `operation_drafts`, `pending_actions`, `eventos`, `compras`, `vendas`, `pesagens_caderno` e `abates`; não houve escrita no Supabase. Depois do ajuste, o gateway foi reiniciado e permaneceu ativo.
+
 ## Tabelas e responsabilidades
 
 | Tabela | Responsabilidade no fluxo |
