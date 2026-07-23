@@ -73,3 +73,24 @@ Para venda/abate, a tela explica diretamente:
 
 Essas faltas bloqueiam apenas a preparação da promoção. “Salvar ajustes”
 continua disponível.
+
+## Rotina repetível de saneamento
+
+A partir desta revisão, o saneamento não depende mais de inspeção manual solta.
+A ferramenta `tools/sanear_fila_revisoes.py` lê `operation_drafts`,
+`pending_actions` e `eventos`, gera um plano em dry-run e só propõe vínculo
+quando há correspondência forte e única entre rascunho e pendência.
+
+O modo padrão não escreve nada. A execução exige a frase exata
+`SANEAR FILA <plano_id>` e, mesmo assim, a única alteração permitida é preencher
+`operation_drafts.pending_action_id` quando ainda estiver vazio. A rotina nunca
+escreve em `compras`, `vendas`, `pesagens_caderno` ou `abates`; ambiguidade,
+duplicidade e evento com referência quebrada permanecem em relatório para
+conferência humana.
+
+Uso operacional:
+
+```bash
+python3 tools/sanear_fila_revisoes.py
+python3 tools/sanear_fila_revisoes.py --executar --confirmacao "SANEAR FILA <plano_id>" --limite N
+```

@@ -13,6 +13,7 @@ Leia conforme a tarefa:
 - `docs/contextos-por-grupo.md` — contrato canônico, dry-run, aplicação e reversão da normalização por grupo
 - `docs/memoria-agentes.md` — contrato de memória reutilizável para Juan/Ceci e auditoria somente leitura
 - `docs/fila-revisoes-prioridades.md` — inventário sanitizado, prioridade operacional e plano dry-run de saneamento
+- `tools/sanear_fila_revisoes.py` — rotina dry-run para vincular rascunhos e pendências somente com correspondência forte, sem tocar tabelas operacionais
 - `docs/regras-de-negocio.md` — fórmulas e regras de cálculo (arrobas, capim, frete, GMD, Funrural, B3, VP)
 - `docs/historico.md` — evolução do projeto (fases do git log)
 - `docs/privado/contexto-negocio.md` — negócio, parcerias, pessoas, frigoríficos (NÃO commitar — ver abaixo)

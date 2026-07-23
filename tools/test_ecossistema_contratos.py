@@ -111,6 +111,17 @@ class ContratosEcossistemaTests(unittest.TestCase):
             {"cancelado", "corrigido", "pendente", "registrado"},
         )
 
+
+    def test_saneamento_da_fila_nao_toca_tabelas_operacionais(self):
+        source = (TOOLS / "sanear_fila_revisoes.py").read_text(encoding="utf-8")
+        self.assertIn('CONFIRM_PREFIX = "SANEAR FILA"', source)
+        self.assertIn('"tabelas_operacionais_alteradas": 0', source)
+        self.assertIn('"pending_action_id": link["pending_action_id"]', source)
+        self.assertNotRegex(
+            source,
+            r'(?:insert|update)\(["\'](?:compras|vendas|pesagens_caderno|abates)',
+        )
+
     def test_rotinas_operacionais_nao_usam_memoria_como_banco(self):
         for name in (
             "promocao_operacional.py",
