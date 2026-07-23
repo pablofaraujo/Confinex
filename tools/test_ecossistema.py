@@ -36,6 +36,14 @@ TABLES_AUDITADAS = (
     "vendas",
 )
 STATUS_EVENTO_VALIDOS = {"cancelado", "corrigido", "pendente", "registrado"}
+CAMPOS_VALIDACAO_COMPLETA = (
+    ("vps_host", "CONFINEX_VPS_HOST"),
+    ("vps_pdf", "CONFINEX_TESTE_PDF"),
+    ("vps_foto", "CONFINEX_TESTE_FOTO"),
+    ("vps_grupo_id", "CONFINEX_TESTE_GRUPO_ID"),
+    ("vps_legenda_pdf", "CONFINEX_TESTE_LEGENDA_PDF"),
+    ("vps_legenda_foto", "CONFINEX_TESTE_LEGENDA_FOTO"),
+)
 
 
 class FalhaValidacao(RuntimeError):
@@ -237,6 +245,22 @@ def validar_vps(args: argparse.Namespace) -> None:
     )
 
 
+def preparar_validacao_completa(args: argparse.Namespace) -> None:
+    if not args.completa:
+        return
+    faltantes = [
+        variavel
+        for atributo, variavel in CAMPOS_VALIDACAO_COMPLETA
+        if not getattr(args, atributo, None)
+    ]
+    if faltantes:
+        raise FalhaValidacao(
+            "validação completa exige as variáveis protegidas: "
+            + ", ".join(faltantes)
+        )
+    args.testar_agente = True
+
+
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         description="Roda a bateria permanente do ecossistema Confinex"
@@ -245,6 +269,14 @@ def parser() -> argparse.ArgumentParser:
         "--supabase",
         action="store_true",
         help="faz auditoria somente leitura e compara assinaturas antes/depois",
+    )
+    p.add_argument(
+        "--completa",
+        action="store_true",
+        help=(
+            "roda local + VPS + arquivos reais + agente; a VPS também compara "
+            "o Supabase antes/depois"
+        ),
     )
     p.add_argument("--vps-host", default=os.getenv("CONFINEX_VPS_HOST"))
     p.add_argument("--vps-user", default=os.getenv("CONFINEX_VPS_USER", "root"))
@@ -271,6 +303,7 @@ def parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = parser().parse_args()
     try:
+        preparar_validacao_completa(args)
         validar_local()
         if args.supabase:
             validar_supabase()

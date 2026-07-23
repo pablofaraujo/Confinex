@@ -46,6 +46,9 @@ def carregar_env() -> dict[str, str]:
 
 
 ENV = carregar_env()
+PYCACHE_TESTE = Path("/tmp") / f"confinex-pycache-{uuid.uuid4().hex}"
+ENV["PYTHONDONTWRITEBYTECODE"] = "1"
+ENV["PYTHONPYCACHEPREFIX"] = str(PYCACHE_TESTE)
 
 
 def run(
@@ -216,13 +219,77 @@ def calls_from_trajectory(path: Path) -> list[dict[str, Any]]:
 
 
 def limpar_sessao(marker: str) -> None:
-    for path in SESSIONS.glob("*.jsonl"):
-        try:
-            content = path.read_text(encoding="utf-8", errors="ignore")
-        except OSError:
-            continue
-        if marker in path.name or marker in content:
+    for path in SESSIONS.iterdir():
+        if path.is_file() and marker in path.name:
             path.unlink(missing_ok=True)
+    restantes = [
+        path.name
+        for path in SESSIONS.iterdir()
+        if path.is_file() and marker in path.name
+    ]
+    if restantes:
+        raise RuntimeError("a sessão de teste não foi removida por completo")
+    preview = json_output(
+        [
+            "openclaw",
+            "sessions",
+            "cleanup",
+            "--agent",
+            "juan",
+            "--dry-run",
+            "--fix-missing",
+            "--json",
+        ],
+        timeout=120,
+    )
+    if preview.get("missing") != 1:
+        raise RuntimeError(
+            "a limpeza esperava exatamente uma referência ausente do teste"
+        )
+    if any(
+        preview.get(campo)
+        for campo in ("dmScopeRetired", "pruned", "capped")
+    ) or (preview.get("unreferencedArtifacts") or {}).get("removedFiles"):
+        raise RuntimeError("a limpeza de sessão atingiria itens fora do teste")
+    json_output(
+        [
+            "openclaw",
+            "sessions",
+            "cleanup",
+            "--agent",
+            "juan",
+            "--fix-missing",
+            "--json",
+        ],
+        timeout=120,
+    )
+    store = SESSIONS / "sessions.json"
+    if store.exists() and marker in store.read_text(
+        encoding="utf-8",
+        errors="ignore",
+    ):
+        raise RuntimeError("o índice de sessões manteve referência ao teste")
+
+
+def validar_indice_sessoes() -> None:
+    preview = json_output(
+        [
+            "openclaw",
+            "sessions",
+            "cleanup",
+            "--agent",
+            "juan",
+            "--dry-run",
+            "--fix-missing",
+            "--json",
+        ],
+        timeout=120,
+    )
+    if preview.get("missing"):
+        raise RuntimeError(
+            "o índice de sessões já possui referências sem arquivo; "
+            "limpe-as antes da bateria"
+        )
 
 
 def validar_agente(path_text: str, legenda: str, grupo_id: str) -> None:
@@ -285,34 +352,29 @@ def validar_agente(path_text: str, legenda: str, grupo_id: str) -> None:
         limpar_sessao(marker)
 
 
-def limpar_temporarios() -> None:
-    for cache in (
-        WORKSPACE / ".juan-ocr-jobs/cache",
-        HANDLERS / "__pycache__",
-    ):
-        if cache.exists():
-            if cache.name == "cache":
-                for path in cache.glob("*.json"):
-                    path.unlink(missing_ok=True)
-            else:
-                shutil.rmtree(cache)
-    run(
-        [
-            "openclaw",
-            "sessions",
-            "cleanup",
-            "--agent",
-            "juan",
-            "--fix-missing",
-            "--enforce",
-            "--json",
-        ],
-        timeout=120,
-    )
+def snapshot_cache_ocr() -> dict[Path, bytes]:
+    cache = WORKSPACE / ".juan-ocr-jobs/cache"
+    if not cache.exists():
+        return {}
+    return {path: path.read_bytes() for path in cache.glob("*.json")}
+
+
+def limpar_temporarios(cache_antes: dict[Path, bytes]) -> None:
+    cache = WORKSPACE / ".juan-ocr-jobs/cache"
+    if cache.exists():
+        for path in cache.glob("*.json"):
+            if path not in cache_antes:
+                path.unlink(missing_ok=True)
+        for path, conteudo in cache_antes.items():
+            if not path.exists() or path.read_bytes() != conteudo:
+                path.write_bytes(conteudo)
+    if PYCACHE_TESTE.exists():
+        shutil.rmtree(PYCACHE_TESTE)
 
 
 def main() -> int:
     before = snapshot()
+    cache_antes = snapshot_cache_ocr()
     evidencias: list[dict[str, Any]] = []
     try:
         py_files = sorted(str(path) for path in HANDLERS.glob("*.py"))
@@ -331,6 +393,7 @@ def main() -> int:
             ]
         )
         run(["openclaw", "config", "validate"])
+        validar_indice_sessoes()
         for service in (
             "openclaw-gateway.service",
             "juan-compra-ocr-worker.service",
@@ -380,7 +443,7 @@ def main() -> int:
         )
         return 0
     finally:
-        limpar_temporarios()
+        limpar_temporarios(cache_antes)
 
 
 if __name__ == "__main__":

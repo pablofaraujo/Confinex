@@ -12,6 +12,12 @@ Ele roda todos os testes Python de `tools/`, a simulação da fila em
 embutido em `revisoes.html` e `git diff --check`. O mesmo comando roda em cada
 push e pull request pelo GitHub Actions.
 
+O workflow também executa a bateria local toda segunda-feira às 10:17 UTC
+(07:17 em Brasília). A execução agendada não recebe credenciais e não acessa a
+VPS ou o Supabase; serve para detectar regressões do código e mudanças no
+ambiente dos runners. Há limite de dez minutos e execuções da mesma referência
+não se sobrepõem.
+
 ## O que a bateria protege
 
 - **Telegram e anexos:** `MediaPath` e `MediaPaths` devem chegar primeiro a
@@ -66,8 +72,14 @@ export CONFINEX_TESTE_FOTO='<foto-real-em-media-inbound>'
 export CONFINEX_TESTE_GRUPO_ID='<grupo-de-homologacao>'
 export CONFINEX_TESTE_LEGENDA_PDF='<contexto-do-pdf>'
 export CONFINEX_TESTE_LEGENDA_FOTO='<contexto-da-foto>'
-python3 tools/test_ecossistema.py --vps-host "$CONFINEX_VPS_HOST" --testar-agente
+python3 tools/test_ecossistema.py --completa
 ```
+
+`--completa` exige as seis variáveis de contexto acima, ativa a simulação do
+agente e roda, em uma única chamada: bateria local, handlers da VPS, OpenClaw,
+serviços, PDF, foto, trajetória do Juan e assinatura do Supabase antes/depois.
+A chave SSH pode ser informada por `CONFINEX_VPS_IDENTITY`; sem ela, o SSH usa
+o agente e a configuração padrão do ambiente.
 
 O orquestrador envia o conteúdo versionado de `tools/test_juan_vps.py`
 diretamente ao Python remoto, sem deixar script instalado. Para cada arquivo
@@ -78,8 +90,18 @@ anexo precisa ser o roteador, também em `--dry-run`.
 
 Antes e depois, o teste compara a assinatura das nove tabelas. Ao terminar,
 mesmo em caso de falha, remove somente sessões marcadas pelo próprio teste,
-limpa cache de OCR e `__pycache__` e executa a manutenção de sessões do Juan.
-Nenhuma promoção ou criação de rascunho faz parte desta bateria.
+remove somente entradas de cache OCR criadas durante a execução e usa um
+diretório temporário isolado para `py_compile`. O conteúdo do cache anterior é
+preservado. Para a sessão, remove os arquivos com o marcador único, confirma
+em prévia que existe exatamente uma referência ausente e pede ao OpenClaw para
+remover somente essa referência; retenção global nunca é forçada. Nenhuma
+promoção ou criação de rascunho faz parte desta bateria.
+
+A execução completa não foi colocada no GitHub Actions: a VPS está em rede
+privada, os anexos reais ficam no servidor e não há clone canônico do Confinex
+na VPS. Também não foi criada cópia permanente do verificador em cron, evitando
+que um script solto fique diferente do repositório. Rode `--completa` a partir
+do clone canônico após mudanças em Juan, roteamento, OCR ou promoção.
 
 ## Leitura do resultado
 

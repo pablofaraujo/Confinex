@@ -2,16 +2,43 @@ from __future__ import annotations
 
 import re
 import unittest
+from argparse import Namespace
 from pathlib import Path
 from unittest.mock import Mock
 
-from test_ecossistema import assinatura_ids, selecionar_todos
+from test_ecossistema import (
+    FalhaValidacao,
+    assinatura_ids,
+    preparar_validacao_completa,
+    selecionar_todos,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOLS = ROOT / "tools"
 
 
 class ContratosEcossistemaTests(unittest.TestCase):
+    def test_validacao_completa_exige_contexto_privado_e_ativa_agente(self):
+        args = Namespace(
+            completa=True,
+            testar_agente=False,
+            vps_host="host",
+            vps_pdf="compra.pdf",
+            vps_foto="compra.jpg",
+            vps_grupo_id="grupo",
+            vps_legenda_pdf="compra em PDF",
+            vps_legenda_foto="compra em foto",
+        )
+        preparar_validacao_completa(args)
+        self.assertTrue(args.testar_agente)
+
+        args.vps_pdf = None
+        with self.assertRaisesRegex(
+            FalhaValidacao,
+            "CONFINEX_TESTE_PDF",
+        ):
+            preparar_validacao_completa(args)
+
     def test_snapshot_pagina_ate_o_fim_e_assina_ids_ordenados(self):
         client = Mock()
         client.select.side_effect = [
@@ -73,6 +100,8 @@ class ContratosEcossistemaTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("python3 tools/test_ecossistema.py", workflow)
+        self.assertRegex(workflow, r"(?m)^\s+schedule:")
+        self.assertIn("timeout-minutes:", workflow)
 
     def test_verificador_vps_exige_roteador_antes_da_midia(self):
         source = (TOOLS / "test_juan_vps.py").read_text(encoding="utf-8")
@@ -103,6 +132,9 @@ class ContratosEcossistemaTests(unittest.TestCase):
             self.assertIn(f'"{table}"', source)
         self.assertIn("if before != after", source)
         self.assertIn("limpar_sessao(marker)", source)
+        self.assertIn("snapshot_cache_ocr()", source)
+        self.assertIn('"--dry-run",\n            "--fix-missing"', source)
+        self.assertNotIn('"--enforce"', source)
 
 
 if __name__ == "__main__":

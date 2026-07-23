@@ -54,6 +54,13 @@ Opcionalmente, compara contagem e assinatura dos IDs das tabelas auditadas no
 Supabase antes e depois de uma leitura e executa na VPS o verificador efêmero
 `tools/test_juan_vps.py`.
 
+O GitHub Actions roda a parte local em push, pull request e semanalmente, sem
+segredos. `python3 tools/test_ecossistema.py --completa` é o caminho único para
+a prova local + VPS; ele exige o contexto privado por variáveis de ambiente e
+ativa os arquivos reais e a trajetória do Juan. A prova completa não é
+agendada no GitHub nem copiada para cron da VPS, pois o servidor não possui
+clone canônico deste repositório.
+
 O verificador da VPS não é instalado no servidor e não cria rascunho nem
 lançamento. Ele compila os handlers, roda seus testes, valida a configuração
 OpenClaw e os serviços, processa foto e PDF reais em `--dry-run` e, quando
@@ -102,5 +109,6 @@ Bundle esbuild legível de `src/confinex-entry.jsx` + `confinex_work.jsx` (fonte
 6. JSONP + scrape CEPEA + heurística `extrairNumeroB3` (aceita 100–800) são frágeis.
 7. `rolar()`/`encerrar()`/`encerrarParcial()` sem transação (o parcial faz 3+ escritas sequenciais: update da posição, insert da parte fechada, rateio das alocações).
 8. Deploy publica tudo, inclusive `promissoria-skill.zip`.
-9. Sem testes, lint ou package.json.
+9. Sem lint ou package.json; a bateria Python/Node cobre o fluxo crítico e
+   roda pelo GitHub Actions, mas ainda não há análise estática geral dos apps.
 10. `painel-boi-gordo.html` foi movido para o repo, mas a tarefa agendada `atualiza-painel-boi-gordo` (Cowork, seg-sex 6h32) ainda atualiza um artifact Cowork separado — o arquivo do repo não recebe as atualizações diárias até a automação ser redirecionada para editar este arquivo (e alguém commitar/push, já que a pasta do Drive não tem `.git`/push).
