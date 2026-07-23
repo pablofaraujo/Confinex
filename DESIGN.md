@@ -79,6 +79,15 @@ Larguras: padrão 1280px; `<body data-w="md">` = 1100px; `<body data-w="sm">` = 
 - Datas: `fmtD` (dd/mm/aa) para datas de negócio; `fmtDT` para timestamps; "há X min" só para heartbeats.
 - Moeda: `fmtR$` (inteiro) para totais; `fmtR$2` para valores unitários.
 
+### Fila de revisões
+
+- O painel usa KPIs e filtros rápidos com nomes operacionais: aguardando revisão, campos faltantes, aguardando confirmação, em andamento, concluídos, precisa conferir e rejeitados/cancelados.
+- O contexto é apresentado pelo nome do grupo. IDs técnicos e JSON não aparecem na interface.
+- Campo obrigatório ausente usa `.fld.campo-incompleto`, `aria-invalid="true"` e um aviso `.aviso-validacao` com atalhos que levam o foco ao campo. O aviso informa os nomes humanos dos campos.
+- A validação bloqueia somente **Preparar promoção operacional**. **Salvar ajustes** continua disponível para permitir a correção progressiva.
+- O histórico traduz estados para linguagem operacional e mostra data, responsável, destino, resultado e ID do registro criado quando existir.
+- Rejeitar exige motivo; devolver para confirmação preserva os dados; cada decisão cria um evento legível. Detalhes internos continuam no banco para auditoria, nunca como JSON bruto na tela.
+
 ## Roadmap do DS
 
 ~~Fases 3 e 4~~ feitas: shell de navegação, index como Home/dashboard e adoção do padrão por Confinex, OCR Pesagem e Ops. Fase 5: tabela rica (ordenar/filtrar/buscar/exportar), toasts/modais no lugar de alert/confirm/prompt, ícones Lucide. Fase 6: toggle dark mode. Detalhes: `docs/auditoria-ui-ux.md`.

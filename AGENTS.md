@@ -9,8 +9,9 @@
 2. **`docs/arquitetura.md`** — apps, backend, deploy, convenções e dívidas técnicas
 3. **`docs/regras-de-negocio.md`** — fórmulas e regras de cálculo (arrobas, capim, frete, GMD, Funrural, B3, VP)
 4. **`DESIGN.md` + `design/`** — Design System (obrigatório antes de criar qualquer tela/componente)
-5. `docs/historico.md` — evolução do projeto
-6. `docs/privado/` — contexto de negócio, infraestrutura e pendências (**gitignored**, só local)
+5. **`docs/fila-revisoes.md`** — obrigatório quando a tarefa tocar Juan, rascunhos, revisões ou promoção operacional
+6. `docs/historico.md` — evolução do projeto
+7. `docs/privado/` — contexto de negócio, infraestrutura e pendências (**gitignored**, só local)
 
 ## Regras de trabalho (valem para TODOS os agentes)
 

@@ -1,6 +1,6 @@
 # Arquitetura do ecossistema CFAgro
 
-Atualizado em 2026-07-20.
+Atualizado em 2026-07-22.
 
 ## Apps e navegação
 
@@ -30,6 +30,16 @@ Tabelas/views por app:
 - **revisões/promoções**: `operation_drafts` e `pending_actions` guardam rascunhos e ordens auditáveis; `revisoes.html` prepara a promoção e `tools/promocao_operacional.py` executa a gravação em `compras`, `vendas`, `pesagens_caderno` ou `abates` somente após confirmação `PROMOVER <id>`. Antes do insert, a pendência é assumida por compare-and-set (`em_execucao`), impedindo dois workers; falhas posteriores ao insert preservam o ID operacional em `erro_pos_gravacao` e exigem reconciliação, nunca repetição automática. `tools/reconciliar_compras_telegram.py` transforma auditorias do Juan em backlog de triagem separado pelo nome do grupo: elimina ocorrências repetidas por conversa, não leva trechos técnicos brutos para a interface, marca dados não confirmados como pendentes e usa UUID determinístico para impedir nova inserção do mesmo candidato. Sem `--executar --limite N`, apenas mostra o plano; com execução, a única tabela permitida é `operation_drafts`.
 - **abate**: `abates` (cabeçalho), `abate_animais` (romaneio por animal — schema alinhado jul/2026: `seq`, `descricao`, `classificacao`, `meia_esq`/`meia_dir`, `peso_kg` = carcaça, `vlr_kg`/`vlr_arroba`/`vlr_total`, `bonus`, `penalizacao`, `condenacao`; não guarda peso vivo/balança nem hora de passagem).
 - **promissórias** (skill): tabela `promissorias` (numero pk `NNN/AAAA`, credor, cpf, valor, vencimento, praça, negocio_id, status aberta/quitada).
+
+## Fila de revisões e promoção operacional
+
+O fluxo seguro é: Telegram/Juan → rascunho separado pelo nome do contexto → revisão visual → correção guiada → aprovação → preparação de uma pendência → confirmação em nova mensagem no mesmo contexto → promoção controlada → dado operacional → evento de auditoria → histórico consultável. Preparar ou aprovar não grava dado operacional.
+
+`operation_drafts` contém o material revisável; `pending_actions` contém a ordem de promoção e seu estado; `eventos` preserva decisões e resultados legíveis. A promoção admite somente `compras`, `vendas`, `pesagens_caderno` e `abates`. O executor assume a pendência por comparação de estado antes da inserção. Uma falha antes da inserção termina em `erro`; uma falha depois dela termina em `erro_pos_gravacao`, conserva o ID operacional e nunca deve ser executada novamente sem reconciliação.
+
+`memorias_agentes` e `contexto_handoff` dão continuidade ao contexto de Juan e à passagem entre agentes, mas não aprovam promoções nem substituem os registros de auditoria. O vínculo operacional é feito pelos IDs do rascunho, da pendência, do evento e do registro de destino; na interface, a referência humana é sempre o nome do grupo.
+
+O contrato das tabelas, o significado dos estados, as ferramentas, os testes e o procedimento de reversão estão em [`docs/fila-revisoes.md`](fila-revisoes.md).
 
 ## Confinex (confinex-app.latest.js, ~110 KB / 2.120 linhas)
 
