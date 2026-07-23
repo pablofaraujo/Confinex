@@ -30,16 +30,17 @@ Ao receber um documento de compra de gado, Juan segue esta ordem:
 
 Reconhecer, extrair, confirmar ou calcular nunca autoriza escrita em `compras`, `operation_drafts` ou qualquer outra tabela. O rascunho depende de aceite explícito posterior e continua sujeito à revisão visual e à promoção controlada.
 
-Desde 23/07/2026, `compra_documento_ocr.py` tem fallback local com Tesseract para foto/PDF quando o provedor visual externo estiver indisponível. O fallback extrai compra, vendedor, cabeças, preço por arroba, peso total ou médio, desconto de barriga, data e pagamento quando legíveis; calcula arrobas e valor quando houver dados suficientes; e registra apenas `ocr_fallback_motivo=provedor_visual_indisponivel`, sem guardar erro técnico bruto do provedor.
+Desde 23/07/2026, `compra_documento_ocr.py` usa primeiro o canal OpenClaw/OpenAI já autenticado por OAuth (`openclaw infer image describe`) para ler foto/PDF de compra. O fallback local com Tesseract permanece para indisponibilidade do canal visual. O fluxo extrai compra, vendedor, cabeças, preço por arroba, peso total ou médio, desconto de barriga, data e pagamento quando legíveis; calcula peso total, arrobas e valor quando houver dados suficientes; e registra apenas `ocr_fallback_motivo=openclaw_visual_indisponivel` quando cair para OCR local, sem guardar erro técnico bruto.
 
 ### Teste operacional validado na VPS
 
-Um documento controlado de compra confirmou o seguinte comportamento, com os dados comerciais sensíveis omitidos deste repositório público:
+Documentos controlados de compra em foto e PDF confirmaram o seguinte comportamento, com os dados comerciais sensíveis omitidos deste repositório público:
 
 - fornecedor, quantidade, preço por arroba e condição de desconto foram reconhecidos;
-- peso, data e pagamento estavam ausentes;
-- Juan informou que não era possível fechar o valor sem o peso;
-- as três pendências foram apresentadas objetivamente;
+- foto e PDF foram lidos pelo canal OpenClaw/OpenAI;
+- peso médio foi convertido em peso total quando necessário;
+- Juan calculou arrobas e valor quando havia peso suficiente;
+- quando peso, data ou pagamento estavam ausentes, as pendências foram apresentadas objetivamente;
 - Juan informou que nenhum dado havia sido salvo;
 - a criação de rascunho foi oferecida somente ao final.
 
