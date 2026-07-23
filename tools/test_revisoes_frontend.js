@@ -189,7 +189,8 @@ const itemDecisao = {draft:{id:'draft-1',agente:'juan',codigo_sugerido:'CF-1'},a
 const dadosDecisao = {contexto_operacional:'Confinamento',quantidade:18,origem_canal:'telegram',origem_conversa_id:'grupo-1',origem_mensagem_id:'msg-1'};
 const eventoRejeicao = api.montarEventoDecisao(rejeicao, itemDecisao, dadosDecisao);
 assert.equal(eventoRejeicao.tipo, 'revisao_rejeitada');
-assert.equal(eventoRejeicao.status, 'rejeitada');
+assert.equal(eventoRejeicao.status, 'registrado');
+assert.equal(eventoRejeicao.dados.status_decisao, 'rejeitada');
 assert.equal(eventoRejeicao.dados.motivo, 'Documento pertence a outro lote');
 assert.match(eventoRejeicao.observacao, /Documento pertence a outro lote/);
 
@@ -206,7 +207,10 @@ assert.equal(eventoDevolucao.dados.motivo, 'Quantidade corrigida');
 const ajustes = api.planoDecisao('em_revisao', 'Peso conferido');
 assert.equal(ajustes.draftStatus, 'em_revisao');
 assert.equal(ajustes.actionStatus, 'em_revisao');
-assert.equal(api.montarEventoDecisao(ajustes,itemDecisao,dadosDecisao).tipo, 'ajustes_salvos_na_revisao');
+const eventoAjustes = api.montarEventoDecisao(ajustes,itemDecisao,dadosDecisao);
+assert.equal(eventoAjustes.tipo, 'ajustes_salvos_na_revisao');
+assert.equal(eventoAjustes.status, 'registrado');
+assert.equal(eventoAjustes.dados.status_decisao, 'ajustes_salvos');
 assert.match(html, /onclick="voltarParaConfirmacao\(\)"/);
 assert.match(html, /Obrigatório para rejeitar/);
 assert.doesNotMatch(html, /Dados técnicos avançados|class="json"/);
@@ -245,7 +249,8 @@ const eventosInseridos = [];
 context.db = {from(table) { assert.equal(table, 'eventos'); return {insert(record) { eventosInseridos.push(record); return {error:null}; }}; }};
 api.registrarEvento(rejeicao,itemDecisao,dadosDecisao).then(() => {
   assert.equal(eventosInseridos.length, 1, 'Rejeição com motivo deve registrar evento');
-  assert.equal(eventosInseridos[0].status, 'rejeitada');
+  assert.equal(eventosInseridos[0].status, 'registrado');
+  assert.equal(eventosInseridos[0].dados.status_decisao, 'rejeitada');
   console.log('Simulações da fila de revisões: OK');
 }).catch(error => {
   console.error(error);
