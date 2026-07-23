@@ -11,6 +11,7 @@ Leia conforme a tarefa:
 - `docs/testes-ecossistema.md` — bateria contínua local, Supabase e VPS/Juan
 - `docs/auditoria-contextos-telegram.md` — cobertura por contexto, lacunas e pendências encontradas nas conversas
 - `docs/contextos-por-grupo.md` — contrato canônico, dry-run, aplicação e reversão da normalização por grupo
+- `docs/memoria-agentes.md` — contrato de memória reutilizável para Juan/Ceci e auditoria somente leitura
 - `docs/regras-de-negocio.md` — fórmulas e regras de cálculo (arrobas, capim, frete, GMD, Funrural, B3, VP)
 - `docs/historico.md` — evolução do projeto (fases do git log)
 - `docs/privado/contexto-negocio.md` — negócio, parcerias, pessoas, frigoríficos (NÃO commitar — ver abaixo)

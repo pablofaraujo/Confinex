@@ -11,6 +11,7 @@ import argparse
 import hashlib
 import json
 import sys
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -42,8 +43,10 @@ SELECTS = {
 CONTEXT_COLUMNS = (
     "contexto_canonico", "contexto_nome", "origem_canal",
     "origem_conversa_id", "origem_mensagem_id", "agente", "escopo",
+    "contexto_escopo",
 )
 CONFIRM_PREFIX = "NORMALIZAR CONTEXTOS"
+CANDIDATE_NAMESPACE = uuid.UUID("e5f19b87-58be-43a7-a94f-518755cdf460")
 
 
 def load_json(path: Path) -> Any:
@@ -98,6 +101,7 @@ def normalized_payload(row: dict[str, Any], spec: dict[str, str], mapped: dict[s
     payload = dict(context)
     if spec["agente"] == "agente_origem":
         payload["agente_origem"] = payload["agente"]
+        payload["contexto_escopo"] = payload.pop("escopo")
     if spec["canal"] == "canal":
         payload.update({
             "canal": payload["origem_canal"],
@@ -258,16 +262,58 @@ def create_candidate_draft(client: Any, draft: dict[str, Any], confirmation: str
         raise ConfinexError(f"confirmação inválida; use exatamente: {expected}")
     if str(draft.get("origem_mensagem_id") or "").endswith("a-confirmar"):
         raise ConfinexError("vincule o ID exato da mensagem antes de criar o rascunho")
+    draft_id = str(uuid.uuid5(CANDIDATE_NAMESPACE, f"rascunho:{plan_id}"))
+    pending_id = str(uuid.uuid5(CANDIDATE_NAMESPACE, f"pendencia:{plan_id}"))
+    event_id = str(uuid.uuid5(CANDIDATE_NAMESPACE, f"evento:{plan_id}"))
     existing = client.select(
         "operation_drafts",
-        select="id",
+        select="id,pending_action_id",
         origem_conversa_id=f"eq.{draft['origem_conversa_id']}",
         origem_mensagem_id=f"eq.{draft['origem_mensagem_id']}",
         limit="2",
     )
-    if existing:
+    if len(existing) > 1 or (existing and existing[0].get("id") != draft_id):
         raise ConfinexError("já existe rascunho para essa conversa e mensagem")
-    created = client.insert("operation_drafts", draft)
+    created = existing[0] if existing else client.insert(
+        "operation_drafts", {**draft, "id": draft_id}
+    )
+    pending_rows = client.select(
+        "pending_actions",
+        select="id",
+        id=f"eq.{pending_id}",
+        limit="2",
+    )
+    pending = pending_rows[0] if pending_rows else client.insert("pending_actions", {
+        "id": pending_id,
+        **{
+            key: draft.get(key)
+            for key in (
+                "contexto_canonico", "contexto_nome", "origem_canal",
+                "origem_conversa_id", "origem_mensagem_id", "agente", "escopo",
+            )
+        },
+        "canal": draft.get("origem_canal"),
+        "conversa_id": draft.get("origem_conversa_id"),
+        "mensagem_id": draft.get("origem_mensagem_id"),
+        "usuario_solicitante": "pablo",
+        "acao_tipo": "revisar_venda_abate",
+        "entidade_tipo": "operation_draft",
+        "entidade_id": created.get("id"),
+        "resumo": "Revisar venda/abate recuperada da auditoria do Telegram",
+        "payload": {
+            "source_draft_id": created.get("id"),
+            "dados_extraidos": draft.get("dados_extraidos"),
+            "campos_pendentes": draft.get("campos_pendentes"),
+            "inferencias": draft.get("inferencias"),
+            "promovido_para_operacional": False,
+        },
+        "status": "em_revisao",
+    })
+    client.update(
+        "operation_drafts",
+        {"id": f"eq.{created.get('id')}"},
+        {"pending_action_id": pending.get("id")},
+    )
     event_payload = {
         key: draft.get(key)
         for key in (
@@ -275,7 +321,9 @@ def create_candidate_draft(client: Any, draft: dict[str, Any], confirmation: str
             "origem_conversa_id", "origem_mensagem_id", "agente", "escopo",
         )
     }
-    event = client.insert("eventos", {
+    event_rows = client.select("eventos", select="id", id=f"eq.{event_id}", limit="2")
+    event = event_rows[0] if event_rows else client.insert("eventos", {
+        "id": event_id,
         **event_payload,
         "tipo": "rascunho_criado_por_reconciliacao",
         "usuario": "pablo",
@@ -285,6 +333,7 @@ def create_candidate_draft(client: Any, draft: dict[str, Any], confirmation: str
         "status": "registrado",
         "dados": {
             "draft_id": created.get("id"),
+            "pending_action_id": pending.get("id"),
             "promovido_para_operacional": False,
             "confirmacao_suficiente": False,
         },
@@ -293,8 +342,10 @@ def create_candidate_draft(client: Any, draft: dict[str, Any], confirmation: str
     return {
         "modo": "rascunho_criado",
         "rascunho_id": created.get("id"),
+        "pending_action_id": pending.get("id"),
         "evento_id": event.get("id"),
         "tabelas_operacionais_alteradas": 0,
+        "execucao_idempotente": True,
     }
 
 

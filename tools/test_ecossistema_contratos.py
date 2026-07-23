@@ -68,8 +68,30 @@ class ContratosEcossistemaTests(unittest.TestCase):
             source,
             r"(?:insert|update)\([\"'](?:compras|vendas|pesagens_caderno|abates)",
         )
-        self.assertIn('client.insert("operation_drafts", draft)', source)
+        self.assertIn('"operation_drafts", {**draft, "id": draft_id}', source)
+        self.assertIn('client.insert("pending_actions"', source)
         self.assertIn('client.insert("eventos"', source)
+
+    def test_migracao_preserva_escopo_das_memorias(self):
+        migration = (
+            ROOT
+            / "supabase"
+            / "migrations"
+            / "202607230001_contextos_canonicos.sql"
+        ).read_text(encoding="utf-8")
+        normalizer = (TOOLS / "normalizar_contextos.py").read_text(encoding="utf-8")
+        self.assertRegex(migration, r"(?m)^BEGIN;$")
+        self.assertRegex(migration, r"(?m)^COMMIT;$")
+        self.assertIn("ADD COLUMN IF NOT EXISTS contexto_escopo text", migration)
+        self.assertLess(
+            migration.index("NEW.payload #>> '{dados_revisados,origem_canal}'"),
+            migration.index("NEW.canal"),
+        )
+        self.assertNotRegex(
+            migration,
+            r"(?i)\b(?:drop\s+table|truncate|delete\s+from|update\s+public\.)\b",
+        )
+        self.assertIn('payload["contexto_escopo"] = payload.pop("escopo")', normalizer)
 
     def test_eventos_da_fila_usam_status_validos(self):
         html = (ROOT / "revisoes.html").read_text(encoding="utf-8")
@@ -98,6 +120,25 @@ class ContratosEcossistemaTests(unittest.TestCase):
                 r"(?:insert|update)\(['\"](?:memorias_agentes|contexto_handoff)",
                 msg=f"{name} não deve gravar memória/handoff como dado operacional",
             )
+
+    def test_handoff_nao_e_movido_ou_encerrado_automaticamente(self):
+        source = (TOOLS / "planejar_handoff.py").read_text(encoding="utf-8")
+        self.assertIn('"modo": "dry-run"', source)
+        self.assertIn('"encerramento_permitido": False', source)
+        self.assertNotRegex(
+            source,
+            r"(?:insert|update)\([\"'](?:contexto_handoff|memorias_agentes|eventos)",
+        )
+
+    def test_auditoria_de_memoria_e_somente_leitura(self):
+        source = (TOOLS / "validar_memorias.py").read_text(encoding="utf-8")
+        for kind in ("decisao", "preferencia", "regra", "excecao", "aprendizado"):
+            self.assertIn(kind, source)
+        self.assertIn('"escritas_realizadas": 0', source)
+        self.assertNotRegex(
+            source,
+            r"(?:insert|update)\([\"']memorias_agentes",
+        )
 
     def test_compra_direta_exige_executor_e_confirmacao(self):
         reconciliar = (TOOLS / "reconciliar_compras_telegram.py").read_text(

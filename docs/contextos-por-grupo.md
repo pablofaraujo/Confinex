@@ -24,9 +24,11 @@ não recebe contexto por aproximação.
 os campos canônicos pela migração
 `supabase/migrations/202607230001_contextos_canonicos.sql`. A tabela
 `contextos_canais` centraliza nomes e aliases; somente `contexto_nome` chega à
-interface. `memorias_agentes` continua restrita a regras, decisões e
-preferências reutilizáveis. `contexto_handoff` continua sendo passagem
-temporária e não é fonte durável.
+interface. Em `memorias_agentes`, o campo preexistente `escopo` continua
+representando o alcance funcional da memória; `contexto_escopo` guarda se a
+conversa de origem é grupo, direta ou sistêmica. `memorias_agentes` continua
+restrita a regras, decisões e preferências reutilizáveis. `contexto_handoff`
+continua sendo passagem temporária e não é fonte durável.
 
 ## Ferramentas e dry-run
 
@@ -52,6 +54,9 @@ Em 2026-07-23, o dry-run real encontrou 20 registros com vínculo comprovável:
 | `eventos` | 2 |
 | `memorias_agentes` | 2 |
 
+O plano atual é `d1e8f0a7d4b4`: 16 vínculos de Boi Balança e 4 de
+Confinamento. As 25 referências ambíguas permanecem fora do plano.
+
 Outros 25 registros com alguma referência ficaram fora: 2 rascunhos, 4 ações,
 7 eventos e 12 memórias. Eles não devem ser corrigidos sem evidência adicional.
 Os eventos sem conversa também permanecem intactos; ausência não autoriza
@@ -65,6 +70,12 @@ copiada automaticamente para memória: primeiro é necessário vincular os fatos
 `memorias_agentes` e então encerrar o handoff. Isso permanece pendente de
 revisão e autorização de escrita.
 
+`tools/planejar_handoff.py` aprofunda essa triagem em modo somente leitura. Ele
+conta fragmentos com sinais de dado operacional, evento, memória reutilizável,
+continuidade temporária ou revisão humana, mas publica somente contagens e a
+assinatura da fonte. O conteúdo não aparece no relatório, e o encerramento
+permanece bloqueado.
+
 ## Aplicação segura
 
 Primeiro aplique e revise a migração de estrutura. Depois rode novamente o
@@ -72,10 +83,21 @@ dry-run e anote o `plano_id` emitido. A escrita só é liberada por uma frase
 vinculada exatamente àquele plano:
 
 ```bash
+psql "$SUPABASE_DB_URL" \
+  --set ON_ERROR_STOP=1 \
+  --file supabase/migrations/202607230001_contextos_canonicos.sql
+```
+
+O arquivo abre e conclui sua própria transação. Ele cria colunas, índices,
+política de leitura, tabela de contextos e triggers; não contém `UPDATE`,
+`DELETE`, `TRUNCATE` ou remoção de tabela. Antes de executá-lo, a URL de banco
+deve vir do cofre e nunca ser gravada no repositório.
+
+```bash
 python3 tools/normalizar_contextos.py \
   --mapa docs/privado/contextos-canais.json \
   --executar \
-  --confirmacao "NORMALIZAR CONTEXTOS <plano_id>"
+  --confirmacao "NORMALIZAR CONTEXTOS d1e8f0a7d4b4"
 ```
 
 Se qualquer registro mudar entre a simulação e a execução, gere um novo plano
@@ -98,12 +120,16 @@ python3 tools/normalizar_contextos.py \
   --mapa docs/privado/contextos-canais.json \
   --candidato-rascunho docs/privado/candidato-venda-abate.json \
   --criar-rascunho \
-  --confirmacao "CRIAR RASCUNHO 7051f8c5f62a"
+  --confirmacao "CRIAR RASCUNHO da1cc9a243cf"
 ```
 
-Essa ação cria somente um `operation_draft` e seu evento. Não cria venda,
-abate ou compra operacional. A deduplicação por conversa e mensagem impede
-repetição do mesmo caso.
+Essa ação cria somente um `operation_draft`, a `pending_action` de revisão e
+seu evento, todos ligados pela mesma origem. Não cria venda, abate ou compra
+operacional. A deduplicação por conversa e mensagem impede repetição do mesmo
+caso. A frase anterior foi invalidada ao retirar o peso ainda não conferido dos
+dados promovíveis; ele permanece apenas como inferência histórica. Os IDs do
+rascunho, da pendência e do evento são determinísticos, permitindo retomar com
+segurança se uma chamada for interrompida entre as gravações.
 
 ## Reversão
 

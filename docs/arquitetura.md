@@ -28,7 +28,7 @@ Tabelas/views por app:
 - **painel**: as anteriores + `v_estoque_atual`, `acertos`, `fluxo_caixa`; `posicoes_hedge.categoria` distingue hedge × `especulacao`; filtro `.or('status.in.(aberta,rolada),origem.eq.bgi-portfolio')` importa posições do app bgi-portfolio.
 - **ops**: `ecossistema_inventario`, `ecossistema_status`, `vps_briefings`.
 - **revisões/promoções**: `operation_drafts` e `pending_actions` guardam rascunhos e ordens auditáveis; `revisoes.html` prepara a promoção e `tools/promocao_operacional.py` executa a gravação em `compras`, `vendas`, `pesagens_caderno` ou `abates` somente após confirmação `PROMOVER <id>`. Antes do insert, a pendência é assumida por compare-and-set (`em_execucao`), impedindo dois workers; falhas posteriores ao insert preservam o ID operacional em `erro_pos_gravacao` e exigem reconciliação, nunca repetição automática. `tools/reconciliar_compras_telegram.py` transforma auditorias do Juan em backlog de triagem separado pelo nome do grupo: elimina ocorrências repetidas por conversa, não leva trechos técnicos brutos para a interface, marca dados não confirmados como pendentes e usa UUID determinístico para impedir nova inserção do mesmo candidato. Sem `--executar --limite N`, apenas mostra o plano; com execução, a única tabela permitida é `operation_drafts`.
-- **contexto por grupo**: `contextos_canais` registra a chave canônica, o nome humano, o canal, o ID técnico e o escopo. `operation_drafts`, `pending_actions`, `eventos` e `memorias_agentes` repetem o vínculo necessário à auditoria. O frontend usa somente `contexto_nome`; `origem_conversa_id` permanece oculto e nunca recebe um nome humano. A migração aditiva e o dry-run protegido estão em [`docs/contextos-por-grupo.md`](contextos-por-grupo.md).
+- **contexto por grupo**: `contextos_canais` registra a chave canônica, o nome humano, o canal, o ID técnico e o escopo. `operation_drafts`, `pending_actions`, `eventos` e `memorias_agentes` repetem o vínculo necessário à auditoria. Nas memórias, `escopo` mantém o alcance funcional existente e `contexto_escopo` identifica grupo/conversa direta/sistema. O frontend usa somente `contexto_nome`; `origem_conversa_id` permanece oculto e nunca recebe um nome humano. A migração aditiva e o dry-run protegido estão em [`docs/contextos-por-grupo.md`](contextos-por-grupo.md).
 - **abate**: `abates` (cabeçalho), `abate_animais` (romaneio por animal — schema alinhado jul/2026: `seq`, `descricao`, `classificacao`, `meia_esq`/`meia_dir`, `peso_kg` = carcaça, `vlr_kg`/`vlr_arroba`/`vlr_total`, `bonus`, `penalizacao`, `condenacao`; não guarda peso vivo/balança nem hora de passagem).
 - **promissórias** (skill): tabela `promissorias` (numero pk `NNN/AAAA`, credor, cpf, valor, vencimento, praça, negocio_id, status aberta/quitada).
 
@@ -43,6 +43,12 @@ O processo do agente permanece em sandbox com escrita limitada à pasta de traba
 `operation_drafts` contém o material revisável; `pending_actions` contém a ordem de promoção e seu estado; `eventos` preserva decisões e resultados legíveis. A promoção admite somente `compras`, `vendas`, `pesagens_caderno` e `abates`. O executor assume a pendência por comparação de estado antes da inserção. Uma falha antes da inserção termina em `erro`; uma falha depois dela termina em `erro_pos_gravacao`, conserva o ID operacional e nunca deve ser executada novamente sem reconciliação.
 
 `memorias_agentes` e `contexto_handoff` dão continuidade ao contexto de Juan e à passagem entre agentes, mas não aprovam promoções nem substituem os registros de auditoria. O vínculo operacional é feito pelos IDs do rascunho, da pendência, do evento e do registro de destino; na interface, a referência humana é sempre o nome do grupo.
+
+Memória permanente aceita somente decisão, preferência, regra, exceção ou
+aprendizado reutilizável. Fatos numerados de compra, venda, pesagem e abate
+ficam em rascunhos, eventos ou tabelas operacionais. O contrato Juan/Ceci e a
+auditoria somente leitura estão em
+[`docs/memoria-agentes.md`](memoria-agentes.md).
 
 O contrato das tabelas, o significado dos estados, as ferramentas, os testes e o procedimento de reversão estão em [`docs/fila-revisoes.md`](fila-revisoes.md).
 

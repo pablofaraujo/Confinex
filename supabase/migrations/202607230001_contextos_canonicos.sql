@@ -2,6 +2,8 @@
 -- Esta migração cria estrutura; a correção dos dados é feita separadamente,
 -- primeiro com tools/normalizar_contextos.py em modo dry-run.
 
+BEGIN;
+
 CREATE TABLE IF NOT EXISTS public.contextos_canais (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   contexto_canonico text NOT NULL UNIQUE,
@@ -37,6 +39,7 @@ ALTER TABLE public.eventos
 ALTER TABLE public.memorias_agentes
   ADD COLUMN IF NOT EXISTS contexto_canonico text,
   ADD COLUMN IF NOT EXISTS contexto_nome text,
+  ADD COLUMN IF NOT EXISTS contexto_escopo text,
   ADD COLUMN IF NOT EXISTS agente text;
 
 CREATE INDEX IF NOT EXISTS operation_drafts_contexto_canonico_idx
@@ -73,19 +76,22 @@ DECLARE
 BEGIN
   IF TG_TABLE_NAME = 'pending_actions' THEN
     v_canal := coalesce(
-      NEW.origem_canal, NEW.canal,
+      NEW.origem_canal,
       NEW.payload #>> '{dados_revisados,origem_canal}',
-      NEW.payload #>> '{dados_extraidos,origem_canal}'
+      NEW.payload #>> '{dados_extraidos,origem_canal}',
+      NEW.canal
     );
     v_conversa := coalesce(
-      NEW.origem_conversa_id, NEW.conversa_id,
+      NEW.origem_conversa_id,
       NEW.payload #>> '{dados_revisados,origem_conversa_id}',
-      NEW.payload #>> '{dados_extraidos,origem_conversa_id}'
+      NEW.payload #>> '{dados_extraidos,origem_conversa_id}',
+      NEW.conversa_id
     );
     v_mensagem := coalesce(
-      NEW.origem_mensagem_id, NEW.mensagem_id,
+      NEW.origem_mensagem_id,
       NEW.payload #>> '{dados_revisados,origem_mensagem_id}',
-      NEW.payload #>> '{dados_extraidos,origem_mensagem_id}'
+      NEW.payload #>> '{dados_extraidos,origem_mensagem_id}',
+      NEW.mensagem_id
     );
     v_nome := coalesce(
       NEW.contexto_nome,
@@ -167,3 +173,5 @@ DROP TRIGGER IF EXISTS eventos_contexto_canonico ON public.eventos;
 CREATE TRIGGER eventos_contexto_canonico
 BEFORE INSERT OR UPDATE ON public.eventos
 FOR EACH ROW EXECUTE FUNCTION public.preencher_contexto_canonico();
+
+COMMIT;

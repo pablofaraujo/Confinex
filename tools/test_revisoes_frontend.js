@@ -185,6 +185,10 @@ const contextoSeparado = api.dadosComGrupoNome(
 assert.equal(contextoSeparado.contexto_nome, 'Grupo Operacional');
 assert.equal(contextoSeparado.origem_conversa_id, '-9999999999', 'ID técnico deve ser preservado sem aparecer como nome');
 assert.equal(api.contextoDe({draft:{contexto_nome:'Grupo Operacional',dados_extraidos:contextoSeparado},action:null}), 'Grupo Operacional');
+assert.doesNotMatch(
+  api.contextoDe({draft:{contexto_canonico:'telegram:grupo:-9999999999',origem_conversa_id:'-9999999999',dados_extraidos:{}},action:null}),
+  /9999999999|telegram:grupo/,
+);
 assert.doesNotMatch(api.contextosResumoHtml(api.painelFila([{id:'ctx',draft:{status:'em_revisao',contexto_nome:'Grupo Operacional',dados_extraidos:{...contextoCompleto('Grupo Operacional','msg'),origem_conversa_id:'-9999999999'}},action:null}])), /9999999999/);
 assert.match(api.filtrosRapidosHtml(painel), /data-filter="campos_faltantes"/);
 assert.match(api.contextosResumoHtml(painel), /Boi Balança/);
