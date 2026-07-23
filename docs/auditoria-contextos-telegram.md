@@ -63,8 +63,9 @@ canônico.
 
 ## Pendências reais
 
-1. Revisar o caso de venda/abate do contexto sem nome recuperável e confirmar
-   seu grupo antes de criar qualquer rascunho.
+1. Revisar o caso de venda/abate cujo grupo e mensagem foram recuperados na
+   segunda leitura das sessões. A proposta privada de rascunho está pronta,
+   mas o peso precisa de conferência por ter recebido correções posteriores.
 2. Resolver os 7 rascunhos e 9 ações que continuam em revisão, considerando
    que alguns representam o mesmo caso e não devem ser duplicados.
 3. Conferir as 4 compras sem o conjunto mínimo e as 9 vendas incompletas.
@@ -98,9 +99,10 @@ regressão do Juan atual.
 
 ## Oportunidades de correção
 
-- Definir uma função única de normalização de contexto para Juan, ferramentas
-  de reconciliação e eventos: entrada técnica aceita em formatos legados, saída
-  sempre na chave canônica do grupo.
+- Aplicar, após aprovação do dry-run, o contrato único já implementado em
+  `tools/contexto_canonico.py`, na migração aditiva e em
+  `tools/normalizar_contextos.py`. A simulação encontrou 20 vínculos
+  comprováveis e manteve referências ambíguas sem alteração.
 - Registrar evento legível sempre que um rascunho for criado, devolvido,
   rejeitado ou promovido.
 - Incluir no teste permanente um contrato que rejeite novas gravações com nome

@@ -157,6 +157,11 @@ As simulações devem confirmar:
 - **Salvar ajustes** habilitado e **Preparar promoção operacional** bloqueado somente enquanto faltar campo;
 - rejeição sem motivo bloqueada, rejeição com motivo auditada, devolução e ajustes auditados;
 - histórico sem JSON bruto para aguardando confirmação, em execução, executado, erro pós-gravação e rejeitado.
+- nome humano do grupo na interface, com o ID técnico preservado somente no vínculo de origem.
+
+O contrato e o procedimento de normalização dos contextos estão em
+[`docs/contextos-por-grupo.md`](contextos-por-grupo.md). A normalização deve
+ser simulada antes de qualquer escrita e não autoriza promoção operacional.
 
 ### 2. Executor local
 

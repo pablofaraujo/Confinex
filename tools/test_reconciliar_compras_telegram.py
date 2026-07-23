@@ -67,14 +67,15 @@ class ReconciliarComprasTelegramTests(unittest.TestCase):
         self.assertFalse(draft["inferencias"]["confirmacao_suficiente"])
         self.assertEqual(draft["inferencias"]["estado"], "pendente")
         self.assertIn("confirmar se o indício representa uma compra real", draft["campos_pendentes"])
-        self.assertNotIn("-9999999999", serialized)
         self.assertNotIn("snippet", serialized)
         self.assertNotIn("conteudo", serialized)
 
     def test_unknown_group_does_not_expose_group_id(self):
         cluster = next(row for row in cluster_candidates(self.candidates) if row["contexto"] == "Contexto não identificado")
         draft = build_draft(cluster)
-        self.assertEqual(draft["origem_conversa_id"], "Contexto não identificado")
+        self.assertEqual(draft["origem_conversa_id"], "-9999999999")
+        self.assertEqual(draft["contexto_canonico"], "telegram:grupo:-9999999999")
+        self.assertEqual(draft["contexto_nome"], "Contexto não identificado")
         self.assertEqual(draft["dados_extraidos"]["grupo_telegram"], "Contexto não identificado")
         self.assertIn("confirmar grupo/contexto", draft["campos_pendentes"])
 

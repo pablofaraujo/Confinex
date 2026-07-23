@@ -10,6 +10,7 @@ Leia conforme a tarefa:
 - `docs/fila-revisoes.md` — fluxo Juan → revisão → promoção, roteiro de testes, limpeza e reversão
 - `docs/testes-ecossistema.md` — bateria contínua local, Supabase e VPS/Juan
 - `docs/auditoria-contextos-telegram.md` — cobertura por contexto, lacunas e pendências encontradas nas conversas
+- `docs/contextos-por-grupo.md` — contrato canônico, dry-run, aplicação e reversão da normalização por grupo
 - `docs/regras-de-negocio.md` — fórmulas e regras de cálculo (arrobas, capim, frete, GMD, Funrural, B3, VP)
 - `docs/historico.md` — evolução do projeto (fases do git log)
 - `docs/privado/contexto-negocio.md` — negócio, parcerias, pessoas, frigoríficos (NÃO commitar — ver abaixo)
@@ -39,6 +40,13 @@ Leia conforme a tarefa:
 
 - **Supabase** `fkmdzwjmjlmxqotznvgq.supabase.co` — usado por bb, bgi, painel, ops, abate, confinamento e index (auth email/senha, chave publicável hardcoded, RLS protege). Tabelas principais: `operacoes` (status inclui `liquidada` desde jul/2026 — compra paga + venda conciliada; `confinamento_id` linka a `confinamentos`), `compras`, `vendas`, `posicoes_hedge`, `alocacoes_hedge`, `cotacoes_bgi`, `pendencias_documentos`, `acertos`, `fluxo_caixa` (jul/2026: conciliação liga `operacao_id` ao lançamento real de entrada), `promissorias`, `vps_briefings`, `ecossistema_inventario`, `ecossistema_status`, `abates`, `abate_animais` (romaneio por animal); views `v_exposicao_hedge`, `v_estoque_atual`. **Grupo `confinamento` (criado 07/07/2026, sem UI até `confinamento.html`)**: `confinamentos` (cadastro dos parceiros/confinadores), `entradas_confinamento` (curral, peso embarque/chegada, perda de transporte, GTA/NF por lote — pode ter várias entradas por operação), `custos_operacao` (frete/trato/financeiro/baldeio/adiantamento_juros), `eventos_operacao` e `fechamentos_operacao` (ainda vazias). Também `transacoes_banco` e `emprestimos` (conciliação bancária Sicoob, jul/2026, sem UI ainda), `notas_fiscais_xml_raw` (staging bruto de NFe/NFSe, não curado), `fazendas` (registro de propriedades, ainda vazia) e `fazenda_ametista` (ledger entrada/saída do rebanho próprio, criada 18/07/2026 — ver `fazenda-ametista.html`).
 - **Confinex está em transição para o Supabase**: localStorage + Google Sheets continuam como compatibilidade temporária; testes nomeados autenticados são gravados em `confinex_testes`. Agentes submetem negócios como `rascunho` pela RPC `submeter_negocio_confinex`; a fila em **Operações → Confinamento** permite aprovar (`aprovar_negocio_confinex`) ou recusar (`recusar_negocio_confinex`). A recusa preserva a avaliação como `cancelado` para auditoria, sem criar lote operacional. O **nome do grupo Telegram** é a referência apresentada ao usuário; `grupo_origem_id` é apenas técnico, opcional e preenchido automaticamente pela integração quando o contexto do Telegram estiver disponível. A estimativa original fica congelada em `confinex_estimativas`. Consolidação previsto × realizado usa `confinex_consolidacoes` + `confinex_desvios`. Migrações: `supabase/migrations/202607200001_confinex_avaliacoes.sql`, `202607200002_confinex_aprovacoes.sql` e `202607210001_confinex_recusas.sql`. A fila operacional de `revisoes.html` usa `operation_drafts`, `pending_actions` e `eventos`; só grava em `compras`, `vendas`, `pesagens_caderno` ou `abates` depois da correção visual, aprovação, preparação e confirmação contextual. No Juan, qualquer foto ou PDF com `MediaPath`/`MediaPaths` passa primeiro por `arquivo_grupo_router.py`, nunca pela ferramenta visual interna. Compras são extraídas antes do OCR de pesagem, sem pergunta preliminar e sem escrita automática; o OCR OpenClaw/OpenAI roda em trabalhador local fora do sandbox do agente, com cache por conteúdo e fallback Tesseract, e somente ao final Juan pode oferecer um rascunho para Revisões. O contrato completo, os estados, as ferramentas, os testes e a reversão estão em `docs/fila-revisoes.md`.
+
+O contexto de conversa segue os campos `contexto_canonico`, `contexto_nome`,
+`origem_canal`, `origem_conversa_id`, `origem_mensagem_id`, `agente` e
+`escopo`. Somente o nome humano aparece nas telas; o ID técnico nunca é
+substituído pelo nome. A estrutura aditiva está em
+`supabase/migrations/202607230001_contextos_canonicos.sql`, e o dry-run,
+aplicação protegida e reversão estão em `docs/contextos-por-grupo.md`.
 
 ## Deploy
 

@@ -19,17 +19,14 @@ from pathlib import Path
 from typing import Any
 
 from confinex_client import ConfinexClient, ConfinexError
+from contexto_canonico import montar_contexto, origem_conversa_tecnica
 
 
 CONTEXT_NAMES = {
     "boi_balanca": "Boi Balança",
     "boi balanca": "Boi Balança",
     "boi balança": "Boi Balança",
-    "-5593693732": "Boi Balança",
-    "telegram:-5593693732": "Boi Balança",
     "confinamento": "Confinamento",
-    "-4865454316": "Confinamento",
-    "telegram:-4865454316": "Confinamento",
     "desconhecido": "Contexto não identificado",
     "sem_contexto": "Contexto não identificado",
     "": "Contexto não identificado",
@@ -104,7 +101,11 @@ def read_candidates(path: Path) -> list[dict[str, Any]]:
 def cluster_candidates(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
     clusters: dict[tuple[str, str], dict[str, Any]] = {}
     for candidate in candidates:
-        context = canonical_context(candidate.get("contexto") or candidate.get("grupo_telegram"))
+        context_value = candidate.get("contexto_nome") or candidate.get("contexto") or candidate.get("grupo_telegram")
+        context = canonical_context(context_value)
+        conversation_id = origem_conversa_tecnica(
+            candidate.get("origem_conversa_id") or context_value
+        )
         source = source_key(candidate)
         key = (context, source)
         cluster = clusters.setdefault(key, {
@@ -115,6 +116,7 @@ def cluster_candidates(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]
             "dados": {},
             "confirmacoes": set(),
             "origem_mensagem_id": candidate.get("origem_mensagem_id"),
+            "origem_conversa_id": conversation_id,
         })
         cluster["ocorrencias"] += 1
         if candidate.get("line") is not None:
@@ -150,23 +152,25 @@ def build_draft(cluster: dict[str, Any]) -> dict[str, Any]:
         pending.append("vincular mensagem original do Telegram")
     pending.append("confirmar se o indício representa uma compra real")
     pending = list(dict.fromkeys(pending))
+    context_fields = montar_contexto(
+        contexto_nome=context,
+        origem_canal="telegram",
+        origem_conversa_id=cluster.get("origem_conversa_id"),
+        origem_mensagem_id=cluster.get("origem_mensagem_id"),
+        agente="juan",
+        escopo="grupo",
+    )
     data.update({
+        **context_fields,
         "contexto_operacional": context,
         "grupo_telegram": context,
-        "origem_canal": "telegram",
-        "origem_conversa_id": context,
-        "origem_mensagem_id": cluster.get("origem_mensagem_id") or "",
-        "agente": "juan",
         "status_confirmacao": "pendente",
         "situacao": f"Auditoria encontrou {cluster['ocorrencias']} indício(s) de compra nesta conversa.",
         "evidencia": "Conteúdo bruto preservado apenas na auditoria do VPS; confirmar no Telegram antes de aprovar.",
     })
     return {
         "id": deterministic_id(fingerprint),
-        "agente": "juan",
-        "origem_canal": "telegram",
-        "origem_conversa_id": context,
-        "origem_mensagem_id": cluster.get("origem_mensagem_id"),
+        **context_fields,
         "tipo_operacao": "triagem_compra_telegram",
         "codigo_sugerido": f"AUD-COMPRA-{fingerprint[:8].upper()}",
         "entidade_final_tipo": "compras",
@@ -185,12 +189,20 @@ def build_draft(cluster: dict[str, Any]) -> dict[str, Any]:
 
 
 def load_existing(client: Any) -> list[dict[str, Any]]:
-    return client.select(
-        "operation_drafts",
-        select="id,origem_conversa_id,origem_mensagem_id,inferencias",
-        order="criado_em.desc",
-        limit="1000",
-    )
+    try:
+        return client.select(
+            "operation_drafts",
+            select="id,contexto_canonico,origem_conversa_id,origem_mensagem_id,inferencias",
+            order="criado_em.desc",
+            limit="1000",
+        )
+    except ConfinexError:
+        return client.select(
+            "operation_drafts",
+            select="id,origem_conversa_id,origem_mensagem_id,inferencias",
+            order="criado_em.desc",
+            limit="1000",
+        )
 
 
 def deduplicate(drafts: list[dict[str, Any]], existing: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[str]]:
@@ -200,7 +212,7 @@ def deduplicate(drafts: list[dict[str, Any]], existing: list[dict[str, Any]]) ->
         for row in existing if isinstance(row.get("inferencias"), dict)
     }
     existing_messages = {
-        (canonical_context(row.get("origem_conversa_id")), str(row.get("origem_mensagem_id")))
+        (row.get("contexto_canonico") or origem_conversa_tecnica(row.get("origem_conversa_id")), str(row.get("origem_mensagem_id")))
         for row in existing if row.get("origem_mensagem_id")
     }
     planned = []
@@ -208,7 +220,7 @@ def deduplicate(drafts: list[dict[str, Any]], existing: list[dict[str, Any]]) ->
     seen = set()
     for draft in drafts:
         fingerprint = draft["inferencias"]["audit_fingerprint"]
-        message_key = (canonical_context(draft.get("origem_conversa_id")), str(draft.get("origem_mensagem_id")))
+        message_key = (draft.get("contexto_canonico") or origem_conversa_tecnica(draft.get("origem_conversa_id")), str(draft.get("origem_mensagem_id")))
         duplicate = (
             draft["id"] in existing_ids
             or fingerprint in existing_fingerprints

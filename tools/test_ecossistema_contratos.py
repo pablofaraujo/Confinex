@@ -53,9 +53,23 @@ class ContratosEcossistemaTests(unittest.TestCase):
 
     def test_frontend_nao_expoe_id_de_grupo_ou_json(self):
         source = (TOOLS / "test_revisoes_frontend.js").read_text(encoding="utf-8")
+        html = (ROOT / "revisoes.html").read_text(encoding="utf-8")
         self.assertIn("Contexto não identificado", source)
         self.assertIn("doesNotMatch(api.contextosResumoHtml", source)
         self.assertIn("Dados técnicos avançados", source)
+        self.assertNotRegex(html, r"TELEGRAM_GROUP_NAMES\s*=\s*\{[^}]*telegram:-\d+")
+        self.assertIn("origem_conversa_id:dados.origem_conversa_id||''", html)
+
+    def test_normalizacao_e_dry_run_nao_promovem_dados(self):
+        source = (TOOLS / "normalizar_contextos.py").read_text(encoding="utf-8")
+        self.assertIn('"modo": "dry-run"', source)
+        self.assertIn("CONFIRM_PREFIX", source)
+        self.assertNotRegex(
+            source,
+            r"(?:insert|update)\([\"'](?:compras|vendas|pesagens_caderno|abates)",
+        )
+        self.assertIn('client.insert("operation_drafts", draft)', source)
+        self.assertIn('client.insert("eventos"', source)
 
     def test_eventos_da_fila_usam_status_validos(self):
         html = (ROOT / "revisoes.html").read_text(encoding="utf-8")

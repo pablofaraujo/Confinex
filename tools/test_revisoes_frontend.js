@@ -18,7 +18,7 @@ const context = {
   console,
 };
 vm.createContext(context);
-new vm.Script(`${scripts[0]}\nglobalThis.__revisoes={buildPromocaoPreview,promotionValidationState,promotionInputElement,aplicarEstadoPromocao,businessFieldIndex,businessTargetPath,promotionMissingLinks,irParaCampoObrigatorio,validarNegocioOperacional,planoDecisao,montarEventoDecisao,montarAtualizacaoRascunho,registrarEvento,promotionHistoryData,promotionHistoryHtml,statusPrincipal,dadosItem,labelStatus,painelFila,itemMatchesStatus,camposObrigatoriosFaltantes,filtrosRapidosHtml,contextosResumoHtml,contextoDe,grupoNome};`, {filename: 'revisoes.html'}).runInContext(context);
+new vm.Script(`${scripts[0]}\nglobalThis.__revisoes={buildPromocaoPreview,promotionValidationState,promotionInputElement,aplicarEstadoPromocao,businessFieldIndex,businessTargetPath,promotionMissingLinks,irParaCampoObrigatorio,validarNegocioOperacional,planoDecisao,montarEventoDecisao,montarAtualizacaoRascunho,registrarEvento,promotionHistoryData,promotionHistoryHtml,statusPrincipal,dadosItem,labelStatus,painelFila,itemMatchesStatus,camposObrigatoriosFaltantes,filtrosRapidosHtml,contextosResumoHtml,contextoDe,grupoNome,dadosComGrupoNome,contextoPersistivel,incluirContextoSeDisponivel};`, {filename: 'revisoes.html'}).runInContext(context);
 
 const api = context.__revisoes;
 
@@ -175,7 +175,17 @@ assert.equal(itensPainel.filter(item => api.itemMatchesStatus(item,'promocao_agu
 assert.equal(itensPainel.filter(item => api.itemMatchesStatus(item,'campos_faltantes')).length, 1);
 assert.equal(itensPainel.filter(item => api.itemMatchesStatus(item,'rejeitados_cancelados')).length, 2);
 assert.equal(api.grupoNome('telegram:-9999999999'), 'Contexto não identificado');
+assert.equal(api.grupoNome('telegram:grupo:-9999999999'), 'Contexto não identificado');
 assert.doesNotMatch(JSON.stringify(painel.contextos), /9999999999/);
+const contextoSeparado = api.dadosComGrupoNome(
+  {contexto_nome:'Grupo Operacional',contexto_canonico:'telegram:grupo:-9999999999',origem_conversa_id:'-9999999999',escopo:'grupo'},
+  {},
+  {origem_canal:'telegram',origem_mensagem_id:'msg'}
+);
+assert.equal(contextoSeparado.contexto_nome, 'Grupo Operacional');
+assert.equal(contextoSeparado.origem_conversa_id, '-9999999999', 'ID técnico deve ser preservado sem aparecer como nome');
+assert.equal(api.contextoDe({draft:{contexto_nome:'Grupo Operacional',dados_extraidos:contextoSeparado},action:null}), 'Grupo Operacional');
+assert.doesNotMatch(api.contextosResumoHtml(api.painelFila([{id:'ctx',draft:{status:'em_revisao',contexto_nome:'Grupo Operacional',dados_extraidos:{...contextoCompleto('Grupo Operacional','msg'),origem_conversa_id:'-9999999999'}},action:null}])), /9999999999/);
 assert.match(api.filtrosRapidosHtml(painel), /data-filter="campos_faltantes"/);
 assert.match(api.contextosResumoHtml(painel), /Boi Balança/);
 assert.doesNotMatch(api.contextosResumoHtml(painel), /9999999999|telegram:-/);
