@@ -1,0 +1,1 @@
+import { iniciarAvaliacao, consolidarAvaliacao } from './confinex-supabase-adaptador.js'; if(!window.CFAgroConfinexSupabase) window.CFAgroConfinexSupabase=Object.freeze({iniciarAvaliacao,consolidarAvaliacao});
