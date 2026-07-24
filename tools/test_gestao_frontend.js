@@ -1,47 +1,1 @@
-'use strict';
-const assert = require('assert');
-const gestao = require('../js/cfagro-gestao.js');
-
-// Positivo: agrega caixa e apresenta estados operacionais em linguagem humana.
-assert.deepStrictEqual(
-  gestao.resumoFinanceiro([
-    {tipo:'entrada', valor:1000, realizado:true},
-    {tipo:'saida', valor:250, realizado:true},
-    {tipo:'entrada', valor:400, realizado:false},
-    {tipo:'saida', valor:150, realizado:false}
-  ]),
-  {previsto:1000, realizado:750, aReceber:400, aPagar:150, quantidade:4}
-);
-assert.strictEqual(gestao.statusHumano('aguardando_confirmacao'), 'Aguardando confirmaÃ§Ã£o');
-assert.strictEqual(
-  gestao.pendenciasLegiveis([{tipo_operacao:'compra_confinamento',status:'pendente'}], [], [])[0].resumo,
-  'Compra confinamento'
-);
-
-// Negativo: valores invÃ¡lidos nÃ£o contaminam totais e IDs tÃ©cnicos nÃ£o viram contexto.
-assert.deepStrictEqual(
-  gestao.resumoFinanceiro([{tipo:'saida', valor:'invÃ¡lido', realizado:true}]),
-  {previsto:0, realizado:0, aReceber:0, aPagar:0, quantidade:1}
-);
-const semContexto = gestao.pendenciasLegiveis(
-  [{id:'11111111-1111-1111-1111-111111111111', resumo:'Conferir compra', status:'pendente'}],
-  [],
-  []
-);
-assert.strictEqual(semContexto[0].contexto, 'Contexto nÃ£o informado');
-assert.ok(!JSON.stringify(semContexto).includes('11111111-1111-1111-1111-111111111111'));
-
-// Vazio: cada projeÃ§Ã£o retorna um estado determinÃ­stico e renderizÃ¡vel.
-assert.deepStrictEqual(gestao.pendenciasLegiveis([], [], []), []);
-assert.deepStrictEqual(gestao.eventosLegiveis([]), []);
-assert.deepStrictEqual(
-  gestao.resumoFinanceiro([]),
-  {previsto:0, realizado:0, aReceber:0, aPagar:0, quantidade:0}
-);
-
-// Falha: a mensagem Ã© clara e nÃ£o vaza detalhes internos da API.
-const mensagem = gestao.erroLegivel(new Error('relation public.segredo does not exist'));
-assert.strictEqual(mensagem, 'NÃ£o foi possÃ­vel carregar os dados. Tente atualizar a pÃ¡gina.');
-assert.ok(!mensagem.includes('public.segredo'));
-
-console.log('test_gestao_frontend: 12 verificaÃ§Ãµes aprovadas');
+m«ëˆ§½©buªàºg§¶Ú(–ÏízË`zËZ¡úè×§v;±¨m«ë€İ…¹îš(§~)^¢‹­~)^mºŞjFëy©ÊyÚ.¶›­º˜§¶‰bë(~W§‚Øgº`İuç(uç^r‡^Šzn¶^–—b²™ZÊØb²g¬±¨Š)éºØ§¦ë_ŠWyö®–×è®Ë]Šz(ºÚn¶‹­¦ë_ŠWyö®–×è®Ë]¢ë

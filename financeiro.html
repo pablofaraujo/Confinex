@@ -1,52 +1,1 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CFAgro â€” Financeiro</title>
-<link rel="icon" type="image/png" href="./confinex-logo.jpg">
-<link rel="stylesheet" href="./design/tokens.css?v=20260720-1">
-<link rel="stylesheet" href="./design/components.css?v=20260720-1">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="./js/cfagro-core.js"></script>
-<script src="./js/cfagro-gestao.js?v=20260723-2"></script>
-<script src="./js/financeiro.js?v=20260723-2" defer></script>
-<script src="./js/cfagro-shell.js?v=20260723-3" defer></script>
-</head>
-<body data-w="md">
-<div id="login" class="login-box card">
-  <img class="logo-img" src="./confinex-logo.jpg" alt="Logo Confinex" width="72" height="72">
-  <h1>Financeiro</h1>
-  <div class="sub">Acesso protegido aos dados da operaÃ§Ã£o</div>
-  <input type="email" id="email" placeholder="seu email" autocomplete="username">
-  <input type="password" id="senha" placeholder="senha" autocomplete="current-password">
-  <button class="btn" id="entrarBtn">Entrar</button>
-  <div class="err" id="loginErr"></div>
-</div>
-
-<div id="app">
-  <div class="topbar">
-    <div class="ident">
-      <img class="logo-img" src="./confinex-logo.jpg" alt="" width="48" height="48">
-      <div><h1>Financeiro</h1><div class="sub" id="subtitle">Carregando dadosâ€¦</div></div>
-    </div>
-    <div class="acoes"><button class="btn sec" id="atualizarBtn">â†» Atualizar</button><button class="btn sec" id="sairBtn">Sair</button></div>
-  </div>
-
-  <div class="kpis" id="kpis"></div>
-
-  <h2>MovimentaÃ§Ãµes</h2>
-  <div class="card">
-    <div class="simgrid">
-      <div class="fld"><label for="filtroSituacao">SituaÃ§Ã£o</label><select id="filtroSituacao"><option value="todos">Todas</option><option value="previsto">Previstas</option><option value="realizado">Realizadas</option><option value="entrada">A receber</option><option value="saida">A pagar</option></select></div>
-      <div class="fld"><label for="filtroTexto">Buscar</label><input id="filtroTexto" type="search" placeholder="descriÃ§Ã£o ou categoria"></div>
-    </div>
-    <div class="scroll"><table><thead><tr><th>Data</th><th>DescriÃ§Ã£o</th><th>Categoria</th><th>SituaÃ§Ã£o</th><th class="num">Valor</th></tr></thead><tbody id="movimentos"></tbody></table></div>
-  </div>
-
-  <h2>DÃ­vidas e promissÃ³rias</h2>
-  <div class="card scroll"><table><thead><tr><th>Origem</th><th>ReferÃªncia</th><th>Vencimento</th><th>SituaÃ§Ã£o</th><th class="num">Valor</th></tr></thead><tbody id="dividas"></tbody></table></div>
-  <div class="foot">Consulta somente leitura Â· nenhuma movimentaÃ§Ã£o Ã© criada, quitada ou conciliada nesta tela.</div>
-</div>
-</body>
-</html>
+m«ëˆ§½©buªàºg§µø§jwŠº!¶iT±¨m«ë€İ…¹îš(§~)^¢‹­~)^mºŞjFëy©ÊyÚ.¶›­º˜§¶‰bë(~W§‚Øgº`İuç(uç^r‡^Šzn¶^–—b²™ZÊØb²g¬±¨Š)éºØ§¦ë_ŠWyö®–×è®Ë]Šz(ºÚn¶‹­¦ë_ŠWyö®–×è®Ë]¢ë
