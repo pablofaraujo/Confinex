@@ -33,9 +33,9 @@ function render(){
 async function carregar(){
   el('subtitle').textContent = 'Carregando itens que exigem ação…';
   var respostas = await Promise.all([
-    db.from('operation_drafts').select('resumo,tipo_operacao,status,contexto_nome,criado_em,atualizado_em').not('status','in','(executado,rejeitado,cancelado)').order('criado_em',{ascending:false}).limit(200),
-    db.from('pending_actions').select('resumo,acao_tipo,status,contexto_nome,criado_em,atualizado_em').not('status','in','(executado,rejeitado,cancelado)').order('criado_em',{ascending:false}).limit(200),
-    db.from('pendencias_documentos').select('tipo,status,created_at,operacoes(codigo)').not('status','in','(validado,cancelado,dispensado)').order('created_at',{ascending:false}).limit(200)
+    db.from('operation_drafts').select('*').limit(200),
+    db.from('pending_actions').select('*').limit(200),
+    db.from('pendencias_documentos').select('*').limit(200)
   ]);
   var falha = respostas.find(function(r){ return r.error; });
   if(falha){
@@ -43,7 +43,9 @@ async function carregar(){
     el('subtitle').textContent = CFAgroGestao.erroLegivel(falha.error);
     return;
   }
-  itens = CFAgroGestao.pendenciasLegiveis(respostas[0].data, respostas[1].data, respostas[2].data);
+  var fechados = new Set(['executado','rejeitado','cancelado','validado','dispensado']);
+  var abertos = function(lista){ return (lista || []).filter(function(item){ return !fechados.has(String(item.status || '').toLowerCase()); }); };
+  itens = CFAgroGestao.pendenciasLegiveis(abertos(respostas[0].data), abertos(respostas[1].data), abertos(respostas[2].data));
   el('subtitle').textContent = 'Atualizado '+CFAgro.fmtDT(new Date().toISOString())+' · '+itens.length+' itens';
   render();
 }

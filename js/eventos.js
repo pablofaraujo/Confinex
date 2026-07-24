@@ -28,13 +28,13 @@ function montarSituacoes(){
 
 async function carregar(){
   el('subtitle').textContent = 'Carregando histórico…';
-  var resposta = await db.from('eventos').select('tipo,status,agente,usuario,observacao,contexto_nome,criado_em,atualizado_em').order('criado_em',{ascending:false}).limit(500);
+  var resposta = await db.from('eventos').select('*').limit(500);
   if(resposta.error){
     itens = []; montarSituacoes(); render();
     el('subtitle').textContent = CFAgroGestao.erroLegivel(resposta.error);
     return;
   }
-  itens = CFAgroGestao.eventosLegiveis(resposta.data);
+  itens = CFAgroGestao.eventosLegiveis(resposta.data).sort(function(a,b){ return String(b.data || '').localeCompare(String(a.data || '')); });
   montarSituacoes(); render();
   el('subtitle').textContent = 'Atualizado '+CFAgro.fmtDT(new Date().toISOString())+' · '+itens.length+' eventos';
 }

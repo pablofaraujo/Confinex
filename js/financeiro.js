@@ -49,9 +49,9 @@ function renderDividas(){
 async function carregar(){
   el('subtitle').textContent = 'Carregando dados financeiros…';
   var respostas = await Promise.all([
-    db.from('fluxo_caixa').select('data,descricao,tipo,valor,realizado,categoria').order('data',{ascending:false}).limit(500),
-    db.from('emprestimos').select('*').order('vencimento',{ascending:true}),
-    db.from('promissorias').select('*').order('vencimento',{ascending:true})
+    db.from('fluxo_caixa').select('*').limit(500),
+    db.from('emprestimos').select('*').limit(200),
+    db.from('promissorias').select('*').limit(200)
   ]);
   var falha = respostas.find(function(r){ return r.error; });
   if(falha){
@@ -59,12 +59,12 @@ async function carregar(){
     fluxo = []; dividas = []; renderKpis(); renderMovimentos(); renderDividas();
     return;
   }
-  fluxo = respostas[0].data || [];
+  fluxo = (respostas[0].data || []).sort(function(a,b){ return String(b.data || '').localeCompare(String(a.data || '')); });
   dividas = (respostas[1].data || []).map(function(item){
     return {origem:'Empréstimo', referencia:item.numero_contrato || item.contrato || item.descricao || 'Contrato', vencimento:item.vencimento, status:item.status, valor:item.saldo_devedor || item.saldo || item.valor};
   }).concat((respostas[2].data || []).map(function(item){
     return {origem:'Promissória', referencia:item.numero || 'Documento', vencimento:item.vencimento, status:item.status, valor:item.valor};
-  }));
+  })).sort(function(a,b){ return String(a.vencimento || '').localeCompare(String(b.vencimento || '')); });
   renderKpis(); renderMovimentos(); renderDividas();
   el('subtitle').textContent = 'Atualizado '+CFAgro.fmtDT(new Date().toISOString())+' · consulta somente leitura';
 }
