@@ -107,6 +107,7 @@ def validar_local() -> None:
         ]
     )
     executar(["node", "tools/test_revisoes_frontend.js"])
+    executar(["node", "tools/test_gestao_frontend.js"])
 
     html = (ROOT / "revisoes.html").read_text(encoding="utf-8")
     scripts = scripts_inline(html)
@@ -115,12 +116,16 @@ def validar_local() -> None:
     if './revisoes.js?v=20260723-1' not in html:
         raise FalhaValidacao("revisoes.html deve carregar revisoes.js versionado")
     executar(["node", "--check", "revisoes.js"])
+    executar(["node", "--check", "js/cfagro-gestao.js"])
+    executar(["node", "--check", "js/financeiro.js"])
+    executar(["node", "--check", "js/pendencias.js"])
+    executar(["node", "--check", "js/eventos.js"])
     executar(["node", "--check", "tools/auditar_ecossistema_browser.js"])
     executar(
         [
             sys.executable,
             "tools/auditar_ecossistema.py",
-            "--modo-descoberta",
+            "--somente-estatico",
         ]
     )
 

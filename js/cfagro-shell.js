@@ -20,7 +20,7 @@ var NAV = [
   { href:'./confinex.html', rotulo:'Confinex',     icone:'🧮' },
   { href:'./confinamento.html', rotulo:'Confinamento', icone:'🐮' },
   { href:'./fazenda-ametista.html', rotulo:'Fazenda Ametista', icone:'🌾' },
-  { href:'https://pablofaraujo.github.io/boi-gordo-portfolio/', rotulo:'Portfolio B3', icone:'🗂', ext:true },
+  { href:'https://pablofaraujo.github.io/boi-gordo-portfolio/', rotulo:'Portfolio B3', icone:'🗂' },
   { href:'./bgi.html',      rotulo:'BGI',           icone:'📈' },
   { href:'./bb.html',       rotulo:'Boi Balança',   icone:'⚖️' },
   { href:'./abate.html',    rotulo:'Abate',         icone:'🥩' },
@@ -30,15 +30,15 @@ var NAV = [
   { href:'https://app.agronota.com.br/', rotulo:'AgroNota', icone:'🧾', ext:true },
   { href:'https://www.sidagro.ima.mg.gov.br/portaldoprodutor/login.jsf', rotulo:'IMA / SIDAGRO', icone:'🏛️', ext:true },
   { href:'./painel-boi-gordo.html', rotulo:'Painel Boi Gordo', icone:'📊' },
-  { href:'./#fluxo',        rotulo:'Financeiro',    icone:'💰' },
+  { href:'./financeiro.html',rotulo:'Financeiro',    icone:'💰' },
   { sec:'Parcerias' },
   { href:'./parcerias.html', rotulo:'Resumo',       icone:'🤝' },
   { href:'./parceria-ricardo.html',rotulo:'Ricardo', icone:'🐂' },
   { href:'./parceria-xande.html',  rotulo:'Xande',   icone:'🐄' },
   { sec:'Gestão' },
-  { href:'./#pendencias',   rotulo:'Pendências',    icone:'📋' },
+  { href:'./pendencias.html',rotulo:'Pendências',    icone:'📋' },
   { href:'./revisoes.html', rotulo:'Revisões',      icone:'✎' },
-  { href:'./#eventos',      rotulo:'Eventos',       icone:'📅' },
+  { href:'./eventos.html',  rotulo:'Eventos',       icone:'📅' },
   { sec:'Sistema' },
   { href:'./ops.html',      rotulo:'Agentes / Ops', icone:'⚙️' }
 ];
@@ -71,7 +71,7 @@ function montar(){
       var full = resolveHref(n.href);
       var arquivo = full.split('#')[0].split('/').pop() || 'index.html';
       var ativa = onPortfolio
-        ? (n.ext ? ' ativa' : '')
+        ? (n.rotulo === 'Portfolio B3' ? ' ativa' : '')
         : (!n.ext && n.href.indexOf('#')<0 && arquivo===aqui ? ' ativa' : '');
       var alvo = n.ext ? ' target="_blank" rel="noopener"' : '';
       var ext = n.ext ? '<span class="ext">↗</span>' : '';

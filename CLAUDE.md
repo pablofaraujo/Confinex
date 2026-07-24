@@ -34,6 +34,9 @@ Leia conforme a tarefa:
 | `bgi.html` | BGI — posições de hedge B3 (módulo principal; o portfolio externo `boi-gordo-portfolio` virou link secundário na topbar) |
 | `ocr-pesagem.html` | OCR Pesagem — leitura de tickets de balança (tema escuro próprio, ainda fora do DS) |
 | `painel-boi-gordo.html` | Painel Boi Gordo — arroba CEPEA/B3, bezerro, relação de troca, curva futura BGI, manchetes e contexto de mercado (dados estáticos no DS, sem Supabase; atualizados por automação — ver Armadilhas) |
+| `financeiro.html` | Financeiro — consulta somente leitura de fluxo previsto/realizado, dívidas e promissórias; não quita, concilia nem cria registros |
+| `pendencias.html` | Pendências — visão agregada somente leitura de rascunhos, ações e documentos que exigem atenção; não substitui Revisões |
+| `eventos.html` | Eventos — histórico operacional legível e filtrável; não expõe JSON nem IDs técnicos |
 | `painel.html` | LEGADA — redirect para `index.html` (conteúdo migrou para a Home) |
 | `ops.html` | Ops — heartbeats de agentes + fila de missões `vps_briefings` para o Claude Code da VPS |
 | `central.html` | LEGADA — agora só redirect para `index.html` |
@@ -73,7 +76,7 @@ Push na `main` → workflow `deploy.yml` publica o repositório inteiro no GitHu
 ## Armadilhas conhecidas
 
 - O fonte do Confinex não está no repo — `confinex-app.latest.js` é o bundle legível usado como entrada e `confinex-app.mobile.js` é o pacote de execução autocontido. Ao editar o `latest`, regenere o `mobile` com React 19 e alvo Safari 14 antes do deploy.
-- `tools/auditar_ecossistema.py` inventaria páginas, recursos e menu; a camada Playwright percorre o site local em desktop e celular, registra console/rede e gera capturas. O modo padrão é estrito. `--modo-descoberta` é a linha de base temporária do Ciclo 1 para provar os quatro defeitos conhecidos antes das correções.
+- `tools/auditar_ecossistema.py` inventaria páginas, recursos e menu; a camada Playwright percorre o site local em desktop e celular, registra console/rede e gera capturas. O modo padrão estrito é o gate permanente. `--modo-descoberta` conserva apenas a linha de base histórica que provou os defeitos antes das correções do Ciclo 2.
 - Cotações B3: a seção geral Mercado BGI mantém uma cotação única por contrato/vencimento dentro de cada estudo, exibe os vencimentos em ordem cronológica crescente e atualiza juntos os vencimentos usados. Parcerias escolhem o contrato automaticamente pela saída; matéria seca e demais modalidades não-parceria permitem escolher o vencimento; o diferencial de base permanece por cenário. A busca usa cascata frágil (API B3 → histórico → Yahoo `{contrato}.SA` → scrape CEPEA via allorigins.win) com heurística `extrairNumeroB3` que aceita qualquer número entre 100 e 800.
 - `rolar()`/`encerrar()`/`encerrarParcial()` no bgi.html fazem escritas sequenciais sem transação.
 - `central.html` legada e `bgi.html` órfão podem divergir do resto.

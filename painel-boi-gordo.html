@@ -22,7 +22,8 @@
 ul.ctx{list-style:none}
 ul.ctx li{font-size:var(--fs-12);padding:6px 0 6px 18px;position:relative;color:var(--text)}
 ul.ctx li::before{content:"•";position:absolute;left:4px;color:var(--green)}
-.chart-box{position:relative;height:260px}
+.chart-box{position:relative;height:260px;min-width:0}
+.chart-box canvas{width:100%!important;max-width:100%}
 </style>
 </head>
 <body>

@@ -523,6 +523,11 @@ def validar_descoberta(
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--navegador", action="store_true")
+    p.add_argument(
+        "--somente-estatico",
+        action="store_true",
+        help="valida apenas a camada estática; a ausência do navegador fica registrada, mas não reprova este gate parcial",
+    )
     p.add_argument("--base-url")
     p.add_argument("--modo-descoberta", action="store_true")
     p.add_argument("--saida-json", type=Path)
@@ -584,6 +589,8 @@ def main() -> int:
         ok, detalhe = validar_descoberta(resultados)
         print("MODO DESCOBERTA:", detalhe)
         return 0 if ok else 1
+    if args.somente_estatico:
+        return 1 if contagem["falhou"] else 0
     return 1 if contagem["falhou"] or contagem["não testado"] else 0
 
 

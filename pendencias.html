@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CFAgro — Pendências</title>
+<link rel="icon" type="image/png" href="./confinex-logo.jpg">
+<link rel="stylesheet" href="./design/tokens.css?v=20260720-1">
+<link rel="stylesheet" href="./design/components.css?v=20260720-1">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="./js/cfagro-core.js"></script>
+<script src="./js/cfagro-gestao.js?v=20260723-1"></script>
+<script src="./js/pendencias.js?v=20260723-1" defer></script>
+<script src="./js/cfagro-shell.js?v=20260723-1" defer></script>
+</head>
+<body data-w="md">
+<div id="login" class="login-box card">
+  <img class="logo-img" src="./confinex-logo.jpg" alt="Logo Confinex" width="72" height="72">
+  <h1>Pendências</h1>
+  <div class="sub">Acesso protegido aos dados da operação</div>
+  <input type="email" id="email" placeholder="seu email" autocomplete="username">
+  <input type="password" id="senha" placeholder="senha" autocomplete="current-password">
+  <button class="btn" id="entrarBtn">Entrar</button>
+  <div class="err" id="loginErr"></div>
+</div>
+
+<div id="app">
+  <div class="topbar">
+    <div class="ident">
+      <img class="logo-img" src="./confinex-logo.jpg" alt="" width="48" height="48">
+      <div><h1>Pendências</h1><div class="sub" id="subtitle">Carregando itens que exigem ação…</div></div>
+    </div>
+    <div class="acoes"><a class="btn" href="./revisoes.html">Abrir Revisões</a><button class="btn sec" id="atualizarBtn">↻ Atualizar</button><button class="btn sec" id="sairBtn">Sair</button></div>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+  <div class="aviso">Esta visão agrega o que exige atenção. A conferência e a promoção operacional continuam exclusivamente na fila de Revisões.</div>
+
+  <h2>Itens que exigem ação</h2>
+  <div class="card">
+    <div class="simgrid">
+      <div class="fld"><label for="filtroOrigem">Origem</label><select id="filtroOrigem"><option value="todas">Todas</option><option>Revisões</option><option>Ações</option><option>Documentos</option></select></div>
+      <div class="fld"><label for="filtroTexto">Buscar</label><input id="filtroTexto" type="search" placeholder="resumo, contexto ou situação"></div>
+    </div>
+    <div class="scroll"><table><thead><tr><th>Origem</th><th>O que exige ação</th><th>Contexto</th><th>Situação</th><th>Atualização</th></tr></thead><tbody id="listaPendencias"></tbody></table></div>
+  </div>
+  <div class="foot">Consulta somente leitura · IDs de grupo e estruturas técnicas não são exibidos.</div>
+</div>
+</body>
+</html>

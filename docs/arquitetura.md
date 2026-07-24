@@ -13,10 +13,13 @@ Atualizado em 2026-07-23.
 - **ops.html** — Ops: heartbeats (`ecossistema_status`, vivo se ≤10 min), inventário (`ecossistema_inventario`), "Ponte VPS" — fila `vps_briefings` (status pendente/em_andamento/concluido) consumida por um Claude Code rodando na VPS via cron (~5–10 min).
 - **central.html** — versão legada da Central (3 cards). Ficou para trás no commit `fc9b66c`.
 - **painel-boi-gordo.html** — Painel Boi Gordo: KPIs de mercado (arroba CEPEA/B3, bezerro, relação de troca, exportação), curva futura BGI com gráfico Chart.js, manchetes e contexto. Sem Supabase/login — dados vêm de um bloco JSON estático (`#painel-data`) embutido no HTML. Integrado ao DS/shell nesta sessão; antes vivia como artifact solto do Cowork.
+- **financeiro.html** — visão autenticada e somente leitura de `fluxo_caixa`, `emprestimos` e `promissorias`, separando previsto/realizado e a pagar/receber. Não executa pagamentos, baixas nem conciliação.
+- **pendencias.html** — agregador autenticado e somente leitura de itens abertos em `operation_drafts`, `pending_actions` e `pendencias_documentos`; encaminha correções para Revisões.
+- **eventos.html** — histórico autenticado e somente leitura de `eventos`, com filtros e projeção humana que omite JSON e identificadores técnicos.
 
 Padrão: cabeçalho azul-marinho com marca Confinex e sidebar branca no desktop; no celular, a navegação vira uma faixa horizontal rolável. O botão legado "⌂ Central" fica oculto quando o shell está ativo. Favicon `confinex-logo.jpg`.
 
-**Shell compartilhado** (`js/cfagro-shell.js`): injeta cabeçalho e navegação com links absolutos (inclusive para o repo externo `boi-gordo-portfolio`) e é carregado com `design/tokens.css`/`design/components.css` por todos os módulos ativos. Em produção usa a base canônica do GitHub Pages; em localhost resolve links contra o servidor local, permitindo auditoria antes do deploy. Preserva a ordem histórica dos módulos e inclui Datamars Livestock, AgroNota e Portal do Produtor IMA/SIDAGRO em nova aba. `ops.html` mantém o client Supabase local, porém não redefine mais tokens nem componentes visuais.
+**Shell compartilhado** (`js/cfagro-shell.js`): injeta cabeçalho e navegação com links absolutos (inclusive para o repo externo `boi-gordo-portfolio`) e é carregado com `design/tokens.css`/`design/components.css` por todos os módulos ativos. O Portfólio B3 navega na mesma janela e se identifica como item ativo no repositório externo; somente Datamars Livestock, AgroNota e Portal do Produtor IMA/SIDAGRO abrem nova aba, por serem ferramentas externas independentes. Em produção usa a base canônica do GitHub Pages; em localhost resolve links contra o servidor local, permitindo auditoria antes do deploy. `ops.html` mantém o client Supabase local, porém não redefine mais tokens nem componentes visuais.
 
 ## Backend Supabase
 
@@ -31,6 +34,7 @@ Tabelas/views por app:
 - **contexto por grupo**: `contextos_canais` registra a chave canônica, o nome humano, o canal, o ID técnico e o escopo. `operation_drafts`, `pending_actions`, `eventos` e `memorias_agentes` repetem o vínculo necessário à auditoria. Nas memórias, `escopo` mantém o alcance funcional existente e `contexto_escopo` identifica grupo/conversa direta/sistema. O frontend usa somente `contexto_nome`; `origem_conversa_id` permanece oculto e nunca recebe um nome humano. A migração aditiva e o dry-run protegido estão em [`docs/contextos-por-grupo.md`](contextos-por-grupo.md).
 - **abate**: `abates` (cabeçalho), `abate_animais` (romaneio por animal — schema alinhado jul/2026: `seq`, `descricao`, `classificacao`, `meia_esq`/`meia_dir`, `peso_kg` = carcaça, `vlr_kg`/`vlr_arroba`/`vlr_total`, `bonus`, `penalizacao`, `condenacao`; não guarda peso vivo/balança nem hora de passagem).
 - **promissórias** (skill): tabela `promissorias` (numero pk `NNN/AAAA`, credor, cpf, valor, vencimento, praça, negocio_id, status aberta/quitada).
+- **gestão somente leitura**: `financeiro.html` lê `fluxo_caixa`, `emprestimos` e `promissorias`; `pendencias.html` lê `operation_drafts`, `pending_actions` e `pendencias_documentos`; `eventos.html` lê `eventos`. `js/cfagro-gestao.js` projeta somente campos humanos e nunca usa um ID técnico como substituto de contexto.
 
 ## Fila de revisões e promoção operacional
 
