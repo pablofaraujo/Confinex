@@ -1,1 +1,72 @@
-m´ÎàßΩ©bu™‡∫gßµ⁄≥˘ö∂∏≥jÁb∂ä‚iÁ(≤»¨µÈöô’,jõj«∫‡7an{¶ä)ﬂäW®¢Î_äWõn∑öë∫ﬁjGßrá^vã≠¶În¶)Ì¢Xßz ïÈ‡∂Óò7]y y◊ú°◊¢ûõ≠Ü••ÿ¨¶V≤∂¨ôÎ,j¢äzn∂)È∫◊‚ïÁ^}´•µ˙+≤◊bûä.∂õ≠¢Îi∫◊‚ïÁ^}´•µ˙+≤◊h∫
+# Matriz permanente de auditoria do ecossistema
+
+Atualizado em 2026-07-23. A fonte execut√°vel √©
+`tools/auditar_ecossistema.py`; o navegador √© dirigido por
+`tools/auditar_ecossistema_browser.js`.
+
+| Requisito | Cen√°rio | Resultado esperado | Evid√™ncia |
+|---|---|---|---|
+| Invent√°rio | reposit√≥rio normal, vazio e refer√™ncia inv√°lida | p√°ginas, scripts, testes, workflows, rotas, menu e depend√™ncias s√£o listados; vazio e arquivo ausente falham | JSON e Markdown da auditoria |
+| Menu | cada item interno | arquivo e √¢ncora existem; n√£o h√° redirecionamento inesperado | resultado est√°tico por item |
+| Janelas | Portfolio B3 | navega na mesma janela | `target`/pol√≠tica do manifesto |
+| Janelas | Datamars, AgroNota e IMA/SIDAGRO | nova janela √© aceita por serem ferramentas externas | pol√≠tica expl√≠cita por item |
+| Navega√ß√£o | clique, URL direta, recarga e voltar | destino permanece correto e volta √† Vis√£o Geral | execu√ß√£o Chromium |
+| Navega√ß√£o | Financeiro, Pend√™ncias e Eventos | cada m√≥dulo tem arquivo real; nenhuma √¢ncora da Home √© usada como substituta | regress√£o Python + Chromium |
+| Conte√∫do protegido | dados positivos, inv√°lidos, vazios e falha da API | proje√ß√µes leg√≠veis, valores inv√°lidos n√£o contaminam totais, vazio √© expl√≠cito e erro n√£o vaza detalhe interno | `tools/test_gestao_frontend.js` |
+| Privacidade | item sem contexto humano | a interface mostra ‚ÄúContexto n√£o informado‚Äù, nunca UUID ou ID de grupo | regress√£o JavaScript |
+| Estado | p√°gina acessada | somente o item correspondente fica ativo | DOM ap√≥s navega√ß√£o |
+| Runtime | p√°gina carregada | nenhum erro JavaScript, console, HTTP ou requisi√ß√£o | eventos do Chromium |
+| Desktop | 1440 √ó 1000 | shell presente, sem estouro da p√°gina | PNG integral + medi√ß√£o |
+| Celular | 390 √ó 844 | shell presente, sem estouro da p√°gina | PNG integral + medi√ß√£o |
+| CI | push, PR, agenda e execu√ß√£o manual | auditoria est√°tica e Chromium geram artefato | GitHub Actions |
+| Pagamento do confinamento | adiantado, mensal e no final | fluxos vencem no dia 0, a cada 30 dias e no fim do ciclo; per√≠odo parcial √© proporcional | regress√£o JavaScript com resultados manuais |
+| Pagamento do confinamento | vazio, modo legado e entrada inv√°lida | vazio preserva `final`; modo desconhecido normaliza; n√∫mero inv√°lido/negativo falha explicitamente | `tools/test_confinex_pagamento_confinamento.mjs` |
+| Custo do dinheiro | recebimento no fim e ap√≥s o abate | cada parcela capitaliza somente do vencimento ao recebimento; n√£o h√° custo duplicado | compara√ß√£o independente a 2% a.m. |
+| Valor presente | qualquer forma de pagamento | VP das parcelas permanece separado do lucro nominal e do valor futuro | regress√£o JavaScript + comparativo/PDF |
+| Lucro bruto/l√≠quido | custo financeiro positivo | bruto ‚àí l√≠quido = custo financeiro total, sem desconto duplicado | regress√£o pura + Chromium desktop/celular |
+| Lucro bruto/l√≠quido | custo financeiro zero | bruto e l√≠quido s√£o iguais e o custo exibido √© zero | regress√£o pura + Chromium desktop/celular |
+| Contrato financeiro | vazio, negativo e entrada inv√°lida | vazio produz zeros; valor negativo ou n√£o num√©rico falha explicitamente | `tools/test_confinex_resultado_financeiro.mjs` |
+| Consist√™ncia | cart√µes, comparativo, evolu√ß√£o, ranking e PDF | todos usam `lucroLiquido`, `rTliq`, `rMliq` e o mesmo custo financeiro | Chromium + evid√™ncia de impress√£o |
+| Financeiro | dados positivos | KPIs, agenda, d√≠vidas, parcelas, saldos, renegocia√ß√£o, lembretes e concilia√ß√£o ficam leg√≠veis | regress√£o JavaScript + Chromium desktop/celular |
+| Financeiro | pagamentos parcial e total | original, pago e saldo n√£o se confundem; realizado zera saldo | `tools/test_gestao_frontend.js` + Chromium |
+| Financeiro | filtros e v√≠nculo com origem | a lista √© filtrada localmente e leva a uma √°rea humana sem mostrar UUID | Chromium desktop/celular |
+| Financeiro | fontes vazias | cada se√ß√£o apresenta estado vazio claro e KPIs zerados | Chromium desktop/celular |
+| Financeiro | falha somente de `transacoes_banco` | agenda e d√≠vidas continuam dispon√≠veis, com aviso espec√≠fico | Chromium desktop/celular |
+| Financeiro | falha das fontes principais | mensagem humana aparece sem detalhe interno da API | regress√£o JavaScript + Chromium |
+| Financeiro | carga, atualiza√ß√£o e filtros | nenhuma chamada de escrita √© feita | regress√£o est√°tica + cliente simulado com contador de muta√ß√µes |
+| Migra√ß√£o financeira | arquivo versionado, ainda n√£o aplicado | modelo √© aditivo, sem DML operacional, com RLS e pol√≠ticas apenas de leitura | `tools/test_migracao_financeiro.py` |
+
+## Estados
+
+- `aprovado`: o resultado observado corresponde ao esperado.
+- `falhou`: houve diverg√™ncia reproduz√≠vel.
+- `n√£o testado`: a camada n√£o foi executada; no modo estrito bloqueia a
+  conclus√£o.
+
+## Linha de base anterior √†s corre√ß√µes
+
+O modo `--modo-descoberta` preserva somente a prova hist√≥rica do Ciclo 1. Ele aprovava a pr√≥pria
+auditoria quando, e somente quando, detecta os quatro defeitos j√° relatados:
+Portfolio B3 em outra janela e os destinos inexistentes de Financeiro,
+Pend√™ncias e Eventos. Qualquer falha adicional ou a aus√™ncia de uma dessas
+detec√ß√µes reprovava a execu√ß√£o, salvo defeito adicional registrado explicitamente
+pela primeira passagem explorat√≥ria. A auditoria inicial tamb√©m detectou estouro
+horizontal de 49 px no Painel Boi Gordo em desktop. O Ciclo 2 corrigiu os cinco
+defeitos e promoveu o modo estrito a gate permanente; a configura√ß√£o hist√≥rica
+continua versionada para demonstrar o que a auditoria detectava antes da corre√ß√£o.
+
+## Comandos
+
+```bash
+python3 tools/auditar_ecossistema.py --somente-estatico
+npm ci
+npx playwright install chromium
+python3 tools/auditar_ecossistema.py --navegador \
+  --saida-json artifacts/auditoria-ecossistema/relatorio.json \
+  --saida-md artifacts/auditoria-ecossistema/relatorio.md
+```
+
+`--somente-estatico` mant√©m a camada de navegador registrada como ‚Äún√£o
+testado‚Äù, mas permite que a bateria parcial valide arquivos e contratos. Ele
+n√£o √© usado no gate Chromium: a execu√ß√£o com `--navegador` continua reprovando
+qualquer falha ou requisito sem teste.

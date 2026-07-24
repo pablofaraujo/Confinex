@@ -1,1 +1,303 @@
-m«ëˆ§½©buªàºg§¶;?qö ®ˆ²Ö¨ŽÅ,j›jÇºà7an{¦Š)ßŠW¨¢ë_ŠW›n·š‘ºÞjG§r‡^v‹­¦ën¦)í¢X§zÊ•éà¶î˜7]yÊy×œ¡×¢ž›­†¥¥Ø¬¦V²¶¬™ë,j¢Šzn¶)éº×â•ç^}«¥µú+²×bžŠ.¶›­¢ëiº×â•ç^}«¥µú+²×hº
+/* ============================================================
+   CFAgro GestÃ£o â€” projeÃ§Ãµes somente leitura para Financeiro,
+   PendÃªncias e Eventos. Nunca devolve IDs tÃ©cnicos nem JSON cru.
+   ============================================================ */
+(function(raiz, fabrica){
+'use strict';
+var api = fabrica();
+if(typeof module === 'object' && module.exports) module.exports = api;
+if(raiz) raiz.CFAgroGestao = api;
+})(typeof window !== 'undefined' ? window : globalThis, function(){
+'use strict';
+
+var STATUS = {
+  aguardando_confirmacao:'Aguardando confirmaÃ§Ã£o',
+  aguardando_vendedor:'Aguardando vendedor',
+  aprovado_confinex:'Aprovado no Confinex',
+  cancelado:'Cancelado',
+  confirmado_telegram:'Confirmado na origem',
+  corrigido:'Corrigido',
+  em_aberto:'Em aberto',
+  em_execucao:'Em andamento',
+  erro:'Falha ao processar',
+  erro_pos_gravacao:'Precisa de conferÃªncia',
+  executado:'ConcluÃ­do',
+  parcial:'Parcial',
+  pendente:'Pendente',
+  previsto:'Previsto',
+  quitada:'Quitada',
+  quitado:'Quitado',
+  renegociado:'Renegociado',
+  realizado:'Realizado',
+  recebido:'Recebido',
+  registrado:'Registrado',
+  rejeitado:'Rejeitado',
+  validado:'Validado'
+};
+
+function texto(valor){
+  return String(valor == null ? '' : valor).trim();
+}
+
+function numero(valor){
+  var n = Number(valor);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function primeiroNumero(){
+  for(var i=0; i<arguments.length; i+=1){
+    if(arguments[i] !== null && arguments[i] !== undefined && arguments[i] !== ''){
+      var n = Number(arguments[i]);
+      if(Number.isFinite(n)) return n;
+    }
+  }
+  return 0;
+}
+
+function pareceIdTecnico(valor){
+  return /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(texto(valor));
+}
+
+function referenciaHumana(){
+  for(var i=0; i<arguments.length; i+=1){
+    var candidato = texto(arguments[i]);
+    if(candidato && !pareceIdTecnico(candidato)) return candidato;
+  }
+  return 'NÃ£o informada';
+}
+
+function diasEntre(hoje, data){
+  if(!data) return null;
+  var inicio = new Date(String(hoje || new Date().toISOString().slice(0,10)).slice(0,10)+'T12:00:00');
+  var fim = new Date(String(data).slice(0,10)+'T12:00:00');
+  if(Number.isNaN(inicio.getTime()) || Number.isNaN(fim.getTime())) return null;
+  return Math.round((fim-inicio)/86400000);
+}
+
+function statusHumano(valor){
+  var chave = texto(valor).toLowerCase();
+  if(!chave) return 'NÃ£o informado';
+  return STATUS[chave] || chave.replace(/_/g,' ').replace(/^\w/, function(c){ return c.toUpperCase(); });
+}
+
+function contextoHumano(item){
+  return texto(item && item.contexto_nome) || 'Contexto nÃ£o informado';
+}
+
+function dataItem(item){
+  return item && (item.atualizado_em || item.criado_em || item.created_at || item.data || item.vencimento) || null;
+}
+
+function resumoItem(item, tipo){
+  if(tipo === 'rascunho') return texto(item.resumo) || statusHumano(item.tipo_operacao) || 'Rascunho aguardando conferÃªncia';
+  if(tipo === 'aÃ§Ã£o') return texto(item.resumo) || statusHumano(item.acao_tipo) || 'AÃ§Ã£o aguardando conferÃªncia';
+  if(tipo === 'documento') return 'Documento: ' + (item.tipo ? statusHumano(item.tipo) : 'tipo nÃ£o informado');
+  return texto(item.observacao || item.resumo || item.descricao || item.tipo) || 'Evento sem descriÃ§Ã£o';
+}
+
+function pendenciasLegiveis(rascunhos, acoes, documentos){
+  var linhas = [];
+  (rascunhos || []).forEach(function(item){
+    linhas.push({origem:'RevisÃµes', resumo:resumoItem(item,'rascunho'), contexto:contextoHumano(item), status:statusHumano(item.status), data:dataItem(item)});
+  });
+  (acoes || []).forEach(function(item){
+    linhas.push({origem:'AÃ§Ãµes', resumo:resumoItem(item,'aÃ§Ã£o'), contexto:contextoHumano(item), status:statusHumano(item.status), data:dataItem(item)});
+  });
+  (documentos || []).forEach(function(item){
+    var codigo = texto(item && item.operacoes && item.operacoes.codigo);
+    linhas.push({origem:'Documentos', resumo:resumoItem(item,'documento'), contexto:codigo || 'OperaÃ§Ã£o vinculada', status:statusHumano(item.status), data:dataItem(item)});
+  });
+  return linhas.sort(function(a,b){ return String(b.data || '').localeCompare(String(a.data || '')); });
+}
+
+function eventosLegiveis(eventos){
+  return (eventos || []).map(function(item){
+    return {
+      tipo:statusHumano(item.tipo),
+      resumo:resumoItem(item,'evento'),
+      contexto:contextoHumano(item),
+      status:statusHumano(item.status),
+      responsavel:texto(item.usuario || item.agente) || 'NÃ£o informado',
+      data:dataItem(item)
+    };
+  });
+}
+
+function sinalFluxo(item){
+  return texto(item && item.tipo).toLowerCase() === 'saida' ? -1 : 1;
+}
+
+function resumoFinanceiro(fluxo){
+  var r = {previsto:0, realizado:0, aReceber:0, aPagar:0, quantidade:0};
+  (fluxo || []).forEach(function(item){
+    var valor = numero(item.valor);
+    var sinal = sinalFluxo(item);
+    r.previsto += sinal * valor;
+    r.quantidade += 1;
+    if(item.realizado === true) r.realizado += sinal * valor;
+    else if(sinal > 0) r.aReceber += valor;
+    else r.aPagar += valor;
+  });
+  return r;
+}
+
+function origemFinanceira(item, fonte){
+  var pista = [
+    fonte,
+    item && item.origem_tipo,
+    item && item.categoria,
+    item && item.negocio,
+    item && item.lote_ref
+  ].join(' ').toLowerCase();
+  if(/confin|\bcf-\d/.test(pista)) return {rotulo:'Confinamento', href:'./confinamento.html'};
+  if(/compra|venda|boi.?balan/.test(pista)) return {rotulo:'Boi BalanÃ§a', href:'./bb.html'};
+  if(/promiss/.test(pista)) return {rotulo:'PromissÃ³ria', href:'./financeiro.html'};
+  if(/empr[eÃ©]st|cprf|d[iÃ­]vida/.test(pista)) return {rotulo:'EmprÃ©stimo', href:'./financeiro.html'};
+  return {rotulo:'Financeiro', href:'./financeiro.html'};
+}
+
+function obrigacoesFinanceiras(fluxo, hoje){
+  return (fluxo || []).map(function(item){
+    var natureza = texto(item.tipo).toLowerCase() === 'saida' ? 'pagar' : 'receber';
+    var valorOriginal = Math.max(0, primeiroNumero(item.valor_original, item.valor));
+    var realizado = item.realizado === true || /realizad|quitad|recebid/.test(texto(item.status).toLowerCase());
+    var valorPago = Math.max(0, Math.min(valorOriginal, realizado ? valorOriginal : primeiroNumero(item.valor_pago, item.valor_realizado, item.total_pago)));
+    var temSaldo = item.saldo_aberto !== null && item.saldo_aberto !== undefined && item.saldo_aberto !== '' ||
+      item.saldo !== null && item.saldo !== undefined && item.saldo !== '';
+    var saldo = Math.max(0, temSaldo ? primeiroNumero(item.saldo_aberto, item.saldo) : valorOriginal-valorPago);
+    if(realizado) saldo = 0;
+    var vencimento = item.vencimento || item.data_prevista || item.data || null;
+    var dias = diasEntre(hoje, vencimento);
+    var status = realizado ? 'Realizado' : valorPago > 0 ? 'Parcial' : dias !== null && dias < 0 ? 'Atrasado' : 'Previsto';
+    return {
+      natureza:natureza,
+      descricao:referenciaHumana(item.descricao, item.categoria, 'MovimentaÃ§Ã£o financeira'),
+      categoria:referenciaHumana(item.categoria, 'NÃ£o informada'),
+      referencia:referenciaHumana(item.origem_referencia, item.lote_ref, item.negocio, item.codigo),
+      origem:origemFinanceira(item, 'fluxo_caixa'),
+      vencimento:vencimento,
+      diasAteVencimento:dias,
+      valorOriginal:valorOriginal,
+      valorPago:valorPago,
+      saldo:saldo,
+      status:status
+    };
+  }).sort(function(a,b){ return String(a.vencimento || '').localeCompare(String(b.vencimento || '')); });
+}
+
+function dividasFinanceiras(emprestimos, promissorias, hoje){
+  var linhas = [];
+  (emprestimos || []).forEach(function(item){
+    var statusOriginal = texto(item.status).toLowerCase();
+    var valorOriginal = Math.max(0, primeiroNumero(item.valor_principal, item.principal, item.valor));
+    var saldoInformado = primeiroNumero(item.saldo_devedor, item.saldo, item.valor_em_aberto);
+    var temSaldoInformado = [item.saldo_devedor,item.saldo,item.valor_em_aberto].some(function(valor){
+      return valor !== null && valor !== undefined && valor !== '';
+    });
+    var quitada = /quitad|pago|encerrad/.test(statusOriginal);
+    var saldo = quitada ? 0 : Math.max(0, temSaldoInformado ? saldoInformado : valorOriginal);
+    var vencimento = item.proximo_vencimento || item.vencimento || item.data_vencimento || null;
+    var dias = diasEntre(hoje, vencimento);
+    linhas.push({
+      origem:'EmprÃ©stimo',
+      referencia:referenciaHumana(item.numero_contrato, item.contrato, item.descricao, 'Contrato'),
+      contraparte:referenciaHumana(item.credor, item.instituicao, item.banco, 'NÃ£o informada'),
+      vencimento:vencimento,
+      diasAteVencimento:dias,
+      valorOriginal:valorOriginal,
+      valorPago:Math.max(0, valorOriginal-saldo),
+      saldo:saldo,
+      parcelas:referenciaHumana(item.parcelas_pagas && item.numero_parcelas ? item.parcelas_pagas+'/'+item.numero_parcelas : '', item.numero_parcelas ? item.numero_parcelas+' parcela(s)' : '', 'NÃ£o informadas'),
+      taxa:item.taxa_juros_aa == null ? null : numero(item.taxa_juros_aa),
+      renegociada:Boolean(item.renegociado_em || item.renegociacao_id || statusOriginal === 'renegociado'),
+      status:quitada ? 'Quitado' : dias !== null && dias < 0 ? 'Atrasado' : saldo < valorOriginal ? 'Parcial' : statusHumano(item.status || 'em_aberto'),
+      origemLink:origemFinanceira(item, 'emprestimo')
+    });
+  });
+  (promissorias || []).forEach(function(item){
+    var statusOriginal = texto(item.status).toLowerCase();
+    var valorOriginal = Math.max(0, primeiroNumero(item.valor));
+    var quitada = /quitad|pago|encerrad/.test(statusOriginal);
+    var valorPago = quitada ? valorOriginal : Math.max(0, Math.min(valorOriginal, primeiroNumero(item.valor_pago, item.total_pago)));
+    var saldo = Math.max(0, valorOriginal-valorPago);
+    var vencimento = item.vencimento || item.data_vencimento || null;
+    var dias = diasEntre(hoje, vencimento);
+    linhas.push({
+      origem:'PromissÃ³ria',
+      referencia:referenciaHumana(item.numero, item.referencia, 'Documento'),
+      contraparte:referenciaHumana(item.credor, 'NÃ£o informada'),
+      vencimento:vencimento,
+      diasAteVencimento:dias,
+      valorOriginal:valorOriginal,
+      valorPago:valorPago,
+      saldo:saldo,
+      parcelas:'Parcela Ãºnica',
+      taxa:null,
+      renegociada:Boolean(item.renegociado_em || item.renegociacao_id || statusOriginal === 'renegociado'),
+      status:quitada ? 'Quitada' : valorPago > 0 ? 'Parcial' : dias !== null && dias < 0 ? 'Atrasada' : statusHumano(item.status || 'em_aberto'),
+      origemLink:origemFinanceira(item, 'promissoria')
+    });
+  });
+  return linhas.sort(function(a,b){ return String(a.vencimento || '').localeCompare(String(b.vencimento || '')); });
+}
+
+function transacoesFinanceiras(transacoes){
+  return (transacoes || []).map(function(item){
+    return {
+      data:item.data || item.data_transacao || item.created_at || null,
+      descricao:referenciaHumana(item.descricao, item.memo, item.historico, 'TransaÃ§Ã£o bancÃ¡ria'),
+      categoria:referenciaHumana(item.categoria, item.tipo, 'NÃ£o informada'),
+      negocio:referenciaHumana(item.lote_ref, item.negocio, item.subtipo),
+      valor:primeiroNumero(item.valor, item.amount),
+      origem:origemFinanceira(item, 'transacoes_banco')
+    };
+  }).sort(function(a,b){ return String(b.data || '').localeCompare(String(a.data || '')); });
+}
+
+function lembretesFinanceiros(obrigacoes, dividas){
+  return (obrigacoes || []).concat(dividas || []).filter(function(item){
+    return item.saldo > 0 && item.diasAteVencimento !== null && item.diasAteVencimento <= 30;
+  }).map(function(item){
+    var dias = item.diasAteVencimento;
+    return {
+      titulo:item.descricao || [item.origem,item.referencia].filter(Boolean).join(' Â· '),
+      vencimento:item.vencimento,
+      saldo:item.saldo,
+      urgencia:dias < 0 ? 'atrasado' : dias <= 7 ? 'urgente' : 'proximo',
+      mensagem:dias < 0 ? 'Vencido hÃ¡ '+Math.abs(dias)+' dia(s)' : dias === 0 ? 'Vence hoje' : 'Vence em '+dias+' dia(s)'
+    };
+  }).sort(function(a,b){ return String(a.vencimento || '').localeCompare(String(b.vencimento || '')); });
+}
+
+function resumoFinanceiroAmpliado(obrigacoes, dividas){
+  var resumo = {aReceber:0, aPagar:0, realizado:0, vencido:0, proximos30:0, dividaAberta:0};
+  (obrigacoes || []).forEach(function(item){
+    if(item.status === 'Realizado') resumo.realizado += item.natureza === 'pagar' ? -item.valorPago : item.valorPago;
+    else if(item.natureza === 'pagar') resumo.aPagar += item.saldo;
+    else resumo.aReceber += item.saldo;
+    if(item.saldo > 0 && item.diasAteVencimento !== null && item.diasAteVencimento < 0) resumo.vencido += item.saldo;
+    if(item.saldo > 0 && item.diasAteVencimento !== null && item.diasAteVencimento >= 0 && item.diasAteVencimento <= 30) resumo.proximos30 += item.saldo;
+  });
+  (dividas || []).forEach(function(item){ resumo.dividaAberta += item.saldo; });
+  return resumo;
+}
+
+function erroLegivel(erro){
+  if(!erro) return 'NÃ£o foi possÃ­vel carregar os dados.';
+  return 'NÃ£o foi possÃ­vel carregar os dados. Tente atualizar a pÃ¡gina.';
+}
+
+return {
+  contextoHumano:contextoHumano,
+  dividasFinanceiras:dividasFinanceiras,
+  erroLegivel:erroLegivel,
+  eventosLegiveis:eventosLegiveis,
+  lembretesFinanceiros:lembretesFinanceiros,
+  obrigacoesFinanceiras:obrigacoesFinanceiras,
+  pendenciasLegiveis:pendenciasLegiveis,
+  resumoFinanceiro:resumoFinanceiro,
+  resumoFinanceiroAmpliado:resumoFinanceiroAmpliado,
+  transacoesFinanceiras:transacoesFinanceiras,
+  statusHumano:statusHumano
+};
+});
