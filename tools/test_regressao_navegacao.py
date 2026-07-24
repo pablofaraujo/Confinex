@@ -20,6 +20,8 @@ class RegressaoNavegacaoTests(unittest.TestCase):
 
     def test_negativo_portfolio_nao_abre_nova_janela(self):
         self.assertFalse(self.menu["Portfolio B3"].externo)
+        shell = (ROOT / "js" / "cfagro-shell.js").read_text(encoding="utf-8")
+        self.assertIn("!portfolio && !n.ext", shell)
         bgi = (ROOT / "bgi.html").read_text(encoding="utf-8")
         link = 'href="https://pablofaraujo.github.io/boi-gordo-portfolio/"'
         self.assertIn(link, bgi)
@@ -40,7 +42,7 @@ class RegressaoNavegacaoTests(unittest.TestCase):
         for pagina in paginas_ativas:
             fonte = pagina.read_text(encoding="utf-8")
             self.assertIn(
-                "cfagro-shell.js?v=20260723-2",
+                "cfagro-shell.js?v=20260723-3",
                 fonte,
                 msg=f"{pagina.name} ainda pode carregar um menu antigo do cache",
             )

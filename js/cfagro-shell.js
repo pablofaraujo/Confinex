@@ -70,9 +70,10 @@ function montar(){
       if(n.sep) return '<div class="shell-sep" aria-hidden="true"></div>';
       var full = resolveHref(n.href);
       var arquivo = full.split('#')[0].split('/').pop() || 'index.html';
+      var portfolio = n.rotulo === 'Portfolio B3';
       var ativa = onPortfolio
-        ? (n.rotulo === 'Portfolio B3' ? ' ativa' : '')
-        : (!n.ext && n.href.indexOf('#')<0 && arquivo===aqui ? ' ativa' : '');
+        ? (portfolio ? ' ativa' : '')
+        : (!portfolio && !n.ext && n.href.indexOf('#')<0 && arquivo===aqui ? ' ativa' : '');
       var alvo = n.ext ? ' target="_blank" rel="noopener"' : '';
       var ext = n.ext ? '<span class="ext">↗</span>' : '';
       return '<a class="shell-link'+ativa+'" href="'+full+'"'+alvo+'><span>'+n.icone+'</span>'+n.rotulo+ext+'</a>';
