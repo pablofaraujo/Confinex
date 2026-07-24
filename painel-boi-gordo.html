@@ -107,7 +107,7 @@ const atualizador = window.PainelBoiGordo && window.PainelBoiGordo.criarAtualiza
     if (!r.ok) throw new Error('fonte indisponível');
     return r.json();
   }),
-  aplicar: (dados, fallback) => { document.getElementById('ts').textContent = dados.atualizadoEm; document.getElementById('estadoAtualizacao').textContent = fallback ? 'fonte indisponível · último dado válido' : 'fonte atualizada'; },
+  aplicar: (dados, fallback) => { document.getElementById('ts').textContent = dados.atualizadoEm; document.getElementById('estadoAtualizacao').textContent = (fallback ? 'fonte indisponível · ' : '') + 'fonte: ' + dados.fonte; },
   fallback: D,
   agora: () => new Date(),
   limiteDias: 2
