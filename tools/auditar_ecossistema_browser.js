@@ -924,6 +924,8 @@ async function auditarPendencias(browser, viewport, resultados) {
       porOrigem === 2 && vazioFiltrado.includes('Nenhuma pendência corresponde aos filtros'),
       `linhas por origem=${porOrigem}; vazio=${vazioFiltrado}`,
     ));
+    await page.locator('#filtroTexto').fill(' ');
+    const linhasRestauradas = await page.locator('#listaPendencias tr').count();
     resultados.push(item(
       `browser:${viewport.nome}:pendencias:responsivo-sem-escrita`,
       'Pendências responsivas e somente leitura',
@@ -946,9 +948,9 @@ async function auditarPendencias(browser, viewport, resultados) {
       `browser:${viewport.nome}:pendencias:evidencia`,
       'Evidência visual de Pendências',
       `dados positivos em ${viewport.nome}`,
-      'captura integral é gerada',
-      fs.existsSync(captura) && fs.statSync(captura).size > 0,
-      captura,
+      'captura integral é gerada depois de restaurar todas as linhas',
+      linhasRestauradas === 4 && fs.existsSync(captura) && fs.statSync(captura).size > 0,
+      `${captura}; linhas restauradas=${linhasRestauradas}`,
     ));
   } catch (erro) {
     resultados.push(item(
@@ -1050,6 +1052,8 @@ async function auditarEventos(browser, viewport, resultados) {
         vazioFiltrado.includes('Nenhum evento corresponde aos filtros'),
       `recentes=${recentes} por tipo=${porTipo}; vazio=${vazioFiltrado}`,
     ));
+    await page.locator('#filtroTexto').fill(' ');
+    const linhasRestauradas = await page.locator('#listaEventos tr').count();
     resultados.push(item(
       `browser:${viewport.nome}:eventos:responsivo-sem-escrita`,
       'Eventos responsivos e somente leitura',
@@ -1072,9 +1076,9 @@ async function auditarEventos(browser, viewport, resultados) {
       `browser:${viewport.nome}:eventos:evidencia`,
       'Evidência visual de Eventos',
       `dados positivos em ${viewport.nome}`,
-      'captura integral é gerada',
-      fs.existsSync(captura) && fs.statSync(captura).size > 0,
-      captura,
+      'captura integral é gerada depois de restaurar todas as linhas',
+      linhasRestauradas === 3 && fs.existsSync(captura) && fs.statSync(captura).size > 0,
+      `${captura}; linhas restauradas=${linhasRestauradas}`,
     ));
   } catch (erro) {
     resultados.push(item(

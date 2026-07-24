@@ -8,6 +8,7 @@ const pendenciasHtml = fs.readFileSync(path.join(raiz, 'pendencias.html'), 'utf8
 const pendenciasJs = fs.readFileSync(path.join(raiz, 'js/pendencias.js'), 'utf8');
 const eventosHtml = fs.readFileSync(path.join(raiz, 'eventos.html'), 'utf8');
 const eventosJs = fs.readFileSync(path.join(raiz, 'js/eventos.js'), 'utf8');
+const auditoriaBrowser = fs.readFileSync(path.join(raiz, 'tools/auditar_ecossistema_browser.js'), 'utf8');
 
 for(const id of ['listaPendencias','filtroOrigem','filtroTexto','erroFontes']){
   assert.ok(pendenciasHtml.includes(`id="${id}"`), `Pendências sem #${id}`);
@@ -34,5 +35,7 @@ for(const html of [pendenciasHtml,eventosHtml]){
 }
 assert.ok(pendenciasHtml.includes('pendencias.js?v=20260724-3'));
 assert.ok(eventosHtml.includes('eventos.js?v=20260724-3'));
+assert.ok(auditoriaBrowser.includes('linhasRestauradas === 4'));
+assert.ok(auditoriaBrowser.includes('linhasRestauradas === 3'));
 
-console.log('Pendências e Eventos: 25 verificações estáticas aprovadas.');
+console.log('Pendências e Eventos: 27 verificações estáticas aprovadas.');
