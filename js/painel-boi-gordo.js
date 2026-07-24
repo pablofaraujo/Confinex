@@ -6,7 +6,7 @@
     if (!payload || typeof payload !== 'object' || !payload.atualizadoEm) {
       throw new Error('Resposta do painel sem data válida');
     }
-    if (!Array.isArray(payload.indicadores) || !Array.isArray(payload.curvaBGI)) {
+    if (!payload.fonte || !Array.isArray(payload.indicadores) || !Array.isArray(payload.curvaBGI)) {
       throw new Error('Resposta do painel sem indicadores ou curva');
     }
     return payload;
