@@ -61,6 +61,7 @@ function montar(){
   // nesse caso nenhum link "interno" bate por nome de arquivo, e o próprio
   // item externo correspondente fica marcado como atual
   var onPortfolio = /\/boi-gordo-portfolio\//.test(location.pathname);
+  var visaoPortfolio = new URLSearchParams(location.search).get('visao') === 'portfolio';
   var aqui = onPortfolio ? '' : (location.pathname.split('/').pop() || 'index.html');
 
   var aside = document.createElement('aside');
@@ -72,8 +73,8 @@ function montar(){
       var full = resolveHref(n.href);
       var arquivo = full.split('#')[0].split('/').pop() || 'index.html';
       var portfolio = n.rotulo === 'Portfolio B3';
-      var ativa = onPortfolio
-        ? (portfolio ? ' ativa' : '')
+      var ativa = onPortfolio || visaoPortfolio
+        ? (portfolio === (onPortfolio || visaoPortfolio) ? ' ativa' : '')
         : (!portfolio && !n.ext && n.href.indexOf('#')<0 && arquivo===aqui ? ' ativa' : '');
       var alvo = n.ext ? ' target="_blank" rel="noopener"' : '';
       var ext = n.ext ? '<span class="ext">↗</span>' : '';
