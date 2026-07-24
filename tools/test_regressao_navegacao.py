@@ -22,11 +22,9 @@ class RegressaoNavegacaoTests(unittest.TestCase):
         self.assertFalse(self.menu["Portfolio B3"].externo)
         shell = (ROOT / "js" / "cfagro-shell.js").read_text(encoding="utf-8")
         self.assertIn("!portfolio && !n.ext", shell)
-        bgi = (ROOT / "bgi.html").read_text(encoding="utf-8")
-        link = 'href="https://pablofaraujo.github.io/boi-gordo-portfolio/"'
-        self.assertIn(link, bgi)
-        trecho = bgi[bgi.index(link):bgi.index(link) + 180]
-        self.assertNotIn('target="_blank"', trecho)
+        self.assertEqual("bgi.html?visao=portfolio", self.menu["Portfolio B3"].href)
+        shell = (ROOT / "js" / "cfagro-shell.js").read_text(encoding="utf-8")
+        self.assertIn("{ href:'bgi.html?visao=portfolio', rotulo:'Portfolio B3'", shell)
 
     def test_vazio_nao_usa_ancoras_como_destino_de_modulo(self):
         for rotulo in ("Financeiro", "Pendências", "Eventos"):
@@ -52,6 +50,14 @@ class RegressaoNavegacaoTests(unittest.TestCase):
         falhas = [item.id for item in resultados if item.status == "falhou"]
         self.assertEqual([], falhas)
 
+    def test_shell_usa_icones_lineares_locais_sem_emoji(self):
+        shell = (ROOT / "js" / "cfagro-shell.js").read_text(encoding="utf-8")
+        self.assertIn("function iconSvg", shell)
+        self.assertIn('stroke-width="1.75"', shell)
+        for emoji in ("🧮", "🐮", "🌾", "📈", "⚖️", "💰", "📅", "⚙️"):
+            self.assertNotIn(emoji, shell)
+
 
 if __name__ == "__main__":
     unittest.main()
+
