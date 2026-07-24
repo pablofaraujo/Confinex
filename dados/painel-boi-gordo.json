@@ -1,0 +1,20 @@
+{
+  "atualizadoEm": "15/07/2026 10:21",
+  "fonte": "CEPEA/Esalq, B3 e fontes de mercado listadas no painel",
+  "indicadores": [
+    { "label": "Boi gordo CEPEA/B3 (SP)", "valor": "R$ 328,10/@", "delta": "+1,08% no dia · −2,47% no mês", "dir": "up" },
+    { "label": "Milho CEPEA/B3 (Campinas-SP)", "valor": "R$ 64,62/sc", "delta": "+0,17% no dia · saca 60 kg", "dir": "up" },
+    { "label": "Relação de troca", "valor": "10,27 @/bezerro", "delta": "Máxima histórica para julho", "dir": "up" },
+    { "label": "Carne exportada (média)", "valor": "US$ 6.384/t", "delta": "+15% vs. julho de 2025", "dir": "up" }
+  ],
+  "curvaBGI": [
+    { "venc": "Físico (CEPEA)", "mes": "jul/26", "valor": 328.10, "agio": null },
+    { "venc": "BGI U26", "mes": "set/26", "valor": 341.20, "agio": 13.10 },
+    { "venc": "BGI V26", "mes": "out/26", "valor": 350.40, "agio": 22.30 },
+    { "venc": "BGI X26", "mes": "nov/26", "valor": 353.50, "agio": 25.40 },
+    { "venc": "BGI F27", "mes": "jan/27", "valor": 363.30, "agio": 35.20 }
+  ],
+  "manchetes": [],
+  "contexto": []
+}
+
