@@ -46,6 +46,12 @@ Atualizado em 2026-07-23. A fonte executável é
 | Eventos | vazio e falha | vazio é explícito; falha não expõe detalhes internos | Chromium desktop/celular |
 | Pendências e Eventos | JSON, UUID, ID de grupo e referência Telegram | conteúdo técnico é descartado, nunca usado como contexto | projetor puro + inspeção do DOM |
 | Pendências e Eventos | carga, atualização e filtros | nenhuma chamada de escrita é feita | regressão estática + cliente simulado com contador de mutações |
+| OCR de anexos | JPG, PNG, PDF textual, PDF escaneado e PDF multipágina | primeira passagem usa `arquivo_grupo_router.py`, sem escrita automática | `tools/test_juan_vps.py` em `--completa` |
+| OCR de PDF | duas ou mais páginas | cada página extraída informa origem, não se repete e respeita limite seguro de oito páginas | contrato `validar_contrato_paginas` + saída remota |
+| OCR de PDF | documento maior que o limite ou origem ausente | falha explícita; nunca soma páginas sem proveniência nem rasteriza indefinidamente | regressão Python + log da VPS |
+| Distância | origem/destino, ajuste manual e fonte | distância positiva, limitada, com fonte e data; ajuste fica separado da base | `tools/test_confinex_distancia.mjs` |
+| Distância congelada | estudo calculado novamente | distância usada no estudo mantém `estudoId` e `congeladaEm`; alteração posterior não muda o estudo | contrato `congelarDistancia` |
+| Frete | responsabilidade própria, dividida ou do confinamento | total, bruto e por cabeça são recalculados sem dados privados ou escrita operacional | regressão JavaScript |
 
 ## Estados
 
@@ -81,3 +87,4 @@ python3 tools/auditar_ecossistema.py --navegador \
 testado”, mas permite que a bateria parcial valide arquivos e contratos. Ele
 não é usado no gate Chromium: a execução com `--navegador` continua reprovando
 qualquer falha ou requisito sem teste.
+
