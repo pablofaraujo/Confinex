@@ -116,6 +116,7 @@ def validar_local() -> None:
     executar(["node", "tools/test_confinex_pagamento_confinamento.mjs"])
     executar(["node", "tools/test_confinex_resultado_financeiro.mjs"])
     executar(["node", "tools/test_ocr_pesagem_contrato.mjs"])
+    executar(["node", "tools/test_confinex_supabase_contrato.mjs"])
 
     html = (ROOT / "revisoes.html").read_text(encoding="utf-8")
     scripts = scripts_inline(html)
