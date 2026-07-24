@@ -30,6 +30,21 @@ class RegressaoNavegacaoTests(unittest.TestCase):
         for rotulo in ("Financeiro", "Pendências", "Eventos"):
             self.assertFalse(self.menu[rotulo].href.startswith("./#"))
 
+    def test_cache_do_shell_e_invalidado_em_todas_as_paginas_ativas(self):
+        paginas_ativas = [
+            path
+            for path in ROOT.glob("*.html")
+            if "cfagro-shell.js" in path.read_text(encoding="utf-8")
+        ]
+        self.assertGreater(len(paginas_ativas), 0)
+        for pagina in paginas_ativas:
+            fonte = pagina.read_text(encoding="utf-8")
+            self.assertIn(
+                "cfagro-shell.js?v=20260723-2",
+                fonte,
+                msg=f"{pagina.name} ainda pode carregar um menu antigo do cache",
+            )
+
     def test_falha_auditoria_estatica_estrita_fica_sem_regressao(self):
         resultados, _ = auditar_estatico()
         falhas = [item.id for item in resultados if item.status == "falhou"]
