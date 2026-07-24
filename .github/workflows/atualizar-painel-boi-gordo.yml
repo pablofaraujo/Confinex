@@ -18,19 +18,26 @@ jobs:
           python-version: '3.12'
       - name: Buscar e validar fonte
         id: fonte
-        if: ${{ vars.PAINEL_BOI_GORDO_SOURCE_URL != '' }}
         env:
           PAINEL_BOI_GORDO_SOURCE_URL: ${{ vars.PAINEL_BOI_GORDO_SOURCE_URL }}
-        run: python3 tools/atualizar_painel_boi_gordo.py
+        run: |
+          set -u
+          if [ -z "${PAINEL_BOI_GORDO_SOURCE_URL}" ]; then
+            echo "não testado: PAINEL_BOI_GORDO_SOURCE_URL não configurada"
+            echo "atualizado=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if python3 tools/atualizar_painel_boi_gordo.py; then
+            echo "atualizado=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Fonte indisponível; último artefato válido preservado"
+            echo "atualizado=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Publicar artefato atualizado
-        if: ${{ steps.fonte.outcome == 'success' }}
+        if: steps.fonte.outputs.atualizado == 'true'
         run: |
           git config user.name 'Confinex bot'
           git config user.email 'confinex-bot@users.noreply.github.com'
           git add dados/painel-boi-gordo.json
           git diff --cached --quiet || git commit -m 'Atualiza Painel Boi Gordo'
           git push
-      - name: Registrar ausência de fonte configurada
-        if: ${{ steps.fonte.outcome == 'skipped' }}
-        run: echo 'não testado: PAINEL_BOI_GORDO_SOURCE_URL não configurada'
-
