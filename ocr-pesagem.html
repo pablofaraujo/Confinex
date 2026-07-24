@@ -95,10 +95,10 @@
   <h2>2 · Foto da folha</h2>
   <div class="card">
     <div class="drop" id="drop">
-      <div id="dropTxt">📷 Toque para tirar foto ou escolher imagem</div>
+      <div id="dropTxt">📷 Toque para tirar foto ou escolher JPG, PNG ou PDF</div>
       <img id="preview" style="display:none">
     </div>
-    <input id="file" type="file" accept="image/*" capture="environment" style="display:none">
+    <input id="file" type="file" accept="image/jpeg,image/png,application/pdf,.jpg,.jpeg,.png,.pdf" capture="environment" style="display:none">
     <button class="btn" id="btnLer" style="margin-top:12px;width:100%" disabled>Ler folha</button>
     <div class="err" id="status" style="color:var(--muted)"></div>
   </div>
@@ -147,7 +147,7 @@
 const KG_POR_ARROBA = 15;
 const $ = id => document.getElementById(id);
 const DEFAULT_MODELS = {gemini:'gemini-2.5-flash', openai:'gpt-4o', anthropic:'claude-sonnet-4-5'};
-let imgBase64=null, imgMime=null, linhas=[];
+let imgBase64=null, imgMime=null, arquivoOCR=null, linhas=[];
 
 // ---------- Config (localStorage) ----------
 function loadCfg(){
@@ -176,13 +176,23 @@ function initUI(){
   $('drop').addEventListener('click',()=>$('file').click());
   $('file').addEventListener('change',e=>{
     const f=e.target.files[0]; if(!f) return;
+    if(!['image/jpeg','image/png','application/pdf'].includes(f.type) || f.size<1 || f.size>20*1024*1024){
+      $('status').textContent='⚠️ Use JPG, PNG ou PDF de até 20 MB.'; e.target.value=''; return;
+    }
+    arquivoOCR={nome:f.name,tipo:f.type,tamanho:f.size};
     const r=new FileReader();
     r.onload=ev=>{
       const d=ev.target.result;
       imgMime=d.substring(5,d.indexOf(';'));
       imgBase64=d.substring(d.indexOf(',')+1);
-      $('preview').src=d; $('preview').style.display='block';
-      $('dropTxt').style.display='none'; $('drop').classList.add('has');
+      if(f.type==='application/pdf'){
+        $('preview').style.display='none';
+        $('dropTxt').textContent='📄 PDF selecionado: '+f.name;
+      } else {
+        $('preview').src=d; $('preview').style.display='block';
+        $('dropTxt').textContent='📷 '+f.name;
+      }
+      $('dropTxt').style.display='block'; $('drop').classList.add('has');
       $('btnLer').disabled=false;
     };
     r.readAsDataURL(f);
@@ -232,10 +242,11 @@ async function ocr(){
   const vps=$('vpsurl').value.trim();
   if(vps){
     const r=await fetch(vps,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({contexto:$('contexto').value,mime:imgMime,imagem:imgBase64})});
+      body:JSON.stringify({contexto:$('contexto').value,arquivo:arquivoOCR,mime:imgMime,imagem:imgBase64})});
     if(!r.ok) throw new Error('VPS erro '+r.status);
     return await r.text();
   }
+  if(imgMime==='application/pdf' && !vps) throw new Error('PDF deve ser enviado ao endpoint do VPS/Juan; o modo direto aceita somente imagens.');
   if(!key) throw new Error('Informe o endpoint do VPS ou uma API key (⚙️) para testar.');
   if(prov==='gemini'){
     const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
@@ -306,7 +317,7 @@ function totais(){
 
 // ---------- Saídas ----------
 function payload(){
-  return {contexto:$('contexto').value, data_folha:$('dataFolha').value,
+  return {contexto:$('contexto').value, data_folha:$('dataFolha').value, arquivo:arquivoOCR,
     linhas:linhas.map(l=>({brinco:l.brinco, peso_kg:l.peso, dente:l.dente}))};
 }
 function exportCSV(){
@@ -337,7 +348,7 @@ function receberHandoff(){
   let h; try{ h=JSON.parse(sessionStorage.getItem('ocrp:handoff')||'null'); }catch(e){ h=null; }
   if(!h||!h.data) return;
   sessionStorage.removeItem('ocrp:handoff');
-  imgMime=h.mime||'image/jpeg'; imgBase64=h.data;
+  imgMime=h.mime||'image/jpeg'; imgBase64=h.data; arquivoOCR={nome:'handoff',tipo:imgMime,tamanho:Math.ceil((h.data||'').length*3/4)};
   $('preview').src=`data:${imgMime};base64,${imgBase64}`;
   $('preview').style.display='block'; $('dropTxt').style.display='none'; $('drop').classList.add('has');
   $('btnLer').disabled=false;
