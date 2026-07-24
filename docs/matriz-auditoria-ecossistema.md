@@ -52,6 +52,10 @@ Atualizado em 2026-07-23. A fonte executável é
 | Distância | origem/destino, ajuste manual e fonte | distância positiva, limitada, com fonte e data; ajuste fica separado da base | `tools/test_confinex_distancia.mjs` |
 | Distância congelada | estudo calculado novamente | distância usada no estudo mantém `estudoId` e `congeladaEm`; alteração posterior não muda o estudo | contrato `congelarDistancia` |
 | Frete | responsabilidade própria, dividida ou do confinamento | total, bruto e por cabeça são recalculados sem dados privados ou escrita operacional | regressão JavaScript |
+| Acompanhamento | entrada, saída, consumo de matéria seca e diária | eventos são normalizados por lote e totalizam cabeças e consumo | `tools/test_confinex_acompanhamento.mjs` |
+| Acompanhamento | pesagem, morte e transferência | saldo de cabeças e pesagens ficam rastreáveis, sem inventar eventos | regressão JavaScript |
+| Acompanhamento financeiro | cobrança e pagamento parcial | saldo aberto é cobrança menos pagamentos; fechamento preserva o histórico | contrato de acompanhamento |
+| Fechamento de lote | data válida e inválida | lote fecha uma vez com data ISO; entrada inválida falha sem escrita | regressão JavaScript |
 
 ## Estados
 
