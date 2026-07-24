@@ -23,6 +23,10 @@ Atualizado em 2026-07-23. A fonte executável é
 | Pagamento do confinamento | vazio, modo legado e entrada inválida | vazio preserva `final`; modo desconhecido normaliza; número inválido/negativo falha explicitamente | `tools/test_confinex_pagamento_confinamento.mjs` |
 | Custo do dinheiro | recebimento no fim e após o abate | cada parcela capitaliza somente do vencimento ao recebimento; não há custo duplicado | comparação independente a 2% a.m. |
 | Valor presente | qualquer forma de pagamento | VP das parcelas permanece separado do lucro nominal e do valor futuro | regressão JavaScript + comparativo/PDF |
+| Lucro bruto/líquido | custo financeiro positivo | bruto − líquido = custo financeiro total, sem desconto duplicado | regressão pura + Chromium desktop/celular |
+| Lucro bruto/líquido | custo financeiro zero | bruto e líquido são iguais e o custo exibido é zero | regressão pura + Chromium desktop/celular |
+| Contrato financeiro | vazio, negativo e entrada inválida | vazio produz zeros; valor negativo ou não numérico falha explicitamente | `tools/test_confinex_resultado_financeiro.mjs` |
+| Consistência | cartões, comparativo, evolução, ranking e PDF | todos usam `lucroLiquido`, `rTliq`, `rMliq` e o mesmo custo financeiro | Chromium + evidência de impressão |
 
 ## Estados
 

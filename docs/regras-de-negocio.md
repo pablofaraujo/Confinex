@@ -63,7 +63,11 @@ Custo de compra: `custoCompra = arrobasCompra × precoCompra × N + baldeio`.
 - Preço bruto: balcão = `precoBalcao`; bolsa = `precoBolsa × (1−baseDesc%)`.
 - `faturamentoBruto = arrobasRef × precoVendaBruto × N`.
 - `valorFunrural = faturamentoBruto × pctFunrural`; `valorFinpec = faturamentoBruto × pctFinpec` (padrão 0%; normalmente 1% quando aplicável). Os encargos são calculados separadamente sobre a mesma base bruta, sem incidência em cascata.
-- `receita = faturamentoBruto − valorFunrural − valorFinpec`; `custos = custoCompra + freteTotal + custoContTotal`; `lucro = receita − custos`.
+- **Receita líquida**: `receita = faturamentoBruto − valorFunrural − valorFinpec`.
+- **Custos operacionais**: `custosOperacionais = custoCompra + freteTotal + custoContTotal`.
+- **Lucro bruto**: `lucroBruto = receita − custosOperacionais`.
+- **Custo financeiro total**: custo do dinheiro da compra + frete + parcelas do confinamento + eventual operação financeira adicional.
+- **Lucro líquido**: `lucroLiquido = lucroBruto − custoFinanceiroTotal`. Cada componente é descontado exatamente uma vez. Bruto e líquido só são iguais quando o custo financeiro total é zero.
 
 ## Capital, prazos e valor presente
 
@@ -73,15 +77,15 @@ Custo de compra: `custoCompra = arrobasCompra × precoCompra × N + baldeio`.
 - Cada parcela do confinamento corre custo do dinheiro somente de seu vencimento até o recebimento da venda: `valorNoRecebimento = parcela × (1 + i)^(diasExposição/30)`. Se a venda for recebida no fim do ciclo, a parcela final não tem exposição; com prazo pós-abate, corre custo somente nesse intervalo.
 - O custo financeiro das parcelas do confinamento reduz o lucro líquido uma única vez. O valor presente segue uma trilha separada: `VPparcela = parcela ÷ (1 + i)^(diaParcela/30)`; ele não é somado nem subtraído novamente do lucro nominal.
 - O tempo consolidado do capital é ponderado pelo valor e prazo de compra e frete.
-- `rentTotal = lucro/investInicial`; `rentMensal = (1+rT)^(1/mesesCapital) − 1` (composto). O custo de oportunidade da compra e do frete não é abatido dessas rentabilidades.
-- O custo do dinheiro da compra e do frete é calculado separadamente conforme o prazo de cada desembolso, apenas como análise informativa e de valor presente.
+- `rentTotal = lucroBruto/investInicial` preserva a visão operacional; `rTliq = lucroLiquido/investInicial` e `rMliq = (1+rTliq)^(1/mesesCapital) − 1` representam o retorno depois do custo financeiro.
+- O custo do dinheiro da compra e do frete é calculado separadamente conforme o prazo de cada desembolso e reduz `lucroLiquido`, `rTliq` e `rMliq`.
 - A simulação financeira possui dois tipos. **Adiantamento de capital** representa dinheiro adicional colocado no negócio: `custoAdiantamento = valorAdiantamento × i × diasAdiantamento/30`; o custo reduz o resultado e o prazo original permanece. **Antecipação do recebimento** representa parte do valor final recebida antes: o valor antecipado entra na data escolhida, enquanto principal e custo são abatidos do saldo no acerto final.
-- `custoDinheiroConfinamento` e `custoAdiantamento`, quando houver, reduzem o resultado usado em `rTliq` e `rMliq`. O custo de oportunidade da compra e do frete permanece informativo nesta etapa.
+- Compra, frete, `custoDinheiroConfinamento` e `custoAdiantamento`, quando houver, reduzem o resultado usado em `rTliq` e `rMliq`.
 - Na antecipação, o valor máximo é `valorTerminalSemOperacao ÷ (1 + i × diasAdiantamento/30)`, evitando saldo final negativo. A rentabilidade mensal é a taxa interna de retorno dos fluxos `−capital` no início equivalente, `+valorAntecipado` na data escolhida e `+saldoFinal` no acerto. Assim, o lucro nominal diminui pelo custo, mas a rentabilidade mensal pode aumentar pela redução do tempo de capital exposto.
 - O efeito da operação é comparado na métrica principal: `rMliqSemAdiantamento` versus `rMliq`; `impactoAdiantamentoMensal = rMliq − rMliqSemAdiantamento`, em pontos percentuais ao mês.
 - Ranking dos cenários: `rMliq` decrescente; desempates por lucro líquido, rentabilidade total líquida e ordem original. Cartões e tabela usam a mesma sequência. A rentabilidade mensal final recebe o destaque visual principal; a total permanece como informação complementar.
 - Forma, parcelas, vencimentos, custo financeiro e valor presente do confinamento pertencem ao cenário e às bases salvas. Comparativo, evolução, ranking e relatório/PDF recalculam a mesma estrutura de fluxos.
-- Valor presente: `fatorVP = (1+i)^mesesCapital`; `vpArroba = precoVenda/fatorVP`; **`precoCompraVpMax`** = maior R$/@ de compra que empata em VP = `(receitaVP − freteTotal − custoContTotal − baldeio)/arrobasCompraTotal`; `margemCompraVp = precoCompraVpMax − precoCompra`.
+- Valor presente é uma análise separada do lucro nominal. Receita e cada desembolso são trazidos ao dia zero por sua própria data: `VP = valor ÷ (1+i)^(dia/30)`. `resultadoVP = receitaVP − compraVP − freteVP − confinamentoVP`; **`precoCompraVpMax`** resolve o preço nominal de compra que zera esse resultado na data de pagamento da compra. `margemCompraVp = precoCompraVpMax − precoCompra`.
 - A antiga indicação isolada de “ponto ótimo” foi removida. Ela não respeitava o mínimo produtivo e mantinha a mesma cotação ao mudar o mês de saída.
 - A evolução temporal compara 60 a 240 dias em intervalos de 15 dias, incluindo também o ciclo atual quando estiver dentro dessa faixa. Cada prazo recalcula a saída e usa a cotação do contrato BGI daquele mês; sem cotação, o ponto fica pendente e não gera resultado enganoso.
 - Depois da aprovação, o prazo operacional pode ser ajustado repetidamente em **Operações → Confinamento**. A estimativa original permanece congelada; cada ajuste exige motivo e registra prazo anterior, novo prazo, saída anterior, nova saída, autor e horário. O prazo atual é sempre o último ajuste válido.
