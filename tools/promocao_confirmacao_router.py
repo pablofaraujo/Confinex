@@ -17,7 +17,7 @@ def path_exists(path: Path) -> bool:
 for path in (HERE, Path('/root/ponte/tools')):
     path_text = str(path)
     if path_exists(path) and path_text not in sys.path:
-        sys.path.insert(0, path_text)
+        sys.path.insert(0 if path == HERE else len(sys.path), path_text)
 from confinex_client import ConfinexClient, ConfinexError
 from promocao_operacional import execute_promotion, expected_confirmation
 
