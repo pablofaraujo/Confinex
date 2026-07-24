@@ -72,6 +72,15 @@ Larguras: padrão 1280px; `<body data-w="md">` = 1100px; `<body data-w="sm">` = 
 | Voltar | `.voltar-central` | botão flutuante ⌂ (oculto quando o shell está ativo) |
 | Shell | `.shell-top .shell-brand .shell-side .shell-sec .shell-sep .shell-link(.ativa) .shell-content` | cabeçalho azul-marinho + sidebar fixa; montados pelo cfagro-shell.js |
 
+### Ícones do shell
+
+Os itens do menu usam SVGs lineares locais, sem emojis, CDN ou fonte externa.
+O contrato visual é 18 px, traço 1,75 px, `currentColor`, sem preenchimento ou
+sombra. O estado normal usa cinza-azulado; hover usa fundo neutro; o item ativo
+usa amarelo CFAgro suave e barra lateral amarela. O texto acessível permanece
+sempre visível ao lado do ícone. A identidade CFAgro fica no brinco circular do
+cabeçalho, não em variações dos ícones.
+
 ## Convenções de comportamento
 
 - Título da aba: `CFAgro — {Módulo}`.
@@ -91,4 +100,5 @@ Larguras: padrão 1280px; `<body data-w="md">` = 1100px; `<body data-w="sm">` = 
 
 ## Roadmap do DS
 
-~~Fases 3 e 4~~ feitas: shell de navegação, index como Home/dashboard e adoção do padrão por Confinex, OCR Pesagem e Ops. Fase 5: tabela rica (ordenar/filtrar/buscar/exportar), toasts/modais no lugar de alert/confirm/prompt, ícones Lucide. Fase 6: toggle dark mode. Detalhes: `docs/auditoria-ui-ux.md`.
+~~Fases 3 e 4~~ feitas: shell de navegação, index como Home/dashboard e adoção do padrão por Confinex, OCR Pesagem e Ops. Fase 5: tabela rica (ordenar/filtrar/buscar/exportar), toasts/modais no lugar de alert/confirm/prompt. Ícones lineares locais do shell concluídos; ícones Lucide externos continuam fora do escopo. Fase 6: toggle dark mode. Detalhes: `docs/auditoria-ui-ux.md`.
+
