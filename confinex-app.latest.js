@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 41067)
-Total output lines: 2892
-
 // src/confinex-entry.jsx
 import React from "react";
 import { createRoot } from "react-dom/client";
