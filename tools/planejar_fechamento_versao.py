@@ -56,7 +56,7 @@ def file_gates() -> list[dict[str, Any]]:
     ]
 
 
-def build_plan(*, validacao_completa: bool = False, publicado: bool | None = None) -> dict[str, Any]:
+def build_plan(*, saneamento_dry_run: bool = False, validacao_completa: bool = False, publicado: bool | None = None) -> dict[str, Any]:
     git = git_state()
     files = file_gates()
     missing = [item["arquivo"] for item in files if not item["ok"]]
@@ -66,8 +66,8 @@ def build_plan(*, validacao_completa: bool = False, publicado: bool | None = Non
         {"gate": "arquivos essenciais", "ok": not missing, "detalhe": missing},
         {"gate": "worktree limpo", "ok": not git["dirty"], "detalhe": git["status"]},
         {"gate": "publicado no GitHub", "ok": publicado, "detalhe": {"head": git["head"], "origin": git["upstream"], "ahead": git["ahead"]}},
-        {"gate": "validação local", "ok": None, "detalhe": REQUIRED_COMMANDS[0]},
-        {"gate": "saneamento dry-run", "ok": None, "detalhe": REQUIRED_COMMANDS[1]},
+        {"gate": "validação local", "ok": validacao_completa, "detalhe": REQUIRED_COMMANDS[0]},
+        {"gate": "saneamento dry-run", "ok": saneamento_dry_run, "detalhe": REQUIRED_COMMANDS[1]},
         {"gate": "validação completa VPS/Juan", "ok": validacao_completa, "detalhe": "python3 tools/test_ecossistema.py --completa"},
     ]
     pendentes = [gate["gate"] for gate in gates if gate["ok"] is not True]
@@ -77,19 +77,24 @@ def build_plan(*, validacao_completa: bool = False, publicado: bool | None = Non
         "gates": gates,
         "proximas_acoes": [
             "publicar commits locais" if git["ahead"] else None,
-            "rodar python3 tools/test_ecossistema.py",
-            "rodar python3 tools/sanear_fila_revisoes.py em dry-run",
-            "rodar validação completa VPS/Juan antes de encerrar a versão",
+            "rodar python3 tools/test_ecossistema.py" if not validacao_completa else None,
+            "rodar python3 tools/sanear_fila_revisoes.py em dry-run" if not saneamento_dry_run else None,
+            "rodar validação completa VPS/Juan antes de encerrar a versão" if not validacao_completa else None,
         ],
     }
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Planeja o fechamento objetivo da versão")
+    parser.add_argument("--saneamento-dry-run-ok", action="store_true")
     parser.add_argument("--validacao-completa-ok", action="store_true")
     parser.add_argument("--publicado", action="store_true", help="marca publicação como conferida externamente")
     args = parser.parse_args()
-    print(json.dumps(build_plan(validacao_completa=args.validacao_completa_ok, publicado=args.publicado or None), ensure_ascii=False, indent=2))
+    print(json.dumps(build_plan(
+        saneamento_dry_run=args.saneamento_dry_run_ok,
+        validacao_completa=args.validacao_completa_ok,
+        publicado=args.publicado or None,
+    ), ensure_ascii=False, indent=2))
     return 0
 
 

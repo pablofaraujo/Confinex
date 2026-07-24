@@ -19,12 +19,18 @@ A versão só fecha quando estes gates estiverem verdes:
 ## Comando de fechamento
 
 ```bash
-python3 tools/planejar_fechamento_versao.py
+python3 tools/planejar_fechamento_versao.py \
+  --publicado \
+  --saneamento-dry-run-ok \
+  --validacao-completa-ok
 ```
 
 O comando é somente leitura. Ele informa se existem commits locais não
-publicados, arquivos essenciais ausentes e quais gates ainda dependem de rodada
-manual ou validação completa.
+publicados, arquivos essenciais ausentes e quais gates ainda dependem de
+validação. As opções `--*-ok` registram evidências já conferidas: use-as somente
+depois que o CI estiver verde, a bateria local tiver passado, o saneamento tiver
+comprovado zero escrita e a validação VPS/Juan tiver terminado com o Supabase
+inalterado. A validação completa já inclui a bateria local.
 
 ## Ordem dos ciclos restantes
 

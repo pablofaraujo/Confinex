@@ -16,12 +16,14 @@ class FechamentoVersaoTests(unittest.TestCase):
                 "dirty": False,
                 "status": "## main...origin/main",
             }
-            plan = build_plan(validacao_completa=True, publicado=True)
+            plan = build_plan(saneamento_dry_run=True, validacao_completa=True, publicado=True)
         nomes = [gate["gate"] for gate in plan["gates"]]
         self.assertIn("arquivos essenciais", nomes)
         self.assertIn("publicado no GitHub", nomes)
         self.assertIn("validação completa VPS/Juan", nomes)
-        self.assertTrue(any("python3 tools/test_ecossistema.py" in str(acao) for acao in plan["proximas_acoes"]))
+        self.assertTrue(plan["versao_pronta"])
+        self.assertEqual([], plan["pendencias"])
+        self.assertFalse(any(plan["proximas_acoes"]))
         self.assertTrue(any(path.endswith("revisoes.js") for path in REQUIRED_FILES))
 
     def test_commit_local_impede_versao_pronta(self):
