@@ -16,6 +16,7 @@ Atualizado em 2026-07-23.
 - **financeiro.html** — visão autenticada e somente leitura de `fluxo_caixa`, `emprestimos`, `promissorias` e `transacoes_banco`. Separa previsto/realizado e a pagar/receber, calcula saldos parciais, reúne vencimentos, dívidas e renegociações já representáveis nas fontes e deriva lembretes para 30 dias. Não executa pagamentos, baixas, renegociações nem conciliação.
 - **pendencias.html** — agregador autenticado e somente leitura de itens abertos em `operation_drafts`, `pending_actions` e `pendencias_documentos`; encaminha correções para Revisões.
 - **eventos.html** — histórico autenticado e somente leitura de `eventos`, com filtros e projeção humana que omite JSON e identificadores técnicos.
+- **Acompanhamento** — `confinamento.html` consolida em modo somente leitura entradas, cabeças, eventos recentes e custos por lote. O contrato puro de eventos (incluindo consumo, pesagem, morte, transferência, cobrança e fechamento) fica em `js/confinex-acompanhamento.mjs`; não há migração nem escrita operacional nessa camada.
 
 Padrão: cabeçalho azul-marinho com marca Confinex e sidebar branca no desktop; no celular, a navegação vira uma faixa horizontal rolável. O botão legado "⌂ Central" fica oculto quando o shell está ativo. Favicon `confinex-logo.jpg`.
 
@@ -112,7 +113,7 @@ Bundle esbuild legível de `src/confinex-entry.jsx` + `confinex_work.jsx` (fonte
 - `RelatorioComparativo` mantém no DOM uma versão exclusiva para impressão/PDF com resumo ordenado, ficha de todos os cenários e respectivas evoluções, independentemente da aba ativa.
 
 ### Estado
-`estadoAtual()` = `{lote, cenarios (até 5, o 5º nasce "Revenda"), confinamentos (modelos salvos), historico (testes de sensibilidade), scAtivo, resultados, data, versao:"1.3-supabase"}`. Defaults em `defaultLote` e `defaultSc(i)`. Cada cenário/base salva persiste `pagamentoConfinamento` (`adiantado`, `mensal` ou `final`); snapshots antigos sem o campo assumem `final`. `lote.cotacoesB3` guarda a curva compartilhada do estudo, indexada por código de contrato; os cenários preservam uma cópia sincronizada do preço para compatibilidade com cálculos e snapshots antigos.
+`estadoAtual()` = `{lote, cenarios (até 5, o 5º nasce "Revenda"), confinamentos (modelos salvos), historico (testes de sensibilidade), scAtivo, resultados, data, versao:"1.3-supabase"}`. Defaults em `defaultLote` e `defaultSc(i)`. Cada cenário/base salva persiste `pagamentoConfinamento` (`adiantado`, `mensal` ou `final`) e, quando rota automática foi calculada, `distanciaFonte`, `distanciaCalculadaEm`, `distanciaEstudoId` e `distanciaCongeladaEm`; snapshots antigos sem esses campos assumem ausência de distância congelada. `lote.cotacoesB3` guarda a curva compartilhada do estudo, indexada por código de contrato; os cenários preservam uma cópia sincronizada do preço para compatibilidade com cálculos e snapshots antigos.
 
 ### Integrações
 - **Cotação B3**: `buscarPrecoB3PorContrato` — cascata API B3 (`InstrumentPriceFluctuation`) → `DailyFluctuationHistory` → Yahoo (`{contrato}.SA`) → CEPEA (scrape via proxy allorigins.win). A seção geral Mercado BGI consulta simultaneamente todos os vencimentos usados no estudo e sincroniza cenários do mesmo contrato. Em parceria, o contrato vem automaticamente da **data de saída** (`dataEntrada + diasCiclo`); em matéria seca e outras modalidades não-parceria, o vencimento pode ser escolhido. Códigos de mês F,G,H,J,K,M,N,Q,U,V,X,Z.
@@ -135,3 +136,4 @@ Bundle esbuild legível de `src/confinex-entry.jsx` + `confinex_work.jsx` (fonte
 9. Sem lint ou package.json; a bateria Python/Node cobre o fluxo crítico e
    roda pelo GitHub Actions, mas ainda não há análise estática geral dos apps.
 10. `painel-boi-gordo.html` foi movido para o repo, mas a tarefa agendada `atualiza-painel-boi-gordo` (Cowork, seg-sex 6h32) ainda atualiza um artifact Cowork separado — o arquivo do repo não recebe as atualizações diárias até a automação ser redirecionada para editar este arquivo (e alguém commitar/push, já que a pasta do Drive não tem `.git`/push).
+
