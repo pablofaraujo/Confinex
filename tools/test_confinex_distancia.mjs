@@ -1,5 +1,11 @@
 import assert from 'node:assert/strict';
 import { calcularFrete, congelarDistancia, normalizarDistancia } from '../js/confinex-distancia.mjs';
+import fs from 'node:fs';
+
+const bundle = fs.readFileSync('confinex-app.latest.js', 'utf8');
+assert.match(bundle, /distanciaFonte/);
+assert.match(bundle, /distanciaCongeladaEm/);
+assert.match(bundle, /congelada neste estudo/);
 
 const base = normalizarDistancia({ origem: 'Fazenda A', destino: 'Cocho B', km: 420, fonte: 'proxy homologado', calculadaEm: '2026-07-24T09:00:00Z', ajusteKm: 10 });
 assert.equal(base.km, 430);
