@@ -52,6 +52,7 @@ Larguras: padrão 1280px; `<body data-w="md">` = 1100px; `<body data-w="sm">` = 
 |---|---|---|
 | Card | `.card` (+ `.scroll` p/ tabela larga) | container padrão |
 | KPI | `.kpis > .kpi > .l/.v/.d` | indicadores no topo |
+| KPI monetário longo | `.kpis.kpis-dinheiro > .kpi` | valores em reais que precisam de cartões mais largos e quebra de segurança |
 | Tabela | `table/th/td`, `.num`, `.pos/.neg`, `td.wrap` | dados operacionais |
 | Badge | `.badge.b-green/.b-amber/.b-red/.b-blue` | status |
 | Botão | `.btn` (+ `.sec .mini .warn`) | ações; funciona em `<a>` |

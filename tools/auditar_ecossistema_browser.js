@@ -447,7 +447,7 @@ function clienteFinanceiroSimulado() {
           descricao: 'Recebimento da venda',
           categoria: 'Venda de gado',
           origem_referencia: 'Lote comercial',
-          valor: 2000,
+          valor: 4610965.43,
           vencimento: isoComDias(5),
           realizado: false,
         },
@@ -588,6 +588,8 @@ async function auditarFinanceiro(browser, viewport, resultados) {
       texto: document.getElementById('app').innerText,
       largura: document.documentElement.scrollWidth,
       mutacoes: window.__mutacoesFinanceiro,
+      kpisSemEstouro: Array.from(document.querySelectorAll('#kpis .kpi .v'))
+        .every(valor => valor.scrollWidth <= valor.clientWidth),
     }));
     resultados.push(item(
       `browser:${viewport.nome}:financeiro:positivo`,
@@ -633,6 +635,14 @@ async function auditarFinanceiro(browser, viewport, resultados) {
       `a página não excede ${viewport.largura}px`,
       estado.largura <= viewport.largura,
       `documento=${estado.largura}px viewport=${viewport.largura}px`,
+    ));
+    resultados.push(item(
+      `browser:${viewport.nome}:financeiro:kpi-sem-estouro`,
+      'Valores monetários dentro dos KPIs',
+      `valor multimilionário em ${viewport.nome}`,
+      'cada valor cabe na largura útil do próprio cartão',
+      estado.kpisSemEstouro,
+      `valores sem estouro=${estado.kpisSemEstouro}`,
     ));
     resultados.push(item(
       `browser:${viewport.nome}:financeiro:sem-escrita`,

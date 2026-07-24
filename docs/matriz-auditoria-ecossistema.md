@@ -28,6 +28,7 @@ Atualizado em 2026-07-23. A fonte executável é
 | Contrato financeiro | vazio, negativo e entrada inválida | vazio produz zeros; valor negativo ou não numérico falha explicitamente | `tools/test_confinex_resultado_financeiro.mjs` |
 | Consistência | cartões, comparativo, evolução, ranking e PDF | todos usam `lucroLiquido`, `rTliq`, `rMliq` e o mesmo custo financeiro | Chromium + evidência de impressão |
 | Financeiro | dados positivos | KPIs, agenda, dívidas, parcelas, saldos, renegociação, lembretes e conciliação ficam legíveis | regressão JavaScript + Chromium desktop/celular |
+| Financeiro | valor monetário multimilionário | o número cabe dentro do próprio cartão, sem corte visual | medição de `scrollWidth` × `clientWidth` + PNG desktop/celular |
 | Financeiro | pagamentos parcial e total | original, pago e saldo não se confundem; realizado zera saldo | `tools/test_gestao_frontend.js` + Chromium |
 | Financeiro | filtros e vínculo com origem | a lista é filtrada localmente e leva a uma área humana sem mostrar UUID | Chromium desktop/celular |
 | Financeiro | fontes vazias | cada seção apresenta estado vazio claro e KPIs zerados | Chromium desktop/celular |

@@ -29,6 +29,9 @@ h2{font-size:var(--fs-13);font-weight:700;color:var(--navy);text-transform:upper
 .kpi .l{font-size:var(--fs-11);color:var(--muted);text-transform:uppercase}
 .kpi .v{font-size:26px;font-weight:700;margin-top:5px;color:var(--navy);font-variant-numeric:tabular-nums}
 .kpi .d{font-size:12px;color:var(--muted);margin-top:3px}
+.kpis.kpis-dinheiro{grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr))}
+.kpis-dinheiro .kpi{min-width:0}
+.kpis-dinheiro .kpi .v{font-size:22px;line-height:1.15;overflow-wrap:anywhere}
 
 /* ---------- Tabelas ---------- */
 table{width:100%;border-collapse:collapse;font-size:var(--fs-12)}
