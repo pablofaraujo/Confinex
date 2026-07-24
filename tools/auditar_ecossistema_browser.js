@@ -283,7 +283,9 @@ async function auditarPagamentoConfinamento(browser, viewport, resultados) {
       mensal: (custoTotal / 3) * ((1.02 ** 2 - 1) + (1.02 - 1)),
       final: 0,
     };
-    const margemMoeda = 0.02;
+    // fR exibe estes cartões em reais inteiros; aceite apenas o arredondamento
+    // visual, enquanto a regressão unitária continua comparando casas decimais.
+    const margemMoeda = 0.51;
     const calculosOk = Object.keys(esperados).every(
       modo => Math.abs(observados[modo] - esperados[modo]) <= margemMoeda,
     );
