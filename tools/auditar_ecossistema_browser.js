@@ -761,7 +761,7 @@ function clientePendenciasEventosSimulado() {
     }],
     pendencias_documentos: [{
       tipo: 'venda',
-      entidade_codigo: 'VEN-2026-014',
+      entidade_codigo: 'compras_missing_fields',
       status: 'aguardando_confirmacao',
       criado_em: isoComDias(-3),
     }],
@@ -785,7 +785,7 @@ function clientePendenciasEventosSimulado() {
       {
         tipo: 'compra_corrigida',
         descricao: 'Compra corrigida 22222222-2222-4222-8222-222222222222',
-        entidade_codigo: 'COMP-2026-021',
+        entidade_codigo: 'juan_promover_pending_action',
         status: 'corrigido',
         usuario: 'telegram:-1001234567890 Operação',
         created_at: isoComDias(-10),
@@ -903,7 +903,7 @@ async function auditarPendencias(browser, viewport, resultados) {
       estado.linhas === 3 && estado.links === 3 &&
         estado.texto.includes('Lote Primavera') &&
         estado.texto.includes('Pesagem Fazenda Norte') &&
-        estado.texto.includes('VEN-2026-014') && semTecnico,
+        estado.texto.includes('Compras com campos faltantes') && semTecnico,
       `linhas=${estado.linhas} links=${estado.links} sem conteúdo técnico=${semTecnico}`,
     ));
     await page.locator('#filtroOrigem').selectOption({ label: 'Documentos' });
@@ -1025,7 +1025,7 @@ async function auditarEventos(browser, viewport, resultados) {
       'descrição, contexto, responsável e origem são legíveis e navegáveis',
       estado.linhas === 3 && estado.links === 3 && estado.tipos === 4 &&
         estado.texto.includes('Lote Primavera') &&
-        estado.texto.includes('COMP-2026-021') && semTecnico,
+        estado.texto.includes('Juan · ação pendente de promoção') && semTecnico,
       `linhas=${estado.linhas} links=${estado.links} tipos=${estado.tipos} sem conteúdo técnico=${semTecnico}`,
     ));
     await page.locator('#filtroPeriodo').selectOption('7');

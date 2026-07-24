@@ -130,9 +130,38 @@ assert.strictEqual(invalida.valorOriginal, 0);
 assert.strictEqual(invalida.referencia, 'Não informada');
 assert.ok(!JSON.stringify(invalida).includes('33333333-3333-3333-3333-333333333333'));
 
+// Regressão exploratória: códigos legados seguros ainda precisam ser humanos.
+const legados = gestao.eventosLegiveis([
+  {
+    tipo: 'frontend_revisoes_validacao',
+    resumo: 'Ajustes salvos na revisao',
+    entidade_codigo: 'juan_promover_pending_action',
+    status: 'em_revisao',
+    usuario: 'pablo',
+  },
+  {
+    tipo: 'auditoria',
+    resumo: 'Campos ausentes',
+    entidade_codigo: 'compras_missing_fields',
+    status: 'registrado',
+  },
+  {
+    tipo: 'frontend',
+    resumo: 'Tela atualizada',
+    entidade_codigo: 'revisoes.html',
+    status: 'registrado',
+  },
+]);
+assert.strictEqual(legados[0].tipo, 'Frontend revisões validação');
+assert.strictEqual(legados[0].resumo, 'Ajustes salvos na revisão');
+assert.strictEqual(legados[0].contexto, 'Juan · ação pendente de promoção');
+assert.strictEqual(legados[0].status, 'Em revisão');
+assert.strictEqual(legados[1].contexto, 'Compras com campos faltantes');
+assert.strictEqual(legados[2].contexto, 'Revisões');
+
 // Falha: a mensagem é clara e não vaza detalhes internos da API.
 const mensagem = gestao.erroLegivel(new Error('relation public.segredo does not exist'));
 assert.strictEqual(mensagem, 'Não foi possível carregar os dados. Tente atualizar a página.');
 assert.ok(!mensagem.includes('public.segredo'));
 
-console.log('test_gestao_frontend: 38 verificações aprovadas');
+console.log('test_gestao_frontend: 44 verificações aprovadas');

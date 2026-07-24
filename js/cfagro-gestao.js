@@ -19,6 +19,7 @@ var STATUS = {
   corrigido:'Corrigido',
   em_aberto:'Em aberto',
   em_execucao:'Em andamento',
+  em_revisao:'Em revisão',
   erro:'Falha ao processar',
   erro_pos_gravacao:'Precisa de conferência',
   executado:'Concluído',
@@ -70,8 +71,27 @@ function limparTextoTecnico(valor){
     .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/ig, '')
     .replace(/\btelegram:-?\d{6,}\b/ig, '')
     .replace(/\bgrupo[_ ]?id\s*[:=]\s*-?\d+\b/ig, '')
+    .replace(/\.html\b/ig, '')
+    .replace(/_/g, ' ')
+    .replace(/\bjuan promover pending action\b/ig, 'Juan · ação pendente de promoção')
+    .replace(/\bcompras missing fields\b/ig, 'Compras com campos faltantes')
+    .replace(/\bpending action\b/ig, 'ação pendente')
+    .replace(/\bmissing fields\b/ig, 'campos faltantes')
+    .replace(/\brevisao\b/ig, 'revisão')
+    .replace(/\brevisoes\b/ig, 'revisões')
+    .replace(/\breconciliacao\b/ig, 'reconciliação')
+    .replace(/\bpromocao\b/ig, 'promoção')
+    .replace(/\bconfirmacao\b/ig, 'confirmação')
+    .replace(/\boperacao\b/ig, 'operação')
+    .replace(/\bgravacao\b/ig, 'gravação')
+    .replace(/\btecnicos?\b/ig, function(palavra){ return palavra.toLowerCase().endsWith('s') ? 'técnicos' : 'técnico'; })
+    .replace(/\bselecao\b/ig, 'seleção')
+    .replace(/\bvalidacao\b/ig, 'validação')
     .replace(/\s{2,}/g, ' ')
     .replace(/^[\s·,;:/-]+|[\s·,;:/-]+$/g, '');
+  if(/^[a-záàâãéêíóôõúç][a-záàâãéêíóôõúç0-9 .·/-]*$/.test(limpo)){
+    limpo = limpo.charAt(0).toUpperCase()+limpo.slice(1);
+  }
   return limpo;
 }
 
@@ -105,7 +125,7 @@ function diasEntre(hoje, data){
 function statusHumano(valor){
   var chave = texto(valor).toLowerCase();
   if(!chave) return 'Não informado';
-  return STATUS[chave] || chave.replace(/_/g,' ').replace(/^\w/, function(c){ return c.toUpperCase(); });
+  return STATUS[chave] || limparTextoTecnico(chave);
 }
 
 function contextoHumano(item){
