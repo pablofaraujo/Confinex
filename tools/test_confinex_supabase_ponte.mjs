@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 const html = await readFile(new URL('../confinex.html', import.meta.url), 'utf8');
-assert.match(html, /confinex-supabase-ponte\.mjs\?v=/);
+assert.match(html, /confinex-supabase-ponte-inline\.js\?v=/);
 globalThis.window = {};
 await import('../js/confinex-supabase-ponte.mjs');
 const adaptador = await import('../js/confinex-supabase-adaptador.mjs');
