@@ -6,6 +6,7 @@
     "menu:Eventos:destino_real"
   ],
   "falhas_derivadas_permitidas": [
-    "^browser:(desktop|celular):menu:(Financeiro|Pendências|Eventos):(clique|ativo)$"
+    "^browser:(desktop|celular):menu:(Financeiro|Pendências|Eventos):(clique|ativo)$",
+    "^browser:desktop:painel-boi-gordo\\.html:responsivo$"
   ]
 }

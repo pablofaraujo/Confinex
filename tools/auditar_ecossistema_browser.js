@@ -51,11 +51,16 @@ async function auditarPagina(browser, pagina, viewport, resultados) {
   });
   const page = await context.newPage();
   const erros = [];
+  let navegacaoIntencional = true;
   page.on('console', msg => {
     if (['error', 'warning'].includes(msg.type())) erros.push(`console ${msg.type()}: ${msg.text()}`);
   });
   page.on('pageerror', erro => erros.push(`javascript: ${erro.message}`));
-  page.on('requestfailed', req => erros.push(`rede: ${req.url()} — ${req.failure()?.errorText || 'falhou'}`));
+  page.on('requestfailed', req => {
+    const motivo = req.failure()?.errorText || 'falhou';
+    if (navegacaoIntencional && motivo === 'net::ERR_ABORTED') return;
+    erros.push(`rede: ${req.url()} — ${motivo}`);
+  });
   page.on('response', res => {
     if (res.status() >= 400) erros.push(`http ${res.status()}: ${res.url()}`);
   });
@@ -67,6 +72,8 @@ async function auditarPagina(browser, pagina, viewport, resultados) {
     await page.waitForLoadState('load', { timeout: 30000 });
   } catch (erro) {
     erros.push(`carregamento: ${erro.message}`);
+  } finally {
+    navegacaoIntencional = false;
   }
   const urlFinal = page.url();
   const redirectEsperado = pagina.redirect
@@ -83,7 +90,9 @@ async function auditarPagina(browser, pagina, viewport, resultados) {
   ));
 
   try {
+    navegacaoIntencional = true;
     await page.reload({ waitUntil: 'load', timeout: 30000 });
+    navegacaoIntencional = false;
     resultados.push(item(
       `browser:${viewport.nome}:${pagina.arquivo}:reload`,
       'Recarregamento',
@@ -93,6 +102,7 @@ async function auditarPagina(browser, pagina, viewport, resultados) {
       `final=${page.url()}`,
     ));
   } catch (erro) {
+    navegacaoIntencional = false;
     resultados.push(item(
       `browser:${viewport.nome}:${pagina.arquivo}:reload`,
       'Recarregamento',
@@ -143,6 +153,7 @@ async function auditarPagina(browser, pagina, viewport, resultados) {
     fs.existsSync(captura) && fs.statSync(captura).size > 0,
     captura,
   ));
+  navegacaoIntencional = true;
   await context.close();
 }
 
@@ -192,7 +203,9 @@ async function auditarMenu(browser, viewport, resultados) {
       ativas.length === 1 && ativas[0].includes(menu.rotulo),
       `ativos=${JSON.stringify(ativas)}`,
     ));
-    await page.goBack({ waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+    if (destino !== antes) {
+      await page.goBack({ waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+    }
     resultados.push(item(
       `browser:${viewport.nome}:menu:${menu.rotulo}:voltar`,
       'Botão voltar',

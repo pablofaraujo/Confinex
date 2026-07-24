@@ -30,7 +30,10 @@ O modo `--modo-descoberta` existe somente para o Ciclo 1. Ele aprova a própria
 auditoria quando, e somente quando, detecta os quatro defeitos já relatados:
 Portfolio B3 em outra janela e os destinos inexistentes de Financeiro,
 Pendências e Eventos. Qualquer falha adicional ou a ausência de uma dessas
-detecções reprova a execução. O modo padrão é estrito e será o gate permanente
+detecções reprova a execução, salvo defeito adicional registrado explicitamente
+pela primeira passagem exploratória. A auditoria inicial também detectou estouro
+horizontal de 49 px no Painel Boi Gordo em desktop; ele permanece visível na
+linha de base até a correção. O modo padrão é estrito e será o gate permanente
 depois das correções.
 
 ## Comandos

@@ -517,7 +517,7 @@ def validar_descoberta(
         if inesperadas:
             partes.append("falhas inesperadas: " + ", ".join(inesperadas))
         return False, "; ".join(partes)
-    return True, "as quatro falhas conhecidas foram detectadas sem falha inesperada"
+    return True, "as falhas obrigatórias foram detectadas sem falha inesperada"
 
 
 def parser() -> argparse.ArgumentParser:
