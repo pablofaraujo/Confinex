@@ -764,6 +764,10 @@ function clientePendenciasEventosSimulado() {
       entidade_codigo: 'compras_missing_fields',
       status: 'aguardando_confirmacao',
       criado_em: isoComDias(-3),
+    }, {
+      tipo: 'outro',
+      status: 'pendente',
+      criado_em: isoComDias(-4),
     }],
   };
   const eventos = {
@@ -900,10 +904,11 @@ async function auditarPendencias(browser, viewport, resultados) {
       'Pendências agregadas em linguagem humana',
       `três origens em ${viewport.nome}`,
       'cada item tem resumo, contexto humano e próxima etapa',
-      estado.linhas === 3 && estado.links === 3 &&
+      estado.linhas === 4 && estado.links === 4 &&
         estado.texto.includes('Lote Primavera') &&
         estado.texto.includes('Pesagem Fazenda Norte') &&
-        estado.texto.includes('Compras com campos faltantes') && semTecnico,
+        estado.texto.includes('Compras com campos faltantes') &&
+        estado.texto.includes('Documento operacional') && semTecnico,
       `linhas=${estado.linhas} links=${estado.links} sem conteúdo técnico=${semTecnico}`,
     ));
     await page.locator('#filtroOrigem').selectOption({ label: 'Documentos' });
@@ -916,7 +921,7 @@ async function auditarPendencias(browser, viewport, resultados) {
       'Filtros de Pendências',
       `origem e busca em ${viewport.nome}`,
       'origem reduz a lista e busca sem resultado mostra estado vazio',
-      porOrigem === 1 && vazioFiltrado.includes('Nenhuma pendência corresponde aos filtros'),
+      porOrigem === 2 && vazioFiltrado.includes('Nenhuma pendência corresponde aos filtros'),
       `linhas por origem=${porOrigem}; vazio=${vazioFiltrado}`,
     ));
     resultados.push(item(
@@ -972,7 +977,7 @@ async function auditarPendencias(browser, viewport, resultados) {
       const aprovado = modo === 'vazio'
         ? estado.texto.includes('Nenhuma pendência corresponde aos filtros')
         : modo === 'falha-parcial'
-          ? estado.linhas === 2 && estado.aviso.includes('1 fonte') &&
+          ? estado.linhas === 3 && estado.aviso.includes('1 fonte') &&
             estado.texto.includes('Compra aguardando conferência')
           : estado.subtitulo.includes('Não foi possível carregar os dados') &&
             !estado.texto.includes('public.segredo');

@@ -40,6 +40,7 @@ Atualizado em 2026-07-23. A fonte executável é
 | Pendências | filtro por origem e busca sem resultado | a lista reduz localmente e o vazio filtrado é explícito | Chromium desktop/celular |
 | Pendências | uma fonte indisponível | itens das outras fontes permanecem visíveis e há aviso humano | cliente simulado com falha parcial |
 | Pendências | vazio e falha total | vazio é claro; falha não expõe detalhes internos | Chromium desktop/celular |
+| Pendências | documento sem código operacional | mantém “Documento operacional” e não perde o contexto de toda a fonte | projetor puro + Chromium desktop/celular |
 | Eventos | dados positivos legados e aninhados | descrição, contexto, responsável e origem são humanos e navegáveis | regressão JavaScript + Chromium desktop/celular |
 | Eventos | situação, tipo, período e texto | filtros atuam localmente e combinam com estado vazio claro | Chromium desktop/celular |
 | Eventos | vazio e falha | vazio é explícito; falha não expõe detalhes internos | Chromium desktop/celular |

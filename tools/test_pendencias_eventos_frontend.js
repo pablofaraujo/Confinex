@@ -30,7 +30,7 @@ assert.ok(eventosJs.includes("href=\"'+esc(item.origem.href)"));
 assert.ok(!/\.(insert|update|delete|upsert|rpc)\s*\(/.test(eventosJs));
 
 for(const html of [pendenciasHtml,eventosHtml]){
-  assert.ok(html.includes('cfagro-gestao.js?v=20260724-5'));
+  assert.ok(html.includes('cfagro-gestao.js?v=20260724-6'));
 }
 assert.ok(pendenciasHtml.includes('pendencias.js?v=20260724-3'));
 assert.ok(eventosHtml.includes('eventos.js?v=20260724-3'));

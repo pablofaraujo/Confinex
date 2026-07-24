@@ -158,10 +158,14 @@ assert.strictEqual(legados[0].contexto, 'Juan · ação pendente de promoção')
 assert.strictEqual(legados[0].status, 'Em revisão');
 assert.strictEqual(legados[1].contexto, 'Compras com campos faltantes');
 assert.strictEqual(legados[2].contexto, 'Revisões');
+const documentoSemContexto = gestao.pendenciasLegiveis([], [], [
+  { tipo: 'outro', status: 'pendente' },
+])[0];
+assert.strictEqual(documentoSemContexto.contexto, 'Documento operacional');
 
 // Falha: a mensagem é clara e não vaza detalhes internos da API.
 const mensagem = gestao.erroLegivel(new Error('relation public.segredo does not exist'));
 assert.strictEqual(mensagem, 'Não foi possível carregar os dados. Tente atualizar a página.');
 assert.ok(!mensagem.includes('public.segredo'));
 
-console.log('test_gestao_frontend: 44 verificações aprovadas');
+console.log('test_gestao_frontend: 45 verificações aprovadas');

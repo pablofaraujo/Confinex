@@ -107,6 +107,7 @@ Custo de compra: `custoCompra = arrobasCompra × precoCompra × N + baldeio`.
 - Uma fonte de Pendências indisponível não oculta itens válidos das demais. Falha total produz mensagem genérica; detalhes internos da API nunca são apresentados.
 - Eventos é histórico, não fila operacional. Os filtros por situação, tipo, período e texto atuam localmente e não alteram registros.
 - Resumo e contexto priorizam campos humanos explícitos e, depois, dados legíveis de estruturas aninhadas ou códigos operacionais. JSON bruto, UUID, ID técnico de grupo e referência `telegram:<id>` são descartados, nunca usados como substituto.
+- Documento sem referência humana específica conserva o contexto genérico “Documento operacional”; a ausência de código não deve transformar toda a fonte documental em “Contexto não informado”.
 - Cada pendência e evento aponta para uma área operacional humana compatível com sua origem. Na falta de destino específico, a Visão Geral é usada com rótulo legível, sem expor identificador técnico.
 
 ## Análise de sensibilidade — `SensPanel` / `calcComOverride`

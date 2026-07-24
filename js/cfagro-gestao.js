@@ -210,7 +210,9 @@ function pendenciasLegiveis(rascunhos, acoes, documentos){
     linhas.push({origem:'Ações', resumo:resumoItem(item,'ação'), contexto:contextoHumano(item), status:statusHumano(item.status), data:dataItem(item), destino:destinoOperacional(item,'ação'), acao:'Conferir'});
   });
   (documentos || []).forEach(function(item){
-    linhas.push({origem:'Documentos', resumo:resumoItem(item,'documento'), contexto:contextoHumano(item), status:statusHumano(item.status), data:dataItem(item), destino:destinoOperacional(item,'documento'), acao:'Abrir origem'});
+    var contexto = contextoHumano(item);
+    if(contexto === 'Contexto não informado') contexto = 'Documento operacional';
+    linhas.push({origem:'Documentos', resumo:resumoItem(item,'documento'), contexto:contexto, status:statusHumano(item.status), data:dataItem(item), destino:destinoOperacional(item,'documento'), acao:'Abrir origem'});
   });
   return linhas.sort(function(a,b){ return String(b.data || '').localeCompare(String(a.data || '')); });
 }
