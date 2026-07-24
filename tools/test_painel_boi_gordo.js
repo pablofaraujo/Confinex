@@ -4,6 +4,8 @@ const vm = require('vm');
 
 const fonte = fs.readFileSync('js/painel-boi-gordo.js', 'utf8');
 const html = fs.readFileSync('painel-boi-gordo.html', 'utf8');
+const artefato = JSON.parse(fs.readFileSync('dados/painel-boi-gordo.json', 'utf8'));
+assert.ok(artefato.fonte && artefato.atualizadoEm, 'artefato sem fonte/data');
 assert.ok(html.includes('dados/painel-boi-gordo.json'));
 assert.ok(html.includes('cache: \'no-store\''));
 assert.ok(html.includes('atualizarPainel'));
@@ -11,8 +13,9 @@ const contexto = { Promise, Date, Number, globalThis: {} };
 vm.runInNewContext(fonte, contexto);
 const api = contexto.globalThis.PainelBoiGordo;
 assert.ok(api, 'API do painel ausente');
+assert.strictEqual(api.normalizarDados(artefato), artefato);
 
-const base = { atualizadoEm: '2026-07-20T10:00:00', indicadores: [], curvaBGI: [] };
+const base = { atualizadoEm: '2026-07-20T10:00:00', fonte: 'teste', indicadores: [], curvaBGI: [] };
 assert.strictEqual(api.normalizarDados(base), base);
 assert.throws(() => api.normalizarDados({}), /data válida/);
 assert.strictEqual(api.estaDefasado(base, new Date('2026-07-21T10:00:00'), 2), false);
