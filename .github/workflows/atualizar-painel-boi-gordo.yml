@@ -1,0 +1,36 @@
+name: Atualizar Painel Boi Gordo
+
+on:
+  schedule:
+    - cron: '32 9 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Buscar e validar fonte
+        id: fonte
+        if: ${{ vars.PAINEL_BOI_GORDO_SOURCE_URL != '' }}
+        env:
+          PAINEL_BOI_GORDO_SOURCE_URL: ${{ vars.PAINEL_BOI_GORDO_SOURCE_URL }}
+        run: python3 tools/atualizar_painel_boi_gordo.py
+      - name: Publicar artefato atualizado
+        if: ${{ steps.fonte.outcome == 'success' }}
+        run: |
+          git config user.name 'Confinex bot'
+          git config user.email 'confinex-bot@users.noreply.github.com'
+          git add dados/painel-boi-gordo.json
+          git diff --cached --quiet || git commit -m 'Atualiza Painel Boi Gordo'
+          git push
+      - name: Registrar ausência de fonte configurada
+        if: ${{ steps.fonte.outcome == 'skipped' }}
+        run: echo 'não testado: PAINEL_BOI_GORDO_SOURCE_URL não configurada'
+
