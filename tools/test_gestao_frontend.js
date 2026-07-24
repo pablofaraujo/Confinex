@@ -1,5 +1,9 @@
 'use strict';
 const assert = require('assert');
+const fs = require('fs');
+const confinamentoHtml = fs.readFileSync('confinamento.html', 'utf8');
+assert.ok(confinamentoHtml.includes('tbAcompanhamento'));
+assert.ok(confinamentoHtml.includes('Acompanhamento operacional por lote'));
 const gestao = require('../js/cfagro-gestao.js');
 
 // Positivo: agrega caixa e apresenta estados operacionais em linguagem humana.
@@ -168,4 +172,5 @@ const mensagem = gestao.erroLegivel(new Error('relation public.segredo does not 
 assert.strictEqual(mensagem, 'Não foi possível carregar os dados. Tente atualizar a página.');
 assert.ok(!mensagem.includes('public.segredo'));
 
-console.log('test_gestao_frontend: 45 verificações aprovadas');
+console.log('test_gestao_frontend: 47 verificações aprovadas');
+
