@@ -65,6 +65,9 @@
 <h2>Eventos recentes (pesagens, dieta, manejo)</h2>
 <div class="card scroll"><table id="tbEventos"></table></div>
 
+<h2>Acompanhamento operacional por lote</h2>
+<div class="card scroll"><table id="tbAcompanhamento"></table></div>
+
 <div class="footer">Lendo ao vivo da base CFAgro (Supabase) · RLS ativo · CFAgro/Confinex</div>
 </div>
 
@@ -307,9 +310,22 @@ async function carregar(){
       const o = opsPorId[e.operacao_id];
       return `<tr><td>${fmtD(e.data)}</td><td><b>${o?.codigo||'—'}</b></td><td>${e.tipo||'—'}</td><td class="wrap">${e.descricao||''}</td></tr>`;
     }).join('') || '<tr><td colspan="4">Sem eventos registrados ainda (pesagens, dieta, manejo) — tabela vazia no momento.</td></tr>';
+
+  // ---- Acompanhamento somente leitura: consolida as fontes atuais sem criar eventos.
+  document.getElementById('tbAcompanhamento').innerHTML =
+    '<tr><th>Lote</th><th>Status</th><th class="num">Entradas</th><th class="num">Cabeças</th><th class="num">Eventos</th><th>Último evento</th><th class="num">Custos</th></tr>' +
+    ops.data.map(o=>{
+      const ent = entradasPorOp[o.id] || [];
+      const ev = (eventos.data||[]).filter(e=>e.operacao_id===o.id).sort((a,b)=>String(b.data||'').localeCompare(String(a.data||'')));
+      const custo = (custos.data||[]).filter(c=>c.operacao_id===o.id).reduce((s,c)=>s+Number(c.valor||0),0);
+      const cab = ent.reduce((s,e)=>s+Number(e.cabecas||0),0);
+      const ultimo = ev[0];
+      return `<tr><td><b>${esc(o.codigo)}</b></td><td>${STATUS_BADGE[o.status]||esc(o.status||'—')}</td><td class="num">${fmtN(ent.length)}</td><td class="num">${cab?fmtN(cab):'—'}</td><td class="num">${fmtN(ev.length)}</td><td>${ultimo?`${fmtD(ultimo.data)} · ${esc(ultimo.tipo||'evento')}`:'—'}</td><td class="num">${fmtR$(custo)}</td></tr>`;
+    }).join('') || '<tr><td colspan="7">Nenhum lote disponível para acompanhamento.</td></tr>';
 }
 
 CFAgro.authInit(carregar);
 </script>
 </body>
 </html>
+
