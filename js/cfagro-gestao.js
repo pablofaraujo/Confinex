@@ -56,9 +56,9 @@ function dataItem(item){
 }
 
 function resumoItem(item, tipo){
-  if(tipo === 'rascunho') return texto(item.resumo || item.tipo_operacao) || 'Rascunho aguardando conferência';
-  if(tipo === 'ação') return texto(item.resumo || item.acao_tipo) || 'Ação aguardando conferência';
-  if(tipo === 'documento') return 'Documento: ' + (texto(item.tipo) || 'tipo não informado');
+  if(tipo === 'rascunho') return texto(item.resumo) || statusHumano(item.tipo_operacao) || 'Rascunho aguardando conferência';
+  if(tipo === 'ação') return texto(item.resumo) || statusHumano(item.acao_tipo) || 'Ação aguardando conferência';
+  if(tipo === 'documento') return 'Documento: ' + (item.tipo ? statusHumano(item.tipo) : 'tipo não informado');
   return texto(item.observacao || item.resumo || item.descricao || item.tipo) || 'Evento sem descrição';
 }
 

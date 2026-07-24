@@ -13,6 +13,10 @@ assert.deepStrictEqual(
   {previsto:1000, realizado:750, aReceber:400, aPagar:150, quantidade:4}
 );
 assert.strictEqual(gestao.statusHumano('aguardando_confirmacao'), 'Aguardando confirmação');
+assert.strictEqual(
+  gestao.pendenciasLegiveis([{tipo_operacao:'compra_confinamento',status:'pendente'}], [], [])[0].resumo,
+  'Compra confinamento'
+);
 
 // Negativo: valores inválidos não contaminam totais e IDs técnicos não viram contexto.
 assert.deepStrictEqual(
