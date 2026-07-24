@@ -5,3 +5,7 @@ MISSAO-VPS-pesagem-caderno.md
 # Sistema
 .DS_Store
 **/.DS_Store
+node_modules/
+artifacts/
+playwright-report/
+test-results/

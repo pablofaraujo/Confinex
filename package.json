@@ -1,0 +1,12 @@
+{
+  "name": "confinex-auditoria",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Dependências da auditoria permanente do ecossistema Confinex",
+  "scripts": {
+    "auditar:browser": "node tools/auditar_ecossistema_browser.js"
+  },
+  "devDependencies": {
+    "playwright": "1.61.1"
+  }
+}

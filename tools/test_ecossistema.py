@@ -115,6 +115,14 @@ def validar_local() -> None:
     if './revisoes.js?v=20260723-1' not in html:
         raise FalhaValidacao("revisoes.html deve carregar revisoes.js versionado")
     executar(["node", "--check", "revisoes.js"])
+    executar(["node", "--check", "tools/auditar_ecossistema_browser.js"])
+    executar(
+        [
+            sys.executable,
+            "tools/auditar_ecossistema.py",
+            "--modo-descoberta",
+        ]
+    )
 
     executar(["git", "diff", "--check"])
 

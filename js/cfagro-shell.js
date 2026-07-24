@@ -9,7 +9,9 @@
 (function(){
 'use strict';
 
-var BASE = 'https://pablofaraujo.github.io/Confinex/';
+var BASE_PRODUCAO = 'https://pablofaraujo.github.io/Confinex/';
+var LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+var BASE = LOCAL ? new URL('./', location.href).href : BASE_PRODUCAO;
 
 var NAV = [
   { href:'./',              rotulo:'Geral',        icone:'⌂' },

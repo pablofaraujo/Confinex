@@ -1,0 +1,11 @@
+{
+  "falhas_esperadas": [
+    "menu:Portfolio B3:mesma_janela",
+    "menu:Financeiro:destino_real",
+    "menu:Pendências:destino_real",
+    "menu:Eventos:destino_real"
+  ],
+  "falhas_derivadas_permitidas": [
+    "^browser:(desktop|celular):menu:(Financeiro|Pendências|Eventos):(clique|ativo)$"
+  ]
+}

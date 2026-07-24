@@ -63,6 +63,7 @@ Push na `main` → workflow `deploy.yml` publica o repositório inteiro no GitHu
 
 - Tudo em pt-BR: código, variáveis, UI, commits.
 - Single-file por app na lógica, mas visual e infra compartilhados: páginas carregam `design/tokens.css` + `design/components.css` + `js/cfagro-shell.js` (cabeçalho azul-marinho, logo amarelo, sidebar e navegação móvel). As páginas Supabase também carregam `js/cfagro-core.js`, salvo `ops.html`, que mantém apenas seu client local por motivo legado, mas reutiliza integralmente os estilos do DS. `confinex.html` usa o shell compartilhado e preserva sua lógica React/Sheets própria.
+- Em produção, o shell usa a base canônica do GitHub Pages. Em `localhost`, `127.0.0.1` ou `::1`, resolve os links contra o servidor local para permitir a auditoria real do mesmo código antes do deploy.
 - Fonte padrão: Inter (via tokens.css). Identidade visual global: cabeçalho azul-marinho, amarelo do logo como destaque, superfícies brancas e sem gradientes. Dark mode preparado em `[data-theme=dark]`, sem toggle ainda.
 - Botão flutuante "⌂ Central" (`.voltar-central`) em toda página-satélite.
 - Ações destrutivas com `confirm()`/`prompt()` nativos.
@@ -72,6 +73,7 @@ Push na `main` → workflow `deploy.yml` publica o repositório inteiro no GitHu
 ## Armadilhas conhecidas
 
 - O fonte do Confinex não está no repo — `confinex-app.latest.js` é o bundle legível usado como entrada e `confinex-app.mobile.js` é o pacote de execução autocontido. Ao editar o `latest`, regenere o `mobile` com React 19 e alvo Safari 14 antes do deploy.
+- `tools/auditar_ecossistema.py` inventaria páginas, recursos e menu; a camada Playwright percorre o site local em desktop e celular, registra console/rede e gera capturas. O modo padrão é estrito. `--modo-descoberta` é a linha de base temporária do Ciclo 1 para provar os quatro defeitos conhecidos antes das correções.
 - Cotações B3: a seção geral Mercado BGI mantém uma cotação única por contrato/vencimento dentro de cada estudo, exibe os vencimentos em ordem cronológica crescente e atualiza juntos os vencimentos usados. Parcerias escolhem o contrato automaticamente pela saída; matéria seca e demais modalidades não-parceria permitem escolher o vencimento; o diferencial de base permanece por cenário. A busca usa cascata frágil (API B3 → histórico → Yahoo `{contrato}.SA` → scrape CEPEA via allorigins.win) com heurística `extrairNumeroB3` que aceita qualquer número entre 100 e 800.
 - `rolar()`/`encerrar()`/`encerrarParcial()` no bgi.html fazem escritas sequenciais sem transação.
 - `central.html` legada e `bgi.html` órfão podem divergir do resto.

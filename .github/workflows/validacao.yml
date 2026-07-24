@@ -32,5 +32,24 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: npm
+      - name: Instalar dependências da auditoria
+        run: npm ci
+      - name: Instalar Chromium
+        run: npx playwright install chromium --with-deps
       - name: Rodar bateria local
         run: python3 tools/test_ecossistema.py
+      - name: Auditar páginas em desktop e celular
+        run: >-
+          python3 tools/auditar_ecossistema.py
+          --navegador
+          --modo-descoberta
+          --saida-json artifacts/auditoria-ecossistema/relatorio.json
+          --saida-md artifacts/auditoria-ecossistema/relatorio.md
+      - name: Publicar evidências da auditoria
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: auditoria-ecossistema
+          path: artifacts/auditoria-ecossistema/
+          retention-days: 30

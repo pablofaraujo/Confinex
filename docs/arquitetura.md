@@ -16,7 +16,7 @@ Atualizado em 2026-07-23.
 
 Padrão: cabeçalho azul-marinho com marca Confinex e sidebar branca no desktop; no celular, a navegação vira uma faixa horizontal rolável. O botão legado "⌂ Central" fica oculto quando o shell está ativo. Favicon `confinex-logo.jpg`.
 
-**Shell compartilhado** (`js/cfagro-shell.js`): injeta cabeçalho e navegação com links absolutos (inclusive para o repo externo `boi-gordo-portfolio`) e é carregado com `design/tokens.css`/`design/components.css` por todos os módulos ativos. Preserva a ordem histórica dos módulos e inclui Datamars Livestock, AgroNota e Portal do Produtor IMA/SIDAGRO em nova aba. `ops.html` mantém o client Supabase local, porém não redefine mais tokens nem componentes visuais.
+**Shell compartilhado** (`js/cfagro-shell.js`): injeta cabeçalho e navegação com links absolutos (inclusive para o repo externo `boi-gordo-portfolio`) e é carregado com `design/tokens.css`/`design/components.css` por todos os módulos ativos. Em produção usa a base canônica do GitHub Pages; em localhost resolve links contra o servidor local, permitindo auditoria antes do deploy. Preserva a ordem histórica dos módulos e inclui Datamars Livestock, AgroNota e Portal do Produtor IMA/SIDAGRO em nova aba. `ops.html` mantém o client Supabase local, porém não redefine mais tokens nem componentes visuais.
 
 ## Backend Supabase
 
@@ -67,6 +67,13 @@ a prova local + VPS; ele exige o contexto privado por variáveis de ambiente e
 ativa os arquivos reais e a trajetória do Juan. A prova completa não é
 agendada no GitHub nem copiada para cron da VPS, pois o servidor não possui
 clone canônico deste repositório.
+
+A auditoria de navegação usa `tools/auditar_ecossistema.py` como orquestrador e
+`tools/auditar_ecossistema_browser.js` para abrir todas as páginas em Chromium,
+nas dimensões desktop e celular. Ela testa acesso direto, recarga, clique,
+voltar, item ativo, shell, estouro horizontal, console, HTTP e falhas de
+requisição; as capturas e os relatórios JSON/Markdown são publicados como
+artefato do workflow.
 
 O verificador da VPS não é instalado no servidor e não cria rascunho nem
 lançamento. Ele compila os handlers, roda seus testes, valida a configuração
