@@ -311,9 +311,10 @@ function sheetsJsonp(url, params = {}) {
     const script = document.createElement("script");
     const cleanup = () => {
       try {
-        delete window[callbackName];
+        window[callbackName] = () => {};
+        setTimeout(() => { try { delete window[callbackName]; } catch {} }, 60_000);
       } catch {
-        window[callbackName] = void 0;
+        window[callbackName] = () => {};
       }
       script.remove();
     };
