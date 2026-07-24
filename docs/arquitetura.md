@@ -34,7 +34,7 @@ Tabelas/views por app:
 - **contexto por grupo**: `contextos_canais` registra a chave canônica, o nome humano, o canal, o ID técnico e o escopo. `operation_drafts`, `pending_actions`, `eventos` e `memorias_agentes` repetem o vínculo necessário à auditoria. Nas memórias, `escopo` mantém o alcance funcional existente e `contexto_escopo` identifica grupo/conversa direta/sistema. O frontend usa somente `contexto_nome`; `origem_conversa_id` permanece oculto e nunca recebe um nome humano. A migração aditiva e o dry-run protegido estão em [`docs/contextos-por-grupo.md`](contextos-por-grupo.md).
 - **abate**: `abates` (cabeçalho), `abate_animais` (romaneio por animal — schema alinhado jul/2026: `seq`, `descricao`, `classificacao`, `meia_esq`/`meia_dir`, `peso_kg` = carcaça, `vlr_kg`/`vlr_arroba`/`vlr_total`, `bonus`, `penalizacao`, `condenacao`; não guarda peso vivo/balança nem hora de passagem).
 - **promissórias** (skill): tabela `promissorias` (numero pk `NNN/AAAA`, credor, cpf, valor, vencimento, praça, negocio_id, status aberta/quitada).
-- **gestão somente leitura**: `financeiro.html` lê `fluxo_caixa`, `emprestimos`, `promissorias` e `transacoes_banco`; `pendencias.html` lê `operation_drafts`, `pending_actions` e `pendencias_documentos`; `eventos.html` lê `eventos`. `js/cfagro-gestao.js` projeta somente campos humanos e nunca usa um ID técnico como substituto de contexto. A interface financeira tolera a ausência isolada da conciliação bancária e mantém as demais seções disponíveis.
+- **gestão somente leitura**: `financeiro.html` lê `fluxo_caixa`, `emprestimos`, `promissorias` e `transacoes_banco`; `pendencias.html` lê `operation_drafts`, `pending_actions` e `pendencias_documentos`; `eventos.html` lê `eventos`. `js/cfagro-gestao.js` recupera contexto humano também de estruturas legadas e aninhadas, descarta JSON/UUID/ID de grupo e associa cada linha a uma área operacional legível. A interface financeira tolera a ausência isolada da conciliação bancária; Pendências tolera a ausência isolada de uma de suas três fontes e mantém as demais disponíveis.
 - **modelo financeiro preparado, não aplicado**: `supabase/migrations/202607240001_financeiro_compromissos.sql` propõe, de forma aditiva, `financeiro_compromissos`, `financeiro_parcelas`, `financeiro_pagamentos`, `financeiro_renegociacoes`, `financeiro_lembretes` e a view `v_financeiro_compromissos`. O arquivo não migra dados operacionais, habilita RLS e concede somente `select` a `authenticated`. Ele exige homologação e autorização explícita antes de qualquer aplicação.
 
 ## Fila de revisões e promoção operacional
@@ -77,9 +77,11 @@ A auditoria de navegação usa `tools/auditar_ecossistema.py` como orquestrador 
 `tools/auditar_ecossistema_browser.js` para abrir todas as páginas em Chromium,
 nas dimensões desktop e celular. Ela testa acesso direto, recarga, clique,
 voltar, item ativo, shell, estouro horizontal, console, HTTP e falhas de
-requisição. O Financeiro também recebe cenários isolados com cliente Supabase
-simulado: positivo, vazio, falha apenas bancária e falha das fontes principais,
-com contador que reprova qualquer tentativa de mutação. As capturas e os
+requisição. Financeiro, Pendências e Eventos também recebem cenários isolados
+com cliente Supabase simulado. Eles cobrem positivo, vazio e falha; Financeiro
+e Pendências incluem ainda falha parcial de uma fonte. Um contador reprova
+qualquer tentativa de mutação, e a prova confere filtros, linguagem humana,
+vínculos de origem e ausência de identificadores técnicos. As capturas e os
 relatórios JSON/Markdown são publicados como artefato do workflow.
 
 O verificador da VPS não é instalado no servidor e não cria rascunho nem

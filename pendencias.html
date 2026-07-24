@@ -9,8 +9,8 @@
 <link rel="stylesheet" href="./design/components.css?v=20260720-1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="./js/cfagro-core.js"></script>
-<script src="./js/cfagro-gestao.js?v=20260723-2"></script>
-<script src="./js/pendencias.js?v=20260723-2" defer></script>
+<script src="./js/cfagro-gestao.js?v=20260724-4"></script>
+<script src="./js/pendencias.js?v=20260724-3" defer></script>
 <script src="./js/cfagro-shell.js?v=20260723-3" defer></script>
 </head>
 <body data-w="md">
@@ -35,6 +35,7 @@
 
   <div class="kpis" id="kpis"></div>
   <div class="aviso">Esta visão agrega o que exige atenção. A conferência e a promoção operacional continuam exclusivamente na fila de Revisões.</div>
+  <div class="err" id="erroFontes"></div>
 
   <h2>Itens que exigem ação</h2>
   <div class="card">
@@ -42,7 +43,7 @@
       <div class="fld"><label for="filtroOrigem">Origem</label><select id="filtroOrigem"><option value="todas">Todas</option><option>Revisões</option><option>Ações</option><option>Documentos</option></select></div>
       <div class="fld"><label for="filtroTexto">Buscar</label><input id="filtroTexto" type="search" placeholder="resumo, contexto ou situação"></div>
     </div>
-    <div class="scroll"><table><thead><tr><th>Origem</th><th>O que exige ação</th><th>Contexto</th><th>Situação</th><th>Atualização</th></tr></thead><tbody id="listaPendencias"></tbody></table></div>
+    <div class="scroll"><table><thead><tr><th>Origem</th><th>O que exige ação</th><th>Contexto</th><th>Situação</th><th>Atualização</th><th>Próxima etapa</th></tr></thead><tbody id="listaPendencias"></tbody></table></div>
   </div>
   <div class="foot">Consulta somente leitura · IDs de grupo e estruturas técnicas não são exibidos.</div>
 </div>

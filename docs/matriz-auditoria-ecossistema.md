@@ -36,6 +36,15 @@ Atualizado em 2026-07-23. A fonte executável é
 | Financeiro | falha das fontes principais | mensagem humana aparece sem detalhe interno da API | regressão JavaScript + Chromium |
 | Financeiro | carga, atualização e filtros | nenhuma chamada de escrita é feita | regressão estática + cliente simulado com contador de mutações |
 | Migração financeira | arquivo versionado, ainda não aplicado | modelo é aditivo, sem DML operacional, com RLS e políticas apenas de leitura | `tools/test_migracao_financeiro.py` |
+| Pendências | rascunho, ação e documento | cada item apresenta resumo, contexto, situação e próxima etapa ligada à origem | regressão JavaScript + Chromium desktop/celular |
+| Pendências | filtro por origem e busca sem resultado | a lista reduz localmente e o vazio filtrado é explícito | Chromium desktop/celular |
+| Pendências | uma fonte indisponível | itens das outras fontes permanecem visíveis e há aviso humano | cliente simulado com falha parcial |
+| Pendências | vazio e falha total | vazio é claro; falha não expõe detalhes internos | Chromium desktop/celular |
+| Eventos | dados positivos legados e aninhados | descrição, contexto, responsável e origem são humanos e navegáveis | regressão JavaScript + Chromium desktop/celular |
+| Eventos | situação, tipo, período e texto | filtros atuam localmente e combinam com estado vazio claro | Chromium desktop/celular |
+| Eventos | vazio e falha | vazio é explícito; falha não expõe detalhes internos | Chromium desktop/celular |
+| Pendências e Eventos | JSON, UUID, ID de grupo e referência Telegram | conteúdo técnico é descartado, nunca usado como contexto | projetor puro + inspeção do DOM |
+| Pendências e Eventos | carga, atualização e filtros | nenhuma chamada de escrita é feita | regressão estática + cliente simulado com contador de mutações |
 
 ## Estados
 

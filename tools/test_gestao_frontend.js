@@ -31,6 +31,46 @@ const semContexto = gestao.pendenciasLegiveis(
 assert.strictEqual(semContexto[0].contexto, 'Contexto não informado');
 assert.ok(!JSON.stringify(semContexto).includes('11111111-1111-1111-1111-111111111111'));
 
+// Pendências recuperam contexto humano aninhado e sempre ligam à origem segura.
+const pendenciaAninhada = gestao.pendenciasLegiveis([{
+  resumo:'{"bruto":"não mostrar"}',
+  tipo_operacao:'compra_confinamento',
+  status:'pendente',
+  dados_extraidos:{
+    resumo:'Conferir compra recebida',
+    contexto_nome:'Grupo operacional'
+  }
+}], [], [])[0];
+assert.strictEqual(pendenciaAninhada.resumo, 'Conferir compra recebida');
+assert.strictEqual(pendenciaAninhada.contexto, 'Grupo operacional');
+assert.deepStrictEqual(pendenciaAninhada.destino, {rotulo:'Revisões',href:'./revisoes.html'});
+assert.strictEqual(pendenciaAninhada.acao, 'Revisar');
+
+const documentoComCodigo = gestao.pendenciasLegiveis([], [], [{
+  tipo:'nota_fiscal',
+  status:'aguardando_vendedor',
+  operacoes:{codigo:'BB-26-041'}
+}])[0];
+assert.strictEqual(documentoComCodigo.contexto, 'BB-26-041');
+assert.deepStrictEqual(documentoComCodigo.destino, {rotulo:'Boi Balança',href:'./bb.html'});
+
+// Eventos legados usam código/contexto humano, nunca UUID ou ID de grupo.
+const eventosHumanos = gestao.eventosLegiveis([{
+  tipo:'promocao_operacional_preparada',
+  observacao:'Promoção 44444444-4444-4444-8444-444444444444 preparada',
+  contexto_nome:'telegram:-1001234567890',
+  entidade_codigo:'CF-26-018',
+  entidade_tipo:'pending_action',
+  origem:'confinex_revisoes',
+  status:'registrado',
+  usuario:'operador'
+}]);
+assert.strictEqual(eventosHumanos[0].contexto, 'CF-26-018');
+assert.strictEqual(eventosHumanos[0].resumo, 'Promoção preparada');
+assert.deepStrictEqual(eventosHumanos[0].origem, {rotulo:'Revisões',href:'./revisoes.html'});
+assert.ok(!JSON.stringify(eventosHumanos).includes('44444444-4444-4444-8444-444444444444'));
+assert.ok(!JSON.stringify(eventosHumanos).includes('telegram:-1001234567890'));
+
 // Financeiro positivo: previsto/realizado, parcial, dívida, lembrete e origem.
 const obrigacoes = gestao.obrigacoesFinanceiras([
   {tipo:'saida', descricao:'Parcela do trato', categoria:'confinamento', valor:1000, valor_pago:250, vencimento:'2026-07-25'},
@@ -95,4 +135,4 @@ const mensagem = gestao.erroLegivel(new Error('relation public.segredo does not 
 assert.strictEqual(mensagem, 'Não foi possível carregar os dados. Tente atualizar a página.');
 assert.ok(!mensagem.includes('public.segredo'));
 
-console.log('test_gestao_frontend: 27 verificações aprovadas');
+console.log('test_gestao_frontend: 38 verificações aprovadas');

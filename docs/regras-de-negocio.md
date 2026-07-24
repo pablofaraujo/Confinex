@@ -101,6 +101,14 @@ Custo de compra: `custoCompra = arrobasCompra × precoCompra × N + baldeio`.
 - `transacoes_banco` é uma fonte de conciliação para consulta. A indisponibilidade dessa tabela não derruba agenda e dívidas; a interface apresenta aviso próprio. Falha das fontes principais produz mensagem genérica sem expor detalhe interno.
 - O rascunho `202607240001_financeiro_compromissos.sql` não foi aplicado. Até autorização e homologação, parcelas, pagamentos, renegociações e lembretes persistentes que não existirem nas fontes atuais permanecem apenas como capacidade projetada, nunca simulada como dado real.
 
+## Pendências e eventos
+
+- Pendências agrega `operation_drafts`, `pending_actions` e `pendencias_documentos` em modo somente leitura. Ela indica o que exige atenção e a próxima etapa, mas conferência e promoção operacional continuam exclusivamente em Revisões.
+- Uma fonte de Pendências indisponível não oculta itens válidos das demais. Falha total produz mensagem genérica; detalhes internos da API nunca são apresentados.
+- Eventos é histórico, não fila operacional. Os filtros por situação, tipo, período e texto atuam localmente e não alteram registros.
+- Resumo e contexto priorizam campos humanos explícitos e, depois, dados legíveis de estruturas aninhadas ou códigos operacionais. JSON bruto, UUID, ID técnico de grupo e referência `telegram:<id>` são descartados, nunca usados como substituto.
+- Cada pendência e evento aponta para uma área operacional humana compatível com sua origem. Na falta de destino específico, a Visão Geral é usada com rótulo legível, sem expor identificador técnico.
+
 ## Análise de sensibilidade — `SensPanel` / `calcComOverride`
 
 7 sliders: `precoCompra`, `prazoPagtoCompra`, `diasCiclo`, `gmd`, `rcFinal`, `perdaTransporte`, `precoVenda` (respeita `modoPreco` do cenário — fix `a7c9db8`). Testes nomeados salvos em `historico`.

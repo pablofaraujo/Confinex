@@ -9,8 +9,8 @@
 <link rel="stylesheet" href="./design/components.css?v=20260720-1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="./js/cfagro-core.js"></script>
-<script src="./js/cfagro-gestao.js?v=20260723-2"></script>
-<script src="./js/eventos.js?v=20260723-2" defer></script>
+<script src="./js/cfagro-gestao.js?v=20260724-4"></script>
+<script src="./js/eventos.js?v=20260724-3" defer></script>
 <script src="./js/cfagro-shell.js?v=20260723-3" defer></script>
 </head>
 <body data-w="md">
@@ -37,9 +37,11 @@
   <div class="card">
     <div class="simgrid">
       <div class="fld"><label for="filtroSituacao">Situação</label><select id="filtroSituacao"><option value="todas">Todas</option></select></div>
+      <div class="fld"><label for="filtroTipo">Tipo</label><select id="filtroTipo"><option value="todos">Todos</option></select></div>
+      <div class="fld"><label for="filtroPeriodo">Período</label><select id="filtroPeriodo"><option value="todos">Todo o histórico</option><option value="7">Últimos 7 dias</option><option value="30">Últimos 30 dias</option><option value="90">Últimos 90 dias</option></select></div>
       <div class="fld"><label for="filtroTexto">Buscar</label><input id="filtroTexto" type="search" placeholder="tipo, contexto, responsável ou descrição"></div>
     </div>
-    <div class="scroll"><table><thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Contexto</th><th>Situação</th><th>Responsável</th></tr></thead><tbody id="listaEventos"></tbody></table></div>
+    <div class="scroll"><table><thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Contexto</th><th>Situação</th><th>Responsável</th><th>Origem</th></tr></thead><tbody id="listaEventos"></tbody></table></div>
   </div>
   <div class="foot">Histórico em linguagem humana · estruturas JSON e IDs técnicos permanecem ocultos.</div>
 </div>

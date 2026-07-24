@@ -732,6 +732,396 @@ async function auditarFinanceiro(browser, viewport, resultados) {
   }
 }
 
+function clientePendenciasEventosSimulado() {
+  function isoComDias(dias) {
+    const data = new Date();
+    data.setHours(12, 0, 0, 0);
+    data.setDate(data.getDate() + dias);
+    return data.toISOString();
+  }
+  const pendencias = {
+    operation_drafts: [{
+      resumo: '{"grupo_id":-1001234567890}',
+      payload: {
+        dados_extraidos: {
+          resumo: 'Compra aguardando conferência',
+          contexto_nome: 'Lote Primavera',
+        },
+      },
+      status: 'pendente',
+      tipo_operacao: 'compra',
+      created_at: isoComDias(-1),
+    }],
+    pending_actions: [{
+      resumo: 'Conferir divergência de peso 11111111-1111-4111-8111-111111111111',
+      dados: { contexto_operacional: 'Pesagem Fazenda Norte' },
+      status: 'em_execucao',
+      acao_tipo: 'revisar_pesagem',
+      criado_em: isoComDias(-2),
+    }],
+    pendencias_documentos: [{
+      tipo: 'venda',
+      entidade_codigo: 'VEN-2026-014',
+      status: 'aguardando_confirmacao',
+      criado_em: isoComDias(-3),
+    }],
+  };
+  const eventos = {
+    eventos: [
+      {
+        tipo: 'pesagem_registrada',
+        observacao: '{"grupo_id":-1009876543210}',
+        payload: {
+          dados_extraidos: {
+            resumo: 'Pesagem conferida',
+            contexto_nome: 'Lote Primavera',
+          },
+        },
+        status: 'registrado',
+        agente: 'Juan',
+        created_at: isoComDias(-1),
+        entidade_tipo: 'pesagem',
+      },
+      {
+        tipo: 'compra_corrigida',
+        descricao: 'Compra corrigida 22222222-2222-4222-8222-222222222222',
+        entidade_codigo: 'COMP-2026-021',
+        status: 'corrigido',
+        usuario: 'telegram:-1001234567890 Operação',
+        created_at: isoComDias(-10),
+        entidade_tipo: 'compra',
+      },
+      {
+        tipo: 'confinamento_encerrado',
+        resumo: 'Lote encerrado',
+        dados: { contexto_operacional: 'Confinamento Primavera' },
+        status: 'concluido',
+        agente: 'Equipe operacional',
+        created_at: isoComDias(-60),
+        entidade_tipo: 'confinamento',
+      },
+    ],
+  };
+  function resposta(nome) {
+    const parametros = new URLSearchParams(location.search);
+    const modo = parametros.get('fixture') || 'positivo';
+    const paginaEventos = location.pathname.endsWith('/eventos.html');
+    if (modo === 'falha') {
+      return { data: null, error: { message: 'relation public.segredo does not exist' } };
+    }
+    if (!paginaEventos && modo === 'falha-parcial' && nome === 'pending_actions') {
+      return { data: null, error: { message: 'fonte temporariamente indisponível' } };
+    }
+    if (modo === 'vazio') return { data: [], error: null };
+    const dados = paginaEventos ? eventos : pendencias;
+    return { data: dados[nome] || [], error: null };
+  }
+  const cliente = {
+    auth: {
+      getSession: async () => ({ data: { session: { user: { id: 'auditoria' } } } }),
+      signInWithPassword: async () => ({ data: {}, error: null }),
+      signOut: async () => ({ error: null }),
+    },
+    from(nome) {
+      const consulta = {
+        select() {
+          return { limit: async () => resposta(nome) };
+        },
+      };
+      ['insert', 'update', 'upsert', 'delete'].forEach(operacao => {
+        consulta[operacao] = () => {
+          window.__mutacoesGestao = (window.__mutacoesGestao || 0) + 1;
+          throw new Error(`mutação inesperada: ${operacao}`);
+        };
+      });
+      return consulta;
+    },
+    rpc() {
+      window.__mutacoesGestao = (window.__mutacoesGestao || 0) + 1;
+      throw new Error('mutação inesperada: rpc');
+    },
+  };
+  window.__mutacoesGestao = 0;
+  window.supabase = { createClient: () => cliente };
+}
+
+async function abrirGestaoSimulada(browser, viewport, paginaNome, modo) {
+  const context = await browser.newContext({
+    viewport: { width: viewport.largura, height: viewport.altura },
+  });
+  await context.route('**/supabase.min.js', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/javascript',
+      body: `(${clientePendenciasEventosSimulado.toString()})();`,
+    });
+  });
+  const page = await context.newPage();
+  const erros = [];
+  page.on('console', msg => {
+    if (['error', 'warning'].includes(msg.type())) {
+      erros.push(`console ${msg.type()}: ${msg.text()}`);
+    }
+  });
+  page.on('pageerror', erro => erros.push(`javascript: ${erro.message}`));
+  page.on('requestfailed', req => {
+    erros.push(`rede: ${req.url()} — ${req.failure()?.errorText || 'falhou'}`);
+  });
+  page.on('response', res => {
+    if (res.status() >= 400) erros.push(`http ${res.status()}: ${res.url()}`);
+  });
+  const destino = new URL(`${paginaNome}.html?fixture=${modo}`, baseUrl).href;
+  await page.goto(destino, { waitUntil: 'load', timeout: 30000 });
+  await page.locator('#app').waitFor({ state: 'visible', timeout: 10000 });
+  await page.waitForFunction(
+    () => !document.getElementById('subtitle').textContent.includes('Carregando'),
+    null,
+    { timeout: 10000 },
+  );
+  return { context, page, erros };
+}
+
+async function auditarPendencias(browser, viewport, resultados) {
+  let execucao;
+  try {
+    execucao = await abrirGestaoSimulada(browser, viewport, 'pendencias', 'positivo');
+    const { page, erros } = execucao;
+    const estado = await page.evaluate(() => ({
+      linhas: document.querySelectorAll('#listaPendencias tr').length,
+      links: document.querySelectorAll('#listaPendencias a[href]').length,
+      texto: document.getElementById('app').innerText,
+      largura: document.documentElement.scrollWidth,
+      mutacoes: window.__mutacoesGestao,
+    }));
+    const semTecnico = !/[0-9a-f]{8}-[0-9a-f-]{27,}/i.test(estado.texto) &&
+      !/grupo[_ ]?id|telegram:-?\d{6,}|\{"?/i.test(estado.texto);
+    resultados.push(item(
+      `browser:${viewport.nome}:pendencias:positivo`,
+      'Pendências agregadas em linguagem humana',
+      `três origens em ${viewport.nome}`,
+      'cada item tem resumo, contexto humano e próxima etapa',
+      estado.linhas === 3 && estado.links === 3 &&
+        estado.texto.includes('Lote Primavera') &&
+        estado.texto.includes('Pesagem Fazenda Norte') &&
+        estado.texto.includes('VEN-2026-014') && semTecnico,
+      `linhas=${estado.linhas} links=${estado.links} sem conteúdo técnico=${semTecnico}`,
+    ));
+    await page.locator('#filtroOrigem').selectOption({ label: 'Documentos' });
+    const porOrigem = await page.locator('#listaPendencias tr').count();
+    await page.locator('#filtroOrigem').selectOption('todas');
+    await page.locator('#filtroTexto').fill('inexistente');
+    const vazioFiltrado = await page.locator('#listaPendencias').innerText();
+    resultados.push(item(
+      `browser:${viewport.nome}:pendencias:filtros`,
+      'Filtros de Pendências',
+      `origem e busca em ${viewport.nome}`,
+      'origem reduz a lista e busca sem resultado mostra estado vazio',
+      porOrigem === 1 && vazioFiltrado.includes('Nenhuma pendência corresponde aos filtros'),
+      `linhas por origem=${porOrigem}; vazio=${vazioFiltrado}`,
+    ));
+    resultados.push(item(
+      `browser:${viewport.nome}:pendencias:responsivo-sem-escrita`,
+      'Pendências responsivas e somente leitura',
+      `carga e filtros em ${viewport.nome}`,
+      'não há estouro horizontal da página nem mutações',
+      estado.largura <= viewport.largura && estado.mutacoes === 0,
+      `documento=${estado.largura}px viewport=${viewport.largura}px mutações=${estado.mutacoes}`,
+    ));
+    resultados.push(item(
+      `browser:${viewport.nome}:pendencias:console-rede`,
+      'Pendências sem erros',
+      `dados positivos em ${viewport.nome}`,
+      'console, JavaScript e rede não registram erros',
+      erros.length === 0,
+      erros.length ? erros.join(' | ') : 'nenhum erro capturado',
+    ));
+    const captura = path.join(artefatos, `${viewport.nome}-pendencias-cenario-positivo.png`);
+    await page.screenshot({ path: captura, fullPage: true });
+    resultados.push(item(
+      `browser:${viewport.nome}:pendencias:evidencia`,
+      'Evidência visual de Pendências',
+      `dados positivos em ${viewport.nome}`,
+      'captura integral é gerada',
+      fs.existsSync(captura) && fs.statSync(captura).size > 0,
+      captura,
+    ));
+  } catch (erro) {
+    resultados.push(item(
+      `browser:${viewport.nome}:pendencias:execucao`,
+      'Pendências no navegador',
+      `dados positivos em ${viewport.nome}`,
+      'o cenário automatizado termina',
+      false,
+      erro.stack || erro.message,
+    ));
+  } finally {
+    if (execucao) await execucao.context.close();
+  }
+
+  for (const modo of ['vazio', 'falha-parcial', 'falha']) {
+    let cenario;
+    try {
+      cenario = await abrirGestaoSimulada(browser, viewport, 'pendencias', modo);
+      const estado = await cenario.page.evaluate(() => ({
+        texto: document.getElementById('app').innerText,
+        subtitulo: document.getElementById('subtitle').textContent,
+        aviso: document.getElementById('erroFontes').textContent,
+        linhas: document.querySelectorAll('#listaPendencias tr').length,
+        mutacoes: window.__mutacoesGestao,
+      }));
+      const aprovado = modo === 'vazio'
+        ? estado.texto.includes('Nenhuma pendência corresponde aos filtros')
+        : modo === 'falha-parcial'
+          ? estado.linhas === 2 && estado.aviso.includes('1 fonte') &&
+            estado.texto.includes('Compra aguardando conferência')
+          : estado.subtitulo.includes('Não foi possível carregar os dados') &&
+            !estado.texto.includes('public.segredo');
+      resultados.push(item(
+        `browser:${viewport.nome}:pendencias:${modo}`,
+        modo === 'vazio' ? 'Estado vazio de Pendências' : 'Falha controlada de Pendências',
+        `${modo} em ${viewport.nome}`,
+        modo === 'vazio'
+          ? 'a tabela mostra estado vazio claro'
+          : modo === 'falha-parcial'
+            ? 'uma fonte indisponível não oculta as demais'
+            : 'falha total mostra mensagem humana sem detalhe técnico',
+        aprovado && estado.mutacoes === 0 && cenario.erros.length === 0,
+        `linhas=${estado.linhas} subtítulo=${estado.subtitulo} aviso=${estado.aviso || 'nenhum'} mutações=${estado.mutacoes} erros=${cenario.erros.length}`,
+      ));
+    } catch (erro) {
+      resultados.push(item(
+        `browser:${viewport.nome}:pendencias:${modo}`,
+        'Estado alternativo de Pendências',
+        `${modo} em ${viewport.nome}`,
+        'o cenário automatizado termina',
+        false,
+        erro.stack || erro.message,
+      ));
+    } finally {
+      if (cenario) await cenario.context.close();
+    }
+  }
+}
+
+async function auditarEventos(browser, viewport, resultados) {
+  let execucao;
+  try {
+    execucao = await abrirGestaoSimulada(browser, viewport, 'eventos', 'positivo');
+    const { page, erros } = execucao;
+    const estado = await page.evaluate(() => ({
+      linhas: document.querySelectorAll('#listaEventos tr').length,
+      links: document.querySelectorAll('#listaEventos a[href]').length,
+      tipos: document.querySelectorAll('#filtroTipo option').length,
+      texto: document.getElementById('app').innerText,
+      largura: document.documentElement.scrollWidth,
+      mutacoes: window.__mutacoesGestao,
+    }));
+    const semTecnico = !/[0-9a-f]{8}-[0-9a-f-]{27,}/i.test(estado.texto) &&
+      !/grupo[_ ]?id|telegram:-?\d{6,}|\{"?/i.test(estado.texto);
+    resultados.push(item(
+      `browser:${viewport.nome}:eventos:positivo`,
+      'Eventos em linguagem humana',
+      `histórico misto em ${viewport.nome}`,
+      'descrição, contexto, responsável e origem são legíveis e navegáveis',
+      estado.linhas === 3 && estado.links === 3 && estado.tipos === 4 &&
+        estado.texto.includes('Lote Primavera') &&
+        estado.texto.includes('COMP-2026-021') && semTecnico,
+      `linhas=${estado.linhas} links=${estado.links} tipos=${estado.tipos} sem conteúdo técnico=${semTecnico}`,
+    ));
+    await page.locator('#filtroPeriodo').selectOption('7');
+    const recentes = await page.locator('#listaEventos tr').count();
+    await page.locator('#filtroPeriodo').selectOption('todos');
+    await page.locator('#filtroTipo').selectOption({ label: 'Compra corrigida' });
+    const porTipo = await page.locator('#listaEventos tr').count();
+    await page.locator('#filtroTipo').selectOption('todos');
+    await page.locator('#filtroTexto').fill('inexistente');
+    const vazioFiltrado = await page.locator('#listaEventos').innerText();
+    resultados.push(item(
+      `browser:${viewport.nome}:eventos:filtros`,
+      'Filtros de Eventos',
+      `período, tipo e busca em ${viewport.nome}`,
+      'cada filtro reduz o histórico e a busca vazia é clara',
+      recentes === 1 && porTipo === 1 &&
+        vazioFiltrado.includes('Nenhum evento corresponde aos filtros'),
+      `recentes=${recentes} por tipo=${porTipo}; vazio=${vazioFiltrado}`,
+    ));
+    resultados.push(item(
+      `browser:${viewport.nome}:eventos:responsivo-sem-escrita`,
+      'Eventos responsivos e somente leitura',
+      `carga e filtros em ${viewport.nome}`,
+      'não há estouro horizontal da página nem mutações',
+      estado.largura <= viewport.largura && estado.mutacoes === 0,
+      `documento=${estado.largura}px viewport=${viewport.largura}px mutações=${estado.mutacoes}`,
+    ));
+    resultados.push(item(
+      `browser:${viewport.nome}:eventos:console-rede`,
+      'Eventos sem erros',
+      `dados positivos em ${viewport.nome}`,
+      'console, JavaScript e rede não registram erros',
+      erros.length === 0,
+      erros.length ? erros.join(' | ') : 'nenhum erro capturado',
+    ));
+    const captura = path.join(artefatos, `${viewport.nome}-eventos-cenario-positivo.png`);
+    await page.screenshot({ path: captura, fullPage: true });
+    resultados.push(item(
+      `browser:${viewport.nome}:eventos:evidencia`,
+      'Evidência visual de Eventos',
+      `dados positivos em ${viewport.nome}`,
+      'captura integral é gerada',
+      fs.existsSync(captura) && fs.statSync(captura).size > 0,
+      captura,
+    ));
+  } catch (erro) {
+    resultados.push(item(
+      `browser:${viewport.nome}:eventos:execucao`,
+      'Eventos no navegador',
+      `dados positivos em ${viewport.nome}`,
+      'o cenário automatizado termina',
+      false,
+      erro.stack || erro.message,
+    ));
+  } finally {
+    if (execucao) await execucao.context.close();
+  }
+
+  for (const modo of ['vazio', 'falha']) {
+    let cenario;
+    try {
+      cenario = await abrirGestaoSimulada(browser, viewport, 'eventos', modo);
+      const estado = await cenario.page.evaluate(() => ({
+        texto: document.getElementById('app').innerText,
+        subtitulo: document.getElementById('subtitle').textContent,
+        mutacoes: window.__mutacoesGestao,
+      }));
+      const aprovado = modo === 'vazio'
+        ? estado.texto.includes('Nenhum evento corresponde aos filtros')
+        : estado.subtitulo.includes('Não foi possível carregar os dados') &&
+          !estado.texto.includes('public.segredo');
+      resultados.push(item(
+        `browser:${viewport.nome}:eventos:${modo}`,
+        modo === 'vazio' ? 'Estado vazio de Eventos' : 'Falha controlada de Eventos',
+        `${modo} em ${viewport.nome}`,
+        modo === 'vazio'
+          ? 'a tabela mostra estado vazio claro'
+          : 'falha mostra mensagem humana sem detalhe técnico',
+        aprovado && estado.mutacoes === 0 && cenario.erros.length === 0,
+        `subtítulo=${estado.subtitulo} mutações=${estado.mutacoes} erros=${cenario.erros.length}`,
+      ));
+    } catch (erro) {
+      resultados.push(item(
+        `browser:${viewport.nome}:eventos:${modo}`,
+        'Estado alternativo de Eventos',
+        `${modo} em ${viewport.nome}`,
+        'o cenário automatizado termina',
+        false,
+        erro.stack || erro.message,
+      ));
+    } finally {
+      if (cenario) await cenario.context.close();
+    }
+  }
+}
+
 (async () => {
   const browser = await chromium.launch({
     headless: true,
@@ -746,6 +1136,8 @@ async function auditarFinanceiro(browser, viewport, resultados) {
       await auditarMenu(browser, viewport, resultados);
       await auditarPagamentoConfinamento(browser, viewport, resultados);
       await auditarFinanceiro(browser, viewport, resultados);
+      await auditarPendencias(browser, viewport, resultados);
+      await auditarEventos(browser, viewport, resultados);
     }
   } finally {
     await browser.close();

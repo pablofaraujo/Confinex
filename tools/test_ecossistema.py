@@ -109,6 +109,7 @@ def validar_local() -> None:
     executar(["node", "tools/test_revisoes_frontend.js"])
     executar(["node", "tools/test_gestao_frontend.js"])
     executar(["node", "tools/test_financeiro_frontend.js"])
+    executar(["node", "tools/test_pendencias_eventos_frontend.js"])
     executar(["node", "tools/test_confinex_pagamento_confinamento.mjs"])
     executar(["node", "tools/test_confinex_resultado_financeiro.mjs"])
 

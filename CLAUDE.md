@@ -35,8 +35,8 @@ Leia conforme a tarefa:
 | `ocr-pesagem.html` | OCR Pesagem — leitura de tickets de balança (tema escuro próprio, ainda fora do DS) |
 | `painel-boi-gordo.html` | Painel Boi Gordo — arroba CEPEA/B3, bezerro, relação de troca, curva futura BGI, manchetes e contexto de mercado (dados estáticos no DS, sem Supabase; atualizados por automação — ver Armadilhas) |
 | `financeiro.html` | Financeiro — consulta somente leitura de fluxo previsto/realizado, contas a pagar/receber, dívidas, promissórias, vencimentos, saldos parciais, renegociações e transações bancárias; não quita, concilia nem cria registros |
-| `pendencias.html` | Pendências — visão agregada somente leitura de rascunhos, ações e documentos que exigem atenção; não substitui Revisões |
-| `eventos.html` | Eventos — histórico operacional legível e filtrável; não expõe JSON nem IDs técnicos |
+| `pendencias.html` | Pendências — visão agregada somente leitura de rascunhos, ações e documentos que exigem atenção, com próxima etapa e tolerância à falha isolada de uma fonte; não substitui Revisões |
+| `eventos.html` | Eventos — histórico operacional legível, filtrável por situação, tipo, período e texto, com ligação humana à origem; não expõe JSON nem IDs técnicos |
 | `painel.html` | LEGADA — redirect para `index.html` (conteúdo migrou para a Home) |
 | `ops.html` | Ops — heartbeats de agentes + fila de missões `vps_briefings` para o Claude Code da VPS |
 | `central.html` | LEGADA — agora só redirect para `index.html` |

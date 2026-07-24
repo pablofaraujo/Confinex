@@ -58,9 +58,37 @@ function pareceIdTecnico(valor){
   return /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(texto(valor));
 }
 
+function objeto(valor){
+  return valor && typeof valor === 'object' && !Array.isArray(valor) ? valor : {};
+}
+
+function limparTextoTecnico(valor){
+  if(valor && typeof valor === 'object') return '';
+  var limpo = texto(valor);
+  if(!limpo || /^[{[]/.test(limpo) || limpo === '[object Object]') return '';
+  limpo = limpo
+    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/ig, '')
+    .replace(/\btelegram:-?\d{6,}\b/ig, '')
+    .replace(/\bgrupo[_ ]?id\s*[:=]\s*-?\d+\b/ig, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/^[\s·,;:/-]+|[\s·,;:/-]+$/g, '');
+  return limpo;
+}
+
+function dadosHumanos(item){
+  var payload = objeto(item && item.payload);
+  var dados = objeto(item && item.dados);
+  return Object.assign(
+    {},
+    objeto(payload.dados_extraidos),
+    objeto(item && item.dados_extraidos),
+    dados
+  );
+}
+
 function referenciaHumana(){
   for(var i=0; i<arguments.length; i+=1){
-    var candidato = texto(arguments[i]);
+    var candidato = limparTextoTecnico(arguments[i]);
     if(candidato && !pareceIdTecnico(candidato)) return candidato;
   }
   return 'Não informada';
@@ -81,7 +109,23 @@ function statusHumano(valor){
 }
 
 function contextoHumano(item){
-  return texto(item && item.contexto_nome) || 'Contexto não informado';
+  var dados = dadosHumanos(item);
+  var operacao = objeto(item && item.operacoes);
+  var candidatos = [
+    item && item.contexto_nome,
+    dados.contexto_nome,
+    dados.grupo_telegram,
+    dados.contexto_operacional,
+    item && item.entidade_codigo,
+    item && item.codigo_sugerido,
+    item && item.operacao_codigo,
+    operacao.codigo
+  ];
+  for(var i=0; i<candidatos.length; i+=1){
+    var candidato = limparTextoTecnico(candidatos[i]);
+    if(candidato && !pareceIdTecnico(candidato)) return candidato;
+  }
+  return 'Contexto não informado';
 }
 
 function dataItem(item){
@@ -89,23 +133,64 @@ function dataItem(item){
 }
 
 function resumoItem(item, tipo){
-  if(tipo === 'rascunho') return texto(item.resumo) || statusHumano(item.tipo_operacao) || 'Rascunho aguardando conferência';
-  if(tipo === 'ação') return texto(item.resumo) || statusHumano(item.acao_tipo) || 'Ação aguardando conferência';
-  if(tipo === 'documento') return 'Documento: ' + (item.tipo ? statusHumano(item.tipo) : 'tipo não informado');
-  return texto(item.observacao || item.resumo || item.descricao || item.tipo) || 'Evento sem descrição';
+  var dados = dadosHumanos(item);
+  if(tipo === 'rascunho') return referenciaHumana(
+    item.resumo, dados.resumo, dados.descricao, dados.situacao,
+    item.tipo_operacao && statusHumano(item.tipo_operacao),
+    'Rascunho aguardando conferência'
+  );
+  if(tipo === 'ação') return referenciaHumana(
+    item.resumo, dados.resumo, dados.descricao,
+    item.acao_tipo && statusHumano(item.acao_tipo),
+    'Ação aguardando conferência'
+  );
+  if(tipo === 'documento') return 'Documento: ' +
+    (item.tipo ? statusHumano(item.tipo) : 'tipo não informado');
+  return referenciaHumana(
+    item.observacao, item.resumo, item.descricao, dados.observacao,
+    dados.resumo, dados.descricao, item.tipo && statusHumano(item.tipo),
+    'Evento sem descrição'
+  );
+}
+
+function destinoOperacional(item, categoria){
+  var dados = dadosHumanos(item);
+  var pista = [
+    categoria,
+    item && item.tipo,
+    item && item.tipo_operacao,
+    item && item.acao_tipo,
+    item && item.entidade_tipo,
+    item && item.origem,
+    item && item.entidade_codigo,
+    dados.tipo_negocio,
+    dados.contexto_operacional,
+    dados.target_table
+  ].join(' ').toLowerCase();
+  if(categoria === 'rascunho' || categoria === 'ação' ||
+      /revis|rascunh|pending.?action|operation.?draft|promoc/.test(pista)){
+    return {rotulo:'Revisões', href:'./revisoes.html'};
+  }
+  if(/confin/.test(pista)) return {rotulo:'Confinamento', href:'./confinamento.html'};
+  if(/abate/.test(pista)) return {rotulo:'Abate', href:'./abate.html'};
+  if(/pesag|caderno|ocr/.test(pista)) return {rotulo:'OCR Pesagem', href:'./ocr-pesagem.html'};
+  if(/bgi|hedge|bolsa/.test(pista)) return {rotulo:'BGI', href:'./bgi.html'};
+  if(categoria === 'documento' || /compra|venda|boi.?balan/.test(pista)){
+    return {rotulo:'Boi Balança', href:'./bb.html'};
+  }
+  return {rotulo:'Visão Geral', href:'./index.html'};
 }
 
 function pendenciasLegiveis(rascunhos, acoes, documentos){
   var linhas = [];
   (rascunhos || []).forEach(function(item){
-    linhas.push({origem:'Revisões', resumo:resumoItem(item,'rascunho'), contexto:contextoHumano(item), status:statusHumano(item.status), data:dataItem(item)});
+    linhas.push({origem:'Revisões', resumo:resumoItem(item,'rascunho'), contexto:contextoHumano(item), status:statusHumano(item.status), data:dataItem(item), destino:destinoOperacional(item,'rascunho'), acao:'Revisar'});
   });
   (acoes || []).forEach(function(item){
-    linhas.push({origem:'Ações', resumo:resumoItem(item,'ação'), contexto:contextoHumano(item), status:statusHumano(item.status), data:dataItem(item)});
+    linhas.push({origem:'Ações', resumo:resumoItem(item,'ação'), contexto:contextoHumano(item), status:statusHumano(item.status), data:dataItem(item), destino:destinoOperacional(item,'ação'), acao:'Conferir'});
   });
   (documentos || []).forEach(function(item){
-    var codigo = texto(item && item.operacoes && item.operacoes.codigo);
-    linhas.push({origem:'Documentos', resumo:resumoItem(item,'documento'), contexto:codigo || 'Operação vinculada', status:statusHumano(item.status), data:dataItem(item)});
+    linhas.push({origem:'Documentos', resumo:resumoItem(item,'documento'), contexto:contextoHumano(item), status:statusHumano(item.status), data:dataItem(item), destino:destinoOperacional(item,'documento'), acao:'Abrir origem'});
   });
   return linhas.sort(function(a,b){ return String(b.data || '').localeCompare(String(a.data || '')); });
 }
@@ -117,8 +202,9 @@ function eventosLegiveis(eventos){
       resumo:resumoItem(item,'evento'),
       contexto:contextoHumano(item),
       status:statusHumano(item.status),
-      responsavel:texto(item.usuario || item.agente) || 'Não informado',
-      data:dataItem(item)
+      responsavel:referenciaHumana(item.usuario, item.agente, 'Não informado'),
+      data:dataItem(item),
+      origem:destinoOperacional(item,'evento')
     };
   });
 }
