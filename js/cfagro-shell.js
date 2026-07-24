@@ -21,7 +21,7 @@ var NAV = [
   { href:'./confinamento.html', rotulo:'Confinamento', icone:'🐮' },
   { href:'./fazenda-ametista.html', rotulo:'Fazenda Ametista', icone:'🌾' },
   // O portfólio B3 usa a tela BGI local para preservar o shell e a navegação
-  { href:'./bgi.html',      rotulo:'Portfolio B3', icone:'🗂' },
+  { href:'./bgi.html?visao=portfolio', rotulo:'Portfolio B3', icone:'🗂' },
   { href:'./bgi.html',      rotulo:'BGI',           icone:'📈' },
   { href:'./bb.html',       rotulo:'Boi Balança',   icone:'⚖️' },
   { href:'./abate.html',    rotulo:'Abate',         icone:'🥩' },
