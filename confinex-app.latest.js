@@ -1,6 +1,10 @@
 // src/confinex-entry.jsx
 import React from "react";
 import { createRoot } from "react-dom/client";
+import {
+  calcularPagamentoConfinamento,
+  rotuloModoPagamentoConfinamento
+} from "./js/confinex-pagamento-confinamento.mjs";
 
 // confinex_work.jsx
 import { useEffect, useState, useMemo, useRef } from "react";
@@ -730,14 +734,23 @@ function calcCenario(lote, sc) {
   const custoDinheiroMensal = pctInput(lote.custoDinheiro, 0);
   const custoDinheiroCompra = custoCompra * (Math.pow(1 + custoDinheiroMensal, diasCapital / 30) - 1);
   const custoDinheiroFrete = freteCapital * (Math.pow(1 + custoDinheiroMensal, diasFreteCapital / 30) - 1);
+  const pagamentoConfinamento = calcularPagamentoConfinamento({
+    valorTotal: custoContTotal,
+    diasCiclo: dias,
+    diasAteRecebimento: diasTotal,
+    taxaMensal: custoDinheiroMensal,
+    modo: sc.pagamentoConfinamento
+  });
+  const custoDinheiroConfinamento = pagamentoConfinamento.custoDinheiro;
+  const lucroAposCustoPagamentoConfinamento = lucro - custoDinheiroConfinamento;
   const dataRecebimentoAdiantamento = addDiasISO(sc.dataEntrada, diasTotal);
-  const custoDinheiroOperacao = custoDinheiroCompra + custoDinheiroFrete;
+  const custoDinheiroOperacao = custoDinheiroCompra + custoDinheiroFrete + custoDinheiroConfinamento;
   const impactoFinanceiro = calcImpactoOperacaoFinanceira(sc, {
     custoDinheiroMensal,
     dataRecebimento: dataRecebimentoAdiantamento,
     mesesCapital,
     baseRentabilidade: investInicial,
-    resultadoSemOperacao: lucro
+    resultadoSemOperacao: lucroAposCustoPagamentoConfinamento
   });
   const custoDinheiroTotal = custoDinheiroOperacao + impactoFinanceiro.custoAdiantamento;
   const fatorVP = custoDinheiroMensal > 0 ? Math.pow(1 + custoDinheiroMensal, mesesCapital) : 1;
@@ -745,8 +758,9 @@ function calcCenario(lote, sc) {
   const receitaVP = receita / fatorVP;
   const arrobasCompraTotal = arrobasCompra * N;
   const baldeioTotal = parseFloat(lote.baldeio) || 0;
-  const precoCompraVpMax = arrobasCompraTotal > 0 ? (receitaVP - freteTotal - custoContTotal - baldeioTotal) / arrobasCompraTotal : 0;
-  const resultadoVP = receitaVP - custos;
+  const custoConfinamentoVP = pagamentoConfinamento.valorPresente;
+  const precoCompraVpMax = arrobasCompraTotal > 0 ? (receitaVP - freteTotal - custoConfinamentoVP - baldeioTotal) / arrobasCompraTotal : 0;
+  const resultadoVP = receitaVP - custoCompra - freteTotal - custoConfinamentoVP;
   const margemCompraVp = precoCompraVpMax - precoCompra;
   const pesoMedioConf = (pesoChegada + pesoAbate) / 2;
   const pctMS = parseFloat(sc.consumoMS) / 100 || 0;
@@ -817,6 +831,13 @@ function calcCenario(lote, sc) {
     custoDinheiroOperacao,
     custoDinheiroCompra,
     custoDinheiroFrete,
+    custoDinheiroConfinamento,
+    custoConfinamentoVP,
+    pagamentoConfinamento: pagamentoConfinamento.modo,
+    pagamentoConfinamentoRotulo: pagamentoConfinamento.rotulo,
+    fluxosPagamentoConfinamento: pagamentoConfinamento.fluxos,
+    quantidadeParcelasConfinamento: pagamentoConfinamento.quantidadeParcelas,
+    lucroAposCustoPagamentoConfinamento,
     ...impactoFinanceiro,
     precoCompraVpMax,
     resultadoVP,
@@ -837,6 +858,7 @@ var defaultSc = (i) => ({
   perdaManual: "",
   respFrete: i === 4 ? "confinamento" : "meu",
   freteNoAcerto: false,
+  pagamentoConfinamento: "final",
   simularAdiantamento: false,
   tipoAdiantamento: "capital",
   dataAdiantamento: isoHoje(),
@@ -882,6 +904,7 @@ var CAMPOS_MODELO_CONFINAMENTO = [
   "perdaManual",
   "respFrete",
   "freteNoAcerto",
+  "pagamentoConfinamento",
   "simularAdiantamento",
   "tipoAdiantamento",
   "dataAdiantamento",
@@ -1192,6 +1215,18 @@ function ScPanel({ sc, upd, sexo, custoDinheiro, resultado, confinamentos, model
         ] }) })
       ] }),
       isParceria && /* @__PURE__ */ jsx("div", { className: "warn", style: { marginTop: 12 }, children: "Parceria: entrego X@ e recebo as mesmas X@ ap\xF3s o abate, ao pre\xE7o de venda do dia." }),
+      /* @__PURE__ */ jsx("div", { className: "sec-t nm", style: { marginTop: 18 }, children: "Pagamento do confinamento" }),
+      /* @__PURE__ */ jsx(F, { label: "Quando o confinamento será pago?", hint: "O custo do dinheiro é calculado de cada desembolso até o recebimento da venda.", children: /* @__PURE__ */ jsx(Tg, { opts: [
+        { v: "adiantado", l: "Adiantado" },
+        { v: "mensal", l: "Mensal" },
+        { v: "final", l: "No final" }
+      ], val: sc.pagamentoConfinamento || "final", set: u("pagamentoConfinamento") }) }),
+      /* @__PURE__ */ jsx("div", { className: "hint", style: { marginTop: 8 }, children: sc.pagamentoConfinamento === "adiantado" ? "Uma parcela na entrada. O valor fica exposto durante todo o ciclo e eventual prazo pós-abate." : sc.pagamentoConfinamento === "mensal" ? "Parcelas vencem a cada 30 dias; o último período parcial é proporcional aos dias do ciclo." : "Uma parcela vence no fim do ciclo; se a venda for recebida depois, somente esse intervalo corre custo do dinheiro." }),
+      resultado && resultado.tipo === "confinamento" && /* @__PURE__ */ jsxs("div", { className: "g3", style: { marginTop: 14 }, children: [
+        /* @__PURE__ */ jsx(F, { label: "Forma considerada", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: resultado.pagamentoConfinamentoRotulo }) }),
+        /* @__PURE__ */ jsx(F, { label: "Parcelas e vencimentos", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: resultado.fluxosPagamentoConfinamento.length ? resultado.fluxosPagamentoConfinamento.map((fluxo) => `${fmtData(addDiasISO(sc.dataEntrada, fluxo.dia))} · ${fR(fluxo.valor)}`).join(" | ") : "Sem custo de confinamento" }) }),
+        /* @__PURE__ */ jsx(F, { label: "Custo do dinheiro do confinamento", hint: "Componente financeiro; o valor presente permanece em uma trilha separada.", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: fR(resultado.custoDinheiroConfinamento) }) })
+      ] }),
       /* @__PURE__ */ jsx("div", { className: "dvdr" })
     ] }),
     /* @__PURE__ */ jsx("div", { className: "sec-t nm", children: "Transporte" }),
@@ -1404,14 +1439,15 @@ function SensPanel({ lote, cenarios, resultados, historico = [], setHistorico = 
         precoCompra: vals.precoCompra,
         prazoPagtoCompra: vals.prazoPagtoCompra,
         diasCiclo: vals.diasCiclo,
+        pagamentoConfinamento: sc.pagamentoConfinamento || "final",
         gmd: vals.gmd,
         rcFinal: vals.rcFinal,
         perdaTransporte: vals.perdaTransporte,
         precoVenda: vals.precoVenda
       },
-      rentMensal: resultado.rentMensal,
-      rentTotal: resultado.rentTotal,
-      lucro: resultado.lucro,
+      rentMensal: resultado.rMliq,
+      rentTotal: resultado.rTliq,
+      lucro: resultado.lucroLiquido,
       investInicial: resultado.investInicial,
       receita: resultado.receita,
       custos: resultado.custos
@@ -1668,6 +1704,7 @@ function RelatorioComparativo({ lote, cenarios, resultados }) {
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Rota / responsável", value: `${sc.origemFrete || "origem não informada"} → ${sc.destinoFrete || "destino não informado"} · ${sc.respFrete || "—"}` }),
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Transporte", value: `${fR(r.freteTotal)} · ${sc.freteNoAcerto ? "acerto final" : "à vista"}` }),
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Custo confinamento", value: fR(r.custoCont) }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Pagamento do confinamento", value: sc.tipo === "revenda" ? "—" : `${r.pagamentoConfinamentoRotulo} · ${r.quantidadeParcelasConfinamento} parcela(s) · custo financeiro ${fR(r.custoDinheiroConfinamento)}` }),
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Custo @ posta", value: fR(r.custoArrobaPosta) }),
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "@ líquidas produzidas", value: sc.tipo === "revenda" ? "—" : `${fAt(r.arrobasProduzidasCab)} / cab` }),
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Custo @ líquida produzida", value: sc.tipo === "revenda" ? "—" : fR(r.custoArrobaLiquidaProduzida) }),
@@ -1740,6 +1777,10 @@ function Comparativo({ resultados, cenarios, lote }) {
     { l: "Frete por cabe\xE7a", fn: (r) => fR(r.fretePorCab) },
     { l: "Consumo MS (kg/dia/cab)", fn: (r, sc) => sc?.modalidade === "ms" ? fN(r.msTotalKgCab / (parseFloat(sc?.diasCiclo) || 110), 1) : "\u2014" },
     { l: "Custo confinamento", fn: (r) => r.tipo === "revenda" ? "\u2014" : fR(r.custoCont) },
+    { l: "Pagamento do confinamento", fn: (r) => r.tipo === "revenda" ? "\u2014" : r.pagamentoConfinamentoRotulo },
+    { l: "Parcelas do confinamento", fn: (r, sc) => r.tipo === "revenda" ? "\u2014" : r.fluxosPagamentoConfinamento.map((fluxo) => `${fmtData(addDiasISO(sc?.dataEntrada, fluxo.dia))}: ${fR(fluxo.valor)}`).join(" · ") || "Sem custo" },
+    { l: "Custo do dinheiro do confinamento", fn: (r) => r.tipo === "revenda" ? "\u2014" : fR(r.custoDinheiroConfinamento), hint: "Calculado por parcela, da data do pagamento até a data do recebimento", cls: () => "neg" },
+    { l: "Confinamento a valor presente", fn: (r) => r.tipo === "revenda" ? "\u2014" : fR(r.custoConfinamentoVP), hint: "Trilha de valor presente; não é somada ao lucro nominal" },
     { l: "Total custos", fn: (r) => fR(r.custos), bold: true },
     { sep: true, l: "RESULTADO \u2014 TOTAL DO LOTE" },
     { l: "Faturamento bruto da venda", fn: (r) => fR(r.faturamentoBruto ?? r.receita), cls: () => "pos" },
@@ -1757,8 +1798,8 @@ function Comparativo({ resultados, cenarios, lote }) {
     { l: "Custo da opera\xE7\xE3o", fn: (r) => r.valorAdiantamento > 0 ? fR(r.custoAdiantamento) : "\u2014", cls: () => "neg" },
     { l: "Valor recebido antecipadamente", fn: (r) => r.tipoAdiantamento === "recebimento" && r.valorAdiantamento > 0 ? fR(r.valorRecebidoAntecipado) : "\u2014", cls: () => "pos" },
     { l: "Saldo previsto no acerto final", fn: (r) => r.tipoAdiantamento === "recebimento" && r.valorAdiantamento > 0 ? fR(r.saldoRecebimentoFinal) : "\u2014" },
-    { l: "Custo de oportunidade total", fn: (r) => fR(r.custoDinheiroOperacao), hint: "Usado na análise de valor presente; não é abatido do resultado", cls: () => "neg" },
-    { l: "Resultado sem opera\xE7\xE3o financeira", fn: (r) => fR(r.resultadoSemOperacaoFinanceira ?? r.lucroLiquidoSemAdiantamento), cls: (r) => (r.resultadoSemOperacaoFinanceira ?? r.lucroLiquidoSemAdiantamento) >= 0 ? "pos" : "neg" },
+    { l: "Custo de oportunidade total", fn: (r) => fR(r.custoDinheiroOperacao), hint: "Compra e frete seguem informativos; o custo datado do confinamento compõe o lucro líquido", cls: () => "neg" },
+    { l: "Lucro após custo do pagamento do confinamento", fn: (r) => fR(r.resultadoSemOperacaoFinanceira ?? r.lucroLiquidoSemAdiantamento), cls: (r) => (r.resultadoSemOperacaoFinanceira ?? r.lucroLiquidoSemAdiantamento) >= 0 ? "pos" : "neg" },
     { l: "Resultado final com opera\xE7\xE3o financeira", fn: (r) => fR(r.lucroLiquido), bold: true, cls: (r) => r.lucroLiquido >= 0 ? "pos" : "neg" },
     { l: "Lucro l\xEDquido / cab", fn: (r) => fR(r.lucroLiquido / r.N), cls: (r) => r.lucroLiquido >= 0 ? "pos" : "neg" },
     { l: "Resultado VP", fn: (r) => fR(r.resultadoVP), bold: true, cls: (r) => r.resultadoVP >= 0 ? "pos" : "neg" },
@@ -1823,6 +1864,11 @@ function Comparativo({ resultados, cenarios, lote }) {
         /* @__PURE__ */ jsxs("div", { className: "rsub", children: [
           "lucro bruto: ",
           fR(r.lucro)
+        ] }),
+        r.tipo !== "revenda" && /* @__PURE__ */ jsxs("div", { className: "rsub", children: [
+          r.pagamentoConfinamentoRotulo,
+          " · custo financeiro: ",
+          fR(r.custoDinheiroConfinamento)
         ] }),
         /* @__PURE__ */ jsxs("div", { className: "rsub", children: [
           "lucro l\xEDq: ",

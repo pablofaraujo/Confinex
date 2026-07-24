@@ -218,6 +218,141 @@ async function auditarMenu(browser, viewport, resultados) {
   await context.close();
 }
 
+function numeroPtBr(texto) {
+  const limpo = String(texto || '').replace(/[^\d,.-]/g, '')
+    .replace(/\./g, '').replace(',', '.');
+  return Number(limpo);
+}
+
+async function auditarPagamentoConfinamento(browser, viewport, resultados) {
+  const context = await browser.newContext({
+    viewport: { width: viewport.largura, height: viewport.altura },
+  });
+  await context.addInitScript(() => {
+    localStorage.clear();
+    Object.defineProperty(window, 'CONFINEX_SHEETS_API_URL', {
+      configurable: false,
+      get: () => '',
+      set: () => {},
+    });
+  });
+  const page = await context.newPage();
+  const erros = [];
+  page.on('console', msg => {
+    if (msg.type() === 'error') erros.push(`console: ${msg.text()}`);
+  });
+  page.on('pageerror', erro => erros.push(`javascript: ${erro.message}`));
+
+  try {
+    await page.goto(new URL('confinex.html', baseUrl).href, {
+      waitUntil: 'load',
+      timeout: 30000,
+    });
+    await page.locator('#root .app').waitFor({ state: 'visible', timeout: 30000 });
+
+    const preencher = async (rotulo, valor) => {
+      const campo = page.locator('.fld').filter({ hasText: rotulo })
+        .locator('input:not([readonly])').first();
+      await campo.fill(String(valor));
+    };
+    await preencher('Qtd Cabeças', 1);
+    await preencher('Custo do dinheiro (% a.m.)', 2);
+    await page.getByRole('button', { name: 'Diária', exact: true }).click();
+    await preencher('Custo diária (R$/cab/dia)', 100);
+    await preencher('Ciclo (dias)', 90);
+    await preencher('Prazo pag. após abate (dias)', 0);
+
+    const observados = {};
+    for (const [modo, botao] of [
+      ['adiantado', 'Adiantado'],
+      ['mensal', 'Mensal'],
+      ['final', 'No final'],
+    ]) {
+      await page.getByRole('button', { name: botao, exact: true }).click();
+      await page.getByRole('button', { name: /CALCULAR E COMPARAR/ }).click();
+      const campoCusto = page.locator('.fld')
+        .filter({ hasText: 'Custo do dinheiro do confinamento' })
+        .locator('input[readonly]').first();
+      await campoCusto.waitFor({ state: 'visible' });
+      observados[modo] = numeroPtBr(await campoCusto.inputValue());
+    }
+
+    const custoTotal = 1 * 100 * 90;
+    const esperados = {
+      adiantado: custoTotal * (1.02 ** 3 - 1),
+      mensal: (custoTotal / 3) * ((1.02 ** 2 - 1) + (1.02 - 1)),
+      final: 0,
+    };
+    const margemMoeda = 0.02;
+    const calculosOk = Object.keys(esperados).every(
+      modo => Math.abs(observados[modo] - esperados[modo]) <= margemMoeda,
+    );
+    resultados.push(item(
+      `browser:${viewport.nome}:confinex:pagamento-fluxos`,
+      'Pagamento datado do confinamento',
+      `adiantado, mensal e final em ${viewport.nome}`,
+      'os custos visíveis coincidem com cálculos manuais a 2% a.m.',
+      calculosOk,
+      `observado=${JSON.stringify(observados)} esperado=${JSON.stringify(esperados)}`,
+    ));
+
+    const estadoSalvo = await page.evaluate(() =>
+      localStorage.getItem('confinex:last-state:v3') || '');
+    resultados.push(item(
+      `browser:${viewport.nome}:confinex:pagamento-estado`,
+      'Estado salvo do pagamento',
+      `forma final em ${viewport.nome}`,
+      'o cenário persiste a forma de pagamento sem gravar em backend externo',
+      estadoSalvo.includes('"pagamentoConfinamento":"final"'),
+      `campo persistido=${estadoSalvo.includes('"pagamentoConfinamento":"final"')} Sheets desabilitado no contexto de teste`,
+    ));
+
+    const larguraDocumento = await page.evaluate(
+      () => document.documentElement.scrollWidth);
+    resultados.push(item(
+      `browser:${viewport.nome}:confinex:pagamento-responsivo`,
+      'Pagamento responsivo',
+      `resultado completo em ${viewport.nome}`,
+      `a interação não cria estouro acima de ${viewport.largura}px`,
+      larguraDocumento <= viewport.largura,
+      `documento=${larguraDocumento}px viewport=${viewport.largura}px`,
+    ));
+    resultados.push(item(
+      `browser:${viewport.nome}:confinex:pagamento-console`,
+      'Pagamento sem erro JavaScript',
+      `cálculo completo em ${viewport.nome}`,
+      'nenhum erro de console ou execução',
+      erros.length === 0,
+      erros.length ? erros.join(' | ') : 'nenhum erro capturado',
+    ));
+
+    const captura = path.join(
+      artefatos,
+      `${viewport.nome}-confinex-pagamento-confinamento.png`,
+    );
+    await page.screenshot({ path: captura, fullPage: true });
+    resultados.push(item(
+      `browser:${viewport.nome}:confinex:pagamento-evidencia`,
+      'Evidência visual do pagamento',
+      `resultado completo em ${viewport.nome}`,
+      'captura integral é gerada',
+      fs.existsSync(captura) && fs.statSync(captura).size > 0,
+      captura,
+    ));
+  } catch (erro) {
+    resultados.push(item(
+      `browser:${viewport.nome}:confinex:pagamento-execucao`,
+      'Pagamento datado do confinamento',
+      `execução em ${viewport.nome}`,
+      'o cenário automatizado termina',
+      false,
+      erro.stack || erro.message,
+    ));
+  } finally {
+    await context.close();
+  }
+}
+
 (async () => {
   const browser = await chromium.launch({
     headless: true,
@@ -230,6 +365,7 @@ async function auditarMenu(browser, viewport, resultados) {
         await auditarPagina(browser, pagina, viewport, resultados);
       }
       await auditarMenu(browser, viewport, resultados);
+      await auditarPagamentoConfinamento(browser, viewport, resultados);
     }
   } finally {
     await browser.close();

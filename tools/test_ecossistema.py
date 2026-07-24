@@ -108,6 +108,7 @@ def validar_local() -> None:
     )
     executar(["node", "tools/test_revisoes_frontend.js"])
     executar(["node", "tools/test_gestao_frontend.js"])
+    executar(["node", "tools/test_confinex_pagamento_confinamento.mjs"])
 
     html = (ROOT / "revisoes.html").read_text(encoding="utf-8")
     scripts = scripts_inline(html)
@@ -120,6 +121,9 @@ def validar_local() -> None:
     executar(["node", "--check", "js/financeiro.js"])
     executar(["node", "--check", "js/pendencias.js"])
     executar(["node", "--check", "js/eventos.js"])
+    executar(["node", "--check", "js/confinex-pagamento-confinamento.mjs"])
+    executar(["node", "--check", "confinex-app.latest.js"])
+    executar(["node", "--check", "confinex-app.mobile.js"])
     executar(["node", "--check", "tools/auditar_ecossistema_browser.js"])
     executar(
         [

@@ -19,6 +19,10 @@ Atualizado em 2026-07-23. A fonte executável é
 | Desktop | 1440 × 1000 | shell presente, sem estouro da página | PNG integral + medição |
 | Celular | 390 × 844 | shell presente, sem estouro da página | PNG integral + medição |
 | CI | push, PR, agenda e execução manual | auditoria estática e Chromium geram artefato | GitHub Actions |
+| Pagamento do confinamento | adiantado, mensal e no final | fluxos vencem no dia 0, a cada 30 dias e no fim do ciclo; período parcial é proporcional | regressão JavaScript com resultados manuais |
+| Pagamento do confinamento | vazio, modo legado e entrada inválida | vazio preserva `final`; modo desconhecido normaliza; número inválido/negativo falha explicitamente | `tools/test_confinex_pagamento_confinamento.mjs` |
+| Custo do dinheiro | recebimento no fim e após o abate | cada parcela capitaliza somente do vencimento ao recebimento; não há custo duplicado | comparação independente a 2% a.m. |
+| Valor presente | qualquer forma de pagamento | VP das parcelas permanece separado do lucro nominal e do valor futuro | regressão JavaScript + comparativo/PDF |
 
 ## Estados
 
