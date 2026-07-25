@@ -14,6 +14,8 @@ from confinex_client import (
     ConfinexError,
     ConfinexHTTPError,
     ConfinexIdempotencyConflict,
+    ConfinexNetworkError,
+    OperationalInsertResult,
 )
 
 
@@ -28,6 +30,9 @@ class MemoryStore:
         self.posts = 0
         self.timeout_mode = None
         self.timeout_used = False
+        self.http_status = None
+        self.http_commit = False
+        self.http_used = False
 
 
 class MemoryClient(ConfinexClient):
@@ -56,6 +61,14 @@ class MemoryClient(ConfinexClient):
                 raise ConfinexHTTPError("duplicidade simulada", status=409)
 
             record = {"id": f"registro-{self.store.posts}", **(payload or {})}
+            if self.store.http_status and not self.store.http_used:
+                self.store.http_used = True
+                if self.store.http_commit and key:
+                    self.store.records[key] = record
+                raise ConfinexHTTPError(
+                    "falha HTTP simulada",
+                    status=self.store.http_status,
+                )
             if key:
                 self.store.records[key] = record
 
@@ -144,6 +157,29 @@ class ComprasIdempotenciaTests(unittest.TestCase):
         self.assertEqual(self.store.posts, 1)
         self.assertEqual(self.store.records, {})
 
+    def test_http_5xx_without_record_is_uncertain_and_not_retried(self):
+        self.store.http_status = 503
+        with self.assertRaises(ConfinexConnectionError):
+            self.client.insert_operational(
+                "compras",
+                self.payload,
+                idempotency_key="origem:mensagem-1",
+            )
+        self.assertEqual(self.store.posts, 1)
+        self.assertEqual(self.store.records, {})
+
+    def test_http_5xx_after_commit_is_reconciled_as_duplicate(self):
+        self.store.http_status = 503
+        self.store.http_commit = True
+        result = self.client.insert_operational(
+            "compras",
+            self.payload,
+            idempotency_key="origem:mensagem-1",
+        )
+        self.assertEqual(result.status, "duplicate")
+        self.assertEqual(self.store.posts, 1)
+        self.assertEqual(len(self.store.records), 1)
+
     def test_transport_timeout_is_classified_for_reconciliation(self):
         client = ConfinexClient(url="https://example.invalid", key="test-only")
         with mock.patch(
@@ -156,6 +192,88 @@ class ComprasIdempotenciaTests(unittest.TestCase):
                     self.payload,
                     idempotency_key="origem:mensagem-1",
                 )
+
+    def test_vps_environment_names_are_supported(self):
+        client = ConfinexClient(
+            env={
+                "CONFINEX_DB_URL": "https://example.invalid",
+                "CONFINEX_DB_KEY": "test-only",
+            }
+        )
+        self.assertEqual(client.url, "https://example.invalid")
+        self.assertEqual(client.key, "test-only")
+
+    def test_vps_legacy_constructor_and_attributes_are_preserved(self):
+        client = ConfinexClient(
+            {
+                "CONFINEX_DB_URL": "https://example.invalid/",
+                "CONFINEX_DB_KEY": "test-only",
+            },
+            timeout=90,
+        )
+        self.assertEqual(client.base_url, "https://example.invalid/rest/v1")
+        self.assertEqual(client.env["CONFINEX_DB_URL"], "https://example.invalid")
+        self.assertIs(ConfinexNetworkError, ConfinexConnectionError)
+
+    def test_vps_legacy_http_error_signature_is_preserved(self):
+        error = ConfinexHTTPError(409, "HTTP 409 simulado")
+        self.assertEqual(error.status, 409)
+        self.assertEqual(str(error), "HTTP 409 simulado")
+
+    def test_vps_legacy_idempotent_wrapper_is_preserved(self):
+        client = ConfinexClient(url="https://example.invalid", key="test-only")
+        inserted = OperationalInsertResult(
+            status="inserted",
+            record={"id": "registro-teste"},
+        )
+        with mock.patch.object(
+            client,
+            "insert_operational",
+            return_value=inserted,
+        ) as request:
+            result = client.insert_operational_idempotent(
+                "compras",
+                self.payload,
+                "juan-promocao-v1:" + "a" * 64,
+            )
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["record"]["id"], "registro-teste")
+        request.assert_called_once()
+
+    def test_idempotency_key_without_namespace_is_rejected(self):
+        with self.assertRaisesRegex(ConfinexError, "chave idempotente invalida"):
+            self.client.insert_operational(
+                "compras",
+                self.payload,
+                idempotency_key="sem-namespace",
+            )
+        self.assertEqual(self.store.posts, 0)
+
+    def test_timeout_is_capped_at_twenty_seconds(self):
+        client = ConfinexClient(
+            url="https://example.invalid",
+            key="test-only",
+            timeout=90,
+        )
+        self.assertEqual(client.timeout, 20)
+
+    def test_generic_insert_cannot_bypass_operational_executor(self):
+        client = ConfinexClient(
+            url="https://example.invalid",
+            key="test-only",
+        )
+        with self.assertRaisesRegex(ConfinexError, "escrita não permitida"):
+            client.insert("compras", self.payload)
+
+    def test_unknown_table_is_rejected_before_network(self):
+        client = ConfinexClient(
+            url="https://example.invalid",
+            key="test-only",
+        )
+        with mock.patch("confinex_client.urllib.request.urlopen") as request:
+            with self.assertRaisesRegex(ConfinexError, "tabela não permitida"):
+                client.select("tabela_inexistente", select="id")
+        request.assert_not_called()
 
     def test_concurrent_same_key_creates_one_record(self):
         clients = [MemoryClient(self.store), MemoryClient(self.store)]
