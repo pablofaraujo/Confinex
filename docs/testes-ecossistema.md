@@ -94,6 +94,13 @@ tentativas precisam chamar o roteador em `--dry-run`; `pdf`, `image`,
 `file_fetch`, `pdftotext`, `pdftoppm` e OCR interno são proibidos em qualquer
 ponto da trajetória.
 
+Antes da leitura real, a bateria cria uma imagem sintética acima do limite
+visual aceito pelo fallback Anthropic e confirma que o handler a normaliza para
+JPEG com dimensão segura. A imagem sintética não é transmitida e é removida
+automaticamente; o gate evita regressões com fotos grandes ou páginas de PDF
+renderizadas. O mesmo gate exige limite de saída suficiente para documentos
+multipágina e tratamento explícito de resposta truncada.
+
 Antes e depois, o teste compara a assinatura das nove tabelas. Ao terminar,
 mesmo em caso de falha, remove somente sessões marcadas pelo próprio teste,
 remove somente entradas de cache OCR criadas durante a execução e usa um

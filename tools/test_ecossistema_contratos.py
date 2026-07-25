@@ -210,6 +210,7 @@ class ContratosEcossistemaTests(unittest.TestCase):
             self.assertIn(contract, source)
         self.assertIn('{".pdf", ".jpg", ".jpeg", ".png", ".webp"}', source)
         self.assertIn('{"pdf", "image", "file_fetch"}', source)
+        self.assertIn("validar_pre_processamento_anthropic()", source)
 
     def test_verificador_vps_compara_todas_as_tabelas_criticas(self):
         source = (TOOLS / "test_juan_vps.py").read_text(encoding="utf-8")
