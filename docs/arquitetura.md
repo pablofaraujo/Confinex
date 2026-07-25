@@ -49,6 +49,11 @@ Para foto ou PDF, a presença de `MediaPath` ou `MediaPaths` obriga Juan a chama
 
 O processo do agente permanece em sandbox com escrita limitada à pasta de trabalho. Como esse ambiente não acessa o OCR externo, `compra_documento_ocr.py` entrega a leitura a um trabalhador local supervisionado, que usa OpenClaw/OpenAI fora do sandbox, processa páginas de PDF em paralelo e mantém cache identificado pelo conteúdo do arquivo. O retorno volta ao mesmo roteador; uma indisponibilidade ainda permite tentativa local com Tesseract. O runtime não pede autorização preliminar para esse comando local já confinado. Nenhuma leitura gera escrita automática; a criação de rascunho em `operation_drafts` é apenas uma opção oferecida ao final da conversa.
 
+O handler de pesagem também aceita foto e PDF, usa OpenClaw/OpenAI primeiro e
+Anthropic como fallback. Para impedir rejeição de anexos grandes, toda imagem
+destinada ao fallback é normalizada para JPEG e reduzida antes do envio; a
+bateria da VPS testa esse limite com arquivo sintético e remove o temporário.
+
 `operation_drafts` contém o material revisável; `pending_actions` contém a ordem de promoção e seu estado; `eventos` preserva decisões e resultados legíveis. A promoção admite somente `compras`, `vendas`, `pesagens_caderno` e `abates`. O executor assume a pendência por comparação de estado antes da inserção. Uma falha antes da inserção termina em `erro`; uma falha depois dela termina em `erro_pos_gravacao`, conserva o ID operacional e nunca deve ser executada novamente sem reconciliação.
 
 Para compras, a proteção persistente no banco já está ativa. A chave vem da

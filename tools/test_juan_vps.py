@@ -370,6 +370,57 @@ def validar_indice_sessoes() -> None:
         )
 
 
+def validar_pre_processamento_anthropic() -> None:
+    """Garante que anexos grandes respeitem o limite visual do fallback."""
+    source = """
+import importlib.util
+import io
+import inspect
+import json
+import re
+import tempfile
+from pathlib import Path
+from PIL import Image
+
+handler_path = Path("/root/juan-severino/handlers/pesagem_caderno_ocr.py")
+spec = importlib.util.spec_from_file_location("pesagem_caderno_ocr", handler_path)
+if spec is None or spec.loader is None:
+    raise RuntimeError("handler de pesagem não pôde ser carregado")
+handler = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(handler)
+limite = int(handler.MAX_DIMENSAO_ANTHROPIC)
+fonte_chamada = inspect.getsource(handler.call_anthropic_model)
+tokens = re.search(r'"max_tokens"\\s*:\\s*(\\d+)', fonte_chamada)
+if tokens is None or int(tokens.group(1)) < 8192:
+    raise RuntimeError("limite de saída Anthropic insuficiente para PDF")
+if "stop_reason" not in fonte_chamada or "max_tokens" not in fonte_chamada:
+    raise RuntimeError("truncamento Anthropic não é tratado explicitamente")
+with tempfile.TemporaryDirectory(prefix="confinex-anthropic-dimensao-") as tmp:
+    entrada = Path(tmp) / "grande.jpg"
+    Image.new("RGB", (limite + 501, 2), "white").save(entrada, "JPEG")
+    conteudo, mime = handler.load_image_as_jpeg(entrada)
+    with Image.open(io.BytesIO(conteudo)) as resultado:
+        dimensao = max(resultado.size)
+print(json.dumps({
+    "mime": mime,
+    "dimensao": dimensao,
+    "limite": limite,
+    "max_tokens": int(tokens.group(1)),
+    "truncamento_tratado": True,
+}))
+"""
+    processo = run([sys.executable, "-c", source], timeout=120)
+    resultado = json.loads(processo.stdout)
+    if resultado.get("mime") != "image/jpeg":
+        raise RuntimeError("fallback Anthropic não normalizou a imagem para JPEG")
+    if int(resultado.get("dimensao") or 0) > int(resultado.get("limite") or 0):
+        raise RuntimeError("fallback Anthropic manteve dimensão acima do limite")
+    if int(resultado.get("max_tokens") or 0) < 8192:
+        raise RuntimeError("fallback Anthropic manteve limite de saída insuficiente")
+    if resultado.get("truncamento_tratado") is not True:
+        raise RuntimeError("fallback Anthropic não trata resposta truncada")
+
+
 def validar_agente(
     path_text: str,
     legenda: str,
@@ -476,6 +527,7 @@ def main() -> int:
         )
         run(["openclaw", "config", "validate"])
         validar_indice_sessoes()
+        validar_pre_processamento_anthropic()
         for service in (
             "openclaw-gateway.service",
             "juan-compra-ocr-worker.service",
@@ -512,6 +564,7 @@ def main() -> int:
                     "py_compile": True,
                     "testes_handlers": True,
                     "openclaw_config": True,
+                    "pre_processamento_anthropic": True,
                     "gateway": "active",
                     "trabalhador_ocr": "active",
                     "status_eventos": statuses,
