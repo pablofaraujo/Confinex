@@ -39,5 +39,13 @@ jobs:
         run: |
           set -eu
           base="${URL_PUBLICA%/}"
+          confinex_html="$(mktemp)"
+          curl --fail --silent --show-error --location --retry 5 --retry-delay 5 "$base/confinex.html" --output "$confinex_html"
+          grep -q 'confinex-app.mobile.js' "$confinex_html"
+          grep -q 'confinex-supabase-ponte-inline.js' "$confinex_html"
+          if grep -q '\\n[[:space:]]*<script' "$confinex_html"; then
+            echo "confinex.html contem quebra de linha literal entre scripts" >&2
+            exit 1
+          fi
           curl --fail --silent --show-error --location --retry 5 --retry-delay 5 "$base/confinamento.html" | grep -q 'tbAcompanhamento'
           curl --fail --silent --show-error --location --retry 5 --retry-delay 5 "$base/painel-boi-gordo.html" | grep -q 'dados/painel-boi-gordo.json'
