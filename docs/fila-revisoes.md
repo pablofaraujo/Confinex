@@ -130,11 +130,12 @@ Destinos permitidos: `compras`, `vendas`, `pesagens_caderno` e `abates`. Campos 
 
 A proteção persistente de compras contra repetição foi aplicada pelo arquivo
 `202607250001_compras_idempotencia.sql`, com dados antigos e RLS preservados.
-Depois da implantação do cliente no executor, cada promoção de compra usará uma
+O cliente e o executor implantados na VPS fazem cada promoção de compra usar uma
 chave derivada da pendência. Uma repetição com os mesmos dados retorna
 `duplicate`; a mesma chave com dados diferentes é recusada. Timeout é
-reconciliado por leitura e nunca dispara um segundo envio automático. O cliente
-ainda não foi implantado no VPS. Consulte
+reconciliado por leitura e nunca dispara um segundo envio automático. A
+implantação foi validada com testes simulados e prévia real sem escrita.
+Consulte
 [`docs/idempotencia-compras.md`](idempotencia-compras.md).
 
 ### `tools/promocao_confirmacao_router.py`

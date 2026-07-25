@@ -1,0 +1,33 @@
+# Google Sheets — compatibilidade legada
+
+Status: **mantido como legado durante a transição; não migrado nem removido**.
+
+O inventário somente leitura do Drive confirmou planilhas de confinamento em
+formatos Google Sheets e Excel. Nenhum arquivo foi aberto, movido,
+compartilhado, renomeado ou alterado.
+
+## Fonte de verdade
+
+- Dados operacionais confirmados: Supabase.
+- Simulação local e recuperação offline: `localStorage`.
+- Sheets/Apps Script: compatibilidade entre dispositivos e histórico antigo.
+- Código: GitHub; a pasta de código no Drive é somente um espelho antigo.
+
+Enquanto a migração não for autorizada e homologada, o Apps Script deve
+permanecer ativo. A interface continua protegendo o carregamento inicial,
+conflitos por horário, versões nomeadas e restauração local.
+
+## Gate para uma migração futura
+
+Uma migração só pode começar com autorização específica e precisa:
+
+1. inventariar versões e assinaturas sem alterar os arquivos;
+2. definir o modelo correspondente no Supabase;
+3. comparar Sheets, Supabase e `localStorage`;
+4. testar conflito entre dispositivos, restauração e histórico;
+5. migrar uma cópia controlada;
+6. homologar antes de desativar qualquer Apps Script;
+7. preservar exportação e reversão.
+
+Até esse gate ser cumprido, Sheets é formalmente **legado em uso**, não uma
+fonte operacional paralela a ser atualizada por agentes.

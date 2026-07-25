@@ -1,6 +1,6 @@
 # Idempotência de compras operacionais
 
-Status: **aplicada no Supabase em 25/07/2026; implantação do executor pendente**.
+Status: **aplicada no Supabase e implantada no executor da VPS em 25/07/2026**.
 
 ## Finalidade
 
@@ -68,16 +68,25 @@ antes/depois confirmou:
 - RLS, políticas e permissões inalterados;
 - nenhum registro operacional criado.
 
-Antes de implantar o cliente no executor:
+O cliente e o executor foram implantados na VPS depois de:
 
-1. conferir novamente o commit implantado;
-2. validar o executor fora do sandbox;
-3. simular o contrato com cliente local sem rede;
-4. preparar um teste real controlado com marcador e IDs anotados;
-5. confirmar `inserted`/`duplicate` e exatamente uma compra;
-6. limpar o teste e comprovar a limpeza.
+1. inventariar os consumidores do cliente compartilhado;
+2. preservar as interfaces usadas pelas rotinas existentes;
+3. criar backup versionado dos arquivos ativos;
+4. aprovar 102 testes Python na bateria local;
+5. aprovar 26 testes simulados na VPS, sem rede operacional;
+6. validar a configuração OpenClaw e os serviços ativos;
+7. executar uma prévia real somente leitura, sem `--executar`;
+8. comparar assinaturas e contagens do Supabase antes e depois.
 
-O cliente e o executor ainda não foram implantados no VPS.
+A prévia retornou `executado = false`, apresentou apenas o hash do registro e
+não expôs os dados comerciais. As tabelas auditadas ficaram idênticas; nenhuma
+compra, promoção, pendência, rascunho ou evento foi criado ou alterado. A ação
+real continua aguardando autorização operacional e não recebeu chave
+persistida durante a prévia.
+
+Não houve necessidade de reiniciar o gateway. O backup fica fora do
+repositório público, na área de backups operacionais da Ponte.
 
 ## Testes locais
 
