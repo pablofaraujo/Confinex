@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -54,6 +55,14 @@ OPERATIONAL_WRITE_TABLES = {
     "vendas",
 }
 
+RPC_FUNCTIONS = {
+    "consolidar_negocio_confinex",
+    "revisar_estimativa_confinex",
+    "submeter_negocio_confinex",
+}
+
+IDEMPOTENCY_KEY_RE = re.compile(r"^[A-Za-z0-9_.-]+:[^\s]{1,180}$")
+
 
 class ConfinexError(RuntimeError):
     """Erro esperado em rotinas operacionais do Confinex."""
@@ -62,13 +71,27 @@ class ConfinexError(RuntimeError):
 class ConfinexHTTPError(ConfinexError):
     """Erro HTTP com status preservado para decisões seguras do cliente."""
 
-    def __init__(self, message: str, *, status: int) -> None:
+    def __init__(
+        self,
+        message: str | int,
+        legacy_message: str | None = None,
+        *,
+        status: int | None = None,
+    ) -> None:
+        if isinstance(message, int):
+            status = message
+            message = legacy_message or f"HTTP {status}"
+        if status is None:
+            raise TypeError("status HTTP é obrigatório")
         super().__init__(message)
         self.status = status
 
 
 class ConfinexConnectionError(ConfinexError):
     """Falha de transporte cuja conclusão no servidor pode ser desconhecida."""
+
+
+ConfinexNetworkError = ConfinexConnectionError
 
 
 class ConfinexIdempotencyConflict(ConfinexError):
@@ -125,10 +148,10 @@ def _same_requested_payload(existing: dict[str, Any], requested: dict[str, Any])
 class ConfinexClient:
     def __init__(
         self,
+        env: dict[str, str] | None = None,
         *,
         url: str | None = None,
         key: str | None = None,
-        env: dict[str, str] | None = None,
         timeout: int = TIMEOUT_MAX_SECONDS,
     ) -> None:
         values = {**_load_protected_env(), **os.environ, **(env or {})}
@@ -151,6 +174,11 @@ class ConfinexClient:
             raise ConfinexError(
                 "credenciais protegidas do Supabase não estão disponíveis"
             )
+        self.base_url = f"{self.url}/rest/v1"
+        self.env = {
+            "CONFINEX_DB_URL": self.url,
+            "CONFINEX_DB_KEY": self.key,
+        }
 
     def _request(
         self,
@@ -187,11 +215,11 @@ class ConfinexClient:
             ) from exc
         except urllib.error.URLError as exc:
             raise ConfinexConnectionError(
-                f"nao foi possivel conectar ao Supabase: {exc.reason}"
+                f"falha de rede em {method} {table}: {type(exc.reason).__name__}"
             ) from exc
-        except TimeoutError as exc:
+        except (TimeoutError, OSError) as exc:
             raise ConfinexConnectionError(
-                "tempo esgotado ao conectar ao Supabase"
+                f"falha de rede em {method} {table}: {type(exc).__name__}"
             ) from exc
         if not text:
             return []
@@ -261,8 +289,8 @@ class ConfinexClient:
         if not isinstance(idempotency_key, str) or not idempotency_key.strip():
             raise ConfinexError("chave idempotente de compra nao pode ser vazia")
         key = idempotency_key.strip()
-        if len(key) > 200:
-            raise ConfinexError("chave idempotente de compra excede 200 caracteres")
+        if len(key) > 200 or not IDEMPOTENCY_KEY_RE.fullmatch(key):
+            raise ConfinexError("chave idempotente invalida")
 
         requested = {**payload, "idempotency_key": key}
         try:
@@ -292,6 +320,54 @@ class ConfinexClient:
                 return reconciled
             raise
 
+    def find_operational_by_idempotency(
+        self,
+        table: str,
+        idempotency_key: str,
+    ) -> dict[str, Any] | None:
+        if table != "compras":
+            raise ConfinexError(
+                "reconciliacao idempotente ainda nao habilitada para esta tabela"
+            )
+        if not IDEMPOTENCY_KEY_RE.fullmatch(idempotency_key):
+            raise ConfinexError("chave idempotente invalida")
+        rows = self._find_purchase_by_idempotency_key(idempotency_key)
+        if len(rows) > 1:
+            raise ConfinexError("violacao de unicidade da chave idempotente")
+        return rows[0] if rows else None
+
+    def insert_operational_idempotent(
+        self,
+        table: str,
+        payload: dict[str, Any],
+        idempotency_key: str,
+    ) -> dict[str, Any]:
+        """Compatibilidade segura com o executor anterior da VPS."""
+        try:
+            result = self.insert_operational(
+                table,
+                payload,
+                idempotency_key=idempotency_key,
+            )
+            if isinstance(result, OperationalInsertResult):
+                status = "success" if result.status == "inserted" else result.status
+                return {"status": status, "record": result.record}
+            return {"status": "success", "record": result}
+        except ConfinexHTTPError as exc:
+            if exc.status != 409 and exc.status < 500:
+                return {"status": "failed", "http_status": exc.status}
+        except ConfinexConnectionError:
+            pass
+        except ConfinexError:
+            return {"status": "failed"}
+        try:
+            found = self.find_operational_by_idempotency(table, idempotency_key)
+        except ConfinexError:
+            found = None
+        if found is not None:
+            return {"status": "duplicate", "record": found}
+        return {"status": "uncertain"}
+
     def update(self, table: str, filters: dict[str, Any], payload: dict[str, Any]) -> list[dict[str, Any]]:
         if table not in WRITE_TABLES:
             raise ConfinexError(f"alteração não permitida para tabela: {table}")
@@ -299,3 +375,41 @@ class ConfinexClient:
         if not isinstance(rows, list):
             raise ConfinexError(f"update em {table} retornou formato inesperado")
         return rows
+
+    def rpc(self, function: str, payload: dict[str, Any]) -> Any:
+        """Executa somente RPCs transacionais previamente autorizadas."""
+        if function not in RPC_FUNCTIONS:
+            raise ConfinexError(f"RPC nao permitida: {function}")
+        if not isinstance(payload, dict):
+            raise ConfinexError("payload da RPC deve ser um objeto")
+        url = f"{self.base_url}/rpc/{function}"
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        headers = {
+            "apikey": self.key,
+            "Authorization": f"Bearer {self.key}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        }
+        req = urllib.request.Request(url, data=body, headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                text = resp.read().decode("utf-8")
+        except urllib.error.HTTPError as exc:
+            raise ConfinexHTTPError(
+                f"Supabase RPC {function} falhou com HTTP {exc.code}",
+                status=exc.code,
+            ) from exc
+        except urllib.error.URLError as exc:
+            raise ConfinexConnectionError(
+                f"falha de rede em RPC {function}: {type(exc.reason).__name__}"
+            ) from exc
+        except (TimeoutError, OSError) as exc:
+            raise ConfinexConnectionError(
+                f"falha de rede em RPC {function}: {type(exc).__name__}"
+            ) from exc
+        if not text:
+            return None
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise ConfinexError(f"resposta invalida em RPC {function}") from exc

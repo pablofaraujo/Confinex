@@ -14,6 +14,8 @@ from confinex_client import (
     ConfinexError,
     ConfinexHTTPError,
     ConfinexIdempotencyConflict,
+    ConfinexNetworkError,
+    OperationalInsertResult,
 )
 
 
@@ -200,6 +202,52 @@ class ComprasIdempotenciaTests(unittest.TestCase):
         )
         self.assertEqual(client.url, "https://example.invalid")
         self.assertEqual(client.key, "test-only")
+
+    def test_vps_legacy_constructor_and_attributes_are_preserved(self):
+        client = ConfinexClient(
+            {
+                "CONFINEX_DB_URL": "https://example.invalid/",
+                "CONFINEX_DB_KEY": "test-only",
+            },
+            timeout=90,
+        )
+        self.assertEqual(client.base_url, "https://example.invalid/rest/v1")
+        self.assertEqual(client.env["CONFINEX_DB_URL"], "https://example.invalid")
+        self.assertIs(ConfinexNetworkError, ConfinexConnectionError)
+
+    def test_vps_legacy_http_error_signature_is_preserved(self):
+        error = ConfinexHTTPError(409, "HTTP 409 simulado")
+        self.assertEqual(error.status, 409)
+        self.assertEqual(str(error), "HTTP 409 simulado")
+
+    def test_vps_legacy_idempotent_wrapper_is_preserved(self):
+        client = ConfinexClient(url="https://example.invalid", key="test-only")
+        inserted = OperationalInsertResult(
+            status="inserted",
+            record={"id": "registro-teste"},
+        )
+        with mock.patch.object(
+            client,
+            "insert_operational",
+            return_value=inserted,
+        ) as request:
+            result = client.insert_operational_idempotent(
+                "compras",
+                self.payload,
+                "juan-promocao-v1:" + "a" * 64,
+            )
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["record"]["id"], "registro-teste")
+        request.assert_called_once()
+
+    def test_idempotency_key_without_namespace_is_rejected(self):
+        with self.assertRaisesRegex(ConfinexError, "chave idempotente invalida"):
+            self.client.insert_operational(
+                "compras",
+                self.payload,
+                idempotency_key="sem-namespace",
+            )
+        self.assertEqual(self.store.posts, 0)
 
     def test_timeout_is_capped_at_twenty_seconds(self):
         client = ConfinexClient(
