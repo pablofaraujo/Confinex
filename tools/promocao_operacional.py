@@ -4,13 +4,20 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from confinex_client import ConfinexClient, ConfinexError
+from confinex_client import (
+    ConfinexClient,
+    ConfinexConnectionError,
+    ConfinexError,
+    ConfinexHTTPError,
+    ConfinexIdempotencyConflict,
+)
 
 ALLOWED_TARGETS = {"compras", "vendas", "pesagens_caderno", "abates"}
 REQUIRED_ACTION = "promover_revisao_operacional"
@@ -198,6 +205,55 @@ def purchase_idempotency_key(action_id: str) -> str:
     return f"promocao_operacional:{action_id}"
 
 
+def record_sha256(target: str, record: dict[str, Any]) -> str:
+    canonical = json.dumps(
+        {"target": target, "record": record},
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
+def mark_uncertain(
+    client: ConfinexClient,
+    action_id: str,
+    payload: dict[str, Any],
+    *,
+    target: str,
+    idempotency_key: str | None,
+) -> None:
+    """Bloqueia repetição quando não é possível provar se houve gravação."""
+    uncertain_payload = {
+        **payload,
+        "idempotency": {
+            "key": idempotency_key,
+            "state": "uncertain",
+        },
+    }
+    client.update(
+        "pending_actions",
+        {"id": f"eq.{action_id}", "status": "eq.em_execucao"},
+        {
+            "status": "erro_pos_gravacao",
+            "atualizado_em": utc_now(),
+            "payload": uncertain_payload,
+            "erro": (
+                "Resultado da gravação não foi confirmado. "
+                "Não repetir; reconciliar pela chave idempotente."
+            ),
+            "resultado": {
+                "target_table": target,
+                "target_record_id": None,
+                "promovido_para_operacional": False,
+                "requer_reconciliacao": True,
+                "estado_idempotencia": "uncertain",
+                "idempotency_key": idempotency_key,
+            },
+        },
+    )
+
+
 def fetch_action(client: ConfinexClient, action_id: str) -> dict[str, Any]:
     rows = client.select("pending_actions", select="*", id=f"eq.{action_id}")
     if len(rows) != 1:
@@ -251,9 +307,14 @@ def execute_promotion(
     result: dict[str, Any] = {
         "pending_action_id": action_id,
         "target_table": target,
-        "record": record,
+        "record_sha256": record_sha256(target, record),
         "executado": False,
         "confirmacao_esperada": expected_confirmation(action_id),
+        "idempotency_key": (
+            purchase_idempotency_key(action_id)
+            if target == "compras"
+            else None
+        ),
     }
     if not executar:
         return result
@@ -263,6 +324,14 @@ def execute_promotion(
         raise ConfinexError(f"confirmacao invalida; use exatamente: {expected}")
     validate_execution_origin(payload, origem_conversa_id, origem_mensagem_id)
 
+    idempotency_key = purchase_idempotency_key(action_id) if target == "compras" else None
+    claimed_payload = {
+        **payload,
+        "idempotency": {
+            "key": idempotency_key,
+            "state": "processing",
+        },
+    }
     claimed = client.update(
         "pending_actions",
         {"id": f"eq.{action_id}", "status": f"eq.{action.get('status')}"},
@@ -271,12 +340,12 @@ def execute_promotion(
             "atualizado_em": now,
             "confirmado_por": usuario,
             "confirmado_em": now,
+            "payload": claimed_payload,
         },
     )
     if len(claimed) != 1:
         raise ConfinexError("pendencia ja foi assumida ou alterada por outra execucao")
 
-    idempotency_key = purchase_idempotency_key(action_id) if target == "compras" else None
     try:
         insert_result = client.insert_operational(
             target,
@@ -284,17 +353,54 @@ def execute_promotion(
             idempotency_key=idempotency_key,
         )
         inserted = insert_result.record
-    except Exception as exc:
+    except ConfinexConnectionError as exc:
+        try:
+            mark_uncertain(
+                client,
+                action_id,
+                claimed_payload,
+                target=target,
+                idempotency_key=idempotency_key,
+            )
+        except Exception:
+            # A ação continua em em_execucao com a chave persistida, o que
+            # também impede nova execução até reconciliação explícita.
+            pass
+        raise ConfinexError(
+            "resultado operacional incerto; não repita a promoção"
+        ) from exc
+    except (ConfinexHTTPError, ConfinexIdempotencyConflict, ConfinexError) as exc:
         client.update(
             "pending_actions",
             {"id": f"eq.{action_id}", "status": "eq.em_execucao"},
             {
                 "status": "erro",
                 "atualizado_em": utc_now(),
-                "erro": f"Falha antes da gravacao operacional: {exc}"[:1000],
+                "payload": {
+                    **claimed_payload,
+                    "idempotency": {
+                        "key": idempotency_key,
+                        "state": "failed",
+                    },
+                },
+                "erro": f"Falha antes da gravação operacional: {exc}"[:1000],
             },
         )
         raise
+    except Exception as exc:
+        try:
+            mark_uncertain(
+                client,
+                action_id,
+                claimed_payload,
+                target=target,
+                idempotency_key=idempotency_key,
+            )
+        except Exception:
+            pass
+        raise ConfinexError(
+            "falha inesperada com resultado incerto; não repita a promoção"
+        ) from exc
 
     payload = {
         **payload,

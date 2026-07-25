@@ -4,7 +4,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from confinex_client import OperationalInsertResult
+from confinex_client import (
+    ConfinexConnectionError,
+    ConfinexHTTPError,
+    OperationalInsertResult,
+)
 from promocao_operacional import (
     clean_record,
     expected_confirmation,
@@ -23,6 +27,7 @@ class FakeClient:
         self.claim_succeeds = True
         self.fail_operational_insert = False
         self.fail_audit_insert = False
+        self.operational_failure = RuntimeError("insert indisponível")
 
     def select(self, table, **params):
         if table == "pending_actions" and params.get("id") == f"eq.{self.action['id']}":
@@ -31,7 +36,7 @@ class FakeClient:
 
     def insert_operational(self, table, payload, *, idempotency_key=None):
         if self.fail_operational_insert:
-            raise RuntimeError("insert indisponivel")
+            raise self.operational_failure
         self.operational_inserts.append((table, payload, idempotency_key))
         return OperationalInsertResult(
             status="inserted",
@@ -48,6 +53,8 @@ class FakeClient:
         self.updates.append((table, filters, payload))
         if table == "pending_actions" and payload.get("status") == "em_execucao" and not self.claim_succeeds:
             return []
+        if table == "pending_actions":
+            self.action.update(payload)
         return [{**payload, "id": filters["id"].replace("eq.", "")}]
 
 
@@ -147,6 +154,12 @@ class PromocaoOperacionalTests(unittest.TestCase):
         self.assertFalse(result["executado"])
         self.assertEqual(client.operational_inserts, [])
         self.assertEqual(result["confirmacao_esperada"], "PROMOVER pa-1")
+        self.assertNotIn("record", result)
+        self.assertRegex(result["record_sha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual(
+            result["idempotency_key"],
+            purchase_idempotency_key("pa-1"),
+        )
 
     def test_execute_requires_exact_confirmation(self):
         client = FakeClient(action_for())
@@ -204,6 +217,13 @@ class PromocaoOperacionalTests(unittest.TestCase):
         self.assertEqual(result["idempotency_status"], "inserted")
         self.assertEqual(client.updates[0][0], "pending_actions")
         self.assertEqual(client.updates[0][2]["status"], "em_execucao")
+        self.assertEqual(
+            client.updates[0][2]["payload"]["idempotency"],
+            {
+                "key": purchase_idempotency_key("pa-1"),
+                "state": "processing",
+            },
+        )
         self.assertEqual(client.updates[1][0], "operation_drafts")
         self.assertEqual(client.updates[2][2]["status"], "executado")
         self.assertEqual(client.audit_inserts[0][1]["tipo"], "promocao_operacional_executada")
@@ -219,16 +239,62 @@ class PromocaoOperacionalTests(unittest.TestCase):
             )
         self.assertEqual(client.operational_inserts, [])
 
-    def test_failure_before_insert_returns_action_to_error_queue(self):
+    def test_http_4xx_before_insert_returns_action_to_error_queue(self):
         client = FakeClient(action_for())
         client.fail_operational_insert = True
-        with self.assertRaisesRegex(Exception, "insert indisponivel"):
+        client.operational_failure = ConfinexHTTPError(
+            "payload inválido simulado",
+            status=400,
+        )
+        with self.assertRaisesRegex(Exception, "payload inválido"):
             execute_promotion(
                 client, "pa-1", usuario="pablo", executar=True,
                 confirmacao=expected_confirmation("pa-1"),
                 origem_conversa_id="grupo-1", origem_mensagem_id="msg-nova",
             )
         self.assertEqual(client.updates[-1][2]["status"], "erro")
+        self.assertEqual(
+            client.updates[-1][2]["payload"]["idempotency"]["state"],
+            "failed",
+        )
+
+    def test_timeout_is_uncertain_and_blocks_repeat(self):
+        client = FakeClient(action_for())
+        client.fail_operational_insert = True
+        client.operational_failure = ConfinexConnectionError(
+            "timeout simulado"
+        )
+        kwargs = {
+            "usuario": "pablo",
+            "executar": True,
+            "confirmacao": expected_confirmation("pa-1"),
+            "origem_conversa_id": "grupo-1",
+            "origem_mensagem_id": "msg-nova",
+        }
+        with self.assertRaisesRegex(Exception, "incerto.*não repita"):
+            execute_promotion(client, "pa-1", **kwargs)
+        self.assertEqual(client.updates[-1][2]["status"], "erro_pos_gravacao")
+        self.assertTrue(
+            client.updates[-1][2]["resultado"]["requer_reconciliacao"]
+        )
+        self.assertEqual(
+            client.updates[-1][2]["resultado"]["estado_idempotencia"],
+            "uncertain",
+        )
+        with self.assertRaisesRegex(Exception, "status nao permite promover"):
+            execute_promotion(client, "pa-1", **kwargs)
+        self.assertEqual(client.operational_inserts, [])
+
+    def test_unexpected_failure_is_uncertain_not_failed(self):
+        client = FakeClient(action_for())
+        client.fail_operational_insert = True
+        with self.assertRaisesRegex(Exception, "resultado incerto"):
+            execute_promotion(
+                client, "pa-1", usuario="pablo", executar=True,
+                confirmacao=expected_confirmation("pa-1"),
+                origem_conversa_id="grupo-1", origem_mensagem_id="msg-nova",
+            )
+        self.assertEqual(client.updates[-1][2]["status"], "erro_pos_gravacao")
 
     def test_failure_after_insert_blocks_retry_and_preserves_record_id(self):
         client = FakeClient(action_for())
