@@ -1,6 +1,6 @@
 # Idempotência de compras operacionais
 
-Status: **preparada, não aplicada no Supabase**.
+Status: **aplicada no Supabase em 25/07/2026; implantação do executor pendente**.
 
 ## Finalidade
 
@@ -56,20 +56,28 @@ Essa consulta evita confundir resposta perdida com gravação perdida. A proteç
 contra concorrência é fornecida pelo índice único, não apenas por memória do
 processo.
 
-## Homologação antes de aplicar
+## Aplicação e homologação
 
-1. Revisar o SQL e o contrato do cliente.
-2. Confirmar o esquema real de `public.compras`.
-3. Executar a migração em ambiente de homologação.
-4. Conferir que as linhas anteriores permanecem com chave nula.
-5. Simular duas requisições com a mesma chave e os mesmos dados.
-6. Confirmar um registro e respostas `inserted`/`duplicate`.
-7. Simular a mesma chave com dados diferentes e confirmar a rejeição.
-8. Auditar RLS e permissões antes e depois.
-9. Aplicar em produção somente com autorização explícita.
+A migração foi aplicada somente depois do CI verde. A verificação sanitizada
+antes/depois confirmou:
 
-Enquanto a migração não for aplicada, o código que envia
-`idempotency_key` não deve ser implantado no executor operacional.
+- mesma quantidade, mesmos IDs e mesmo conteúdo das compras;
+- coluna nula e do tipo `text`;
+- nenhuma compra antiga recebeu chave;
+- índice único parcial e restrição validados;
+- RLS, políticas e permissões inalterados;
+- nenhum registro operacional criado.
+
+Antes de implantar o cliente no executor:
+
+1. conferir novamente o commit implantado;
+2. validar o executor fora do sandbox;
+3. simular o contrato com cliente local sem rede;
+4. preparar um teste real controlado com marcador e IDs anotados;
+5. confirmar `inserted`/`duplicate` e exatamente uma compra;
+6. limpar o teste e comprovar a limpeza.
+
+O cliente e o executor ainda não foram implantados no VPS.
 
 ## Testes locais
 
