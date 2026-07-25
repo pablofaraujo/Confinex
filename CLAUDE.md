@@ -62,7 +62,7 @@ aplicação protegida e reversão estão em `docs/contextos-por-grupo.md`.
 
 ## Deploy
 
-Push na `main` → workflow `deploy.yml` publica o repositório inteiro no GitHub Pages (sem build). Cuidado: tudo que estiver commitado fica público.
+Push na `main` → workflow `deploy.yml` publica o repositório inteiro no GitHub Pages (sem build). O workflow também aceita execução manual para recuperar uma implantação travada sem criar commit vazio. Cuidado: tudo que estiver commitado fica público.
 
 ## Regra permanente — Design System
 
