@@ -194,6 +194,10 @@ def expected_confirmation(action_id: str) -> str:
     return CONFIRM_TEMPLATE.format(id=action_id)
 
 
+def purchase_idempotency_key(action_id: str) -> str:
+    return f"promocao_operacional:{action_id}"
+
+
 def fetch_action(client: ConfinexClient, action_id: str) -> dict[str, Any]:
     rows = client.select("pending_actions", select="*", id=f"eq.{action_id}")
     if len(rows) != 1:
@@ -272,8 +276,14 @@ def execute_promotion(
     if len(claimed) != 1:
         raise ConfinexError("pendencia ja foi assumida ou alterada por outra execucao")
 
+    idempotency_key = purchase_idempotency_key(action_id) if target == "compras" else None
     try:
-        inserted = client.insert_operational(target, record)
+        insert_result = client.insert_operational(
+            target,
+            record,
+            idempotency_key=idempotency_key,
+        )
+        inserted = insert_result.record
     except Exception as exc:
         client.update(
             "pending_actions",
@@ -294,6 +304,8 @@ def execute_promotion(
         "target_table": target,
         "target_record_id": inserted.get("id"),
         "record_executed": record,
+        "idempotency_status": insert_result.status,
+        "idempotency_key": idempotency_key,
         "confirmacao_origem_conversa_id": origem_conversa_id,
         "confirmacao_origem_mensagem_id": origem_mensagem_id,
     }
@@ -317,6 +329,7 @@ def execute_promotion(
                     "target_record_id": inserted.get("id"),
                     "record": record,
                     "promovido_para_operacional": True,
+                    "idempotency_status": insert_result.status,
                 },
                 "observacao": "Promocao operacional executada por rotina controlada de backend.",
             },
@@ -373,7 +386,14 @@ def execute_promotion(
             f"registro operacional {target}/{inserted.get('id')} foi criado, "
             "mas a finalizacao falhou; nao repita a promocao"
         ) from exc
-    result.update({"executado": True, "target_record_id": inserted.get("id"), "evento_id": event.get("id")})
+    result.update(
+        {
+            "executado": True,
+            "target_record_id": inserted.get("id"),
+            "evento_id": event.get("id"),
+            "idempotency_status": insert_result.status,
+        }
+    )
     return result
 
 
