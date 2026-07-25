@@ -53,8 +53,9 @@ O processo do agente permanece em sandbox com escrita limitada à pasta de traba
 
 Para compras, a proteção persistente no banco já está ativa. A chave vem da
 pendência confirmada, e timeout sem registro reconciliado nunca provoca novo
-`POST` automático. A implantação do cliente no executor continua pendente de
-um ciclo próprio de VPS e teste controlado.
+`POST` automático. O cliente e o executor já foram implantados na VPS após
+backup, testes simulados e prévia real somente leitura, sem promoção nem
+persistência da chave.
 
 `memorias_agentes` e `contexto_handoff` dão continuidade ao contexto de Juan e à passagem entre agentes, mas não aprovam promoções nem substituem os registros de auditoria. O vínculo operacional é feito pelos IDs do rascunho, da pendência, do evento e do registro de destino; na interface, a referência humana é sempre o nome do grupo.
 
