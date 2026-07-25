@@ -4,7 +4,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from promocao_operacional import clean_record, expected_confirmation, execute_promotion, validate_action
+from confinex_client import OperationalInsertResult
+from promocao_operacional import (
+    clean_record,
+    expected_confirmation,
+    execute_promotion,
+    purchase_idempotency_key,
+    validate_action,
+)
 
 
 class FakeClient:
@@ -22,11 +29,14 @@ class FakeClient:
             return [self.action]
         return []
 
-    def insert_operational(self, table, payload):
+    def insert_operational(self, table, payload, *, idempotency_key=None):
         if self.fail_operational_insert:
             raise RuntimeError("insert indisponivel")
-        self.operational_inserts.append((table, payload))
-        return {"id": "operacional-1", **payload}
+        self.operational_inserts.append((table, payload, idempotency_key))
+        return OperationalInsertResult(
+            status="inserted",
+            record={"id": "operacional-1", **payload},
+        )
 
     def insert(self, table, payload):
         if self.fail_audit_insert:
@@ -187,6 +197,11 @@ class PromocaoOperacionalTests(unittest.TestCase):
         )
         self.assertTrue(result["executado"])
         self.assertEqual(client.operational_inserts[0][0], "compras")
+        self.assertEqual(
+            client.operational_inserts[0][2],
+            purchase_idempotency_key("pa-1"),
+        )
+        self.assertEqual(result["idempotency_status"], "inserted")
         self.assertEqual(client.updates[0][0], "pending_actions")
         self.assertEqual(client.updates[0][2]["status"], "em_execucao")
         self.assertEqual(client.updates[1][0], "operation_drafts")

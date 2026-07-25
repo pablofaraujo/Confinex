@@ -128,6 +128,14 @@ python3 tools/promocao_operacional.py \
 
 Destinos permitidos: `compras`, `vendas`, `pesagens_caderno` e `abates`. Campos fora da lista permitida são descartados antes da inserção.
 
+A proteção persistente de compras contra repetição está preparada em
+`202607250001_compras_idempotencia.sql`, mas não foi aplicada. Depois de
+homologada, cada promoção de compra usará uma chave derivada da pendência. Uma
+repetição com os mesmos dados retorna `duplicate`; a mesma chave com dados
+diferentes é recusada. Timeout é reconciliado por leitura e nunca dispara um
+segundo envio automático. Consulte
+[`docs/idempotencia-compras.md`](idempotencia-compras.md).
+
 ### `tools/promocao_confirmacao_router.py`
 
 Reconhece apenas a mensagem exata `PROMOVER <id>`. Para validar o caminho sem gravar:

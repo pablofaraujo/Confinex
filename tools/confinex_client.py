@@ -8,11 +8,62 @@ import os
 import urllib.error
 import urllib.parse
 import urllib.request
+from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 
 class ConfinexError(RuntimeError):
     """Erro esperado em rotinas operacionais do Confinex."""
+
+
+class ConfinexHTTPError(ConfinexError):
+    """Erro HTTP com status preservado para decisões seguras do cliente."""
+
+    def __init__(self, message: str, *, status: int) -> None:
+        super().__init__(message)
+        self.status = status
+
+
+class ConfinexConnectionError(ConfinexError):
+    """Falha de transporte cuja conclusão no servidor pode ser desconhecida."""
+
+
+class ConfinexIdempotencyConflict(ConfinexError):
+    """A mesma chave idempotente foi associada a dados diferentes."""
+
+
+@dataclass(frozen=True)
+class OperationalInsertResult:
+    """Resultado persistente de uma tentativa de gravação operacional."""
+
+    status: str
+    record: dict[str, Any]
+
+
+def _canonical_value(value: Any) -> Any:
+    if value is None or isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float, Decimal)):
+        try:
+            return ("numero", str(Decimal(str(value)).normalize()))
+        except InvalidOperation:
+            return value
+    if isinstance(value, dict):
+        return {key: _canonical_value(current) for key, current in sorted(value.items())}
+    if isinstance(value, list):
+        return [_canonical_value(current) for current in value]
+    return value
+
+
+def _same_requested_payload(existing: dict[str, Any], requested: dict[str, Any]) -> bool:
+    expected = {
+        key: _canonical_value(value)
+        for key, value in requested.items()
+        if key != "idempotency_key"
+    }
+    actual = {key: _canonical_value(existing.get(key)) for key in expected}
+    return actual == expected
 
 
 class ConfinexClient:
@@ -49,9 +100,18 @@ class ConfinexClient:
                 text = resp.read().decode("utf-8")
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
-            raise ConfinexError(f"Supabase {method} {table} falhou: {exc.code} {detail}") from exc
+            raise ConfinexHTTPError(
+                f"Supabase {method} {table} falhou: {exc.code} {detail}",
+                status=exc.code,
+            ) from exc
         except urllib.error.URLError as exc:
-            raise ConfinexError(f"nao foi possivel conectar ao Supabase: {exc.reason}") from exc
+            raise ConfinexConnectionError(
+                f"nao foi possivel conectar ao Supabase: {exc.reason}"
+            ) from exc
+        except TimeoutError as exc:
+            raise ConfinexConnectionError(
+                "tempo esgotado ao conectar ao Supabase"
+            ) from exc
         if not text:
             return []
         try:
@@ -71,8 +131,65 @@ class ConfinexClient:
             return rows[0]
         raise ConfinexError(f"insert em {table} nao retornou registro")
 
-    def insert_operational(self, table: str, payload: dict[str, Any]) -> dict[str, Any]:
-        return self.insert(table, payload)
+    def _find_purchase_by_idempotency_key(self, key: str) -> list[dict[str, Any]]:
+        return self.select(
+            "compras",
+            select="*",
+            idempotency_key=f"eq.{key}",
+            limit=2,
+        )
+
+    def _reconcile_purchase(
+        self,
+        key: str,
+        requested: dict[str, Any],
+    ) -> OperationalInsertResult | None:
+        rows = self._find_purchase_by_idempotency_key(key)
+        if not rows:
+            return None
+        if len(rows) != 1:
+            raise ConfinexError("chave idempotente de compra retornou mais de um registro")
+        existing = rows[0]
+        if not _same_requested_payload(existing, requested):
+            raise ConfinexIdempotencyConflict(
+                "chave idempotente ja existe com dados diferentes"
+            )
+        return OperationalInsertResult(status="duplicate", record=existing)
+
+    def insert_operational(
+        self,
+        table: str,
+        payload: dict[str, Any],
+        *,
+        idempotency_key: str | None = None,
+    ) -> OperationalInsertResult:
+        if table != "compras" or idempotency_key is None:
+            return OperationalInsertResult(status="inserted", record=self.insert(table, payload))
+
+        if not isinstance(idempotency_key, str) or not idempotency_key.strip():
+            raise ConfinexError("chave idempotente de compra nao pode ser vazia")
+        key = idempotency_key.strip()
+        if len(key) > 200:
+            raise ConfinexError("chave idempotente de compra excede 200 caracteres")
+
+        requested = {**payload, "idempotency_key": key}
+        try:
+            inserted = self.insert("compras", requested)
+            return OperationalInsertResult(status="inserted", record=inserted)
+        except ConfinexHTTPError as exc:
+            if exc.status != 409:
+                raise
+            reconciled = self._reconcile_purchase(key, requested)
+            if reconciled is None:
+                raise ConfinexError(
+                    "Supabase informou duplicidade, mas a compra nao foi localizada"
+                ) from exc
+            return reconciled
+        except ConfinexConnectionError:
+            reconciled = self._reconcile_purchase(key, requested)
+            if reconciled is not None:
+                return reconciled
+            raise
 
     def update(self, table: str, filters: dict[str, Any], payload: dict[str, Any]) -> list[dict[str, Any]]:
         rows = self._request("PATCH", table, params=filters, payload=payload)
