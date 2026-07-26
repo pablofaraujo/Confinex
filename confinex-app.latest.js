@@ -8,6 +8,11 @@ import {
   calcularResultadoFinanceiro,
   calcularValorPresente
 } from "./js/confinex-resultado-financeiro.mjs";
+import {
+  cotacaoBgiValida,
+  criarCotacaoBgiManual,
+  mesclarCotacoesBgiAutomaticas
+} from "./js/confinex-bgi.mjs";
 
 // confinex_work.jsx
 import { useEffect, useState, useMemo, useRef } from "react";
@@ -1121,6 +1126,13 @@ function normalizarMercadoB3(loteInformado, cenariosInformados) {
     ...loteInformado || {},
     cotacoesB3: { ...loteInformado?.cotacoesB3 || {} }
   };
+  Object.entries(loteNovo.cotacoesB3).forEach(([contrato, registro]) => {
+    if (!registro || typeof registro !== "object") return;
+    loteNovo.cotacoesB3[contrato] = {
+      ...registro,
+      modo: registro.modo || (/manual/i.test(registro.fonte || "") ? "manual" : "automatico")
+    };
+  });
   const cenariosNovos = (cenariosInformados || []).map((sc) => ({ ...sc }));
   cenariosNovos.forEach((sc) => {
     const contrato = contratoB3DoCenario(sc);
@@ -1132,7 +1144,8 @@ function normalizarMercadoB3(loteInformado, cenariosInformados) {
       loteNovo.cotacoesB3[contrato] = {
         preco: String(sc.precoBolsa || existente?.preco || "350"),
         fonte: sc.cotacaoB3Fonte || existente?.fonte || "Valor migrado do cenário",
-        atualizadaEm
+        atualizadaEm,
+        modo: existente?.modo || (/manual/i.test(sc.cotacaoB3Fonte || "") ? "manual" : "automatico")
       };
     }
   });
@@ -1443,9 +1456,9 @@ function ScPanel({ sc, upd, sexo, custoDinheiro, resultado, confinamentos, model
           }
         ) }),
         sc.modoPreco === "bolsa" ? /* @__PURE__ */ jsxs(Fragment, { children: [
-          /* @__PURE__ */ jsx(F, { label: isParceria ? "Contrato B3 automático" : "Contrato B3 escolhido", hint: isParceria ? `Definido pela sa\xEDda em ${mesSaidaLabel(dataSaida)}` : `Sugest\xE3o pela sa\xEDda: ${contratoSugerido || "\u2014"}`, children: isParceria ? /* @__PURE__ */ jsx("input", { readOnly: true, value: contratoSugerido || "" }) : /* @__PURE__ */ jsxs("div", { style: { display: "flex", gap: 6 }, children: [
+          /* @__PURE__ */ jsx(F, { label: isParceria ? "Contrato pelo mês da saída" : "Vencimento para este cenário", hint: isParceria ? `Definido pela sa\xEDda em ${mesSaidaLabel(dataSaida)}` : `M\xEAs da sa\xEDda sugere ${contratoSugerido || "\u2014"}`, children: isParceria ? /* @__PURE__ */ jsx("input", { readOnly: true, value: contratoSugerido || "" }) : /* @__PURE__ */ jsxs("div", { style: { display: "flex", gap: 6 }, children: [
             /* @__PURE__ */ jsx("input", { value: sc.contratoB3 || contratoSugerido, onChange: u("contratoB3"), style: { flex: 1 } }),
-            /* @__PURE__ */ jsx("button", { className: "tb", style: { padding: "10px 13px" }, onClick: () => u("contratoB3")(contratoSugerido), children: "Usar sugest\xE3o" })
+            /* @__PURE__ */ jsx("button", { className: "tb", style: { padding: "10px 13px" }, onClick: () => u("contratoB3")(contratoSugerido), children: "Usar mês da saída" })
           ] }) }),
           /* @__PURE__ */ jsx(F, { label: "BGI Futuro compartilhado (R$/@)", hint: sc.cotacaoB3Fonte ? `${sc.cotacaoB3Fonte} \xB7 ${fmtData((sc.cotacaoB3AtualizadaEm || "").slice(0, 10))}` : "Atualize o contrato na se\xE7\xE3o Mercado BGI acima", children: /* @__PURE__ */ jsx("input", { type: "number", readOnly: true, value: sc.precoBolsa }) }),
           /* @__PURE__ */ jsx(F, { label: "Diferencial de base (%)", hint: "0 a 12,5% \u2014 desconto sobre BGI", children: /* @__PURE__ */ jsx("input", { type: "number", step: ".5", min: "0", max: "12.5", value: sc.baseDesc, onChange: u("baseDesc") }) })
@@ -2388,23 +2401,61 @@ function Confinex() {
     setCenarios((p) => p.map((s, j) => j === scAtivo ? { ...s, ...patch } : s));
     setResultados([]);
   };
+  const aplicarCotacaoAosCenarios = (contrato, registro) => {
+    setCenarios((p) => p.map((sc) => contratoB3DoCenario(sc) === contrato ? {
+      ...sc,
+      contratoB3: contrato,
+      precoBolsa: registro ? String(registro.preco) : "",
+      cotacaoB3Fonte: registro?.fonte || "",
+      cotacaoB3AtualizadaEm: registro?.atualizadaEm || ""
+    } : sc));
+    setResultados([]);
+  };
   const definirCotacaoB3 = (contrato, preco) => {
-    const valor = String(preco || "");
     const agora = (/* @__PURE__ */ new Date()).toISOString();
-    const registro = { preco: valor, fonte: "Valor informado manualmente", atualizadaEm: agora };
+    let registro;
+    try {
+      registro = criarCotacaoBgiManual(preco, agora);
+    } catch (err) {
+      setStatusB3(err?.message || "Informe uma cotação válida.");
+      return;
+    }
+    if (!registro) {
+      setLote((p) => {
+        const cotacoesB3 = { ...p.cotacoesB3 || {} };
+        delete cotacoesB3[contrato];
+        return { ...p, cotacoesB3, cotacoesB3AtualizadasEm: agora };
+      });
+      aplicarCotacaoAosCenarios(contrato, null);
+      setStatusB3(`${contrato} ficou sem cotação; nenhum valor zero foi usado.`);
+      return;
+    }
     setLote((p) => ({
       ...p,
       cotacoesB3: { ...p.cotacoesB3 || {}, [contrato]: registro },
       cotacoesB3AtualizadasEm: agora
     }));
-    setCenarios((p) => p.map((sc) => contratoB3DoCenario(sc) === contrato ? {
-      ...sc,
-      contratoB3: contrato,
-      precoBolsa: valor,
-      cotacaoB3Fonte: registro.fonte,
-      cotacaoB3AtualizadaEm: agora
-    } : sc));
-    setResultados([]);
+    aplicarCotacaoAosCenarios(contrato, registro);
+    setStatusB3(`${contrato} mantido como valor manual.`);
+  };
+  const usarCotacaoAutomatica = async (contrato) => {
+    setStatusB3(`Buscando cotação automática para ${contrato}...`);
+    try {
+      const cotacao = await buscarPrecoB3PorContrato(contrato);
+      const agora = (/* @__PURE__ */ new Date()).toISOString();
+      const mescla = mesclarCotacoesBgiAutomaticas({}, [{ contrato, cotacao }], agora);
+      const registro = mescla.cotacoes[contrato];
+      if (!cotacaoBgiValida(registro)) throw new Error("cotação indisponível");
+      setLote((p) => ({
+        ...p,
+        cotacoesB3: { ...p.cotacoesB3 || {}, [contrato]: registro },
+        cotacoesB3AtualizadasEm: agora
+      }));
+      aplicarCotacaoAosCenarios(contrato, registro);
+      setStatusB3(`${contrato} voltou a acompanhar a cotação automática.`);
+    } catch {
+      setStatusB3(`Não encontrei cotação automática para ${contrato}; o valor manual foi mantido.`);
+    }
   };
   const atualizarMercadoB3 = async () => {
     if (!contratosB3Estudo.length) {
@@ -2417,23 +2468,17 @@ function Confinex() {
     const obtidas = respostas.filter((r) => r.status === "fulfilled").map((r) => r.value);
     const falhas = respostas.length - obtidas.length;
     if (obtidas.length) {
-      const novosRegistros = {};
-      obtidas.forEach(({ contrato, cotacao }) => {
-        novosRegistros[contrato] = {
-          preco: String(Math.round(cotacao.preco * 100) / 100),
-          fonte: cotacao.fonte,
-          atualizadaEm: cotacao.data || agora
-        };
-      });
+      const mescla = mesclarCotacoesBgiAutomaticas(lote.cotacoesB3, obtidas, agora);
+      const contratosAtualizados = new Set(mescla.atualizados);
       setLote((p) => ({
         ...p,
-        cotacoesB3: { ...p.cotacoesB3 || {}, ...novosRegistros },
-        cotacoesB3AtualizadasEm: agora
+        cotacoesB3: mescla.cotacoes,
+        cotacoesB3AtualizadasEm: mescla.atualizados.length ? agora : p.cotacoesB3AtualizadasEm
       }));
       setCenarios((p) => p.map((sc) => {
         const contrato = contratoB3DoCenario(sc);
-        const cotacao = novosRegistros[contrato];
-        return cotacao ? {
+        const cotacao = mescla.cotacoes[contrato];
+        return contratosAtualizados.has(contrato) && cotacao ? {
           ...sc,
           contratoB3: contrato,
           precoBolsa: cotacao.preco,
@@ -2442,8 +2487,13 @@ function Confinex() {
         } : sc;
       }));
       setResultados([]);
+      const partes = [`${mescla.atualizados.length} contrato(s) atualizado(s)`];
+      if (mescla.preservados.length) partes.push(`${mescla.preservados.length} valor(es) manual(is) preservado(s)`);
+      if (falhas) partes.push(`${falhas} sem cotação automática`);
+      setStatusB3(`${partes.join("; ")}.`);
+      return;
     }
-    setStatusB3(falhas ? `${obtidas.length} contrato(s) atualizado(s); ${falhas} sem cotação automática.` : `${obtidas.length} contrato(s) atualizado(s) no mesmo lote de consulta.`);
+    setStatusB3("Nenhuma cotação automática foi encontrada; os valores atuais foram mantidos.");
   };
   const calcularDistancia = async () => {
     const sc = cenarios[scAtivo];
@@ -2735,16 +2785,23 @@ function Confinex() {
         ] })
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "sec", children: [
-        /* @__PURE__ */ jsx("div", { className: "sec-t", children: "Mercado BGI \u2014 cota\xE7\xF5es por contrato" }),
+        /* @__PURE__ */ jsx("div", { className: "sec-t", children: "Mercado BGI \u2014 curva de referência" }),
+        /* @__PURE__ */ jsxs("div", { className: "g2", style: { marginBottom: 16 }, children: [
+          /* @__PURE__ */ jsx(F, { label: "Atualização automática", hint: "Atualiza de uma vez todos os vencimentos usados no estudo sem substituir valores manuais.", children: /* @__PURE__ */ jsx("button", { className: "tb on", style: { width: "100%", padding: "10px 13px" }, onClick: atualizarMercadoB3, children: "Atualizar curva BGI" }) }),
+          /* @__PURE__ */ jsx(F, { label: "Escolha do vencimento", hint: "O vencimento de cada cenário é escolhido na seção do próprio cenário.", children: /* @__PURE__ */ jsx("div", { className: "hint", style: { paddingTop: 10 }, children: "Uma cotação por contrato é compartilhada por todos os negócios." }) })
+        ] }),
         /* @__PURE__ */ jsxs("div", { className: "g4", children: [
           contratosB3Estudo.map((contrato) => {
             const registro = lote.cotacoesB3?.[contrato];
-            const cenarioReferencia = cenarios.find((sc) => contratoB3DoCenario(sc) === contrato);
-            return /* @__PURE__ */ jsx(F, { label: contrato, hint: registro?.fonte || "Valor inicial do estudo", children: /* @__PURE__ */ jsx("input", { type: "number", value: registro?.preco ?? cenarioReferencia?.precoBolsa ?? "", onChange: (e) => definirCotacaoB3(contrato, e.target.value) }) }, contrato);
-          }),
-          /* @__PURE__ */ jsx(F, { label: "Atualizar a curva usada", hint: "Consulta juntos os vencimentos da janela de 60 a 240 dias", children: /* @__PURE__ */ jsx("button", { className: "tb on", style: { width: "100%", padding: "10px 13px" }, onClick: atualizarMercadoB3, children: "Atualizar cota\xE7\xF5es BGI" }) })
+            const manual = registro?.modo === "manual";
+            const situacao = !cotacaoBgiValida(registro) ? "Cotação pendente" : manual ? `Manual · ${registro.fonte || "valor informado"}` : `Automática · ${registro.fonte || "fonte de mercado"}`;
+            return /* @__PURE__ */ jsx(F, { label: contrato, hint: situacao, children: /* @__PURE__ */ jsxs("div", { style: { display: "flex", gap: 6 }, children: [
+              /* @__PURE__ */ jsx("input", { type: "number", min: "0", step: ".01", placeholder: "Pendente", value: registro?.preco ?? "", onChange: (e) => definirCotacaoB3(contrato, e.target.value), style: { flex: 1 } }),
+              manual && /* @__PURE__ */ jsx("button", { className: "tb", style: { padding: "10px 9px" }, onClick: () => usarCotacaoAutomatica(contrato), children: "Usar automático" })
+            ] }) }, contrato);
+          })
         ] }),
-        /* @__PURE__ */ jsx("div", { className: "hint", style: { marginTop: 10 }, children: statusB3 || "Cada contrato tem uma única cotação compartilhada. A curva inclui os meses necessários para comparar permanências entre 60 e 240 dias." }),
+        /* @__PURE__ */ jsx("div", { className: "hint", style: { marginTop: 10 }, children: statusB3 || "Digite um valor para fixá-lo manualmente. Apague o campo para deixá-lo pendente; valor ausente nunca é tratado como zero." }),
         lote.cotacoesB3AtualizadasEm && /* @__PURE__ */ jsx("div", { className: "hint", style: { marginTop: 4 }, children: `Última alteração conjunta: ${(/* @__PURE__ */ new Date(lote.cotacoesB3AtualizadasEm)).toLocaleString("pt-BR")}` })
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "sec", style: { padding: 0 }, children: [

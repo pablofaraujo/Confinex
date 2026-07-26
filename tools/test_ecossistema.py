@@ -115,6 +115,7 @@ def validar_local() -> None:
     executar(["node", "tools/test_confinex_acompanhamento.mjs"])
     executar(["node", "tools/test_confinex_pagamento_confinamento.mjs"])
     executar(["node", "tools/test_confinex_resultado_financeiro.mjs"])
+    executar(["node", "tools/test_confinex_bgi.mjs"])
     executar(["node", "tools/test_ocr_pesagem_contrato.mjs"])
     executar(["node", "tools/test_confinex_supabase_contrato.mjs"])
     executar(["node", "tools/test_confinex_supabase_adaptador.mjs"])
@@ -133,6 +134,7 @@ def validar_local() -> None:
     executar(["node", "--check", "js/eventos.js"])
     executar(["node", "--check", "js/confinex-pagamento-confinamento.mjs"])
     executar(["node", "--check", "js/confinex-resultado-financeiro.mjs"])
+    executar(["node", "--check", "js/confinex-bgi.mjs"])
     executar(["node", "--check", "confinex-app.latest.js"])
     executar(["node", "--check", "confinex-app.mobile.js"])
     executar(["node", "--check", "tools/auditar_ecossistema_browser.js"])
@@ -336,4 +338,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
