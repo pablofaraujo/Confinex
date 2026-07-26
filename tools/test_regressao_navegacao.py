@@ -40,7 +40,7 @@ class RegressaoNavegacaoTests(unittest.TestCase):
         for pagina in paginas_ativas:
             fonte = pagina.read_text(encoding="utf-8")
             self.assertIn(
-                "cfagro-shell.js?v=20260723-3",
+                "cfagro-shell.js?v=20260726-1",
                 fonte,
                 msg=f"{pagina.name} ainda pode carregar um menu antigo do cache",
             )
@@ -57,7 +57,26 @@ class RegressaoNavegacaoTests(unittest.TestCase):
         for emoji in ("🧮", "🐮", "🌾", "📈", "⚖️", "💰", "📅", "⚙️"):
             self.assertNotIn(emoji, shell)
 
+    def test_shell_usa_rotulos_e_icones_humanos_aprovados(self):
+        shell = (ROOT / "js" / "cfagro-shell.js").read_text(encoding="utf-8")
+        self.assertIn("rotulo:'Visão Geral'", shell)
+        self.assertIn("rotulo:'Confinamento', icone:'curral'", shell)
+        self.assertIn("rotulo:'Fazenda Ametista', icone:'porteira'", shell)
+        self.assertIn("rotulo:'Ricardo', icone:'pessoa'", shell)
+        self.assertIn("rotulo:'Xande',   icone:'pessoa'", shell)
+        self.assertNotIn("icone:'cow'", shell)
+
+    def test_acoes_globais_so_aparecem_com_sessao_confirmada(self):
+        shell = (ROOT / "js" / "cfagro-shell.js").read_text(encoding="utf-8")
+        self.assertIn("data-shell-atualizar hidden", shell)
+        self.assertIn("data-shell-sair hidden", shell)
+        self.assertIn("window.db.auth.getSession()", shell)
+        self.assertIn("resultado.data.session", shell)
+        for nome in ("index.html", "confinados.html"):
+            pagina = (ROOT / nome).read_text(encoding="utf-8")
+            self.assertNotIn('onclick="sair()"', pagina)
+            self.assertNotIn('onclick="carregar()">↻ Atualizar', pagina)
+
 
 if __name__ == "__main__":
     unittest.main()
-

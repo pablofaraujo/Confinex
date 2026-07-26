@@ -191,7 +191,11 @@ body.has-shell{display:grid;grid-template-columns:240px minmax(0,1fr);grid-templ
 .shell-top{grid-area:top;position:sticky;top:0;z-index:1000;height:68px;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 24px;box-shadow:0 1px 0 rgba(255,255,255,.08)}
 .shell-brand{display:flex;align-items:center;gap:12px;color:#fff;text-decoration:none;font-size:22px;font-weight:700;letter-spacing:.04em}
 .shell-brand img{width:46px;height:46px;border-radius:50%;object-fit:cover;background:var(--yellow)}
-.shell-context{font-size:var(--fs-12);color:rgba(255,255,255,.72);letter-spacing:.08em;text-transform:uppercase}
+.shell-context{margin-left:auto;font-size:var(--fs-12);color:rgba(255,255,255,.72);letter-spacing:.08em;text-transform:uppercase}
+.shell-actions{display:flex;align-items:center;gap:8px;margin-left:18px}
+.shell-action{border:1px solid rgba(255,255,255,.22);border-radius:var(--radius-sm);background:transparent;color:#fff;padding:7px 11px;font:inherit;font-size:var(--fs-12);cursor:pointer}
+.shell-action:hover{background:rgba(255,255,255,.1)}
+.shell-action[hidden]{display:none}
 .shell-side{grid-area:side;position:sticky;top:68px;height:calc(100vh - 68px);background:var(--card);border-right:1px solid var(--border);padding:14px 12px;display:flex;flex-direction:column;gap:1px;overflow-y:auto}
 .shell-sec{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin:14px 8px 4px;font-weight:600}
 .shell-sep{height:1px;background:var(--border);margin:7px 8px}
@@ -209,7 +213,7 @@ body.has-shell .shell-content .topbar .logo-img{display:none}
 @media(max-width:900px){
   body.has-shell{grid-template-columns:1fr;grid-template-rows:60px auto minmax(0,1fr);grid-template-areas:"top" "side" "content"}
   .shell-top{height:60px;padding:0 14px}
-  .shell-brand{font-size:18px}.shell-brand img{width:40px;height:40px}.shell-context{display:none}
+  .shell-brand{font-size:18px}.shell-brand img{width:40px;height:40px}.shell-context{display:none}.shell-actions{margin-left:auto}.shell-action{padding:6px 9px}
   .shell-side{position:sticky;top:60px;z-index:900;height:auto;max-width:100vw;flex-direction:row;flex-wrap:nowrap;align-items:center;gap:4px;border-right:none;border-bottom:1px solid var(--border);padding:8px 10px;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
   .shell-sec{display:none}
   .shell-sep{width:1px;height:24px;flex:0 0 1px;margin:0 3px}
@@ -221,4 +225,3 @@ body.has-shell .shell-content .topbar .logo-img{display:none}
   .kpis-overview{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(max-width:520px){.kpis,.kpis-overview{grid-template-columns:1fr}.topbar .acoes{width:100%;overflow-x:auto}.eco-section{padding:17px 15px}.eco-row-top{align-items:flex-start;flex-direction:column;gap:2px}}
-

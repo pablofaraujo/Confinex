@@ -81,6 +81,10 @@ usa amarelo CFAgro suave e barra lateral amarela. O texto acessível permanece
 sempre visível ao lado do ícone. A identidade CFAgro fica no brinco circular do
 cabeçalho, não em variações dos ícones.
 
+Fazenda usa uma porteira; confinamento usa um curral; parceiros usam uma pessoa
+e o resumo de parcerias usa o aperto de mãos. As ações globais “Atualizar” e
+“Sair” ficam no cabeçalho do shell e só aparecem após confirmação da sessão.
+
 ## Convenções de comportamento
 
 - Título da aba: `CFAgro — {Módulo}`.
@@ -101,4 +105,3 @@ cabeçalho, não em variações dos ícones.
 ## Roadmap do DS
 
 ~~Fases 3 e 4~~ feitas: shell de navegação, index como Home/dashboard e adoção do padrão por Confinex, OCR Pesagem e Ops. Fase 5: tabela rica (ordenar/filtrar/buscar/exportar), toasts/modais no lugar de alert/confirm/prompt. Ícones lineares locais do shell concluídos; ícones Lucide externos continuam fora do escopo. Fase 6: toggle dark mode. Detalhes: `docs/auditoria-ui-ux.md`.
-
