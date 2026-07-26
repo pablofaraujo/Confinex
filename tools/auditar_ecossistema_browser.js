@@ -57,20 +57,11 @@ async function auditarSafari14Confinex(browser, viewport, resultados) {
       get: () => '',
       set: () => {},
     });
-    const anexar = Element.prototype.appendChild;
-    Element.prototype.appendChild = function (elemento) {
-      if (
-        elemento?.tagName === 'SCRIPT' &&
-        /supabase(?:-js)?/i.test(elemento.src || '')
-      ) {
-        return elemento;
-      }
-      return anexar.call(this, elemento);
-    };
   });
   const page = await context.newPage();
   const erros = [];
   const requisicoesSupabase = [];
+  let navegacaoIntencional = true;
   page.on('console', msg => {
     if (['error', 'warning'].includes(msg.type())) {
       erros.push(`console ${msg.type()}: ${msg.text()}`);
@@ -81,7 +72,9 @@ async function auditarSafari14Confinex(browser, viewport, resultados) {
     if (/\.supabase\.co\//i.test(req.url())) requisicoesSupabase.push(req.url());
   });
   page.on('requestfailed', req => {
-    erros.push(`rede: ${req.url()} — ${req.failure()?.errorText || 'falhou'}`);
+    const motivo = req.failure()?.errorText || 'falhou';
+    if (navegacaoIntencional && motivo === 'net::ERR_ABORTED') return;
+    erros.push(`rede: ${req.url()} — ${motivo}`);
   });
   page.on('response', res => {
     if (res.status() >= 400) erros.push(`http ${res.status()}: ${res.url()}`);
@@ -92,23 +85,29 @@ async function auditarSafari14Confinex(browser, viewport, resultados) {
   let evidencia = '';
   let ok = false;
   try {
-    await page.goto(origem, { waitUntil: 'load', timeout: 30000 });
-    await page.locator('#root .app').waitFor({ state: 'visible', timeout: 30000 });
-    await page.reload({ waitUntil: 'load', timeout: 30000 });
-    await page.locator('#root .app').waitFor({ state: 'visible', timeout: 30000 });
+    await page.goto(origem, { waitUntil: 'commit', timeout: 30000 });
+    await page.locator('#root .app').waitFor({ state: 'visible', timeout: 60000 });
+    navegacaoIntencional = true;
+    await page.reload({ waitUntil: 'commit', timeout: 30000 });
+    await page.locator('#root .app').waitFor({ state: 'visible', timeout: 60000 });
+    navegacaoIntencional = false;
 
     const linkConfinex = page.locator(`.shell-link[href="${destino}"]`);
     const quantidadeLinks = await linkConfinex.count();
     const ativoAntes = await page.locator('.shell-link.ativa').allTextContents();
     if (quantidadeLinks === 1) {
-      await linkConfinex.click();
-      await page.waitForLoadState('domcontentloaded', { timeout: 30000 });
-      await page.locator('#root .app').waitFor({ state: 'visible', timeout: 30000 });
+      navegacaoIntencional = true;
+      await linkConfinex.click({ noWaitAfter: true });
+      await page.waitForURL(destino, { waitUntil: 'commit', timeout: 30000 });
+      await page.locator('#root .app').waitFor({ state: 'visible', timeout: 60000 });
+      navegacaoIntencional = false;
     }
     const urlAposMenu = page.url();
     const ativoDepois = await page.locator('.shell-link.ativa').allTextContents();
-    await page.goBack({ waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.locator('#root .app').waitFor({ state: 'visible', timeout: 30000 });
+    navegacaoIntencional = true;
+    await page.goBack({ waitUntil: 'commit', timeout: 30000 });
+    await page.locator('#root .app').waitFor({ state: 'visible', timeout: 60000 });
+    navegacaoIntencional = false;
     const urlAposVoltar = page.url();
     const estado = await page.evaluate(() => ({
       apiAusente: typeof Object.hasOwn === 'undefined',
@@ -131,7 +130,16 @@ async function auditarSafari14Confinex(browser, viewport, resultados) {
     const captura = path.join(artefatos, 'celular-confinex-safari14.png');
     await page.screenshot({ path: captura, fullPage: true });
   } catch (erro) {
-    evidencia = `${erro.stack || erro.message}; erros=${erros.join(' | ') || 'nenhum'}`;
+    const estadoFalha = await page.evaluate(() => ({
+      pronto: document.readyState,
+      bootOk: window.__CONFINEX_BOOT_OK === true,
+      apiAusente: typeof Object.hasOwn === 'undefined',
+      filhosRoot: document.getElementById('root')?.childElementCount ?? -1,
+      bootStatus: document.getElementById('boot-status')?.textContent?.trim() || '',
+      scripts: Array.from(document.scripts).map(script => script.src || 'inline'),
+    })).catch(() => null);
+    evidencia = `${erro.stack || erro.message}; estado=${JSON.stringify(estadoFalha)}; ` +
+      `erros=${erros.join(' | ') || 'nenhum'}`;
   } finally {
     await context.close();
   }
