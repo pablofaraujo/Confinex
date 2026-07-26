@@ -13,6 +13,7 @@ import {
   criarCotacaoBgiManual,
   mesclarCotacoesBgiAutomaticas
 } from "./js/confinex-bgi.mjs";
+import { calcularReferenciasTransporte } from "./js/confinex-referencias-transporte.mjs";
 
 // confinex_work.jsx
 import { useEffect, useState, useMemo, useRef } from "react";
@@ -122,6 +123,7 @@ var fN = (n, d = 2) => !isFinite(n) || isNaN(n) ? "\u2014" : n.toFixed(d).replac
 var fR = (n) => !isFinite(n) || isNaN(n) ? "\u2014" : "R$\xA0" + n.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 var fP = (n) => !isFinite(n) || isNaN(n) ? "\u2014" : fN(n, 1) + "%";
 var fAt = (n) => !isFinite(n) || isNaN(n) ? "\u2014" : fN(n, 1) + "\xA0@";
+var fCalc = (n, formatador = fR) => Number.isFinite(n) ? formatador(n) : "Não calculável";
 var pctInput = (value, fallbackPct = 0) => {
   const parsed = parseFloat(value);
   return Number.isFinite(parsed) ? parsed / 100 : fallbackPct;
@@ -860,6 +862,16 @@ function calcCenario(lote, sc) {
   const custoArrobaMarginal = kgCarcacaMarginalDia > 0 ? custoDiarioCab / kgCarcacaMarginalDia * 15 : 0;
   const fretePorArrobaProduzida = arrobasProduzidasTotal > 0 ? freteTotal / arrobasProduzidasTotal : 0;
   const custoProducaoFretePorArroba = arrobasProduzidasTotal > 0 ? (custoContTotal + freteTotal) / arrobasProduzidasTotal : 0;
+  const referenciasTransporte = calcularReferenciasTransporte({
+    cabecas: N,
+    pesoOrigem: pm,
+    pesoChegada,
+    pesoProcessado: pesoProc,
+    carcacaSaidaKg: carcacaKg,
+    custoCompra,
+    custoFrete: freteTotal,
+    custoConfinamento: custoContTotal
+  });
   return {
     N,
     pm,
@@ -908,6 +920,8 @@ function calcCenario(lote, sc) {
     custoArrobaMarginal,
     fretePorArrobaProduzida,
     custoProducaoFretePorArroba,
+    referenciaTransporte: sc.referenciaTransporte || "transporte_na_entrada",
+    referenciasTransporte,
     msTotalKgCab: sc.modalidade === "ms" ? msTotalKgCab : 0,
     custoDinheiroTotal,
     custoDinheiroOperacao,
@@ -948,6 +962,7 @@ var defaultSc = (i) => ({
   perdaManual: "",
   respFrete: i === 4 ? "confinamento" : "meu",
   freteNoAcerto: false,
+  referenciaTransporte: "transporte_na_entrada",
   pagamentoConfinamento: "final",
   simularAdiantamento: false,
   tipoAdiantamento: "capital",
@@ -998,6 +1013,7 @@ var CAMPOS_MODELO_CONFINAMENTO = [
   "perdaManual",
   "respFrete",
   "freteNoAcerto",
+  "referenciaTransporte",
   "pagamentoConfinamento",
   "simularAdiantamento",
   "tipoAdiantamento",
@@ -1379,6 +1395,11 @@ function ScPanel({ sc, upd, sexo, custoDinheiro, resultado, confinamentos, model
       !isRev && !isParceria && /* @__PURE__ */ jsx(F, { label: "Recupera\xE7\xE3o peso 7d (%)", hint: "% da perda de transporte recuperada", children: /* @__PURE__ */ jsx("input", { type: "number", value: sc.recuperacao, onChange: u("recuperacao") }) }),
       /* @__PURE__ */ jsx(F, { label: isRev ? "Prazo pagamento (dias)" : "Prazo pag. ap\xF3s abate (dias)", children: /* @__PURE__ */ jsx("input", { type: "number", value: sc.diasPagamento, onChange: u("diasPagamento") }) })
     ] }),
+    !isRev && /* @__PURE__ */ jsx("div", { className: "g2", style: { marginTop: 14 }, children: /* @__PURE__ */ jsx(F, { label: "Referência para analisar transporte", hint: "Muda somente a leitura das arrobas. Lucro, custos totais e ranking permanecem iguais.", children: /* @__PURE__ */ jsx(Tg, { opts: [
+      { v: "transporte_na_entrada", l: "Transporte na @ de chegada" },
+      { v: "transporte_na_producao", l: "Transporte na @ produzida" },
+      { v: "comparar", l: "Comparar as duas" }
+    ], val: sc.referenciaTransporte || "transporte_na_entrada", set: u("referenciaTransporte") }) }) }),
     /* @__PURE__ */ jsx("div", { className: "dvdr" }),
     /* @__PURE__ */ jsx("div", { className: "sec-t nm", children: "Simula\xE7\xE3o financeira" }),
     /* @__PURE__ */ jsx(F, { label: "Avaliar uma opera\xE7\xE3o financeira?", children: /* @__PURE__ */ jsx(Ck, { checked: sc.simularAdiantamento, onChange: u("simularAdiantamento"), label: "Sim \u2014 comparar o efeito no resultado e na rentabilidade mensal" }) }),
@@ -1853,6 +1874,7 @@ function Comparativo({ resultados, cenarios, lote }) {
   if (!ativos.length) return null;
   const ranked = [...ativos].sort((a, b) => b.r.rMliq - a.r.rMliq || b.r.lucroLiquido - a.r.lucroLiquido || b.r.rTliq - a.r.rTliq || a.i - b.i);
   const semCustoFrete = (r) => r.respFrete === "confinamento" || r.freteTotal === 0 && r.fretePorCab === 0;
+  const mostraReferencia = (sc, referencia) => (sc?.referenciaTransporte || "transporte_na_entrada") === referencia || sc?.referenciaTransporte === "comparar";
   const rows = [
     { l: "Arrobas compra / cab", fn: (r) => fAt(r.arrobasCompra) },
     { l: "Perda no transporte", fn: (r) => fP(r.pctPerda) },
@@ -1865,16 +1887,21 @@ function Comparativo({ resultados, cenarios, lote }) {
     { l: "VP da @ (R$/@)", fn: (r) => fR(r.vpArroba), hint: "Valor presente \u2014 pre\xE7o descontado pelo custo do dinheiro" },
     { l: "Pre\xE7o limite de compra (VP)", fn: (r) => fR(r.precoCompraVpMax), hint: "Maior R$/@ de compra que ainda empata o neg\xF3cio em valor presente, j\xE1 descontando frete, confinamento e custo do dinheiro.", cls: (r) => r.margemCompraVp >= 0 ? "pos" : "neg" },
     { l: "Margem vs compra atual (R$/@)", fn: (r) => fR(r.margemCompraVp), cls: (r) => r.margemCompraVp >= 0 ? "pos" : "neg" },
-    { sep: true, l: "MÉTRICAS DE ARROBA" },
+    { sep: true, l: "REFERÊNCIAS DE TRANSPORTE E ARROBA" },
+    { l: "Referência escolhida", fn: (r, sc) => r.tipo === "revenda" ? "—" : sc?.referenciaTransporte === "comparar" ? "Comparar as duas" : sc?.referenciaTransporte === "transporte_na_producao" ? "Transporte na @ produzida" : "Transporte na @ de chegada" },
     { l: "Peso processado (kg/cab)", fn: (r) => fN(r.pesoProc, 1) },
-    { l: "Arrobas postas a 50% RC / cab", fn: (r) => fAt(r.arrobasPostasCab) },
-    { l: "Custo da @ posta (compra + frete)", fn: (r) => fR(r.custoArrobaPosta), bold: true },
-    { l: "Carcaça líquida produzida (kg/cab)", fn: (r) => r.tipo === "revenda" ? "—" : fN(r.kgCarcacaProduzidaCab, 1) },
-    { l: "Arrobas líquidas produzidas / cab", fn: (r) => r.tipo === "revenda" ? "—" : fAt(r.arrobasProduzidasCab) },
-    { l: "Custo da @ líquida produzida", fn: (r) => r.tipo === "revenda" ? "—" : fR(r.custoArrobaLiquidaProduzida), bold: true },
+    { l: "Perda bruta no transporte (kg/cab)", fn: (r) => r.tipo === "revenda" ? "—" : fN(r.referenciasTransporte?.perdaPeso.brutaKgCab, 1) },
+    { l: "Peso recuperado (kg/cab)", fn: (r) => r.tipo === "revenda" ? "—" : fN(r.referenciasTransporte?.perdaPeso.recuperadaKgCab, 1) },
+    { l: "Perda líquida (kg/cab)", fn: (r) => r.tipo === "revenda" ? "—" : fN(r.referenciasTransporte?.perdaPeso.liquidaKgCab, 1) },
+    { l: "A · @ base processada / cab", fn: (r, sc) => r.tipo === "revenda" || !mostraReferencia(sc, "transporte_na_entrada") ? "—" : fCalc(r.referenciasTransporte?.transporteNaEntrada.arrobasBaseCab, fAt) },
+    { l: "A · Custo da @ posta (compra + transporte)", fn: (r, sc) => r.tipo === "revenda" || !mostraReferencia(sc, "transporte_na_entrada") ? "—" : fCalc(r.referenciasTransporte?.transporteNaEntrada.custoArrobaBase), bold: true },
+    { l: "A · @ produzidas só pelo confinamento / cab", fn: (r, sc) => r.tipo === "revenda" || !mostraReferencia(sc, "transporte_na_entrada") ? "—" : fCalc(r.referenciasTransporte?.transporteNaEntrada.arrobasProduzidasCab, fAt) },
+    { l: "A · Custo da @ produzida só pelo confinamento", fn: (r, sc) => r.tipo === "revenda" || !mostraReferencia(sc, "transporte_na_entrada") ? "—" : fCalc(r.referenciasTransporte?.transporteNaEntrada.custoArrobaProduzida), bold: true },
+    { l: "B · @ de origem / cab", fn: (r, sc) => r.tipo === "revenda" || !mostraReferencia(sc, "transporte_na_producao") ? "—" : fCalc(r.referenciasTransporte?.transporteNaProducao.arrobasBaseCab, fAt) },
+    { l: "B · Custo da @ de origem (sem transporte)", fn: (r, sc) => r.tipo === "revenda" || !mostraReferencia(sc, "transporte_na_producao") ? "—" : fCalc(r.referenciasTransporte?.transporteNaProducao.custoArrobaBase), bold: true },
+    { l: "B · @ produzidas desde a origem / cab", fn: (r, sc) => r.tipo === "revenda" || !mostraReferencia(sc, "transporte_na_producao") ? "—" : fCalc(r.referenciasTransporte?.transporteNaProducao.arrobasProduzidasCab, fAt) },
+    { l: "B · Custo da @ produzida com transporte", fn: (r, sc) => r.tipo === "revenda" || !mostraReferencia(sc, "transporte_na_producao") ? "—" : fCalc(r.referenciasTransporte?.transporteNaProducao.custoArrobaProduzida), bold: true },
     { l: "Custo marginal da @ de ganho", fn: (r) => r.tipo === "revenda" ? "—" : fR(r.custoArrobaMarginal) },
-    { l: "Frete diluído / @ produzida", fn: (r) => r.tipo === "revenda" ? "—" : fR(r.fretePorArrobaProduzida) },
-    { l: "Produção + frete / @ produzida", fn: (r) => r.tipo === "revenda" ? "—" : fR(r.custoProducaoFretePorArroba), bold: true },
     { sep: true, l: "CUSTOS \u2014 TOTAL DO LOTE" },
     { l: "Custo de compra", fn: (r) => fR(r.custoCompra) },
     { l: "Bois por carreta", fn: (r) => semCustoFrete(r) ? "\u2014" : r.qtdCarretas > 0 ? fN(r.boisPorCarreta, 0) : "\u2014" },

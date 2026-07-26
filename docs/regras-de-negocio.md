@@ -35,12 +35,21 @@ Custo de compra: `custoCompra = arrobasCompra × precoCompra × N + baldeio`.
 7% base + 0,5 p.p. por 100 km acima de 300 km (override manual por `perdaManual`).
 `pesoChegada = pesoMedio × (1 − pctPerda)`; `pesoProc = pesoChegada + (pesoMedio − pesoChegada) × recuperacao%`.
 
+### Duas referências para analisar as arrobas
+
+As duas leituras são auxiliares e não mudam lucro, custos totais, caixa ou ranking:
+
+- **Transporte na @ de chegada (padrão legado)**: @ base = peso processado × 50% ÷ 15; custo da @ posta = (compra + transporte) ÷ @ base; @ produzida = @ de saída − @ base; custo produzido = confinamento ÷ @ produzida.
+- **Transporte na @ produzida**: @ base = peso de origem × 50% ÷ 15; custo da @ de origem = compra ÷ @ base; @ produzida = @ de saída − @ de origem; custo produzido = (confinamento + transporte) ÷ @ produzida.
+- A opção **Comparar as duas** apresenta os dois referenciais sem somar transporte ou perda duas vezes.
+- Perda bruta = origem − chegada; recuperação = processado − chegada; perda líquida = origem − processado. Denominador ausente ou não positivo aparece como “Não calculável”, nunca como zero.
+
 ## Engorda e abate
 
 - `pesoAbate = pesoBase(refGanho) + gmd × diasCiclo` (refGanho: chegada/origem/proc).
 - `carcacaKg = pesoAbate × rcFinal`; `arrobasAbate = carcacaKg / 15`; `arrobasEntrada = pesoRef × rcEntrada / 15`.
 
-## Métricas de custo por arroba
+## Métricas legadas de custo por arroba
 
 - **Arrobas postas no confinamento**: `arrobasPostas = pesoProcessado × 50% ÷ 15 × N`.
 - **Custo da arroba posta**: `(custoCompra + freteTotal) ÷ arrobasPostas`. Mede o custo do gado já transportado e processado, independentemente do prazo de permanência.
