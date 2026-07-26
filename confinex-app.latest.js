@@ -8,6 +8,7 @@ import {
   calcularResultadoFinanceiro,
   calcularValorPresente
 } from "./js/confinex-resultado-financeiro.mjs";
+import { compararRevendaComConfinamento } from "./js/confinex-revenda-equivalente.mjs";
 import {
   cotacaoBgiValida,
   criarCotacaoBgiManual,
@@ -96,6 +97,11 @@ select option{background:white}
 .rval.pos{color:${T.green}}
 .rval.neg{color:${T.red}}
 .rsub{font-size:10px;color:${T.muted};font-family:'DM Mono',monospace;margin-top:2px}
+.rkey{margin-top:9px;padding-top:8px;border-top:1px solid ${T.border};display:grid;gap:5px}
+.rkey-line{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:10px;color:${T.label}}
+.rkey-line strong{font-family:'DM Mono',monospace;font-size:12px;color:${T.text};text-align:right}
+.rkey-line strong.pos{color:${T.green}}
+.rkey-line strong.neg{color:${T.red}}
 .tbl-wrap{overflow-x:auto}
 .cmp-tbl{width:100%;border-collapse:collapse;font-size:12px}
 .cmp-tbl th{padding:9px 13px;font-size:9px;font-weight:600;color:${T.muted};letter-spacing:.8px;text-transform:uppercase;border-bottom:1px solid ${T.border};text-align:right;white-space:nowrap;background:${T.bg}}
@@ -579,7 +585,7 @@ function calcCenario(lote, sc) {
   const pesoProc = pesoChegada + (pm - pesoChegada) * (rec / 100);
   const prazoPagtoCompra = parseFloat(lote.prazoPagtoCompra) || 0;
   if (sc.tipo === "revenda") {
-    const precoVenda2 = parseFloat(sc.precoRevenda) || 0;
+    const precoVendaBruto2 = parseFloat(sc.precoRevenda) || 0;
     const arrobasVenda = calcArrobas({
       peso: pm,
       sexo: lote.sexo,
@@ -588,7 +594,13 @@ function calcCenario(lote, sc) {
       descBezerro: lote.descBezerro,
       limBezerro: lote.limBezerro
     });
-    const receita2 = arrobasVenda * precoVenda2 * N;
+    const faturamentoBruto2 = arrobasVenda * precoVendaBruto2 * N;
+    const fur2 = pctInput(sc.funrural, 2e-3);
+    const finpec2 = pctInput(sc.finpec, 0);
+    const valorFunrural2 = faturamentoBruto2 * fur2;
+    const valorFinpec2 = faturamentoBruto2 * finpec2;
+    const receita2 = faturamentoBruto2 - valorFunrural2 - valorFinpec2;
+    const precoVenda2 = arrobasVenda > 0 && N > 0 ? receita2 / (arrobasVenda * N) : 0;
     const custos2 = custoCompra + freteTotal;
     const lucro2 = receita2 - custos2;
     const diasVenda = parseFloat(sc.diasPagamento) || 0;
@@ -670,9 +682,9 @@ function calcCenario(lote, sc) {
       pctPerda: pctPerda * 100,
       precoVendaLiq: precoVenda2,
       vpArroba: vpArroba2,
-      faturamentoBruto: receita2,
-      valorFunrural: 0,
-      valorFinpec: 0,
+      faturamentoBruto: faturamentoBruto2,
+      valorFunrural: valorFunrural2,
+      valorFinpec: valorFinpec2,
       receita: receita2,
       receitaVP: receitaVP2,
       custoCompra,
@@ -1354,14 +1366,22 @@ function ScPanel({ sc, upd, sexo, custoDinheiro, resultado, confinamentos, model
     /* @__PURE__ */ jsx("div", { className: "sec-t nm", children: "Transporte" }),
     !freteDeles && /* @__PURE__ */ jsxs(Fragment, { children: [
       /* @__PURE__ */ jsxs("div", { className: "g3", children: [
-        /* @__PURE__ */ jsx(F, { label: "Origem do frete", hint: "Fazenda, cidade ou coordenada", children: /* @__PURE__ */ jsx("input", { value: sc.origemFrete || "", onChange: u("origemFrete"), placeholder: "Ex: Fazenda Ametista, MG" }) }),
-        /* @__PURE__ */ jsx(F, { label: "Destino", hint: "Confinamento ou frigor\xEDfico", children: /* @__PURE__ */ jsx("input", { value: sc.destinoFrete || "", onChange: u("destinoFrete"), placeholder: "Ex: Confinamento X, GO" }) }),
-        /* @__PURE__ */ jsx(F, { label: "Google Maps", children: /* @__PURE__ */ jsxs("div", { style: { display: "flex", gap: 6 }, children: [
-          /* @__PURE__ */ jsx("button", { className: "tb", style: { flex: 1, padding: "10px 13px" }, disabled: !(sc.origemFrete && sc.destinoFrete), onClick: calcularDistancia, children: "Calcular rota" }),
-          /* @__PURE__ */ jsx("button", { className: "tb", style: { padding: "10px 13px" }, disabled: !(sc.origemFrete && sc.destinoFrete), onClick: () => window.open(googleMapsUrl(sc.origemFrete, sc.destinoFrete), "_blank", "noopener,noreferrer"), children: "Abrir" })
+        /* @__PURE__ */ jsx(F, { label: "Origem do gado", hint: "Fazenda, cidade ou coordenada usada neste estudo", children: /* @__PURE__ */ jsx("input", { value: sc.origemFrete || "", onChange: u("origemFrete"), placeholder: "Ex: Fazenda, cidade e UF" }) }),
+        /* @__PURE__ */ jsx(F, { label: "Local do confinamento", hint: "Fica salvo junto da base do confinamento", children: /* @__PURE__ */ jsx("input", { value: sc.destinoFrete || "", onChange: u("destinoFrete"), placeholder: "Ex: Confinamento, cidade e UF" }) }),
+        /* @__PURE__ */ jsx(F, { label: "Rota", children: /* @__PURE__ */ jsxs("div", { style: { display: "flex", gap: 6 }, children: [
+          /* @__PURE__ */ jsx("button", { className: "tb", style: { flex: 1, padding: "10px 13px" }, disabled: !(sc.origemFrete && sc.destinoFrete), onClick: calcularDistancia, children: "Calcular dist\xE2ncia" }),
+          /* @__PURE__ */ jsx("button", { className: "tb", style: { padding: "10px 13px" }, disabled: !(sc.origemFrete && sc.destinoFrete), onClick: () => window.open(googleMapsUrl(sc.origemFrete, sc.destinoFrete), "_blank", "noopener,noreferrer"), children: "Ver no Maps" })
         ] }) })
       ] }),
       statusDistancia && /* @__PURE__ */ jsx("div", { className: "hint", style: { marginTop: 8 }, children: statusDistancia }),
+      sc.distanciaFonte && /* @__PURE__ */ jsxs("div", { className: "hint", style: { marginTop: 8 }, children: [
+        "Dist\xE2ncia deste estudo: ",
+        sc.km || "\u2014",
+        " km \xB7 fonte: ",
+        sc.distanciaFonte,
+        sc.distanciaCalculadaEm ? ` \xB7 conferida em ${fmtData(sc.distanciaCalculadaEm)}` : "",
+        sc.distanciaCongeladaEm ? " \xB7 preservada neste estudo" : ""
+      ] }),
       /* @__PURE__ */ jsx("div", { className: "dvdr" })
     ] }),
     /* @__PURE__ */ jsxs("div", { className: "g4", children: [
@@ -1445,6 +1465,13 @@ function ScPanel({ sc, upd, sexo, custoDinheiro, resultado, confinamentos, model
             set: u("modoCapimVenda")
           }
         ) })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "g2", style: { marginTop: 14 }, children: [
+        /* @__PURE__ */ jsx(F, { label: "Tributo sobre a revenda (%)", hint: "Use a alíquota efetiva do Funrural neste cenário", children: /* @__PURE__ */ jsx("input", { type: "number", step: ".1", min: "0", value: sc.funrural, onChange: u("funrural") }) }),
+        /* @__PURE__ */ jsx(F, { label: "Outros encargos da revenda (%)", hint: "Informe Finpec ou outro encargo percentual aplicável; deixe zero quando não houver", children: /* @__PURE__ */ jsx("input", { type: "number", step: ".1", min: "0", value: sc.finpec, onChange: (e) => {
+          upd("finpec", e.target.value);
+          upd("finpecConfigurado", true);
+        } }) })
       ] })
     ] }),
     !isRev && /* @__PURE__ */ jsxs(Fragment, { children: [
@@ -1775,10 +1802,22 @@ function ItemRelatorio({ label, value }) {
     /* @__PURE__ */ jsx("div", { className: "report-value", children: value ?? "—" })
   ] });
 }
+function calcularComparacaoRevenda(revendaBase, resultadoConfinamento) {
+  if (!revendaBase || resultadoConfinamento?.tipo === "revenda") return null;
+  return compararRevendaComConfinamento({
+    lucroLiquidoConfinamento: resultadoConfinamento?.lucroLiquido,
+    custosOperacionaisRevenda: revendaBase.r.custos,
+    custoFinanceiroRevenda: revendaBase.r.custoFinanceiro,
+    arrobasVendidas: revendaBase.r.arrobasEntrega * revendaBase.r.N,
+    tributosPercentual: pctInput(revendaBase.sc.funrural, 2e-3) + pctInput(revendaBase.sc.finpec, 0),
+    precoDisponivel: revendaBase.sc.precoRevenda
+  });
+}
 function RelatorioComparativo({ lote, cenarios, resultados }) {
   const ativos = cenarios.map((sc, i) => ({ sc, r: resultados[i], i })).filter((x) => x.r);
   if (!ativos.length) return null;
   const ranked = [...ativos].sort((a, b) => b.r.rMliq - a.r.rMliq || b.r.lucroLiquido - a.r.lucroLiquido || b.r.rTliq - a.r.rTliq || a.i - b.i);
+  const revendaBase = ativos.find(({ r }) => r.tipo === "revenda");
   return /* @__PURE__ */ jsxs(Fragment, { children: [
     /* @__PURE__ */ jsxs("div", { className: "sec no-print", style: { marginTop: 18 }, children: [
       /* @__PURE__ */ jsx("div", { className: "sec-t", children: "Relatório comparativo" }),
@@ -1818,6 +1857,7 @@ function RelatorioComparativo({ lote, cenarios, resultados }) {
       ] }),
       ranked.map(({ sc, r }, pos) => {
         const evolucao = calcEvolucaoTempo(lote, sc);
+        const comparacao = calcularComparacaoRevenda(revendaBase, r);
         return /* @__PURE__ */ jsxs("section", { className: "report-page", children: [
           /* @__PURE__ */ jsxs("div", { className: "report-brand", children: [pos + 1, "º · ", sc.nome] }),
           /* @__PURE__ */ jsxs("h1", { children: [sc.tipo === "revenda" ? "Revenda" : sc.modalidade, " · ", `${fP(r.rMliq)} a.m.`] }),
@@ -1836,11 +1876,15 @@ function RelatorioComparativo({ lote, cenarios, resultados }) {
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Custo @ posta", value: fR(r.custoArrobaPosta) }),
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "@ líquidas produzidas", value: sc.tipo === "revenda" ? "—" : `${fAt(r.arrobasProduzidasCab)} / cab` }),
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Custo @ líquida produzida", value: sc.tipo === "revenda" ? "—" : fR(r.custoArrobaLiquidaProduzida) }),
+            sc.tipo !== "revenda" && (sc.referenciaTransporte || "transporte_na_entrada") !== "transporte_na_producao" && /* @__PURE__ */ jsx(ItemRelatorio, { label: "A · Transporte na entrada", value: `@ posta ${fCalc(r.referenciasTransporte?.transporteNaEntrada.custoArrobaBase)} · @ produzida ${fCalc(r.referenciasTransporte?.transporteNaEntrada.custoArrobaProduzida)}` }),
+            sc.tipo !== "revenda" && (sc.referenciaTransporte === "transporte_na_producao" || sc.referenciaTransporte === "comparar") && /* @__PURE__ */ jsx(ItemRelatorio, { label: "B · Transporte na produção", value: `@ origem ${fCalc(r.referenciasTransporte?.transporteNaProducao.custoArrobaBase)} · @ produzida ${fCalc(r.referenciasTransporte?.transporteNaProducao.custoArrobaProduzida)}` }),
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Custo marginal @", value: sc.tipo === "revenda" ? "—" : fR(r.custoArrobaMarginal) }),
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Produção + frete / @", value: sc.tipo === "revenda" ? "—" : fR(r.custoProducaoFretePorArroba) }),
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Capital", value: fR(r.investInicial) }),
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Lucro bruto / líquido", value: `${fR(r.lucroBruto)} · ${fR(r.lucroLiquido)}` }),
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Custo financeiro total", value: fR(r.custoFinanceiro) }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Preço máximo de compra para VP zero", value: `${fR(r.precoCompraVpMax)}/@ · ${r.margemCompraVp >= 0 ? "abaixo" : "acima"} do limite por ${fR(Math.abs(r.margemCompraVp))}/@` }),
+            sc.tipo !== "revenda" && /* @__PURE__ */ jsx(ItemRelatorio, { label: "Revenda para igualar o lucro líquido", value: comparacao?.calculavel ? comparacao.igualdadePossivel ? `${fR(comparacao.precoMinimo)}/@ · disponível ${fR(comparacao.precoDisponivel)}/@ · ${comparacao.melhorAlternativa}` : comparacao.observacao : comparacao?.motivo || "Adicione um cenário de revenda" }),
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Rentabilidade", value: `${fP(r.rTliq)} total · ${fP(r.rMliq)} a.m.` }),
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Operação financeira", value: r.valorAdiantamento > 0 ? `${r.tipoAdiantamento === "recebimento" ? "Antecipação do recebimento" : "Adiantamento de capital"} · ${fR(r.valorAdiantamento)} · ${r.diasAdiantamento} dias · custo ${fR(r.custoAdiantamento)}${r.tipoAdiantamento === "recebimento" ? ` · saldo final ${fR(r.saldoRecebimentoFinal)}` : ""}` : "Não simulada" })
           ] }),
@@ -1873,8 +1917,23 @@ function Comparativo({ resultados, cenarios, lote }) {
   const ativos = cenarios.map((sc, i) => ({ sc, r: resultados[i], i })).filter((x) => x.r);
   if (!ativos.length) return null;
   const ranked = [...ativos].sort((a, b) => b.r.rMliq - a.r.rMliq || b.r.lucroLiquido - a.r.lucroLiquido || b.r.rTliq - a.r.rTliq || a.i - b.i);
+  const revendaBase = ativos.find(({ r }) => r.tipo === "revenda");
   const semCustoFrete = (r) => r.respFrete === "confinamento" || r.freteTotal === 0 && r.fretePorCab === 0;
   const mostraReferencia = (sc, referencia) => (sc?.referenciaTransporte || "transporte_na_entrada") === referencia || sc?.referenciaTransporte === "comparar";
+  const resumoReferenciaTransporte = (r, sc) => {
+    if (r.tipo === "revenda") return `@ líquida de venda: ${fR(r.precoVendaLiq)}`;
+    const referencia = sc?.referenciaTransporte || "transporte_na_entrada";
+    const entrada = r.referenciasTransporte?.transporteNaEntrada;
+    const producao = r.referenciasTransporte?.transporteNaProducao;
+    if (referencia === "comparar") return `A · @ posta ${fCalc(entrada?.custoArrobaBase)} · @ produzida ${fCalc(entrada?.custoArrobaProduzida)} | B · @ origem ${fCalc(producao?.custoArrobaBase)} · @ produzida ${fCalc(producao?.custoArrobaProduzida)}`;
+    if (referencia === "transporte_na_producao") return `@ origem: ${fCalc(producao?.custoArrobaBase)} · @ produzida com transporte: ${fCalc(producao?.custoArrobaProduzida)}`;
+    return `@ posta: ${fCalc(entrada?.custoArrobaBase)} · @ produzida no confinamento: ${fCalc(entrada?.custoArrobaProduzida)}`;
+  };
+  const situacaoVp = (r) => {
+    const diferenca = r.precoCompraVpMax - lote.precoArroba;
+    return `${fR(Math.abs(diferenca))}/@ ${diferenca >= 0 ? "abaixo do limite" : "acima do limite"}`;
+  };
+  const comparacaoRevenda = (r) => calcularComparacaoRevenda(revendaBase, r);
   const rows = [
     { l: "Arrobas compra / cab", fn: (r) => fAt(r.arrobasCompra) },
     { l: "Perda no transporte", fn: (r) => fP(r.pctPerda) },
@@ -1885,14 +1944,31 @@ function Comparativo({ resultados, cenarios, lote }) {
     { l: "Pre\xE7o venda l\xEDq. (R$/@)", fn: (r) => fR(r.precoVendaLiq) },
     { l: "Sa\xEDda / contrato B3", fn: (r, sc) => sc?.tipo === "revenda" ? "\u2014" : `${fmtData(addDiasISO(sc?.dataEntrada, parseFloat(sc?.diasCiclo) || 0))} \xB7 ${sc?.contratoB3 || contratoB3PorData(addDiasISO(sc?.dataEntrada, parseFloat(sc?.diasCiclo) || 0)) || "\u2014"}` },
     { l: "VP da @ (R$/@)", fn: (r) => fR(r.vpArroba), hint: "Valor presente \u2014 pre\xE7o descontado pelo custo do dinheiro" },
-    { l: "Pre\xE7o limite de compra (VP)", fn: (r) => fR(r.precoCompraVpMax), hint: "Maior R$/@ de compra que ainda empata o neg\xF3cio em valor presente, j\xE1 descontando frete, confinamento e custo do dinheiro.", cls: (r) => r.margemCompraVp >= 0 ? "pos" : "neg" },
-    { l: "Margem vs compra atual (R$/@)", fn: (r) => fR(r.margemCompraVp), cls: (r) => r.margemCompraVp >= 0 ? "pos" : "neg" },
+    { l: "Pre\xE7o atual de compra (R$/@)", fn: () => fR(lote.precoArroba) },
+    { l: "Pre\xE7o m\xE1ximo de compra para VP zero", fn: (r) => `${fR(r.precoCompraVpMax)}/@`, hint: "Maior pre\xE7o de compra que deixa o resultado a valor presente exatamente em zero, considerando frete, confinamento e custo do dinheiro.", cls: (r) => r.margemCompraVp >= 0 ? "pos" : "neg" },
+    { l: "Diferen\xE7a at\xE9 o limite (R$/@)", fn: (r) => fR(r.margemCompraVp), cls: (r) => r.margemCompraVp >= 0 ? "pos" : "neg" },
+    { l: "Situa\xE7\xE3o no VP", fn: (r) => situacaoVp(r), cls: (r) => r.margemCompraVp >= 0 ? "pos" : "neg" },
+    { sep: true, l: "COMPARA\xC7\xC3O COM REVENDA" },
+    { l: "Lucro l\xEDquido do confinamento", fn: (r) => r.tipo === "revenda" ? "\u2014" : fR(r.lucroLiquido) },
+    { l: "Pre\xE7o m\xEDnimo de revenda para igualar o lucro", fn: (r) => {
+      const equivalente = comparacaoRevenda(r);
+      if (r.tipo === "revenda") return "Cen\xE1rio usado como base";
+      if (!equivalente) return "Adicione um cen\xE1rio de revenda";
+      return equivalente.calculavel ? equivalente.igualdadePossivel ? `${fR(equivalente.precoMinimo)}/@` : equivalente.observacao : equivalente.motivo;
+    }, hint: "Pre\xE7o bruto de venda direta necess\xE1rio para gerar o mesmo lucro l\xEDquido total deste confinamento, ap\xF3s custos, prazo, custo do dinheiro, desconto de capim e tributos da revenda." },
+    { l: "Pre\xE7o dispon\xEDvel na revenda", fn: (r, sc) => r.tipo === "revenda" ? `${fR(sc.precoRevenda)}/@` : comparacaoRevenda(r)?.calculavel ? `${fR(comparacaoRevenda(r).precoDisponivel)}/@` : "\u2014" },
+    { l: "Diferen\xE7a da revenda (R$/@)", fn: (r) => r.tipo === "revenda" ? "\u2014" : comparacaoRevenda(r)?.calculavel ? fR(comparacaoRevenda(r).diferencaPreco) : "\u2014", cls: (r) => comparacaoRevenda(r)?.diferencaPreco >= 0 ? "pos" : "neg" },
+    { l: "Lucro l\xEDquido estimado da revenda", fn: (r) => r.tipo === "revenda" ? "\u2014" : comparacaoRevenda(r)?.calculavel ? fR(comparacaoRevenda(r).lucroLiquidoRevenda) : "\u2014", cls: (r) => comparacaoRevenda(r)?.lucroLiquidoRevenda >= r.lucroLiquido ? "pos" : "neg" },
+    { l: "Melhor alternativa pelo lucro l\xEDquido total", fn: (r) => r.tipo === "revenda" ? "Base da compara\xE7\xE3o" : comparacaoRevenda(r)?.calculavel ? comparacaoRevenda(r).melhorAlternativa : "N\xE3o calcul\xE1vel", bold: true },
     { sep: true, l: "REFERÊNCIAS DE TRANSPORTE E ARROBA" },
     { l: "Referência escolhida", fn: (r, sc) => r.tipo === "revenda" ? "—" : sc?.referenciaTransporte === "comparar" ? "Comparar as duas" : sc?.referenciaTransporte === "transporte_na_producao" ? "Transporte na @ produzida" : "Transporte na @ de chegada" },
     { l: "Peso processado (kg/cab)", fn: (r) => fN(r.pesoProc, 1) },
     { l: "Perda bruta no transporte (kg/cab)", fn: (r) => r.tipo === "revenda" ? "—" : fN(r.referenciasTransporte?.perdaPeso.brutaKgCab, 1) },
+    { l: "Perda bruta no lote", fn: (r) => r.tipo === "revenda" ? "—" : `${fN(r.referenciasTransporte?.perdaPeso.brutaKgTotal, 1)} kg · ${fAt(r.referenciasTransporte?.perdaPeso.brutaArrobasEquivalentes)}` },
     { l: "Peso recuperado (kg/cab)", fn: (r) => r.tipo === "revenda" ? "—" : fN(r.referenciasTransporte?.perdaPeso.recuperadaKgCab, 1) },
+    { l: "Peso recuperado no lote", fn: (r) => r.tipo === "revenda" ? "—" : `${fN(r.referenciasTransporte?.perdaPeso.recuperadaKgTotal, 1)} kg · ${fAt(r.referenciasTransporte?.perdaPeso.recuperadaArrobasEquivalentes)}` },
     { l: "Perda líquida (kg/cab)", fn: (r) => r.tipo === "revenda" ? "—" : fN(r.referenciasTransporte?.perdaPeso.liquidaKgCab, 1) },
+    { l: "Perda líquida no lote", fn: (r) => r.tipo === "revenda" ? "—" : `${fN(r.referenciasTransporte?.perdaPeso.liquidaKgTotal, 1)} kg · ${fAt(r.referenciasTransporte?.perdaPeso.liquidaArrobasEquivalentes)}` },
     { l: "A · @ base processada / cab", fn: (r, sc) => r.tipo === "revenda" || !mostraReferencia(sc, "transporte_na_entrada") ? "—" : fCalc(r.referenciasTransporte?.transporteNaEntrada.arrobasBaseCab, fAt) },
     { l: "A · Custo da @ posta (compra + transporte)", fn: (r, sc) => r.tipo === "revenda" || !mostraReferencia(sc, "transporte_na_entrada") ? "—" : fCalc(r.referenciasTransporte?.transporteNaEntrada.custoArrobaBase), bold: true },
     { l: "A · @ produzidas só pelo confinamento / cab", fn: (r, sc) => r.tipo === "revenda" || !mostraReferencia(sc, "transporte_na_entrada") ? "—" : fCalc(r.referenciasTransporte?.transporteNaEntrada.arrobasProduzidasCab, fAt) },
@@ -1993,38 +2069,36 @@ function Comparativo({ resultados, cenarios, lote }) {
           fP(r.rMliq),
           " a.m."
         ] }),
-        /* @__PURE__ */ jsxs("div", { className: "rsub", children: [
-          "@ posta: ",
-          fR(r.custoArrobaPosta),
-          " \xB7 @ produzida: ",
-          r.tipo === "revenda" ? "\u2014" : fR(r.custoArrobaLiquidaProduzida)
-        ] }),
+        /* @__PURE__ */ jsx("div", { className: "rsub", children: resumoReferenciaTransporte(r, sc) }),
         /* @__PURE__ */ jsxs("div", { className: "rsub", children: [
           "lucro bruto: ",
-          fR(r.lucroBruto)
+          fR(r.lucroBruto),
+          " · rent. total: ",
+          fP(r.rTliq)
         ] }),
-        /* @__PURE__ */ jsxs("div", { className: "rsub", children: [
-          "custo financeiro: ",
-          fR(r.custoFinanceiro)
+        /* @__PURE__ */ jsxs("div", { className: "rkey", children: [
+          /* @__PURE__ */ jsxs("div", { className: "rkey-line", children: [
+            /* @__PURE__ */ jsx("span", { children: "Lucro l\xEDquido" }),
+            /* @__PURE__ */ jsx("strong", { className: r.lucroLiquido >= 0 ? "pos" : "neg", children: fR(r.lucroLiquido) })
+          ] }),
+          /* @__PURE__ */ jsxs("div", { className: "rkey-line", children: [
+            /* @__PURE__ */ jsx("span", { children: "Custo financeiro total" }),
+            /* @__PURE__ */ jsx("strong", { children: fR(r.custoFinanceiro) })
+          ] }),
+          /* @__PURE__ */ jsxs("div", { className: "rkey-line", children: [
+            /* @__PURE__ */ jsx("span", { children: "Capital investido" }),
+            /* @__PURE__ */ jsx("strong", { children: fR(r.investInicial) })
+          ] })
         ] }),
-        r.tipo !== "revenda" && /* @__PURE__ */ jsxs("div", { className: "rsub", children: [
-          r.pagamentoConfinamentoRotulo,
-          " · custo financeiro: ",
-          fR(r.custoDinheiroConfinamento)
-        ] }),
-        /* @__PURE__ */ jsxs("div", { className: "rsub", children: [
-          "lucro l\xEDq: ",
-          fR(r.lucroLiquido)
-        ] }),
-        /* @__PURE__ */ jsxs("div", { className: "rsub", children: [
-          "limite compra VP: ",
+        /* @__PURE__ */ jsxs("div", { className: "rsub", style: { marginTop: 7 }, children: [
+          "Compra: ",
+          fR(lote.precoArroba),
+          "/@ \u2192 m\xE1ximo para VP zero: ",
           fR(r.precoCompraVpMax),
           "/@"
         ] }),
-        /* @__PURE__ */ jsxs("div", { className: "rsub", children: [
-          "capital: ",
-          fR(r.investInicial)
-        ] })
+        /* @__PURE__ */ jsx("div", { className: `rsub ${r.margemCompraVp >= 0 ? "pos" : "neg"}`, children: situacaoVp(r) }),
+        r.tipo !== "revenda" && /* @__PURE__ */ jsx("div", { className: "rsub", children: comparacaoRevenda(r)?.calculavel ? comparacaoRevenda(r).igualdadePossivel ? `Revenda para igualar este lucro l\xEDquido: ${fR(comparacaoRevenda(r).precoMinimo)}/@` : comparacaoRevenda(r).observacao : comparacaoRevenda(r)?.motivo || "Adicione um cen\xE1rio de revenda para comparar" })
       ] }) }, sc.id)) }),
     /* @__PURE__ */ jsx("div", { className: "sec", style: { padding: 0 }, children: /* @__PURE__ */ jsx("div", { className: "tbl-wrap", children: /* @__PURE__ */ jsxs("table", { className: "cmp-tbl", children: [
       /* @__PURE__ */ jsx("thead", { children: /* @__PURE__ */ jsxs("tr", { children: [
@@ -2531,7 +2605,7 @@ function Confinex() {
     const key = window.CONFINEX_GOOGLE_MAPS_KEY;
     const endpoint = window.CONFINEX_DISTANCE_PROXY;
     if (!key && !endpoint) {
-      setStatusDistancia("Abri a rota no Google Maps. Sem chave/proxy, copie a km e cole em Dist\xE2ncia ida.");
+      setStatusDistancia("Abri a rota no Google Maps. Confira a quilometragem e preencha Dist\xE2ncia ida; o local do confinamento continua salvo na base.");
       window.open(googleMapsUrl(sc.origemFrete, sc.destinoFrete), "_blank", "noopener,noreferrer");
       return;
     }

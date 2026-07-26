@@ -462,13 +462,78 @@ async function auditarPagamentoConfinamento(browser, viewport, resultados) {
     await preencher('Custo do dinheiro (% a.m.)', 2);
     await page.getByRole('button', { name: /CALCULAR E COMPARAR/ }).click();
 
+    await preencher('Qtd Cabeças', 65);
+    await preencher('Custo diária (R$/cab/dia)', 10);
+    await page.getByRole('button', { name: 'Comparar as duas', exact: true }).click();
+    await page.getByRole('button', { name: /CALCULAR E COMPARAR/ }).click();
+    const referenciasTransporte = await page.evaluate(() => {
+      const rotulos = [
+        'A · Custo da @ posta (compra + transporte)',
+        'A · Custo da @ produzida só pelo confinamento',
+        'B · Custo da @ de origem (sem transporte)',
+        'B · Custo da @ produzida com transporte',
+      ];
+      const linhas = Array.from(document.querySelectorAll('.cmp-tbl tbody tr'));
+      return Object.fromEntries(rotulos.map(rotulo => {
+        const linha = linhas.find(tr => tr.cells?.[0]?.textContent?.trim() === rotulo);
+        return [rotulo, linha?.cells?.[1]?.textContent?.trim() || ''];
+      }));
+    });
+    const referenciasOk = Object.values(referenciasTransporte).every(
+      valor => valor && valor !== '—' && !valor.includes('Não calculável'),
+    );
+    resultados.push(item(
+      `browser:${viewport.nome}:confinex:referencias-transporte`,
+      'Duas referências de transporte',
+      `comparação lado a lado em ${viewport.nome}`,
+      'as duas referências exibem custos calculáveis sem alterar o resultado',
+      referenciasOk,
+      JSON.stringify(referenciasTransporte),
+    ));
+
+    for (let indice = 0; indice < 4; indice += 1) {
+      await page.locator('.sc-add').click();
+    }
+    await preencher('Preço de Revenda (R$/@)', 350);
+    await preencher('Tributo sobre a revenda (%)', 0.2);
+    await preencher('Outros encargos da revenda (%)', 0);
+    await page.getByRole('button', { name: /CALCULAR E COMPARAR/ }).click();
+    const comparacaoRevenda = await page.evaluate(() => {
+      const rotulos = [
+        'Preço mínimo de revenda para igualar o lucro',
+        'Preço disponível na revenda',
+        'Diferença da revenda (R$/@)',
+        'Lucro líquido estimado da revenda',
+        'Melhor alternativa pelo lucro líquido total',
+      ];
+      const cabecalhos = Array.from(document.querySelectorAll('.cmp-tbl thead th'));
+      const colunaConfinamento = cabecalhos.findIndex(th =>
+        th.textContent?.includes('Confinamento 1'));
+      const linhas = Array.from(document.querySelectorAll('.cmp-tbl tbody tr'));
+      return Object.fromEntries(rotulos.map(rotulo => {
+        const linha = linhas.find(tr => tr.cells?.[0]?.textContent?.trim() === rotulo);
+        return [rotulo, linha?.cells?.[colunaConfinamento]?.textContent?.trim() || ''];
+      }));
+    });
+    const comparacaoOk =
+      Object.values(comparacaoRevenda).every(valor => valor && valor !== '—') &&
+      !Object.values(comparacaoRevenda).some(valor => valor.includes('Não calculável'));
+    resultados.push(item(
+      `browser:${viewport.nome}:confinex:revenda-equivalente`,
+      'Revenda para igualar lucro líquido',
+      `confinamento contra revenda em ${viewport.nome}`,
+      'preço mínimo, preço disponível, diferença, lucro e melhor alternativa aparecem',
+      comparacaoOk,
+      JSON.stringify(comparacaoRevenda),
+    ));
+
     const textoRelatorio = await page.locator('.report-print').textContent();
     resultados.push(item(
       `browser:${viewport.nome}:confinex:contrato-pdf`,
       'Contrato financeiro no PDF',
       `relatório comparativo em ${viewport.nome}`,
       'o relatório nomeia bruto, líquido, custo financeiro e fluxo de parcelas',
-      ['Lucro bruto / líquido', 'Custo financeiro total', 'Fluxo do confinamento']
+      ['Lucro bruto / líquido', 'Custo financeiro total', 'Fluxo do confinamento', 'Revenda para igualar o lucro líquido', 'A · Transporte na entrada', 'B · Transporte na produção']
         .every(texto => textoRelatorio.includes(texto)),
       'relatório de impressão usa o mesmo resultado calculado',
     ));

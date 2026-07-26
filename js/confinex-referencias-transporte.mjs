@@ -23,6 +23,9 @@ export function calcularReferenciasTransporte({
   const arrobasOrigemCab = origem * 0.5 / 15;
   const produzidasDesdeProcessamentoCab = Math.max(arrobasSaidaCab - arrobasProcessadasCab, 0);
   const produzidasDesdeOrigemCab = Math.max(arrobasSaidaCab - arrobasOrigemCab, 0);
+  const perdaBrutaKgCab = Math.max(origem - chegada, 0);
+  const pesoRecuperadoKgCab = Math.max(processado - chegada, 0);
+  const perdaLiquidaKgCab = Math.max(origem - processado, 0);
 
   return {
     transporteNaEntrada: {
@@ -38,9 +41,15 @@ export function calcularReferenciasTransporte({
       custoArrobaProduzida: dividir(Number(custoConfinamento || 0) + Number(custoFrete || 0), produzidasDesdeOrigemCab * n),
     },
     perdaPeso: {
-      brutaKgCab: Math.max(origem - chegada, 0),
-      recuperadaKgCab: Math.max(processado - chegada, 0),
-      liquidaKgCab: Math.max(origem - processado, 0),
+      brutaKgCab: perdaBrutaKgCab,
+      brutaKgTotal: perdaBrutaKgCab * n,
+      brutaArrobasEquivalentes: perdaBrutaKgCab * n * 0.5 / 15,
+      recuperadaKgCab: pesoRecuperadoKgCab,
+      recuperadaKgTotal: pesoRecuperadoKgCab * n,
+      recuperadaArrobasEquivalentes: pesoRecuperadoKgCab * n * 0.5 / 15,
+      liquidaKgCab: perdaLiquidaKgCab,
+      liquidaKgTotal: perdaLiquidaKgCab * n,
+      liquidaArrobasEquivalentes: perdaLiquidaKgCab * n * 0.5 / 15,
     },
   };
 }
