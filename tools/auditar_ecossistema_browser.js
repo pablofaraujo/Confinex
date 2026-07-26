@@ -45,6 +45,106 @@ function urlLocal(href) {
   return new URL(href.replace(/^\.\//, ''), baseUrl).href;
 }
 
+async function auditarSafari14Confinex(browser, viewport, resultados) {
+  const context = await browser.newContext({
+    viewport: { width: viewport.largura, height: viewport.altura },
+  });
+  await context.addInitScript(() => {
+    delete Object.hasOwn;
+    localStorage.clear();
+    Object.defineProperty(window, 'CONFINEX_SHEETS_API_URL', {
+      configurable: false,
+      get: () => '',
+      set: () => {},
+    });
+    const anexar = Element.prototype.appendChild;
+    Element.prototype.appendChild = function (elemento) {
+      if (
+        elemento?.tagName === 'SCRIPT' &&
+        /supabase(?:-js)?/i.test(elemento.src || '')
+      ) {
+        return elemento;
+      }
+      return anexar.call(this, elemento);
+    };
+  });
+  const page = await context.newPage();
+  const erros = [];
+  const requisicoesSupabase = [];
+  page.on('console', msg => {
+    if (['error', 'warning'].includes(msg.type())) {
+      erros.push(`console ${msg.type()}: ${msg.text()}`);
+    }
+  });
+  page.on('pageerror', erro => erros.push(`javascript: ${erro.message}`));
+  page.on('request', req => {
+    if (/\.supabase\.co\//i.test(req.url())) requisicoesSupabase.push(req.url());
+  });
+  page.on('requestfailed', req => {
+    erros.push(`rede: ${req.url()} — ${req.failure()?.errorText || 'falhou'}`);
+  });
+  page.on('response', res => {
+    if (res.status() >= 400) erros.push(`http ${res.status()}: ${res.url()}`);
+  });
+
+  const origem = new URL('confinex.html?validacao=safari14', baseUrl).href;
+  const destino = new URL('confinex.html', baseUrl).href;
+  let evidencia = '';
+  let ok = false;
+  try {
+    await page.goto(origem, { waitUntil: 'load', timeout: 30000 });
+    await page.locator('#root .app').waitFor({ state: 'visible', timeout: 30000 });
+    await page.reload({ waitUntil: 'load', timeout: 30000 });
+    await page.locator('#root .app').waitFor({ state: 'visible', timeout: 30000 });
+
+    const linkConfinex = page.locator(`.shell-link[href="${destino}"]`);
+    const quantidadeLinks = await linkConfinex.count();
+    const ativoAntes = await page.locator('.shell-link.ativa').allTextContents();
+    if (quantidadeLinks === 1) {
+      await linkConfinex.click();
+      await page.waitForLoadState('domcontentloaded', { timeout: 30000 });
+      await page.locator('#root .app').waitFor({ state: 'visible', timeout: 30000 });
+    }
+    const urlAposMenu = page.url();
+    const ativoDepois = await page.locator('.shell-link.ativa').allTextContents();
+    await page.goBack({ waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.locator('#root .app').waitFor({ state: 'visible', timeout: 30000 });
+    const urlAposVoltar = page.url();
+    const estado = await page.evaluate(() => ({
+      apiAusente: typeof Object.hasOwn === 'undefined',
+      bootOk: window.__CONFINEX_BOOT_OK === true,
+      shell: document.body.classList.contains('has-shell'),
+      appVisivel: Boolean(document.querySelector('#root .app')),
+      larguraDocumento: document.documentElement.scrollWidth,
+    }));
+    ok = estado.apiAusente && estado.bootOk && estado.shell && estado.appVisivel &&
+      estado.larguraDocumento <= viewport.largura && quantidadeLinks === 1 &&
+      ativoAntes.length === 1 && ativoAntes[0].includes('Confinex') &&
+      urlAposMenu === destino && ativoDepois.length === 1 &&
+      ativoDepois[0].includes('Confinex') && urlAposVoltar === origem &&
+      requisicoesSupabase.length === 0 && erros.length === 0;
+    evidencia = `estado=${JSON.stringify(estado)} links=${quantidadeLinks} ` +
+      `ativoAntes=${JSON.stringify(ativoAntes)} ativoDepois=${JSON.stringify(ativoDepois)} ` +
+      `menu=${urlAposMenu} voltar=${urlAposVoltar} ` +
+      `supabase=${requisicoesSupabase.length} erros=${erros.join(' | ') || 'nenhum'}`;
+
+    const captura = path.join(artefatos, 'celular-confinex-safari14.png');
+    await page.screenshot({ path: captura, fullPage: true });
+  } catch (erro) {
+    evidencia = `${erro.stack || erro.message}; erros=${erros.join(' | ') || 'nenhum'}`;
+  } finally {
+    await context.close();
+  }
+  resultados.push(item(
+    'browser:celular:confinex:safari14',
+    'Compatibilidade permanente com Safari 14',
+    'Object.hasOwn ausente em viewport 390×844',
+    'carregamento, recarga, menu, item ativo e voltar funcionam sem Supabase, erros de console ou rede',
+    ok,
+    evidencia,
+  ));
+}
+
 async function auditarPagina(browser, pagina, viewport, resultados) {
   const context = await browser.newContext({
     viewport: { width: viewport.largura, height: viewport.altura },
@@ -1138,15 +1238,26 @@ async function auditarEventos(browser, viewport, resultados) {
   });
   const resultados = [];
   try {
-    for (const viewport of viewports) {
-      for (const pagina of config.paginas) {
-        await auditarPagina(browser, pagina, viewport, resultados);
+    if (config.somenteSafari14) {
+      await auditarSafari14Confinex(
+        browser,
+        viewports.find(viewport => viewport.nome === 'celular'),
+        resultados,
+      );
+    } else {
+      for (const viewport of viewports) {
+        for (const pagina of config.paginas) {
+          await auditarPagina(browser, pagina, viewport, resultados);
+        }
+        await auditarMenu(browser, viewport, resultados);
+        if (viewport.nome === 'celular') {
+          await auditarSafari14Confinex(browser, viewport, resultados);
+        }
+        await auditarPagamentoConfinamento(browser, viewport, resultados);
+        await auditarFinanceiro(browser, viewport, resultados);
+        await auditarPendencias(browser, viewport, resultados);
+        await auditarEventos(browser, viewport, resultados);
       }
-      await auditarMenu(browser, viewport, resultados);
-      await auditarPagamentoConfinamento(browser, viewport, resultados);
-      await auditarFinanceiro(browser, viewport, resultados);
-      await auditarPendencias(browser, viewport, resultados);
-      await auditarEventos(browser, viewport, resultados);
     }
   } finally {
     await browser.close();

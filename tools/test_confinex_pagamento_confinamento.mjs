@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import {
   calcularPagamentoConfinamento,
   normalizarModoPagamentoConfinamento,
@@ -9,6 +10,31 @@ const perto = (observado, esperado, mensagem) =>
     Math.abs(observado - esperado) < 1e-8,
     `${mensagem}: esperado ${esperado}, observado ${observado}`,
   );
+
+// Safari 14 não oferece Object.hasOwn. A regressão precisa exercitar o módulo
+// nessas condições e também impedir que a API reapareça nos bundles servidos.
+const descritorHasOwn = Object.getOwnPropertyDescriptor(Object, "hasOwn");
+Object.defineProperty(Object, "hasOwn", {
+  configurable: true,
+  value: undefined,
+  writable: true,
+});
+try {
+  assert.equal(normalizarModoPagamentoConfinamento("mensal"), "mensal");
+  assert.equal(normalizarModoPagamentoConfinamento("legado"), "final");
+} finally {
+  if (descritorHasOwn) Object.defineProperty(Object, "hasOwn", descritorHasOwn);
+  else delete Object.hasOwn;
+}
+
+for (const arquivo of ["confinex-app.latest.js", "confinex-app.mobile.js"]) {
+  const bundle = await readFile(new URL(`../${arquivo}`, import.meta.url), "utf8");
+  assert.doesNotMatch(
+    bundle,
+    /\bObject\.hasOwn\s*\(/,
+    `${arquivo} deve executar no Safari 14 sem Object.hasOwn`,
+  );
+}
 
 // Positivo, calculado sem reutilizar a função sob teste:
 // R$ 1.000 por 90 dias a 2% a.m.
@@ -112,4 +138,4 @@ perto(
   "valor no recebimento separado",
 );
 
-console.log("Pagamento do confinamento: 17 verificações aprovadas.");
+console.log("Pagamento do confinamento: 21 verificações aprovadas, incluindo Safari 14.");

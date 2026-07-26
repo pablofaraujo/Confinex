@@ -14,7 +14,12 @@ function numeroNaoNegativo(valor, campo) {
 }
 
 function normalizarModoPagamentoConfinamento(modo) {
-  return Object.hasOwn(MODOS_PAGAMENTO_CONFINAMENTO, modo) ? modo : "final";
+  return Object.prototype.hasOwnProperty.call(
+    MODOS_PAGAMENTO_CONFINAMENTO,
+    modo,
+  )
+    ? modo
+    : "final";
 }
 
 function criarParcelasMensais(valorTotal, diasCiclo) {
