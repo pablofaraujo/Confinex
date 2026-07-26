@@ -1314,7 +1314,519 @@ function ScPanel({ sc, upd, sexo, custoDinheiro, resultado, confinamentos, model
         { v: "mensal", l: "Mensal" },
         { v: "final", l: "No final" }
       ], val: sc.pagamentoConfinamento || "final", set: u("pagamentoConfinamento") }) }),
-      /* @__PURE__ */ jsx("div", { className: "hint", style: { marginTop: 8 }, childr…11067 tokens truncated…      ] }, ponto.dias);
+      /* @__PURE__ */ jsx("div", { className: "hint", style: { marginTop: 8 }, children: sc.pagamentoConfinamento === "adiantado" ? "Uma parcela na entrada. O valor fica exposto durante todo o ciclo e eventual prazo pós-abate." : sc.pagamentoConfinamento === "mensal" ? "Parcelas vencem a cada 30 dias; o último período parcial é proporcional aos dias do ciclo." : "Uma parcela vence no fim do ciclo; se a venda for recebida depois, somente esse intervalo corre custo do dinheiro." }),
+      resultado && resultado.tipo === "confinamento" && /* @__PURE__ */ jsxs("div", { className: "g3", style: { marginTop: 14 }, children: [
+        /* @__PURE__ */ jsx(F, { label: "Forma considerada", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: resultado.pagamentoConfinamentoRotulo }) }),
+        /* @__PURE__ */ jsx(F, { label: "Parcelas e vencimentos", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: resultado.fluxosPagamentoConfinamento.length ? resultado.fluxosPagamentoConfinamento.map((fluxo) => `${fmtData(addDiasISO(sc.dataEntrada, fluxo.dia))} · ${fR(fluxo.valor)}`).join(" | ") : "Sem custo de confinamento" }) }),
+        /* @__PURE__ */ jsx(F, { label: "Custo do dinheiro do confinamento", hint: "Componente financeiro; o valor presente permanece em uma trilha separada.", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: fR(resultado.custoDinheiroConfinamento) }) })
+      ] }),
+      /* @__PURE__ */ jsx("div", { className: "dvdr" })
+    ] }),
+    /* @__PURE__ */ jsx("div", { className: "sec-t nm", children: "Transporte" }),
+    !freteDeles && /* @__PURE__ */ jsxs(Fragment, { children: [
+      /* @__PURE__ */ jsxs("div", { className: "g3", children: [
+        /* @__PURE__ */ jsx(F, { label: "Origem do frete", hint: "Fazenda, cidade ou coordenada", children: /* @__PURE__ */ jsx("input", { value: sc.origemFrete || "", onChange: u("origemFrete"), placeholder: "Ex: Fazenda Ametista, MG" }) }),
+        /* @__PURE__ */ jsx(F, { label: "Destino", hint: "Confinamento ou frigor\xEDfico", children: /* @__PURE__ */ jsx("input", { value: sc.destinoFrete || "", onChange: u("destinoFrete"), placeholder: "Ex: Confinamento X, GO" }) }),
+        /* @__PURE__ */ jsx(F, { label: "Google Maps", children: /* @__PURE__ */ jsxs("div", { style: { display: "flex", gap: 6 }, children: [
+          /* @__PURE__ */ jsx("button", { className: "tb", style: { flex: 1, padding: "10px 13px" }, disabled: !(sc.origemFrete && sc.destinoFrete), onClick: calcularDistancia, children: "Calcular rota" }),
+          /* @__PURE__ */ jsx("button", { className: "tb", style: { padding: "10px 13px" }, disabled: !(sc.origemFrete && sc.destinoFrete), onClick: () => window.open(googleMapsUrl(sc.origemFrete, sc.destinoFrete), "_blank", "noopener,noreferrer"), children: "Abrir" })
+        ] }) })
+      ] }),
+      statusDistancia && /* @__PURE__ */ jsx("div", { className: "hint", style: { marginTop: 8 }, children: statusDistancia }),
+      /* @__PURE__ */ jsx("div", { className: "dvdr" })
+    ] }),
+    /* @__PURE__ */ jsxs("div", { className: "g4", children: [
+      /* @__PURE__ */ jsx(F, { label: "Respons\xE1vel pelo frete", children: /* @__PURE__ */ jsx(
+        Tg,
+        {
+          opts: [{ v: "meu", l: "Meu" }, { v: "dividido", l: "50/50" }, { v: "confinamento", l: "Deles" }],
+          val: sc.respFrete,
+          set: u("respFrete")
+        }
+      ) }),
+      !freteDeles && /* @__PURE__ */ jsxs(Fragment, { children: [
+        /* @__PURE__ */ jsx(F, { label: "Dist\xE2ncia ida (km)", children: /* @__PURE__ */ jsx("input", { type: "number", value: sc.km, onChange: u("km") }) }),
+        /* @__PURE__ */ jsx(F, { label: "R$/km da carreta (ida+volta)", hint: "Custo total da viagem. Rateado por cabe\xE7a automaticamente.", children: /* @__PURE__ */ jsx("input", { type: "number", step: ".1", value: sc.precoPorKm, onChange: u("precoPorKm") }) }),
+        /* @__PURE__ */ jsx(F, { label: "Bois por carreta", hint: "Macho: 65 \xB7 F\xEAmea: 70. Total de carretas = qtd. bois \xF7 capacidade, arredondado para cima.", children: /* @__PURE__ */ jsx("input", { type: "number", min: "1", value: sc.boisPorCarreta ?? boisPorCarretaPadrao(sexo), onChange: u("boisPorCarreta") }) }),
+        /* @__PURE__ */ jsx(F, { label: "Ped\xE1gios Ida+Volta (R$)", children: /* @__PURE__ */ jsx("input", { type: "number", value: sc.pedIda, onChange: u("pedIda") }) })
+      ] }),
+      /* @__PURE__ */ jsx(F, { label: "Perda no transporte (%)", hint: sc.perdaManual === "" ? `Auto: ${(perdaKm(parseFloat(sc.km) || 0) * 100).toFixed(1)}% p/ ${sc.km || 0} km` : "Valor manual", children: /* @__PURE__ */ jsx(
+        "input",
+        {
+          type: "number",
+          step: ".5",
+          placeholder: "Auto por km",
+          value: sc.perdaManual,
+          onChange: u("perdaManual")
+        }
+      ) })
+    ] }),
+    /* @__PURE__ */ jsxs("div", { className: "g3", style: { marginTop: 14 }, children: [
+      !freteDeles && /* @__PURE__ */ jsx(F, { label: "Frete pago no acerto?", children: /* @__PURE__ */ jsx(Ck, { checked: sc.freteNoAcerto, onChange: u("freteNoAcerto"), label: "Sim \u2014 pago s\xF3 no acerto final" }) }),
+      !isRev && !isParceria && /* @__PURE__ */ jsx(F, { label: "Recupera\xE7\xE3o peso 7d (%)", hint: "% da perda de transporte recuperada", children: /* @__PURE__ */ jsx("input", { type: "number", value: sc.recuperacao, onChange: u("recuperacao") }) }),
+      /* @__PURE__ */ jsx(F, { label: isRev ? "Prazo pagamento (dias)" : "Prazo pag. ap\xF3s abate (dias)", children: /* @__PURE__ */ jsx("input", { type: "number", value: sc.diasPagamento, onChange: u("diasPagamento") }) })
+    ] }),
+    /* @__PURE__ */ jsx("div", { className: "dvdr" }),
+    /* @__PURE__ */ jsx("div", { className: "sec-t nm", children: "Simula\xE7\xE3o financeira" }),
+    /* @__PURE__ */ jsx(F, { label: "Avaliar uma opera\xE7\xE3o financeira?", children: /* @__PURE__ */ jsx(Ck, { checked: sc.simularAdiantamento, onChange: u("simularAdiantamento"), label: "Sim \u2014 comparar o efeito no resultado e na rentabilidade mensal" }) }),
+    sc.simularAdiantamento && /* @__PURE__ */ jsxs(Fragment, { children: [
+      /* @__PURE__ */ jsx("div", { className: "g2", style: { marginTop: 14 }, children: /* @__PURE__ */ jsx(F, { label: "Tipo da opera\xE7\xE3o", hint: antecipacaoRecebimento ? "Parte do recebimento final volta antes e reduz o tempo do capital exposto" : "Dinheiro adicional colocado no neg\xF3cio; o custo reduz o resultado", children: /* @__PURE__ */ jsx(Tg, { opts: [
+        { v: "capital", l: "Adiantamento de capital" },
+        { v: "recebimento", l: "Antecipa\xE7\xE3o do recebimento" }
+      ], val: sc.tipoAdiantamento || "capital", set: u("tipoAdiantamento") }) }) }),
+      /* @__PURE__ */ jsxs("div", { className: "g3", style: { marginTop: 14 }, children: [
+        /* @__PURE__ */ jsx(F, { label: antecipacaoRecebimento ? "Data da antecipa\xE7\xE3o" : "Data do adiantamento", children: /* @__PURE__ */ jsx("input", { type: "date", value: sc.dataAdiantamento || "", onChange: u("dataAdiantamento") }) }),
+        /* @__PURE__ */ jsx(F, { label: antecipacaoRecebimento ? "Valor a receber antes (R$)" : "Valor adiantado (R$)", children: /* @__PURE__ */ jsx("input", { type: "number", min: "0", step: "100", value: sc.valorAdiantamento || "", onChange: u("valorAdiantamento") }) }),
+        /* @__PURE__ */ jsx(F, { label: "Recebimento previsto", hint: "Calculado pela entrada, ciclo e prazo de recebimento", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: fmtData(dataRecebimento) }) })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "warn", style: { marginTop: 12 }, children: [
+        "Juros simples pr\xF3-rata pela taxa de ",
+        custoDinheiro || "0",
+        antecipacaoRecebimento ? "% a.m. O valor informado entra antes como recebimento; o principal e o custo s\xE3o descontados do saldo no acerto final. A rentabilidade mensal \xE9 recalculada pelos fluxos de caixa datados." : "% a.m., somente sobre o valor adiantado e pelos dias efetivos. Neste modo o prazo do recebimento n\xE3o muda, por isso o custo reduz a rentabilidade."
+      ] }),
+      resultado && /* @__PURE__ */ jsxs("div", { className: "g3", style: { marginTop: 14 }, children: [
+        /* @__PURE__ */ jsx(F, { label: antecipacaoRecebimento ? "Tempo antecipado" : "Tempo do adiantamento", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: `${fN(resultado.diasAdiantamento, 0)} dias` }) }),
+        /* @__PURE__ */ jsx(F, { label: antecipacaoRecebimento ? "Custo da antecipa\xE7\xE3o" : "Custo do adiantamento", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: fR(resultado.custoAdiantamento) }) }),
+        /* @__PURE__ */ jsx(F, { label: "Impacto na rentabilidade mensal", hint: "Sem opera\xE7\xE3o \u2192 resultado mensal final", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: `${fP(resultado.rMliqSemAdiantamento ?? resultado.rMliq)} \u2192 ${fP(resultado.rMliq)} a.m. (${fN(resultado.impactoAdiantamentoMensal ?? 0, 2)} p.p.)` }) })
+      ] }),
+      resultado && antecipacaoRecebimento && /* @__PURE__ */ jsxs("div", { className: "g3", style: { marginTop: 14 }, children: [
+        /* @__PURE__ */ jsx(F, { label: "Recebido antecipadamente", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: fR(resultado.valorRecebidoAntecipado) }) }),
+        /* @__PURE__ */ jsx(F, { label: "Saldo no acerto final", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: fR(resultado.saldoRecebimentoFinal) }) }),
+        /* @__PURE__ */ jsx(F, { label: "Limite antecip\xE1vel neste cen\xE1rio", hint: resultado.valorAdiantamentoSolicitado > resultado.valorAdiantamento ? "O valor informado foi limitado para n\xE3o gerar saldo final negativo" : "Principal mais custo n\xE3o podem superar o valor final dispon\xEDvel", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: fR(resultado.valorMaximoAntecipacao) }) })
+      ] })
+    ] }),
+    isRev && /* @__PURE__ */ jsxs(Fragment, { children: [
+      /* @__PURE__ */ jsx("div", { className: "warn", style: { marginTop: 12 }, children: "Revenda: receita = arrobas venda (desconto abaixo) \xD7 pre\xE7o de revenda." }),
+      /* @__PURE__ */ jsxs("div", { className: "g3", style: { marginTop: 14 }, children: [
+        /* @__PURE__ */ jsx(F, { label: "Pre\xE7o de Revenda (R$/@)", children: /* @__PURE__ */ jsx("input", { type: "number", value: sc.precoRevenda, onChange: u("precoRevenda") }) }),
+        /* @__PURE__ */ jsx(F, { label: "Desconto de capim na venda", hint: "Sem desc. \xB7 10kg fixo \xB7 700g/@", children: /* @__PURE__ */ jsx(
+          Tg,
+          {
+            opts: [
+              { v: "sem", l: "Sem desc." },
+              { v: "10kg", l: "10kg fixo" },
+              { v: "700g", l: "700g/@" }
+            ],
+            val: sc.modoCapimVenda || "sem",
+            set: u("modoCapimVenda")
+          }
+        ) })
+      ] })
+    ] }),
+    !isRev && /* @__PURE__ */ jsxs(Fragment, { children: [
+      /* @__PURE__ */ jsx("div", { className: "dvdr" }),
+      /* @__PURE__ */ jsx("div", { className: "sec-t nm", children: "Desempenho Zoot\xE9cnico" }),
+      /* @__PURE__ */ jsxs("div", { className: "g4", children: [
+        /* @__PURE__ */ jsx(F, { label: "Data de entrada", children: /* @__PURE__ */ jsx("input", { type: "date", value: sc.dataEntrada || "", onChange: u("dataEntrada") }) }),
+        /* @__PURE__ */ jsx(F, { label: "Ciclo (dias)", children: /* @__PURE__ */ jsx("input", { type: "number", value: sc.diasCiclo, onChange: u("diasCiclo") }) }),
+        /* @__PURE__ */ jsx(F, { label: "Sa\xEDda prevista", hint: `${mesSaidaLabel(dataSaida)} \xB7 ${contratoSugerido || "sem contrato"}`, children: /* @__PURE__ */ jsx("input", { readOnly: true, value: fmtData(dataSaida) }) }),
+        !isParceria && /* @__PURE__ */ jsx(F, { label: "GMD (kg/dia)", children: /* @__PURE__ */ jsx("input", { type: "number", step: ".1", value: sc.gmd, onChange: u("gmd") }) }),
+        !isParceria && /* @__PURE__ */ jsx(F, { label: "RC Final (%)", children: /* @__PURE__ */ jsx("input", { type: "number", step: ".5", value: sc.rcFinal, onChange: u("rcFinal") }) }),
+        !isParceria && sc.modalidade !== "arroba" && /* @__PURE__ */ jsx(F, { label: "Base do ganho de peso", children: /* @__PURE__ */ jsx(
+          Tg,
+          {
+            opts: [{ v: "origem", l: "Origem" }, { v: "chegada", l: "Chegada" }, { v: "proc", l: "Proc. 7d" }],
+            val: sc.refGanho,
+            set: u("refGanho")
+          }
+        ) })
+      ] }),
+      /* @__PURE__ */ jsx("div", { className: "dvdr" }),
+      /* @__PURE__ */ jsx("div", { className: "sec-t nm", children: "Pre\xE7o de Venda" }),
+      /* @__PURE__ */ jsxs("div", { className: "g4", children: [
+        /* @__PURE__ */ jsx(F, { label: "Modalidade de pre\xE7o", children: /* @__PURE__ */ jsx(
+          Tg,
+          {
+            opts: [{ v: "bolsa", l: "Bolsa / Termo" }, { v: "balcao", l: "Balc\xE3o" }],
+            val: sc.modoPreco,
+            set: u("modoPreco")
+          }
+        ) }),
+        sc.modoPreco === "bolsa" ? /* @__PURE__ */ jsxs(Fragment, { children: [
+          /* @__PURE__ */ jsx(F, { label: isParceria ? "Contrato B3 automático" : "Contrato B3 escolhido", hint: isParceria ? `Definido pela sa\xEDda em ${mesSaidaLabel(dataSaida)}` : `Sugest\xE3o pela sa\xEDda: ${contratoSugerido || "\u2014"}`, children: isParceria ? /* @__PURE__ */ jsx("input", { readOnly: true, value: contratoSugerido || "" }) : /* @__PURE__ */ jsxs("div", { style: { display: "flex", gap: 6 }, children: [
+            /* @__PURE__ */ jsx("input", { value: sc.contratoB3 || contratoSugerido, onChange: u("contratoB3"), style: { flex: 1 } }),
+            /* @__PURE__ */ jsx("button", { className: "tb", style: { padding: "10px 13px" }, onClick: () => u("contratoB3")(contratoSugerido), children: "Usar sugest\xE3o" })
+          ] }) }),
+          /* @__PURE__ */ jsx(F, { label: "BGI Futuro compartilhado (R$/@)", hint: sc.cotacaoB3Fonte ? `${sc.cotacaoB3Fonte} \xB7 ${fmtData((sc.cotacaoB3AtualizadaEm || "").slice(0, 10))}` : "Atualize o contrato na se\xE7\xE3o Mercado BGI acima", children: /* @__PURE__ */ jsx("input", { type: "number", readOnly: true, value: sc.precoBolsa }) }),
+          /* @__PURE__ */ jsx(F, { label: "Diferencial de base (%)", hint: "0 a 12,5% \u2014 desconto sobre BGI", children: /* @__PURE__ */ jsx("input", { type: "number", step: ".5", min: "0", max: "12.5", value: sc.baseDesc, onChange: u("baseDesc") }) })
+        ] }) : /* @__PURE__ */ jsx(F, { label: "Pre\xE7o balc\xE3o (R$/@)", children: /* @__PURE__ */ jsx("input", { type: "number", value: sc.precoBalcao, onChange: u("precoBalcao") }) }),
+        /* @__PURE__ */ jsxs("div", { className: "g2", style: { gridColumn: "1 / -1" }, children: [
+          /* @__PURE__ */ jsx(F, { label: "Funrural (%)", hint: "Calculado sobre o faturamento bruto da venda", children: /* @__PURE__ */ jsx("input", { type: "number", step: ".1", min: "0", value: sc.funrural, onChange: u("funrural") }) }),
+          /* @__PURE__ */ jsx(F, { label: "Finpec (%)", hint: "Normalmente 0%; informe 1% somente quando houver cobrança", children: /* @__PURE__ */ jsx("input", { type: "number", step: ".1", min: "0", value: sc.finpec, onChange: (e) => {
+            upd("finpec", e.target.value);
+            upd("finpecConfigurado", true);
+          } }) })
+        ] })
+      ] })
+    ] })
+  ] });
+}
+function calcComOverride(lote, sc, overrides) {
+  const loteMod = { ...lote };
+  const scMod = { ...sc };
+  if (overrides.precoCompra !== void 0) loteMod.precoCompra = String(overrides.precoCompra);
+  if (overrides.prazoPagtoCompra !== void 0) loteMod.prazoPagtoCompra = String(overrides.prazoPagtoCompra);
+  if (overrides.diasCiclo !== void 0) scMod.diasCiclo = String(overrides.diasCiclo);
+  if (overrides.gmd !== void 0) scMod.gmd = String(overrides.gmd);
+  if (overrides.rcFinal !== void 0) scMod.rcFinal = String(overrides.rcFinal);
+  if (overrides.perdaTransporte !== void 0) scMod.perdaManual = String(overrides.perdaTransporte);
+  if (overrides.precoVenda !== void 0) {
+    if (scMod.modoPreco === "balcao") scMod.precoBalcao = String(overrides.precoVenda);
+    else scMod.precoBolsa = String(overrides.precoVenda);
+  }
+  try {
+    return calcCenario(loteMod, scMod);
+  } catch {
+    return null;
+  }
+}
+var SLIDERS = [
+  { k: "precoCompra", l: "Pre\xE7o de compra", unit: "R$/@", min: 200, max: 500, step: 5, dec: 0 },
+  { k: "prazoPagtoCompra", l: "Prazo de compra", unit: "dias", min: 0, max: 60, step: 1, dec: 0 },
+  { k: "diasCiclo", l: "Dias confinados", unit: "dias", min: 30, max: 240, step: 1, dec: 0 },
+  { k: "gmd", l: "GMD", unit: "kg/dia", min: 0.5, max: 2.5, step: 0.1, dec: 2 },
+  { k: "rcFinal", l: "RC Final", unit: "%", min: 48, max: 60, step: 0.5, dec: 1 },
+  { k: "perdaTransporte", l: "Perda transporte", unit: "%", min: 0, max: 15, step: 0.5, dec: 1 },
+  { k: "precoVenda", l: "Pre\xE7o de venda", unit: "R$/@", min: 250, max: 500, step: 5, dec: 0 }
+];
+function getBase(lote, sc, k) {
+  if (k === "precoCompra") return parseFloat(lote.precoCompra) || 305;
+  if (k === "prazoPagtoCompra") return parseFloat(lote.prazoPagtoCompra) || 0;
+  if (k === "diasCiclo") return parseFloat(sc.diasCiclo) || 110;
+  if (k === "gmd") return parseFloat(sc.gmd) || 1.3;
+  if (k === "rcFinal") return parseFloat(sc.rcFinal) || 53;
+  if (k === "perdaTransporte") return sc.perdaManual !== "" ? parseFloat(sc.perdaManual) || 7 : +(perdaKm(parseFloat(sc.km) || 0) * 100).toFixed(1);
+  if (k === "precoVenda") return parseFloat(sc.precoBolsa) || parseFloat(sc.precoBalcao) || 350;
+  return 0;
+}
+function SensPanel({ lote, cenarios, resultados, historico = [], setHistorico = () => {
+} }) {
+  const [scSel, setScSel] = useState(0);
+  const [nomeTeste, setNomeTeste] = useState("Teste 1");
+  const sc = cenarios[scSel] || cenarios[0];
+  const color = T.sc[scSel] || T.sc[0];
+  const initVals = (scIdx) => {
+    const s = cenarios[scIdx] || cenarios[0];
+    return Object.fromEntries(SLIDERS.map((sl) => [sl.k, getBase(lote, s, sl.k)]));
+  };
+  const [vals, setVals] = useState(() => initVals(0));
+  const handleScSel = (i) => {
+    setScSel(i);
+    setVals(Object.fromEntries(SLIDERS.map((sl) => [sl.k, getBase(lote, cenarios[i], sl.k)])));
+  };
+  const resetSliders = () => setVals(initVals(scSel));
+  const resultado = useMemo(
+    () => calcComOverride(lote, sc, vals),
+    [lote, sc, vals]
+  );
+  const salvar = () => {
+    if (!resultado) return;
+    const novo = {
+      id: Date.now(),
+      nome: nomeTeste || `Teste ${historico.length + 1}`,
+      cenario: sc.nome,
+      vals: { ...vals },
+      // Snapshot dos inputs principais para referência
+      inputs: {
+        pesoMedio: lote.pesoMedio,
+        precoCompra: vals.precoCompra,
+        prazoPagtoCompra: vals.prazoPagtoCompra,
+        diasCiclo: vals.diasCiclo,
+        pagamentoConfinamento: sc.pagamentoConfinamento || "final",
+        gmd: vals.gmd,
+        rcFinal: vals.rcFinal,
+        perdaTransporte: vals.perdaTransporte,
+        precoVenda: vals.precoVenda
+      },
+      rentMensal: resultado.rMliq,
+      rentTotal: resultado.rTliq,
+      lucro: resultado.lucroLiquido,
+      investInicial: resultado.investInicial,
+      receita: resultado.receita,
+      custos: resultado.custos
+    };
+    setHistorico((h) => [...h, novo]);
+    setNomeTeste(`Teste ${historico.length + 2}`);
+  };
+  const carregarTeste = (t) => {
+    setVals({ ...t.vals });
+    const idx = cenarios.findIndex((c) => c.nome === t.cenario);
+    if (idx >= 0) setScSel(idx);
+  };
+  const sliderCss = `
+    .sens-slider-row { display:flex; align-items:center; gap:14px; padding:12px 0; border-bottom:1px solid ${T.border}; }
+    .sens-slider-row:last-child { border-bottom:none; }
+    .sens-lbl { font-size:11px; color:${T.label}; width:150px; flex-shrink:0; font-family:'Plus Jakarta Sans',sans-serif; font-weight:500; }
+    .sens-slider { flex:1; -webkit-appearance:none; appearance:none; height:3px; border-radius:2px; background:${T.border}; outline:none; cursor:pointer; }
+    .sens-slider::-webkit-slider-thumb { -webkit-appearance:none; width:18px; height:18px; border-radius:50%; background:var(--sc-color,${T.accent}); cursor:pointer; border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.15); }
+    .sens-val { font-family:'DM Mono',monospace; font-size:13px; font-weight:600; color:${T.text}; width:72px; text-align:right; flex-shrink:0; }
+    .sens-unit { font-size:10px; color:${T.muted}; width:42px; flex-shrink:0; }
+    .sens-result { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:18px; }
+    .sens-kpi { background:${T.bg}; border-radius:10px; padding:14px 16px; border:1px solid ${T.border}; }
+    .sens-kpi-l { font-size:10px; color:${T.muted}; text-transform:uppercase; letter-spacing:.6px; margin-bottom:6px; font-family:'Plus Jakarta Sans',sans-serif; font-weight:500; }
+    .sens-kpi-v { font-family:'DM Mono',monospace; font-size:18px; font-weight:500; }
+    .sens-actions { display:flex; gap:10px; margin-top:18px; align-items:center; flex-wrap:wrap; }
+    .sens-save-btn { background:${T.accent}; border:none; border-radius:8px; color:#fff; cursor:pointer; font-family:'Plus Jakarta Sans',sans-serif; font-size:12px; font-weight:700; padding:9px 20px; transition:opacity .15s; }
+    .sens-save-btn:hover { opacity:.85; }
+    .sens-reset-btn { background:transparent; border:1.5px solid ${T.border}; border-radius:8px; color:${T.muted}; cursor:pointer; font-size:12px; padding:9px 16px; transition:all .15s; font-family:'Plus Jakarta Sans',sans-serif; }
+    .sens-reset-btn:hover { border-color:${T.label}; color:${T.text}; }
+    .sens-nome-input { background:${T.surface}; border:1px solid ${T.border}; border-radius:8px; color:${T.text}; font-family:'DM Mono',monospace; font-size:12px; padding:8px 12px; outline:none; flex:1; min-width:120px; max-width:200px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+    .hist-table { width:100%; border-collapse:collapse; font-size:12px; margin-top:14px; }
+    .hist-table th { padding:8px 12px; font-size:9px; font-weight:600; color:${T.muted}; letter-spacing:.8px; text-transform:uppercase; border-bottom:1px solid ${T.border}; text-align:right; background:${T.bg}; }
+    .hist-table th:first-child { text-align:left; }
+    .hist-table td { padding:9px 12px; border-bottom:1px solid ${T.border}; font-family:'DM Mono',monospace; text-align:right; color:${T.text}; }
+    .hist-table td:first-child { text-align:left; font-family:'Plus Jakarta Sans',sans-serif; color:${T.label}; }
+    .hist-table tr:last-child td { border-bottom:none; }
+    .hist-load-btn { background:${T.bg}; border:1px solid ${T.border}; border-radius:6px; color:${T.muted}; cursor:pointer; font-size:10px; padding:4px 9px; transition:all .15s; }
+    .hist-load-btn:hover { border-color:${T.accent}; color:${T.accent}; }
+    .hist-del-btn { background:transparent; border:none; color:${T.red}; cursor:pointer; font-size:13px; opacity:.35; padding:0 4px; }
+    .hist-del-btn:hover { opacity:1; }
+    @media(max-width:600px){ .sens-result{grid-template-columns:1fr 1fr} .sens-lbl{width:110px} }
+  `;
+  return /* @__PURE__ */ jsxs("div", { style: { marginTop: 28 }, children: [
+    /* @__PURE__ */ jsx("style", { children: sliderCss }),
+    /* @__PURE__ */ jsx("div", { className: "res-ttl", children: "An\xE1lise de Sensibilidade" }),
+    /* @__PURE__ */ jsx("div", { className: "res-sub", children: "Arraste os sliders \u2014 salve testes para comparar" }),
+    /* @__PURE__ */ jsxs("div", { className: "sec", children: [
+      /* @__PURE__ */ jsxs("div", { style: { display: "flex", gap: 12, marginBottom: 18, alignItems: "flex-end", flexWrap: "wrap" }, children: [
+        /* @__PURE__ */ jsx(F, { label: "Cen\xE1rio", children: /* @__PURE__ */ jsx("select", { value: scSel, onChange: (e) => handleScSel(+e.target.value), style: { maxWidth: 220 }, children: cenarios.map((s, i) => resultados[i] ? /* @__PURE__ */ jsx("option", { value: i, children: s.nome }, s.id) : null) }) }),
+        /* @__PURE__ */ jsx("button", { className: "sens-reset-btn", onClick: resetSliders, children: "\u21BA Resetar para base" })
+      ] }),
+      SLIDERS.map((sl) => /* @__PURE__ */ jsxs("div", { className: "sens-slider-row", children: [
+        /* @__PURE__ */ jsx("span", { className: "sens-lbl", children: sl.l }),
+        /* @__PURE__ */ jsx(
+          "input",
+          {
+            type: "range",
+            className: "sens-slider",
+            style: { "--sc-color": color },
+            min: sl.min,
+            max: sl.max,
+            step: sl.step,
+            value: vals[sl.k],
+            onChange: (e) => setVals((v) => ({ ...v, [sl.k]: +e.target.value }))
+          }
+        ),
+        /* @__PURE__ */ jsx("span", { className: "sens-val", children: fN(vals[sl.k], sl.dec) }),
+        /* @__PURE__ */ jsx("span", { className: "sens-unit", children: sl.unit })
+      ] }, sl.k)),
+      resultado && /* @__PURE__ */ jsxs("div", { className: "sens-result", children: [
+        /* @__PURE__ */ jsxs("div", { className: "sens-kpi", children: [
+          /* @__PURE__ */ jsx("div", { className: "sens-kpi-l", children: "Rent. Mensal" }),
+          /* @__PURE__ */ jsx("div", { className: "sens-kpi-v", style: { color: resultado.rentMensal >= 0 ? T.green : T.red }, children: fP(resultado.rentMensal) })
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "sens-kpi", children: [
+          /* @__PURE__ */ jsx("div", { className: "sens-kpi-l", children: "Rent. Total" }),
+          /* @__PURE__ */ jsx("div", { className: `sens-kpi-v ${resultado.rentTotal >= 0 ? "pos" : "neg"}`, children: fP(resultado.rentTotal) })
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "sens-kpi", children: [
+          /* @__PURE__ */ jsx("div", { className: "sens-kpi-l", children: "Lucro Total" }),
+          /* @__PURE__ */ jsx("div", { className: `sens-kpi-v ${resultado.lucro >= 0 ? "pos" : "neg"}`, children: fR(resultado.lucro) })
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "sens-kpi", children: [
+          /* @__PURE__ */ jsx("div", { className: "sens-kpi-l", children: "Capital" }),
+          /* @__PURE__ */ jsx("div", { className: "sens-kpi-v", children: fR(resultado.investInicial) })
+        ] })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "sens-actions", children: [
+        /* @__PURE__ */ jsx(
+          "input",
+          {
+            className: "sens-nome-input",
+            placeholder: "Nome do teste...",
+            value: nomeTeste,
+            onChange: (e) => setNomeTeste(e.target.value)
+          }
+        ),
+        /* @__PURE__ */ jsx("button", { className: "sens-save-btn", onClick: salvar, children: "SALVAR TESTE" })
+      ] })
+    ] }),
+    historico.length > 0 && /* @__PURE__ */ jsxs("div", { className: "sec", style: { marginTop: 14 }, children: [
+      /* @__PURE__ */ jsx("div", { className: "sec-t", children: "Testes Salvos" }),
+      /* @__PURE__ */ jsx("div", { className: "tbl-wrap", children: /* @__PURE__ */ jsxs("table", { className: "hist-table", children: [
+        /* @__PURE__ */ jsx("thead", { children: /* @__PURE__ */ jsxs("tr", { children: [
+          /* @__PURE__ */ jsx("th", { style: { textAlign: "left" }, children: "Nome" }),
+          /* @__PURE__ */ jsx("th", { children: "Cen\xE1rio" }),
+          /* @__PURE__ */ jsx("th", { children: "Compra R$/@" }),
+          /* @__PURE__ */ jsx("th", { children: "Prazo compra" }),
+          /* @__PURE__ */ jsx("th", { children: "Dias conf." }),
+          /* @__PURE__ */ jsx("th", { children: "GMD" }),
+          /* @__PURE__ */ jsx("th", { children: "RC%" }),
+          /* @__PURE__ */ jsx("th", { children: "Perda%" }),
+          /* @__PURE__ */ jsx("th", { children: "Venda R$/@" }),
+          /* @__PURE__ */ jsx("th", { children: "Rent. Mensal" }),
+          /* @__PURE__ */ jsx("th", { children: "Lucro" }),
+          /* @__PURE__ */ jsx("th", { children: "Capital" }),
+          /* @__PURE__ */ jsx("th", {})
+        ] }) }),
+        /* @__PURE__ */ jsx("tbody", { children: historico.map((t) => /* @__PURE__ */ jsxs("tr", { children: [
+          /* @__PURE__ */ jsx("td", { style: { fontFamily: "Inter,sans-serif", color: T.text, fontWeight: 600 }, children: t.nome }),
+          /* @__PURE__ */ jsx("td", { style: { color: T.muted, fontFamily: "Inter,sans-serif", fontSize: 11 }, children: t.cenario }),
+          /* @__PURE__ */ jsx("td", { children: fN(t.inputs.precoCompra, 0) }),
+          /* @__PURE__ */ jsxs("td", { children: [
+            fN(t.inputs.prazoPagtoCompra, 0),
+            "d"
+          ] }),
+          /* @__PURE__ */ jsxs("td", { children: [
+            fN(t.inputs.diasCiclo, 0),
+            "d"
+          ] }),
+          /* @__PURE__ */ jsx("td", { children: fN(t.inputs.gmd, 2) }),
+          /* @__PURE__ */ jsxs("td", { children: [
+            fN(t.inputs.rcFinal, 1),
+            "%"
+          ] }),
+          /* @__PURE__ */ jsxs("td", { children: [
+            fN(t.inputs.perdaTransporte, 1),
+            "%"
+          ] }),
+          /* @__PURE__ */ jsx("td", { children: fN(t.inputs.precoVenda, 0) }),
+          /* @__PURE__ */ jsx("td", { className: t.rentMensal >= 0 ? "pos" : "neg", style: { fontWeight: 700 }, children: fP(t.rentMensal) }),
+          /* @__PURE__ */ jsx("td", { className: t.lucro >= 0 ? "pos" : "neg", children: fR(t.lucro) }),
+          /* @__PURE__ */ jsx("td", { children: fR(t.investInicial) }),
+          /* @__PURE__ */ jsxs("td", { style: { display: "flex", gap: 6, justifyContent: "flex-end" }, children: [
+            /* @__PURE__ */ jsx("button", { className: "hist-load-btn", onClick: () => carregarTeste(t), title: "Carregar nos sliders", children: "\u2191 usar" }),
+            /* @__PURE__ */ jsx("button", { className: "hist-del-btn", onClick: () => setHistorico((h) => h.filter((x) => x.id !== t.id)), title: "Remover", children: "\xD7" })
+          ] })
+        ] }, t.id)) })
+      ] }) })
+    ] })
+  ] });
+}
+function EvolucaoTempo({ lote, cenarios }) {
+  const ativos = cenarios.filter((sc) => sc.tipo !== "revenda");
+  if (!ativos.length) return null;
+  return /* @__PURE__ */ jsxs("div", { className: "sec", style: { marginTop: 18 }, children: [
+    /* @__PURE__ */ jsx("div", { className: "sec-t", children: "Evolução entre 60 e 240 dias" }),
+    /* @__PURE__ */ jsx("div", { className: "hint", style: { marginBottom: 16 }, children: "Cada prazo usa a cotação BGI do próprio mês de saída. A linha fica pendente quando a curva não possui aquele vencimento." }),
+    ativos.map((sc) => {
+      const evolucao = calcEvolucaoTempo(lote, sc);
+      const diasAtual = Math.round(parseFloat(sc.diasCiclo) || 0);
+      return /* @__PURE__ */ jsxs("div", { style: { marginBottom: 24 }, children: [
+        /* @__PURE__ */ jsxs("div", { className: "sec-t nm", style: { marginBottom: 8 }, children: [sc.nome, " · ", sc.modalidade, " · ciclo atual ", diasAtual, " dias"] }),
+        /* @__PURE__ */ jsx("div", { className: "tbl-wrap", children: /* @__PURE__ */ jsxs("table", { className: "cmp-tbl evolucao-table", children: [
+          /* @__PURE__ */ jsx("thead", { children: /* @__PURE__ */ jsxs("tr", { children: [
+            /* @__PURE__ */ jsxs("th", { children: ["Prazo /", /* @__PURE__ */ jsx("br", {}), "saída"] }),
+            /* @__PURE__ */ jsxs("th", { children: ["BGI do", /* @__PURE__ */ jsx("br", {}), "mês"] }),
+            /* @__PURE__ */ jsxs("th", { children: ["@ produzidas", /* @__PURE__ */ jsx("br", {}), "por cab."] }),
+            /* @__PURE__ */ jsxs("th", { children: ["Custo da @", /* @__PURE__ */ jsx("br", {}), "produzida"] }),
+            /* @__PURE__ */ jsxs("th", { children: ["Custo da @", /* @__PURE__ */ jsx("br", {}), "marginal"] }),
+            /* @__PURE__ */ jsxs("th", { children: ["Frete por @", /* @__PURE__ */ jsx("br", {}), "produzida"] }),
+            /* @__PURE__ */ jsxs("th", { children: ["Produção + frete", /* @__PURE__ */ jsx("br", {}), "por @"] }),
+            /* @__PURE__ */ jsxs("th", { children: ["Rent.", /* @__PURE__ */ jsx("br", {}), "mensal"] }),
+            /* @__PURE__ */ jsxs("th", { children: ["Resultado", /* @__PURE__ */ jsx("br", {}), "final"] })
+          ] }) }),
+          /* @__PURE__ */ jsx("tbody", { children: evolucao.map((ponto) => {
+            const r = ponto.resultado;
+            return /* @__PURE__ */ jsxs("tr", { className: ponto.dias === diasAtual ? "tot" : "", children: [
+              /* @__PURE__ */ jsxs("td", { children: [ponto.dias, " dias · ", fmtData(ponto.dataSaida)] }),
+              /* @__PURE__ */ jsx("td", { children: ponto.cotacao == null ? `${ponto.contrato} · sem cotação` : `${ponto.contrato} · ${fR(ponto.cotacao)}` }),
+              /* @__PURE__ */ jsx("td", { children: r ? fAt(r.arrobasProduzidasCab) : "—" }),
+              /* @__PURE__ */ jsx("td", { children: r ? fR(r.custoArrobaLiquidaProduzida) : "—" }),
+              /* @__PURE__ */ jsx("td", { children: r ? fR(r.custoArrobaMarginal) : "—" }),
+              /* @__PURE__ */ jsx("td", { children: r ? fR(r.fretePorArrobaProduzida) : "—" }),
+              /* @__PURE__ */ jsx("td", { children: r ? fR(r.custoProducaoFretePorArroba) : "—" }),
+              /* @__PURE__ */ jsx("td", { className: r ? r.rMliq >= 0 ? "pos" : "neg" : "", children: r ? `${fP(r.rMliq)} a.m.` : "—" }),
+              /* @__PURE__ */ jsx("td", { className: r ? r.lucroLiquido >= 0 ? "pos" : "neg" : "", children: r ? fR(r.lucroLiquido) : "—" })
+            ] }, ponto.dias);
+          }) })
+        ] }) })
+      ] }, sc.id);
+    })
+  ] });
+}
+function ItemRelatorio({ label, value }) {
+  return /* @__PURE__ */ jsxs("div", { className: "report-item", children: [
+    /* @__PURE__ */ jsx("div", { className: "report-label", children: label }),
+    /* @__PURE__ */ jsx("div", { className: "report-value", children: value ?? "—" })
+  ] });
+}
+function RelatorioComparativo({ lote, cenarios, resultados }) {
+  const ativos = cenarios.map((sc, i) => ({ sc, r: resultados[i], i })).filter((x) => x.r);
+  if (!ativos.length) return null;
+  const ranked = [...ativos].sort((a, b) => b.r.rMliq - a.r.rMliq || b.r.lucroLiquido - a.r.lucroLiquido || b.r.rTliq - a.r.rTliq || a.i - b.i);
+  return /* @__PURE__ */ jsxs(Fragment, { children: [
+    /* @__PURE__ */ jsxs("div", { className: "sec no-print", style: { marginTop: 18 }, children: [
+      /* @__PURE__ */ jsx("div", { className: "sec-t", children: "Relatório comparativo" }),
+      /* @__PURE__ */ jsxs("div", { className: "g2", children: [
+        /* @__PURE__ */ jsx("div", { className: "hint", children: "Inclui as premissas e os resultados de todos os confinamentos, independentemente do cenário selecionado. Na impressão, escolha Salvar como PDF." }),
+        /* @__PURE__ */ jsx("button", { className: "calc-btn", style: { marginTop: 0 }, onClick: () => window.print(), children: "GERAR RELATÓRIO COMPARATIVO / PDF" })
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxs("div", { className: "report-print", children: [
+      /* @__PURE__ */ jsxs("section", { className: "report-page", children: [
+        /* @__PURE__ */ jsx("div", { className: "report-brand", children: "CONFINEX · RELATÓRIO COMPARATIVO" }),
+        /* @__PURE__ */ jsxs("h1", { children: [lote.origemNome || "Estudo de confinamento", " · ", lote.codigoNegocio || "sem código"] }),
+        /* @__PURE__ */ jsx("div", { className: "report-muted", children: `Gerado em ${(/* @__PURE__ */ new Date()).toLocaleString("pt-BR")}` }),
+        /* @__PURE__ */ jsxs("div", { className: "report-grid", children: [
+          /* @__PURE__ */ jsx(ItemRelatorio, { label: "Cabeças", value: lote.qtd }),
+          /* @__PURE__ */ jsx(ItemRelatorio, { label: "Sexo", value: lote.sexo === "macho" ? "Macho" : "Fêmea" }),
+          /* @__PURE__ */ jsx(ItemRelatorio, { label: "Peso médio", value: `${lote.pesoMedio} kg` }),
+          /* @__PURE__ */ jsx(ItemRelatorio, { label: "Compra", value: `${fR(parseFloat(lote.precoCompra) || 0)}/@` }),
+          /* @__PURE__ */ jsx(ItemRelatorio, { label: "Prazo da compra", value: `${lote.prazoPagtoCompra || 0} dias` }),
+          /* @__PURE__ */ jsx(ItemRelatorio, { label: "Custo do dinheiro", value: `${lote.custoDinheiro || 0}% a.m.` })
+        ] }),
+        /* @__PURE__ */ jsx("h2", { children: "Resumo por rentabilidade mensal" }),
+        /* @__PURE__ */ jsx("table", { className: "report-table", children: /* @__PURE__ */ jsxs("tbody", { children: [
+          /* @__PURE__ */ jsxs("tr", { children: ["#", "Cenário", "Modalidade", "Prazo", "Contrato", "@ posta", "@ produzida", "Rent. mensal", "Resultado"].map((h) => /* @__PURE__ */ jsx("th", { children: h }, h)) }),
+          ranked.map(({ sc, r }, pos) => /* @__PURE__ */ jsxs("tr", { children: [
+            /* @__PURE__ */ jsx("td", { children: pos + 1 }),
+            /* @__PURE__ */ jsx("td", { children: sc.nome }),
+            /* @__PURE__ */ jsx("td", { children: sc.tipo === "revenda" ? "Revenda" : sc.modalidade }),
+            /* @__PURE__ */ jsx("td", { children: sc.tipo === "revenda" ? "—" : `${sc.diasCiclo} dias` }),
+            /* @__PURE__ */ jsx("td", { children: sc.tipo === "revenda" || sc.modoPreco !== "bolsa" ? "—" : sc.contratoB3 || contratoB3DoCenario(sc) }),
+            /* @__PURE__ */ jsx("td", { children: fR(r.custoArrobaPosta) }),
+            /* @__PURE__ */ jsx("td", { children: sc.tipo === "revenda" ? "—" : fR(r.custoArrobaLiquidaProduzida) }),
+            /* @__PURE__ */ jsx("td", { children: `${fP(r.rMliq)} a.m.` }),
+            /* @__PURE__ */ jsx("td", { children: fR(r.lucroLiquido) })
+          ] }, sc.id))
+        ] }) })
+      ] }),
+      ranked.map(({ sc, r }, pos) => {
+        const evolucao = calcEvolucaoTempo(lote, sc);
+        return /* @__PURE__ */ jsxs("section", { className: "report-page", children: [
+          /* @__PURE__ */ jsxs("div", { className: "report-brand", children: [pos + 1, "º · ", sc.nome] }),
+          /* @__PURE__ */ jsxs("h1", { children: [sc.tipo === "revenda" ? "Revenda" : sc.modalidade, " · ", `${fP(r.rMliq)} a.m.`] }),
+          /* @__PURE__ */ jsxs("div", { className: "report-grid", children: [
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Entrada / saída", value: sc.tipo === "revenda" ? "—" : `${fmtData(sc.dataEntrada)} · ${fmtData(addDiasISO(sc.dataEntrada, parseFloat(sc.diasCiclo) || 0))}` }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Ciclo / recebimento", value: sc.tipo === "revenda" ? `${sc.diasPagamento || 0} dias` : `${sc.diasCiclo} + ${sc.diasPagamento || 0} dias` }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Contrato / base", value: sc.modoPreco === "bolsa" ? `${sc.contratoB3 || contratoB3DoCenario(sc)} · -${sc.baseDesc || 0}%` : `Balcão · ${fR(parseFloat(sc.precoBalcao) || 0)}` }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "GMD / RC final", value: sc.tipo === "revenda" ? "—" : `${sc.gmd} kg/d · ${sc.rcFinal}%` }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Premissas da modalidade", value: sc.tipo === "revenda" ? "Revenda direta" : sc.modalidade === "ms" ? `MS ${fR(parseFloat(sc.custoMS) || 0)}/t · ${sc.consumoMS}% PV · adm ${fR(parseFloat(sc.custoAdm) || 0)}/d · protocolo ${fR(parseFloat(sc.protocolo) || 0)}` : sc.modalidade === "arroba" ? `${fR(parseFloat(sc.custoArrobaProd) || 0)}/@ produzida` : sc.modalidade === "diaria" ? `${fR(parseFloat(sc.custoDiaria) || 0)}/cab/dia` : `Parceria · RC entrada ${sc.rcEntrada}%` }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Peso processado / abate", value: sc.tipo === "revenda" ? `${fN(r.pesoProc, 1)} kg` : `${fN(r.pesoProc, 1)} · ${fN(r.pesoAbate, 1)} kg` }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Rota / responsável", value: `${sc.origemFrete || "origem não informada"} → ${sc.destinoFrete || "destino não informado"} · ${sc.respFrete || "—"}` }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Transporte", value: `${fR(r.freteTotal)} · ${sc.freteNoAcerto ? "acerto final" : "à vista"}` }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Custo confinamento", value: fR(r.custoCont) }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Pagamento do confinamento", value: sc.tipo === "revenda" ? "—" : `${r.pagamentoConfinamentoRotulo} · ${r.quantidadeParcelasConfinamento} parcela(s) · custo financeiro ${fR(r.custoDinheiroConfinamento)}` }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Fluxo do confinamento", value: sc.tipo === "revenda" ? "—" : r.fluxosPagamentoConfinamento.map((fluxo) => `${fmtData(addDiasISO(sc.dataEntrada, fluxo.dia))}: ${fR(fluxo.valor)}`).join(" · ") || "Sem custo" }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Custo @ posta", value: fR(r.custoArrobaPosta) }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "@ líquidas produzidas", value: sc.tipo === "revenda" ? "—" : `${fAt(r.arrobasProduzidasCab)} / cab` }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Custo @ líquida produzida", value: sc.tipo === "revenda" ? "—" : fR(r.custoArrobaLiquidaProduzida) }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Custo marginal @", value: sc.tipo === "revenda" ? "—" : fR(r.custoArrobaMarginal) }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Produção + frete / @", value: sc.tipo === "revenda" ? "—" : fR(r.custoProducaoFretePorArroba) }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Capital", value: fR(r.investInicial) }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Lucro bruto / líquido", value: `${fR(r.lucroBruto)} · ${fR(r.lucroLiquido)}` }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Custo financeiro total", value: fR(r.custoFinanceiro) }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Rentabilidade", value: `${fP(r.rTliq)} total · ${fP(r.rMliq)} a.m.` }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Operação financeira", value: r.valorAdiantamento > 0 ? `${r.tipoAdiantamento === "recebimento" ? "Antecipação do recebimento" : "Adiantamento de capital"} · ${fR(r.valorAdiantamento)} · ${r.diasAdiantamento} dias · custo ${fR(r.custoAdiantamento)}${r.tipoAdiantamento === "recebimento" ? ` · saldo final ${fR(r.saldoRecebimentoFinal)}` : ""}` : "Não simulada" })
+          ] }),
+          sc.tipo !== "revenda" && /* @__PURE__ */ jsxs(Fragment, { children: [
+            /* @__PURE__ */ jsx("h2", { children: "Evolução de custo e rentabilidade" }),
+            /* @__PURE__ */ jsx("table", { className: "report-table report-table-compact", children: /* @__PURE__ */ jsxs("tbody", { children: [
+              /* @__PURE__ */ jsxs("tr", { children: ["Dias", "Saída", "BGI", "@ prod./cab", "Custo @ prod.", "Frete/@", "Prod.+frete/@", "Rent. mês", "Resultado"].map((h) => /* @__PURE__ */ jsx("th", { children: h }, h)) }),
+              evolucao.map((ponto) => {
+                const e = ponto.resultado;
+                return /* @__PURE__ */ jsxs("tr", { children: [
+                  /* @__PURE__ */ jsx("td", { children: ponto.dias }),
+                  /* @__PURE__ */ jsx("td", { children: fmtData(ponto.dataSaida) }),
+                  /* @__PURE__ */ jsx("td", { children: ponto.cotacao == null ? `${ponto.contrato} · pendente` : `${ponto.contrato} · ${fR(ponto.cotacao)}` }),
+                  /* @__PURE__ */ jsx("td", { children: e ? fAt(e.arrobasProduzidasCab) : "—" }),
+                  /* @__PURE__ */ jsx("td", { children: e ? fR(e.custoArrobaLiquidaProduzida) : "—" }),
+                  /* @__PURE__ */ jsx("td", { children: e ? fR(e.fretePorArrobaProduzida) : "—" }),
+                  /* @__PURE__ */ jsx("td", { children: e ? fR(e.custoProducaoFretePorArroba) : "—" }),
+                  /* @__PURE__ */ jsx("td", { children: e ? fP(e.rMliq) : "—" }),
+                  /* @__PURE__ */ jsx("td", { children: e ? fR(e.lucroLiquido) : "—" })
+                ] }, ponto.dias);
               })
             ] }) })
           ] })
@@ -1521,7 +2033,7 @@ function Confinex() {
   const [statusB3, setStatusB3] = useState("");
   const [statusDistancia, setStatusDistancia] = useState("");
   const [backendUrl, setBackendUrl] = useState(getStoredSheetsBackendUrl);
-  const [statusSheets, setStatusSheets] = useState(backendUrl ? "Backend Sheets configurado." : "Sem backend Sheets: salvando apenas neste navegador.");
+  const [statusSheets, setStatusSheets] = useState(backendUrl ? "Cópia online disponível." : "Salvo somente neste aparelho.");
   const [statusSupabase, setStatusSupabase] = useState("Supabase: aguardando um negócio ser iniciado.");
   const [versoesSalvas, setVersoesSalvas] = useState(carregarVersoesNomeadas);
   const [versaoSelecionada, setVersaoSelecionada] = useState("");
@@ -1593,24 +2105,24 @@ function Confinex() {
     if (url) {
       try {
         await sheetsPost(url, "saveVersion", versaoReset);
-        setStatusSheets("Novo estudo iniciado. Versao anterior salva no Sheets e bases preservadas.");
+        setStatusSheets("Novo estudo iniciado. A versão anterior foi preservada também na cópia online.");
         return;
       } catch {
       }
     }
-    setStatusSheets("Novo estudo iniciado. Versao anterior salva localmente e bases preservadas.");
+    setStatusSheets("Novo estudo iniciado. A versão anterior e as bases foram preservadas neste aparelho.");
   };
   const retornarAntesReset = () => {
     try {
       const raw = localStorage.getItem(RESTORE_STORAGE_KEY);
       if (!raw) {
-        setStatusSheets("Ainda nao existe ponto de retorno salvo.");
+        setStatusSheets("Ainda não existe um ponto de retorno salvo.");
         return;
       }
       aplicarEstado(JSON.parse(raw));
-      setStatusSheets("Estado anterior restaurado.");
+      setStatusSheets("Estudo anterior restaurado.");
     } catch {
-      setStatusSheets("Nao consegui restaurar o estado anterior.");
+      setStatusSheets("Não consegui restaurar o estudo anterior.");
     }
   };
   const persistirVersoes = (lista) => {
@@ -1620,7 +2132,7 @@ function Confinex() {
   const carregarVersoesSheets = async (mostrarStatus = true) => {
     const url = backendUrl.trim();
     if (!url) {
-      if (mostrarStatus) setStatusSheets("Cole a URL do Apps Script para carregar versoes.");
+      if (mostrarStatus) setStatusSheets("A cópia online não está disponível neste aparelho.");
       return;
     }
     try {
@@ -1634,9 +2146,9 @@ function Confinex() {
       persistirVersoes(lista.slice(0, 80));
       soLocais.forEach((v) => { sheetsPost(url, "saveVersion", v).catch(() => {}); });
       if (!versaoSelecionada && lista[0]) setVersaoSelecionada(lista[0].id);
-      if (mostrarStatus) setStatusSheets(`${nuvem.length} versao(oes) na nuvem${soLocais.length ? `; ${soLocais.length} local(is) reenviada(s)` : ""}.`);
+      if (mostrarStatus) setStatusSheets(`${nuvem.length} versão(ões) online${soLocais.length ? `; ${soLocais.length} versão(ões) deste aparelho sincronizada(s)` : ""}.`);
     } catch {
-      if (mostrarStatus) setStatusSheets("Nao consegui carregar versoes do Sheets; mantendo lista local.");
+      if (mostrarStatus) setStatusSheets("Não consegui consultar as versões online; a lista deste aparelho foi mantida.");
     }
   };
   const salvarVersaoNomeada = async () => {
@@ -1675,20 +2187,20 @@ function Confinex() {
     }
     const url = backendUrl.trim();
     if (!url) {
-      setStatusSheets(`Versao salva localmente: ${versao.nome}.`);
+      setStatusSheets(`Versão salva neste aparelho: ${versao.nome}.`);
       return;
     }
     try {
       await sheetsPost(url, "saveVersion", versao);
-      setStatusSheets(`Versao salva no Sheets: ${versao.nome}.`);
+      setStatusSheets(`Versão salva neste aparelho e na cópia online: ${versao.nome}.`);
     } catch {
-      setStatusSheets(`Versao salva localmente; nao consegui enviar ao Sheets agora.`);
+      setStatusSheets("Versão salva neste aparelho; a cópia online está temporariamente indisponível.");
     }
   };
   const restaurarVersaoNomeada = () => {
     const versao = versoesSalvas.find((v) => String(v.id) === String(versaoSelecionada));
     if (!versao) {
-      setStatusSheets("Selecione uma versao salva para restaurar.");
+      setStatusSheets("Selecione uma versão salva para restaurar.");
       return;
     }
     try {
@@ -1696,12 +2208,12 @@ function Confinex() {
     } catch {
     }
     aplicarEstado(versao.state || {});
-    setStatusSheets(`Versao restaurada: ${versao.nome}.`);
+    setStatusSheets(`Versão restaurada: ${versao.nome}.`);
   };
   const apagarVersaoNomeada = async () => {
     const versao = versoesSalvas.find((v) => String(v.id) === String(versaoSelecionada));
     if (!versao) {
-      setStatusSheets("Selecione uma versao salva para apagar.");
+      setStatusSheets("Selecione uma versão salva para apagar.");
       return;
     }
     if (!window.confirm(`Apagar a versao "${versao.nome}"?`)) return;
@@ -1710,23 +2222,23 @@ function Confinex() {
     setVersaoSelecionada(lista[0]?.id || "");
     const url = backendUrl.trim();
     if (!url) {
-      setStatusSheets("Versao apagada localmente.");
+      setStatusSheets("Versão apagada deste aparelho.");
       return;
     }
     try {
       await sheetsPost(url, "deleteVersion", { id: versao.id });
-      setStatusSheets("Versao apagada do Sheets.");
+      setStatusSheets("Versão apagada deste aparelho e da cópia online.");
     } catch {
-      setStatusSheets("Versao apagada localmente; nao consegui apagar do Sheets agora.");
+      setStatusSheets("Versão apagada deste aparelho; a cópia online não respondeu.");
     }
   };
   const carregarSheets = async () => {
     const url = backendUrl.trim();
     if (!url) {
-      setStatusSheets("Cole a URL do Apps Script para carregar do Sheets.");
+      setStatusSheets("A cópia online não está disponível neste aparelho.");
       return;
     }
-    setStatusSheets("Carregando do Google Sheets...");
+    setStatusSheets("Buscando a cópia online...");
     try {
       const data = await sheetsJsonp(url, { action: "getState" });
       skipNextAutoSaveRef.current = true;
@@ -1734,26 +2246,26 @@ function Confinex() {
       cloudReadyRef.current = true;
       aplicarEstadoSheets(data);
       carregarVersoesSheets(false);
-      setStatusSheets("Dados carregados do Google Sheets.");
+      setStatusSheets("Cópia online carregada.");
     } catch {
-      setStatusSheets("Nao consegui carregar do Sheets. Confira a URL publicada do Apps Script.");
+      setStatusSheets("Não consegui carregar a cópia online. Os dados deste aparelho foram mantidos.");
     }
   };
   const salvarSheetsAgora = async () => {
     const url = backendUrl.trim();
     if (!url) {
-      setStatusSheets("Cole a URL do Apps Script para salvar no Sheets.");
+      setStatusSheets("A cópia online não está disponível neste aparelho.");
       return;
     }
-    setStatusSheets("Salvando no Google Sheets...");
+    setStatusSheets("Salvando a cópia online...");
     try {
       // Save manual = intencional: sem carimbo, passa por cima de conflito.
       const res = await sheetsPost(url, "saveState", { state: estadoAtual(), device: confinexDeviceId() });
       cloudUpdatedAtRef.current = String(res?.updated_at || "");
       cloudReadyRef.current = true;
-      setStatusSheets(`Salvo no Google Sheets as ${(/* @__PURE__ */ new Date()).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}.`);
+      setStatusSheets(`Cópia online salva às ${(/* @__PURE__ */ new Date()).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}.`);
     } catch (err) {
-      setStatusSheets(`Nao consegui salvar no Sheets (${err?.message || "erro"}). Os dados continuam neste navegador.`);
+      setStatusSheets("Não consegui salvar a cópia online. Os dados continuam neste aparelho.");
     }
   };
   useEffect(() => {
@@ -1781,14 +2293,14 @@ function Confinex() {
         if (temNuvem && !temLocal) {
           skipNextAutoSaveRef.current = true;
           aplicarEstadoSheets(data);
-          setStatusSheets("Estado carregado da nuvem.");
+          setStatusSheets("Cópia online carregada.");
         } else if (temNuvem && temLocal) {
-          setStatusSheets("Nuvem e este navegador têm dados. Use Carregar (nuvem) ou Salvar (sobrescrever).");
+          setStatusSheets("Há mudanças neste aparelho e na cópia online. Escolha qual versão deseja manter.");
         }
         cloudReadyRef.current = true;
         carregarVersoesSheets(false);
       } catch {
-        if (!cancelado) setStatusSheets("Sem conexao com a nuvem — alteracoes NAO estao sendo salvas no Sheets.");
+        if (!cancelado) setStatusSheets("Sem conexão com a cópia online. As mudanças continuam salvas neste aparelho.");
       }
     })();
     return () => { cancelado = true; };
@@ -1804,12 +2316,12 @@ function Confinex() {
       const payload = { state: estadoAtual(), clientUpdatedAt: cloudUpdatedAtRef.current, device: confinexDeviceId() };
       sheetsPost(url, "saveState", payload).then((res) => {
         cloudUpdatedAtRef.current = String(res?.updated_at || cloudUpdatedAtRef.current);
-        setStatusSheets(`Auto-salvo no Sheets as ${(/* @__PURE__ */ new Date()).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}.`);
+        setStatusSheets(`Cópia online atualizada às ${(/* @__PURE__ */ new Date()).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}.`);
       }).catch((err) => {
         if (err && err.backend && err.backend.error === "conflict") {
-          setStatusSheets("CONFLITO: outro dispositivo salvou depois. Use Carregar para trazer a nuvem, ou Salvar para forcar.");
+          setStatusSheets("Existe uma versão mais recente em outro aparelho. Carregue essa versão ou confirme que deseja manter a atual.");
         } else {
-          setStatusSheets(`Auto-save falhou (${err?.message || "erro"}). Dados seguem salvos neste navegador.`);
+          setStatusSheets("A cópia online não foi atualizada. Os dados seguem salvos neste aparelho.");
         }
       });
     }, 1e4);
@@ -2090,101 +2602,46 @@ function Confinex() {
     /* @__PURE__ */ jsx("style", { children: css }),
     /* @__PURE__ */ jsxs("div", { className: "app", children: [
       /* @__PURE__ */ jsxs("div", { className: "hdr", children: [
-        /* @__PURE__ */ jsxs("div", { style: { display: "flex", alignItems: "center", gap: 14 }, children: [
-          /* @__PURE__ */ jsx("img", { src: "./confinex-logo.jpg", alt: "Logo Confinex", style: { width: 48, height: 48, borderRadius: "50%", objectFit: "cover", flexShrink: 0 } }),
-          /* @__PURE__ */ jsxs("div", { children: [
-            /* @__PURE__ */ jsxs("div", { className: "logo", children: [
-              "CONFINEX ",
-              /* @__PURE__ */ jsx("span", { style: { fontWeight: 400, color: "#6B7280", fontSize: 18 }, children: "\u2014 PABLO FERREIRA" })
-            ] }),
-            /* @__PURE__ */ jsx("div", { className: "logo-sub", children: "Avalia\xE7\xE3o & Comparativo de Confinamento" })
-          ] })
-        ] }),
-        /* @__PURE__ */ jsxs("div", { style: { marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }, children: [
-          /* @__PURE__ */ jsx("a", { href: "./", className: "tb", style: { display: "inline-flex", alignItems: "center", textDecoration: "none", whiteSpace: "nowrap" }, children: "\u2302 In\xEDcio" }),
-          /* @__PURE__ */ jsxs(
-            "label",
-            {
-              style: {
-                background: "transparent",
-                border: `1px solid ${T.border}`,
-                borderRadius: 8,
-                color: T.muted,
-                cursor: "pointer",
-                fontFamily: "'Inter',sans-serif",
-                fontSize: 12,
-                fontWeight: 500,
-                padding: "8px 16px",
-                transition: "all .15s",
-                whiteSpace: "nowrap"
-              },
-              onMouseOver: (e) => {
-                e.currentTarget.style.borderColor = T.label;
-                e.currentTarget.style.color = T.text;
-              },
-              onMouseOut: (e) => {
-                e.currentTarget.style.borderColor = T.border;
-                e.currentTarget.style.color = T.muted;
-              },
-              children: [
-                "\u2191 Carregar",
-                /* @__PURE__ */ jsx("input", { type: "file", accept: ".json", onChange: importarJSON, style: { display: "none" } })
-              ]
-            }
-          ),
-          /* @__PURE__ */ jsx(
-            "button",
-            {
-              onClick: exportarJSON,
-              style: {
-                background: T.accentDim,
-                border: `1px solid ${T.accent}`,
-                borderRadius: 8,
-                color: T.accent,
-                cursor: "pointer",
-                fontFamily: "'Syne',sans-serif",
-                fontSize: 12,
-                fontWeight: 700,
-                padding: "8px 16px",
-                transition: "opacity .15s",
-                whiteSpace: "nowrap"
-              },
-              onMouseOver: (e) => e.currentTarget.style.opacity = ".8",
-              onMouseOut: (e) => e.currentTarget.style.opacity = "1",
-              children: "\u2193 Salvar JSON"
-            }
-          )
+        /* @__PURE__ */ jsxs("div", { children: [
+          /* @__PURE__ */ jsx("div", { className: "logo", children: "Confinex" }),
+          /* @__PURE__ */ jsx("div", { className: "logo-sub", children: "Avaliação e comparativo de confinamento" })
         ] })
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "sec", style: { padding: "14px 18px" }, children: [
-        /* @__PURE__ */ jsx("div", { className: "sec-t nm", children: "Sincroniza\xE7\xE3o tempor\xE1ria \u2014 Google Sheets" }),
+        /* @__PURE__ */ jsx("div", { className: "sec-t", children: "Arquivo do estudo" }),
         /* @__PURE__ */ jsxs("div", { className: "g4", children: [
-          /* @__PURE__ */ jsx(F, { label: "URL Apps Script", span: 2, children: /* @__PURE__ */ jsx("input", { value: backendUrl, placeholder: "https://script.google.com/macros/s/.../exec", onChange: (e) => setBackendUrl(e.target.value) }) }),
-          /* @__PURE__ */ jsx(F, { label: "Carregar Sheets", children: /* @__PURE__ */ jsx("button", { className: "tb", style: { width: "100%", padding: "10px 13px" }, onClick: carregarSheets, children: "Carregar" }) }),
-          /* @__PURE__ */ jsx(F, { label: "Salvar agora", children: /* @__PURE__ */ jsx("button", { className: "tb on", style: { width: "100%", padding: "10px 13px" }, onClick: salvarSheetsAgora, children: "Salvar" }) })
+          /* @__PURE__ */ jsx(F, { label: "Importar arquivo", children: /* @__PURE__ */ jsxs("label", { className: "tb", style: { display: "block", width: "100%", padding: "10px 13px", textAlign: "center", boxSizing: "border-box", cursor: "pointer" }, children: [
+            "Importar estudo",
+            /* @__PURE__ */ jsx("input", { type: "file", accept: ".json", onChange: importarJSON, style: { display: "none" } })
+          ] }) }),
+          /* @__PURE__ */ jsx(F, { label: "Guardar uma cópia", children: /* @__PURE__ */ jsx("button", { className: "tb", style: { width: "100%", padding: "10px 13px" }, onClick: exportarJSON, children: "Baixar cópia" }) }),
+          /* @__PURE__ */ jsx(F, { label: "Começar outro estudo", children: /* @__PURE__ */ jsx("button", { className: "tb", style: { width: "100%", padding: "10px 13px", color: T.red }, onClick: resetarInformacoes, children: "Novo estudo" }) }),
+          /* @__PURE__ */ jsx(F, { label: "Desfazer novo estudo", children: /* @__PURE__ */ jsx("button", { className: "tb", style: { width: "100%", padding: "10px 13px" }, onClick: retornarAntesReset, children: "Restaurar anterior" }) })
         ] }),
         /* @__PURE__ */ jsxs("div", { className: "g4", style: { marginTop: 10 }, children: [
-          /* @__PURE__ */ jsx(F, { label: "Resetar informacoes", children: /* @__PURE__ */ jsx("button", { className: "tb", style: { width: "100%", padding: "10px 13px", color: T.red }, onClick: resetarInformacoes, children: "Resetar" }) }),
-          /* @__PURE__ */ jsx(F, { label: "Retornar anterior", children: /* @__PURE__ */ jsx("button", { className: "tb", style: { width: "100%", padding: "10px 13px" }, onClick: retornarAntesReset, children: "Retornar" }) }),
-          /* @__PURE__ */ jsx(F, { label: "Como funciona", span: 2, children: /* @__PURE__ */ jsx("div", { className: "hint", style: { paddingTop: 8 }, children: "Resetar salva uma versao antes de limpar e mantem as bases de confinamento. Retornar recupera a copia anterior." }) })
-        ] }),
-        /* @__PURE__ */ jsxs("div", { className: "g4", style: { marginTop: 10 }, children: [
-          /* @__PURE__ */ jsx(F, { label: "Salvar versao", children: /* @__PURE__ */ jsx("button", { className: "tb on", style: { width: "100%", padding: "10px 13px" }, onClick: salvarVersaoNomeada, children: "Salvar versao" }) }),
-          /* @__PURE__ */ jsx(F, { label: "Versoes salvas", span: 2, children: /* @__PURE__ */ jsxs("select", { value: versaoSelecionada, onChange: (e) => setVersaoSelecionada(e.target.value), children: [
-            /* @__PURE__ */ jsx("option", { value: "", children: versoesSalvas.length ? "Selecione uma versao" : "Nenhuma versao salva" }),
+          /* @__PURE__ */ jsx(F, { label: "Criar versão", children: /* @__PURE__ */ jsx("button", { className: "tb on", style: { width: "100%", padding: "10px 13px" }, onClick: salvarVersaoNomeada, children: "Salvar versão" }) }),
+          /* @__PURE__ */ jsx(F, { label: "Versões salvas", span: 2, children: /* @__PURE__ */ jsxs("select", { value: versaoSelecionada, onChange: (e) => setVersaoSelecionada(e.target.value), children: [
+            /* @__PURE__ */ jsx("option", { value: "", children: versoesSalvas.length ? "Selecione uma versão" : "Nenhuma versão salva" }),
             versoesSalvas.map((v) => /* @__PURE__ */ jsxs("option", { value: v.id, children: [
               v.nome,
               " - ",
-              v.resumo || "snapshot"
+              v.resumo || "cópia salva"
             ] }, v.id))
           ] }) }),
-          /* @__PURE__ */ jsx(F, { label: "Restaurar/apagar", children: /* @__PURE__ */ jsxs("div", { style: { display: "flex", gap: 6 }, children: [
+          /* @__PURE__ */ jsx(F, { label: "Ações da versão", children: /* @__PURE__ */ jsxs("div", { style: { display: "flex", gap: 6 }, children: [
             /* @__PURE__ */ jsx("button", { className: "tb", style: { flex: 1, padding: "10px 13px" }, onClick: restaurarVersaoNomeada, children: "Restaurar" }),
-            /* @__PURE__ */ jsx("button", { className: "tb", style: { padding: "10px 13px" }, onClick: () => carregarVersoesSheets(true), children: "Atualizar" }),
             /* @__PURE__ */ jsx("button", { className: "tb", style: { padding: "10px 13px", color: T.red }, onClick: apagarVersaoNomeada, children: "Apagar" })
           ] }) })
         ] }),
-        /* @__PURE__ */ jsx("div", { className: "hint", style: { marginTop: 8 }, children: statusSheets })
+        /* @__PURE__ */ jsxs("details", { style: { marginTop: 14 }, children: [
+          /* @__PURE__ */ jsx("summary", { className: "hint", style: { cursor: "pointer", fontWeight: 600 }, children: "Cópia online e segurança" }),
+          /* @__PURE__ */ jsxs("div", { className: "g3", style: { marginTop: 12 }, children: [
+            /* @__PURE__ */ jsx(F, { label: "Trazer cópia online", children: /* @__PURE__ */ jsx("button", { className: "tb", style: { width: "100%", padding: "10px 13px" }, onClick: carregarSheets, children: "Carregar cópia" }) }),
+            /* @__PURE__ */ jsx(F, { label: "Guardar cópia online", children: /* @__PURE__ */ jsx("button", { className: "tb on", style: { width: "100%", padding: "10px 13px" }, onClick: salvarSheetsAgora, children: "Salvar cópia" }) }),
+            /* @__PURE__ */ jsx(F, { label: "Atualizar versões", children: /* @__PURE__ */ jsx("button", { className: "tb", style: { width: "100%", padding: "10px 13px" }, onClick: () => carregarVersoesSheets(true), children: "Consultar versões" }) })
+          ] }),
+          /* @__PURE__ */ jsx("div", { className: "hint", style: { marginTop: 8 }, children: statusSheets })
+        ] })
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "sec", children: [
         /* @__PURE__ */ jsx("div", { className: "sec-t", children: "01 \u2014 Dados do Lote (base comum a todos os cen\xE1rios)" }),
@@ -2377,4 +2834,3 @@ function Confinex() {
 // src/confinex-entry.jsx
 import { jsx as jsx2 } from "react/jsx-runtime";
 createRoot(document.getElementById("root")).render(/* @__PURE__ */ jsx2(Confinex, {}));
-

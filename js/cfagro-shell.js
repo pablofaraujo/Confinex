@@ -106,7 +106,11 @@ function montar(){
     else location.reload();
   });
   sair.addEventListener('click', function(){ if(typeof window.sair === 'function') window.sair(); });
-  if(window.db && window.db.auth){
+  function revelarAcoesComSessao(tentativa){
+    if(!(window.db && window.db.auth)){
+      if(tentativa < 40) setTimeout(function(){ revelarAcoesComSessao(tentativa + 1); }, 250);
+      return;
+    }
     window.db.auth.getSession().then(function(resultado){
       if(resultado && resultado.data && resultado.data.session){
         atualizar.hidden = false;
@@ -114,6 +118,7 @@ function montar(){
       }
     }).catch(function(){ /* Sem sessão confirmada, as ações continuam ocultas. */ });
   }
+  revelarAcoesComSessao(0);
 }
 
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', montar);
