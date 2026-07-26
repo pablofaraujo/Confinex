@@ -142,6 +142,7 @@ def validar_local() -> None:
     executar(["node", "--check", "confinex-app.latest.js"])
     executar(["node", "--check", "confinex-app.mobile.js"])
     executar(["node", "--check", "tools/auditar_ecossistema_browser.js"])
+    executar(["node", "--check", "tools/auditar_ecossistema_webkit.js"])
     executar(
         [
             sys.executable,

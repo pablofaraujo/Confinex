@@ -1,8 +1,15 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 const html = await readFile(new URL('../confinex.html', import.meta.url), 'utf8');
+const fonte = await readFile(new URL('../confinex-app.latest.js', import.meta.url), 'utf8');
 assert.match(html, /confinex-supabase-ponte-inline\.js\?v=/);
 assert.match(html, /confinex-app\.mobile\.js\?v=/);
+assert.match(html, /__CONFINEX_BUILD = "20260726-5"/);
+assert.match(html, /__CONFINEX_CARREGAR_APP/);
+assert.match(html, /recarga=/);
+assert.doesNotMatch(html, /<script defer src="\.\/confinex-app\.mobile\.js/);
+assert.match(fonte, /__CONFINEX_APP_INICIADO/);
+assert.match(fonte, /role: "button",\s+tabIndex: 0/);
 assert.doesNotMatch(html, /<\/script>\\n\s*<script/);
 assert.match(html, /id="root"/);
 assert.match(html, /__CONFINEX_BUILD/);

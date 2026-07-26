@@ -2909,11 +2909,19 @@ function Confinex() {
         /* @__PURE__ */ jsx("div", { style: { padding: "18px 22px 0" }, children: /* @__PURE__ */ jsx("div", { className: "sec-t", children: "02 \u2014 Cen\xE1rios (at\xE9 5)" }) }),
         /* @__PURE__ */ jsxs("div", { className: "sc-bar", children: [
           cenarios.map((sc, i) => /* @__PURE__ */ jsxs(
-            "button",
+            "div",
             {
               className: `sc-tab ${scAtivo === i ? "on" : ""}`,
               style: { "--c": T.sc[i] },
               onClick: () => setScAtivo(i),
+              onKeyDown: (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setScAtivo(i);
+                }
+              },
+              role: "button",
+              tabIndex: 0,
               children: [
                 /* @__PURE__ */ jsx("span", { style: { maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis" }, children: sc.nome }),
                 cenarios.length > 1 && /* @__PURE__ */ jsx("button", { className: "sc-del", onClick: (e) => {
@@ -2991,4 +2999,7 @@ function Confinex() {
 
 // src/confinex-entry.jsx
 import { jsx as jsx2 } from "react/jsx-runtime";
-createRoot(document.getElementById("root")).render(/* @__PURE__ */ jsx2(Confinex, {}));
+if (!window.__CONFINEX_APP_INICIADO) {
+  createRoot(document.getElementById("root")).render(/* @__PURE__ */ jsx2(Confinex, {}));
+  window.__CONFINEX_APP_INICIADO = true;
+}

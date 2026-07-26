@@ -2,7 +2,7 @@
 """Auditoria permanente de páginas, dependências, menu e navegação do Confinex.
 
 O modo estático não usa rede. Com ``--navegador``, um servidor local efêmero é
-iniciado e o Chromium percorre as páginas em desktop e celular. O relatório
+iniciado; Chromium percorre as páginas e WebKit valida o Confinex no iPhone. O relatório
 sempre distingue ``aprovado``, ``falhou`` e ``não testado``.
 """
 
@@ -408,7 +408,8 @@ def auditar_navegador(
     artefatos.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="confinex-auditoria-") as pasta:
         config = Path(pasta) / "config.json"
-        bruto = Path(pasta) / "resultado.json"
+        bruto_chromium = Path(pasta) / "resultado-chromium.json"
+        bruto_webkit = Path(pasta) / "resultado-webkit.json"
         config.write_text(
             json.dumps(
                 {
@@ -431,11 +432,24 @@ def auditar_navegador(
                     "--config",
                     str(config),
                     "--saida",
-                    str(bruto),
+                    str(bruto_chromium),
                 ],
                 cwd=root,
                 check=True,
                 timeout=600,
+            )
+            subprocess.run(
+                [
+                    "node",
+                    str(root / "tools" / "auditar_ecossistema_webkit.js"),
+                    "--base-url",
+                    url,
+                    "--saida",
+                    str(bruto_webkit),
+                ],
+                cwd=root,
+                check=True,
+                timeout=180,
             )
 
         if base_url:
@@ -443,8 +457,10 @@ def auditar_navegador(
         else:
             with servidor_local(root) as url:
                 executar(url)
-        dados = json.loads(bruto.read_text(encoding="utf-8"))
-    return [Resultado(**item) for item in dados["resultados"]]
+        dados_chromium = json.loads(bruto_chromium.read_text(encoding="utf-8"))
+        dados_webkit = json.loads(bruto_webkit.read_text(encoding="utf-8"))
+    itens = dados_chromium["resultados"] + dados_webkit["resultados"]
+    return [Resultado(**item) for item in itens]
 
 
 def resumo(resultados: list[Resultado]) -> dict[str, int]:

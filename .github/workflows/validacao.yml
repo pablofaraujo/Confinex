@@ -35,8 +35,8 @@ jobs:
           cache: npm
       - name: Instalar dependências da auditoria
         run: npm ci
-      - name: Instalar Chromium
-        run: npx playwright install chromium --with-deps
+      - name: Instalar Chromium e WebKit
+        run: npx playwright install chromium webkit --with-deps
       - name: Rodar bateria local
         run: python3 tools/test_ecossistema.py
       - name: Auditar páginas em desktop e celular

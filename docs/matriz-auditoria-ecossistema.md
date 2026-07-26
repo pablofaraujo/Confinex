@@ -1,8 +1,9 @@
 # Matriz permanente de auditoria do ecossistema
 
 Atualizado em 2026-07-23. A fonte executável é
-`tools/auditar_ecossistema.py`; o navegador é dirigido por
-`tools/auditar_ecossistema_browser.js`.
+`tools/auditar_ecossistema.py`; os navegadores são dirigidos por
+`tools/auditar_ecossistema_browser.js` (Chromium) e
+`tools/auditar_ecossistema_webkit.js` (Safari/iPhone).
 
 | Requisito | Cenário | Resultado esperado | Evidência |
 |---|---|---|---|
@@ -18,7 +19,9 @@ Atualizado em 2026-07-23. A fonte executável é
 | Runtime | página carregada | nenhum erro JavaScript, console, HTTP ou requisição | eventos do Chromium |
 | Desktop | 1440 × 1000 | shell presente, sem estouro da página | PNG integral + medição |
 | Celular | 390 × 844 | shell presente, sem estouro da página | PNG integral + medição |
-| CI | push, PR, agenda e execução manual | auditoria estática e Chromium geram artefato | GitHub Actions |
+| Safari/iPhone | WebKit real, pacote normal | interface monta uma vez, sem erro ou estouro horizontal | Playwright WebKit |
+| Safari/iPhone | primeira carga lenta/interrompida | nova cópia é buscada automaticamente; não há montagem duplicada nem aviso terminal | Playwright WebKit com falha de rede controlada |
+| CI | push, PR, agenda e execução manual | auditoria estática, Chromium e WebKit geram artefato | GitHub Actions |
 | Pagamento do confinamento | adiantado, mensal e no final | fluxos vencem no dia 0, a cada 30 dias e no fim do ciclo; período parcial é proporcional | regressão JavaScript com resultados manuais |
 | Pagamento do confinamento | vazio, modo legado e entrada inválida | vazio preserva `final`; modo desconhecido normaliza; número inválido/negativo falha explicitamente | `tools/test_confinex_pagamento_confinamento.mjs` |
 | Custo do dinheiro | recebimento no fim e após o abate | cada parcela capitaliza somente do vencimento ao recebimento; não há custo duplicado | comparação independente a 2% a.m. |
@@ -81,7 +84,7 @@ continua versionada para demonstrar o que a auditoria detectava antes da correç
 ```bash
 python3 tools/auditar_ecossistema.py --somente-estatico
 npm ci
-npx playwright install chromium
+npx playwright install chromium webkit
 python3 tools/auditar_ecossistema.py --navegador \
   --saida-json artifacts/auditoria-ecossistema/relatorio.json \
   --saida-md artifacts/auditoria-ecossistema/relatorio.md
@@ -89,6 +92,5 @@ python3 tools/auditar_ecossistema.py --navegador \
 
 `--somente-estatico` mantém a camada de navegador registrada como “não
 testado”, mas permite que a bateria parcial valide arquivos e contratos. Ele
-não é usado no gate Chromium: a execução com `--navegador` continua reprovando
+não é usado no gate de navegadores: a execução com `--navegador` continua reprovando
 qualquer falha ou requisito sem teste.
-

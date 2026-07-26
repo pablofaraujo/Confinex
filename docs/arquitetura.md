@@ -5,7 +5,7 @@ Atualizado em 2026-07-23.
 ## Apps e navegação
 
 - **index.html** — Visão Geral e página inicial. Mostra quatro KPIs na ordem: total de cabeças, confinadas, Fazenda Ametista e Parceria Ricardo. A seção "Áreas do ecossistema" detalha cabeças e arrobas descobertas por confinamento, sexo do rebanho da Ametista quando disponível e bois ativos de Ricardo.
-- **confinex.html** — shell do Confinex: carrega o Design System e a navegação compartilhada, define `window.CONFINEX_SHEETS_API_URL` (Apps Script) e inicia `confinex-app.mobile.js`, pacote autocontido com React 19 e alvo Safari 14. O boot só é considerado concluído quando `#root` recebe a interface; Supabase e `cfagro-core.js` são carregados depois do evento `load`, sem bloquear a primeira pintura no Safari/iPhone. `confinex-app.latest.js` permanece como bundle legível de manutenção.
+- **confinex.html** — shell do Confinex: carrega o Design System e a navegação compartilhada, define `window.CONFINEX_SHEETS_API_URL` (Apps Script) e inicia `confinex-app.mobile.js`, pacote autocontido com React 19 e alvo Safari 14. O boot só é considerado concluído quando `#root` recebe a interface. Se a primeira carga do pacote demorar ou falhar, o shell tenta automaticamente uma cópia com endereço novo e impede duas montagens do React; o aviso terminal aparece apenas depois da recuperação falhar. Supabase e `cfagro-core.js` são carregados depois do evento `load`, sem bloquear a primeira pintura no Safari/iPhone. `confinex-app.latest.js` permanece como bundle legível de manutenção.
 - **bb.html** — Boi Balança: simulador pré-compra + lotes + contas a pagar/receber + pendências GTA/NF.
 - **abate.html** — Abate: cabeçalho por abate (`abates`: data, frigorífico, origem, romaneio, GTA) + romaneio animal a animal (`abate_animais`) com leitura OCR do romaneio do frigorífico (`aprovarFolha`). Não está no design system compartilhado (sem sidebar).
 - **bgi.html** — BGI Posições: exposição por lote, travas, encerramento, rolagem, cotações, basis. Não é linkado por nenhuma página (o card BGI aponta para o repo externo `boi-gordo-portfolio`); acesso por URL direta. Ainda linka de volta para `central.html` (legada).
@@ -88,11 +88,14 @@ ativa os arquivos reais e a trajetória do Juan. A prova completa não é
 agendada no GitHub nem copiada para cron da VPS, pois o servidor não possui
 clone canônico deste repositório.
 
-A auditoria de navegação usa `tools/auditar_ecossistema.py` como orquestrador e
-`tools/auditar_ecossistema_browser.js` para abrir todas as páginas em Chromium,
-nas dimensões desktop e celular. Ela testa acesso direto, recarga, clique,
+A auditoria de navegação usa `tools/auditar_ecossistema.py` como orquestrador,
+`tools/auditar_ecossistema_browser.js` para abrir todas as páginas em Chromium e
+`tools/auditar_ecossistema_webkit.js` para provar a abertura do Confinex no motor
+do Safari/iPhone. Ela testa acesso direto, recarga, clique,
 voltar, item ativo, shell, estouro horizontal, console, HTTP e falhas de
-requisição. Financeiro, Pendências e Eventos também recebem cenários isolados
+requisição. No WebKit, uma segunda prova atrasa e interrompe o primeiro pacote;
+a página precisa buscar uma nova cópia automaticamente e montar uma única interface.
+Financeiro, Pendências e Eventos também recebem cenários isolados
 com cliente Supabase simulado. Eles cobrem positivo, vazio e falha; Financeiro
 e Pendências incluem ainda falha parcial de uma fonte. Um contador reprova
 qualquer tentativa de mutação, e a prova confere filtros, linguagem humana,
