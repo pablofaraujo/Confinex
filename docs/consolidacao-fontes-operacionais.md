@@ -52,3 +52,31 @@ python3 tools/analisar_extrato_ofx.py \
 O comando não tem opção de execução. Lançamentos ausentes são apenas apontados;
 uma importação posterior precisa de autorização própria, chave idempotente por
 `FITID` e comparação de contagens antes/depois.
+
+## Atualização pela ficha sanitária do IMA
+
+`tools/analisar_ficha_ima.py` lê o período, o saldo do rebanho e as GTAs bovinas
+de entrada e saída de uma ficha sanitária. Em seguida, compara somente os
+números normalizados com snapshots de `gtas`, `entradas_confinamento`,
+`notas_fiscais_xml_raw` e `fazenda_ametista`.
+
+O relatório público não guarda números de GTA, nomes, documentos pessoais,
+endereços, origens ou destinos. O resultado registra apenas período, contagens,
+quantidades agregadas, cobertura das fontes e eventual diferença de saldo. A
+ferramenta não possui caminho de escrita e nunca cria movimentação compensatória
+para fazer o saldo fechar.
+
+```bash
+python3 tools/analisar_ficha_ima.py \
+  --pdf /caminho/privado/ficha.pdf \
+  --gtas /caminho/privado/gtas.json \
+  --entradas /caminho/privado/entradas.json \
+  --fiscal /caminho/privado/fiscal.json \
+  --ledger /caminho/privado/ledger.json \
+  --data-referencia AAAA-MM-DD \
+  --saida-json /caminho/privado/plano-ima.json \
+  --saida-md /caminho/privado/relatorio-ima.md
+```
+
+O modo `--pdf` exige `pdftotext`. Ambientes sem Poppler podem fornecer o texto
+previamente extraído por meio de `--texto-extraido`.
