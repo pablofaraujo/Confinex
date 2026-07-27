@@ -44,6 +44,28 @@ function calcularResultadoFinanceiro({
   };
 }
 
+function calcularRentabilidadeBruta({
+  lucroBruto,
+  capitalInvestido,
+  mesesCapital,
+} = {}) {
+  const lucro = numeroFinanceiro(lucroBruto, "lucroBruto", {
+    permitirNegativo: true,
+  });
+  const capital = numeroFinanceiro(capitalInvestido, "capitalInvestido");
+  const meses = numeroFinanceiro(mesesCapital, "mesesCapital");
+  const rentabilidadeTotalBruta = capital > 0 ? (lucro / capital) * 100 : 0;
+  const baseComposta = Math.max(1 + rentabilidadeTotalBruta / 100, 0);
+  const rentabilidadeMensalBruta = meses > 0
+    ? (Math.pow(baseComposta, 1 / meses) - 1) * 100
+    : 0;
+
+  return {
+    rentabilidadeTotalBruta,
+    rentabilidadeMensalBruta,
+  };
+}
+
 function calcularValorPresente({
   receita,
   diaReceita,
@@ -86,6 +108,7 @@ function calcularValorPresente({
 }
 
 export {
+  calcularRentabilidadeBruta,
   calcularResultadoFinanceiro,
   calcularValorPresente,
 };

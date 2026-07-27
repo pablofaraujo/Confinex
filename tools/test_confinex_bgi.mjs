@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  atualizarContratoBgiPorPrazo,
   cotacaoBgiValida,
   criarCotacaoBgiManual,
   mesclarCotacoesBgiAutomaticas,
@@ -36,4 +37,42 @@ assert.equal(mescla.cotacoes.BGIF27, undefined, "ausência não pode virar zero"
 assert.deepEqual(mescla.preservados, ["BGIX26"]);
 assert.deepEqual(mescla.atualizados, ["BGIZ26"]);
 
-console.log("Mercado BGI: 12 verificações aprovadas.");
+const cenario = {
+  tipo: "confinamento",
+  modoPreco: "bolsa",
+  dataEntrada: "2026-07-01",
+  diasCiclo: "100",
+  contratoB3: "BGIV26",
+  precoBolsa: "300",
+};
+const prazoAtualizado = atualizarContratoBgiPorPrazo({
+  cenario,
+  campoAlterado: "diasCiclo",
+  valor: "130",
+  contratoSugerido: "BGIX26",
+  cotacoes: { BGIX26: { preco: "315", fonte: "B3", atualizadaEm: agora } },
+});
+assert.equal(prazoAtualizado.contratoB3, "BGIX26");
+assert.equal(prazoAtualizado.precoBolsa, "315");
+assert.equal(prazoAtualizado.cotacaoB3Fonte, "B3");
+
+const semCotacao = atualizarContratoBgiPorPrazo({
+  cenario,
+  campoAlterado: "dataEntrada",
+  valor: "2027-01-01",
+  contratoSugerido: "BGIK27",
+  cotacoes: {},
+});
+assert.equal(semCotacao.contratoB3, "BGIK27");
+assert.equal(semCotacao.precoBolsa, "");
+
+const edicaoManual = atualizarContratoBgiPorPrazo({
+  cenario,
+  campoAlterado: "precoBolsa",
+  valor: "321",
+  contratoSugerido: "BGIX26",
+});
+assert.equal(edicaoManual.contratoB3, "BGIV26");
+assert.equal(edicaoManual.precoBolsa, "321");
+
+console.log("Mercado BGI: 19 verificações aprovadas.");

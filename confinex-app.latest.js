@@ -5,11 +5,13 @@ import {
   calcularPagamentoConfinamento
 } from "./js/confinex-pagamento-confinamento.mjs";
 import {
+  calcularRentabilidadeBruta,
   calcularResultadoFinanceiro,
   calcularValorPresente
 } from "./js/confinex-resultado-financeiro.mjs";
 import { compararRevendaComConfinamento } from "./js/confinex-revenda-equivalente.mjs";
 import {
+  atualizarContratoBgiPorPrazo,
   cotacaoBgiValida,
   criarCotacaoBgiManual,
   mesclarCotacoesBgiAutomaticas
@@ -612,8 +614,14 @@ function calcCenario(lote, sc) {
     const diasFreteCapital2 = freteCapital2 > 0 ? diasTotal2 : 0;
     const diasCapitalPonderado2 = investInicial2 > 0 ? (custoCompra * diasCapital2 + freteCapital2 * diasFreteCapital2) / investInicial2 : 0;
     const mesesCapital2 = Math.max(diasCapitalPonderado2 / 30, 0.05);
-    const rT2 = investInicial2 > 0 ? lucro2 / investInicial2 * 100 : 0;
-    const rM2 = mesesCapital2 > 0 ? (Math.pow(1 + rT2 / 100, 1 / mesesCapital2) - 1) * 100 : 0;
+    const {
+      rentabilidadeTotalBruta: rT2,
+      rentabilidadeMensalBruta: rM2
+    } = calcularRentabilidadeBruta({
+      lucroBruto: lucro2,
+      capitalInvestido: investInicial2,
+      mesesCapital: mesesCapital2
+    });
     const custoDinheiroMensal2 = pctInput(lote.custoDinheiro, 0);
     const custoDinheiroCompra2 = custoCompra * (Math.pow(1 + custoDinheiroMensal2, diasCapital2 / 30) - 1);
     const custoDinheiroFrete2 = freteCapital2 * (Math.pow(1 + custoDinheiroMensal2, diasFreteCapital2 / 30) - 1);
@@ -701,6 +709,8 @@ function calcCenario(lote, sc) {
       capitalFrete: freteCapital2,
       rentTotal: rT2,
       rentMensal: rM2,
+      rentabilidadeTotalBruta: rT2,
+      rentabilidadeMensalBruta: rM2,
       diasTotal: diasTotal2,
       diasPag: diasVenda,
       meses: meses2,
@@ -791,8 +801,14 @@ function calcCenario(lote, sc) {
   const diasFreteCapital = freteCapital > 0 ? diasTotal : 0;
   const diasCapitalPonderado = investInicial > 0 ? (custoCompra * diasCapital + freteCapital * diasFreteCapital) / investInicial : 0;
   const mesesCapital = Math.max(diasCapitalPonderado / 30, 0.05);
-  const rT = investInicial > 0 ? lucro / investInicial * 100 : 0;
-  const rM = mesesCapital > 0 ? (Math.pow(1 + rT / 100, 1 / mesesCapital) - 1) * 100 : 0;
+  const {
+    rentabilidadeTotalBruta: rT,
+    rentabilidadeMensalBruta: rM
+  } = calcularRentabilidadeBruta({
+    lucroBruto: lucro,
+    capitalInvestido: investInicial,
+    mesesCapital
+  });
   const custoDinheiroMensal = pctInput(lote.custoDinheiro, 0);
   const custoDinheiroCompra = custoCompra * (Math.pow(1 + custoDinheiroMensal, diasCapital / 30) - 1);
   const custoDinheiroFrete = freteCapital * (Math.pow(1 + custoDinheiroMensal, diasFreteCapital / 30) - 1);
@@ -917,6 +933,8 @@ function calcCenario(lote, sc) {
     capitalFrete: freteCapital,
     rentTotal: rT,
     rentMensal: rM,
+    rentabilidadeTotalBruta: rT,
+    rentabilidadeMensalBruta: rM,
     diasTotal,
     diasPag,
     meses,
@@ -1441,7 +1459,7 @@ function ScPanel({ sc, upd, sexo, custoDinheiro, resultado, confinamentos, model
       resultado && /* @__PURE__ */ jsxs("div", { className: "g3", style: { marginTop: 14 }, children: [
         /* @__PURE__ */ jsx(F, { label: antecipacaoRecebimento ? "Tempo antecipado" : "Tempo do adiantamento", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: `${fN(resultado.diasAdiantamento, 0)} dias` }) }),
         /* @__PURE__ */ jsx(F, { label: antecipacaoRecebimento ? "Custo da antecipa\xE7\xE3o" : "Custo do adiantamento", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: fR(resultado.custoAdiantamento) }) }),
-        /* @__PURE__ */ jsx(F, { label: "Impacto na rentabilidade mensal", hint: "Sem opera\xE7\xE3o \u2192 resultado mensal final", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: `${fP(resultado.rMliqSemAdiantamento ?? resultado.rMliq)} \u2192 ${fP(resultado.rMliq)} a.m. (${fN(resultado.impactoAdiantamentoMensal ?? 0, 2)} p.p.)` }) })
+        /* @__PURE__ */ jsx(F, { label: "Impacto na rentabilidade mensal l\xEDquida", hint: "Sem opera\xE7\xE3o \u2192 resultado mensal l\xEDquido final", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: `${fP(resultado.rMliqSemAdiantamento ?? resultado.rMliq)} \u2192 ${fP(resultado.rMliq)} a.m. (${fN(resultado.impactoAdiantamentoMensal ?? 0, 2)} p.p.)` }) })
       ] }),
       resultado && antecipacaoRecebimento && /* @__PURE__ */ jsxs("div", { className: "g3", style: { marginTop: 14 }, children: [
         /* @__PURE__ */ jsx(F, { label: "Recebido antecipadamente", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: fR(resultado.valorRecebidoAntecipado) }) }),
@@ -1599,9 +1617,9 @@ function SensPanel({ lote, cenarios, resultados, historico = [], setHistorico = 
         perdaTransporte: vals.perdaTransporte,
         precoVenda: vals.precoVenda
       },
-      rentMensal: resultado.rMliq,
-      rentTotal: resultado.rTliq,
-      lucro: resultado.lucroLiquido,
+      rentMensal: resultado.rentMensal,
+      rentTotal: resultado.rentTotal,
+      lucro: resultado.lucroBruto,
       investInicial: resultado.investInicial,
       receita: resultado.receita,
       custos: resultado.custos
@@ -1787,8 +1805,8 @@ function EvolucaoTempo({ lote, cenarios }) {
               /* @__PURE__ */ jsx("td", { children: r ? fR(r.custoArrobaMarginal) : "—" }),
               /* @__PURE__ */ jsx("td", { children: r ? fR(r.fretePorArrobaProduzida) : "—" }),
               /* @__PURE__ */ jsx("td", { children: r ? fR(r.custoProducaoFretePorArroba) : "—" }),
-              /* @__PURE__ */ jsx("td", { className: r ? r.rMliq >= 0 ? "pos" : "neg" : "", children: r ? `${fP(r.rMliq)} a.m.` : "—" }),
-              /* @__PURE__ */ jsx("td", { className: r ? r.lucroLiquido >= 0 ? "pos" : "neg" : "", children: r ? fR(r.lucroLiquido) : "—" })
+              /* @__PURE__ */ jsx("td", { className: r ? r.rentMensal >= 0 ? "pos" : "neg" : "", children: r ? `${fP(r.rentMensal)} a.m.` : "—" }),
+              /* @__PURE__ */ jsx("td", { className: r ? r.lucroBruto >= 0 ? "pos" : "neg" : "", children: r ? fR(r.lucroBruto) : "—" })
             ] }, ponto.dias);
           }) })
         ] }) })
@@ -1816,7 +1834,7 @@ function calcularComparacaoRevenda(revendaBase, resultadoConfinamento) {
 function RelatorioComparativo({ lote, cenarios, resultados }) {
   const ativos = cenarios.map((sc, i) => ({ sc, r: resultados[i], i })).filter((x) => x.r);
   if (!ativos.length) return null;
-  const ranked = [...ativos].sort((a, b) => b.r.rMliq - a.r.rMliq || b.r.lucroLiquido - a.r.lucroLiquido || b.r.rTliq - a.r.rTliq || a.i - b.i);
+  const ranked = [...ativos].sort((a, b) => b.r.rentMensal - a.r.rentMensal || b.r.lucroBruto - a.r.lucroBruto || b.r.rentTotal - a.r.rentTotal || a.i - b.i);
   const revendaBase = ativos.find(({ r }) => r.tipo === "revenda");
   return /* @__PURE__ */ jsxs(Fragment, { children: [
     /* @__PURE__ */ jsxs("div", { className: "sec no-print", style: { marginTop: 18 }, children: [
@@ -1839,9 +1857,9 @@ function RelatorioComparativo({ lote, cenarios, resultados }) {
           /* @__PURE__ */ jsx(ItemRelatorio, { label: "Prazo da compra", value: `${lote.prazoPagtoCompra || 0} dias` }),
           /* @__PURE__ */ jsx(ItemRelatorio, { label: "Custo do dinheiro", value: `${lote.custoDinheiro || 0}% a.m.` })
         ] }),
-        /* @__PURE__ */ jsx("h2", { children: "Resumo por rentabilidade mensal" }),
+        /* @__PURE__ */ jsx("h2", { children: "Resumo por rentabilidade mensal bruta" }),
         /* @__PURE__ */ jsx("table", { className: "report-table", children: /* @__PURE__ */ jsxs("tbody", { children: [
-          /* @__PURE__ */ jsxs("tr", { children: ["#", "Cenário", "Modalidade", "Prazo", "Contrato", "@ posta", "@ produzida", "Rent. mensal", "Resultado"].map((h) => /* @__PURE__ */ jsx("th", { children: h }, h)) }),
+          /* @__PURE__ */ jsxs("tr", { children: ["#", "Cenário", "Modalidade", "Prazo", "Contrato", "@ posta", "@ produzida", "Rent. bruta mensal", "Lucro bruto"].map((h) => /* @__PURE__ */ jsx("th", { children: h }, h)) }),
           ranked.map(({ sc, r }, pos) => /* @__PURE__ */ jsxs("tr", { children: [
             /* @__PURE__ */ jsx("td", { children: pos + 1 }),
             /* @__PURE__ */ jsx("td", { children: sc.nome }),
@@ -1850,8 +1868,8 @@ function RelatorioComparativo({ lote, cenarios, resultados }) {
             /* @__PURE__ */ jsx("td", { children: sc.tipo === "revenda" || sc.modoPreco !== "bolsa" ? "—" : sc.contratoB3 || contratoB3DoCenario(sc) }),
             /* @__PURE__ */ jsx("td", { children: fR(r.custoArrobaPosta) }),
             /* @__PURE__ */ jsx("td", { children: sc.tipo === "revenda" ? "—" : fR(r.custoArrobaLiquidaProduzida) }),
-            /* @__PURE__ */ jsx("td", { children: `${fP(r.rMliq)} a.m.` }),
-            /* @__PURE__ */ jsx("td", { children: fR(r.lucroLiquido) })
+            /* @__PURE__ */ jsx("td", { children: `${fP(r.rentMensal)} a.m.` }),
+            /* @__PURE__ */ jsx("td", { children: fR(r.lucroBruto) })
           ] }, sc.id))
         ] }) })
       ] }),
@@ -1860,7 +1878,7 @@ function RelatorioComparativo({ lote, cenarios, resultados }) {
         const comparacao = calcularComparacaoRevenda(revendaBase, r);
         return /* @__PURE__ */ jsxs("section", { className: "report-page", children: [
           /* @__PURE__ */ jsxs("div", { className: "report-brand", children: [pos + 1, "º · ", sc.nome] }),
-          /* @__PURE__ */ jsxs("h1", { children: [sc.tipo === "revenda" ? "Revenda" : sc.modalidade, " · ", `${fP(r.rMliq)} a.m.`] }),
+          /* @__PURE__ */ jsxs("h1", { children: [sc.tipo === "revenda" ? "Revenda" : sc.modalidade, " · ", `${fP(r.rentMensal)} a.m. bruta`] }),
           /* @__PURE__ */ jsxs("div", { className: "report-grid", children: [
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Entrada / saída", value: sc.tipo === "revenda" ? "—" : `${fmtData(sc.dataEntrada)} · ${fmtData(addDiasISO(sc.dataEntrada, parseFloat(sc.diasCiclo) || 0))}` }),
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Ciclo / recebimento", value: sc.tipo === "revenda" ? `${sc.diasPagamento || 0} dias` : `${sc.diasCiclo} + ${sc.diasPagamento || 0} dias` }),
@@ -1885,13 +1903,14 @@ function RelatorioComparativo({ lote, cenarios, resultados }) {
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Custo financeiro total", value: fR(r.custoFinanceiro) }),
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Preço máximo de compra para VP zero", value: `${fR(r.precoCompraVpMax)}/@ · ${r.margemCompraVp >= 0 ? "abaixo" : "acima"} do limite por ${fR(Math.abs(r.margemCompraVp))}/@` }),
             sc.tipo !== "revenda" && /* @__PURE__ */ jsx(ItemRelatorio, { label: "Revenda para igualar o lucro líquido", value: comparacao?.calculavel ? comparacao.igualdadePossivel ? `${fR(comparacao.precoMinimo)}/@ · disponível ${fR(comparacao.precoDisponivel)}/@ · ${comparacao.melhorAlternativa}` : comparacao.observacao : comparacao?.motivo || "Adicione um cenário de revenda" }),
-            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Rentabilidade", value: `${fP(r.rTliq)} total · ${fP(r.rMliq)} a.m.` }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Rentabilidade bruta", value: `${fP(r.rentTotal)} total · ${fP(r.rentMensal)} a.m.` }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Rentabilidade l\xEDquida", value: `${fP(r.rTliq)} total · ${fP(r.rMliq)} a.m.` }),
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Operação financeira", value: r.valorAdiantamento > 0 ? `${r.tipoAdiantamento === "recebimento" ? "Antecipação do recebimento" : "Adiantamento de capital"} · ${fR(r.valorAdiantamento)} · ${r.diasAdiantamento} dias · custo ${fR(r.custoAdiantamento)}${r.tipoAdiantamento === "recebimento" ? ` · saldo final ${fR(r.saldoRecebimentoFinal)}` : ""}` : "Não simulada" })
           ] }),
           sc.tipo !== "revenda" && /* @__PURE__ */ jsxs(Fragment, { children: [
             /* @__PURE__ */ jsx("h2", { children: "Evolução de custo e rentabilidade" }),
             /* @__PURE__ */ jsx("table", { className: "report-table report-table-compact", children: /* @__PURE__ */ jsxs("tbody", { children: [
-              /* @__PURE__ */ jsxs("tr", { children: ["Dias", "Saída", "BGI", "@ prod./cab", "Custo @ prod.", "Frete/@", "Prod.+frete/@", "Rent. mês", "Resultado"].map((h) => /* @__PURE__ */ jsx("th", { children: h }, h)) }),
+              /* @__PURE__ */ jsxs("tr", { children: ["Dias", "Saída", "BGI", "@ prod./cab", "Custo @ prod.", "Frete/@", "Prod.+frete/@", "Rent. bruta mês", "Lucro bruto"].map((h) => /* @__PURE__ */ jsx("th", { children: h }, h)) }),
               evolucao.map((ponto) => {
                 const e = ponto.resultado;
                 return /* @__PURE__ */ jsxs("tr", { children: [
@@ -1902,8 +1921,8 @@ function RelatorioComparativo({ lote, cenarios, resultados }) {
                   /* @__PURE__ */ jsx("td", { children: e ? fR(e.custoArrobaLiquidaProduzida) : "—" }),
                   /* @__PURE__ */ jsx("td", { children: e ? fR(e.fretePorArrobaProduzida) : "—" }),
                   /* @__PURE__ */ jsx("td", { children: e ? fR(e.custoProducaoFretePorArroba) : "—" }),
-                  /* @__PURE__ */ jsx("td", { children: e ? fP(e.rMliq) : "—" }),
-                  /* @__PURE__ */ jsx("td", { children: e ? fR(e.lucroLiquido) : "—" })
+                  /* @__PURE__ */ jsx("td", { children: e ? fP(e.rentMensal) : "—" }),
+                  /* @__PURE__ */ jsx("td", { children: e ? fR(e.lucroBruto) : "—" })
                 ] }, ponto.dias);
               })
             ] }) })
@@ -1916,7 +1935,7 @@ function RelatorioComparativo({ lote, cenarios, resultados }) {
 function Comparativo({ resultados, cenarios, lote }) {
   const ativos = cenarios.map((sc, i) => ({ sc, r: resultados[i], i })).filter((x) => x.r);
   if (!ativos.length) return null;
-  const ranked = [...ativos].sort((a, b) => b.r.rMliq - a.r.rMliq || b.r.lucroLiquido - a.r.lucroLiquido || b.r.rTliq - a.r.rTliq || a.i - b.i);
+  const ranked = [...ativos].sort((a, b) => b.r.rentMensal - a.r.rentMensal || b.r.lucroBruto - a.r.lucroBruto || b.r.rentTotal - a.r.rentTotal || a.i - b.i);
   const revendaBase = ativos.find(({ r }) => r.tipo === "revenda");
   const semCustoFrete = (r) => r.respFrete === "confinamento" || r.freteTotal === 0 && r.fretePorCab === 0;
   const mostraReferencia = (sc, referencia) => (sc?.referenciaTransporte || "transporte_na_entrada") === referencia || sc?.referenciaTransporte === "comparar";
@@ -2026,11 +2045,13 @@ function Comparativo({ resultados, cenarios, lote }) {
     { l: "Prazo recebimento (dias)", fn: (r) => fN(r.diasPag, 0) },
     { l: "Prazo total (dias)", fn: (r) => fN(r.diasTotal, 0), bold: true },
     { l: "Tempo capital investido (meses)", fn: (r) => fN(r.mesesCapital, 1) },
-    { l: "Rent. total antes da operação adicional", fn: (r) => fP(r.rTliqSemAdiantamento), hint: "Já desconta o custo financeiro base", cls: (r) => r.rTliqSemAdiantamento >= 0 ? "pos" : "neg" },
-    { l: "Rent. total final", fn: (r) => fP(r.rTliq), cls: (r) => r.rTliq >= 0 ? "pos" : "neg" },
-    { l: "Rent. mensal antes da operação adicional", fn: (r) => fP(r.rMliqSemAdiantamento ?? r.rMliq), hint: "Já desconta o custo financeiro base", bold: true, cls: (r) => (r.rMliqSemAdiantamento ?? r.rMliq) >= 0 ? "pos" : "neg" },
-    { l: "Impacto da opera\xE7\xE3o na rent. mensal", fn: (r) => `${fN(r.impactoAdiantamentoMensal ?? 0, 2)} p.p.`, cls: (r) => (r.impactoAdiantamentoMensal ?? 0) >= 0 ? "pos" : "neg" },
-    { l: "Rent. mensal final", fn: (r) => `${fP(r.rMliq)} a.m.`, bold: true, cls: (r) => r.rMliq >= 0 ? "pos" : "neg", best: true }
+    { l: "Rentabilidade total bruta", fn: (r) => fP(r.rentTotal), hint: "Lucro bruto dividido pelo capital investido", cls: (r) => r.rentTotal >= 0 ? "pos" : "neg" },
+    { l: "Rentabilidade mensal bruta", fn: (r) => `${fP(r.rentMensal)} a.m.`, hint: "Métrica principal antes do custo financeiro", bold: true, cls: (r) => r.rentMensal >= 0 ? "pos" : "neg", best: true },
+    { l: "Rentabilidade total líquida antes da operação adicional", fn: (r) => fP(r.rTliqSemAdiantamento), hint: "Já desconta o custo financeiro base", cls: (r) => r.rTliqSemAdiantamento >= 0 ? "pos" : "neg" },
+    { l: "Rentabilidade total líquida", fn: (r) => fP(r.rTliq), cls: (r) => r.rTliq >= 0 ? "pos" : "neg" },
+    { l: "Rentabilidade mensal líquida antes da operação adicional", fn: (r) => fP(r.rMliqSemAdiantamento ?? r.rMliq), hint: "Já desconta o custo financeiro base", cls: (r) => (r.rMliqSemAdiantamento ?? r.rMliq) >= 0 ? "pos" : "neg" },
+    { l: "Impacto da operação na rentabilidade líquida mensal", fn: (r) => `${fN(r.impactoAdiantamentoMensal ?? 0, 2)} p.p.`, cls: (r) => (r.impactoAdiantamentoMensal ?? 0) >= 0 ? "pos" : "neg" },
+    { l: "Rentabilidade mensal líquida", fn: (r) => `${fP(r.rMliq)} a.m.`, cls: (r) => r.rMliq >= 0 ? "pos" : "neg" }
   ];
   return /* @__PURE__ */ jsxs("div", { className: "res-wrap", children: [
     /* @__PURE__ */ jsx("div", { className: "res-ttl", children: "Resultado" }),
@@ -2047,16 +2068,16 @@ function Comparativo({ resultados, cenarios, lote }) {
         /* @__PURE__ */ jsx("div", { className: "rn", children: pos + 1 }),
         /* @__PURE__ */ jsx("div", { className: "rname", children: sc.nome }),
         /* @__PURE__ */ jsx("div", { className: "rtype", children: r.tipo === "revenda" ? "Revenda" : sc.modalidade }),
-        /* @__PURE__ */ jsxs("div", { className: `rval ${r.rMliq >= 0 ? "pos" : "neg"}`, style: { fontSize: 22, fontWeight: 700 }, children: [
-          fP(r.rMliq),
+        /* @__PURE__ */ jsxs("div", { className: `rval ${r.rentMensal >= 0 ? "pos" : "neg"}`, style: { fontSize: 22, fontWeight: 700 }, children: [
+          fP(r.rentMensal),
           " a.m."
         ] }),
         /* @__PURE__ */ jsxs("div", { className: "rsub", children: [
-          "rent. total: ",
-          fP(r.rTliq),
+          "rent. bruta total: ",
+          fP(r.rentTotal),
           " \xB7 ",
-          fN(r.meses, 1),
-          " meses"
+          fN(r.mesesCapital, 1),
+          " meses de capital"
         ] }),
         r.valorAdiantamento > 0 && /* @__PURE__ */ jsxs("div", { className: "rsub", style: { marginTop: 5 }, children: [
           r.tipoAdiantamento === "recebimento" ? "antecipa\xE7\xE3o: " : "adiantamento: ",
@@ -2067,14 +2088,21 @@ function Comparativo({ resultados, cenarios, lote }) {
           fP(r.rMliqSemAdiantamento ?? r.rMliq),
           " \u2192 ",
           fP(r.rMliq),
-          " a.m."
+          " a.m. líquida"
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "rsub", children: [
+          "rent. líquida: ",
+          fP(r.rMliq),
+          " a.m. · ",
+          fP(r.rTliq),
+          " total"
         ] }),
         /* @__PURE__ */ jsx("div", { className: "rsub", children: resumoReferenciaTransporte(r, sc) }),
         /* @__PURE__ */ jsxs("div", { className: "rsub", children: [
           "lucro bruto: ",
           fR(r.lucroBruto),
-          " · rent. total: ",
-          fP(r.rTliq)
+          " · rent. bruta total: ",
+          fP(r.rentTotal)
         ] }),
         /* @__PURE__ */ jsxs("div", { className: "rkey", children: [
           /* @__PURE__ */ jsxs("div", { className: "rkey-line", children: [
@@ -2480,7 +2508,15 @@ function Confinex() {
     setCenarios((p) => p.map((s, j) => {
       if (j !== i) return s;
       const valor = k === "contratoB3" ? String(v || "").trim().toUpperCase() : v;
-      const next = { ...s, [k]: valor };
+      const nextBase = { ...s, [k]: valor };
+      const contratoSugerido = contratoB3PorData(addDiasISO(nextBase.dataEntrada, parseFloat(nextBase.diasCiclo) || 0));
+      const next = atualizarContratoBgiPorPrazo({
+        cenario: s,
+        campoAlterado: k,
+        valor,
+        contratoSugerido,
+        cotacoes: lote.cotacoesB3
+      });
       const contrato = contratoB3DoCenario(next);
       const cotacao = lote.cotacoesB3?.[contrato];
       return cotacao ? {
@@ -2489,8 +2525,9 @@ function Confinex() {
         precoBolsa: String(cotacao.preco),
         cotacaoB3Fonte: cotacao.fonte || "",
         cotacaoB3AtualizadaEm: cotacao.atualizadaEm || ""
-      } : k === "contratoB3" ? {
+      } : k === "contratoB3" || k === "dataEntrada" || k === "diasCiclo" ? {
         ...next,
+        contratoB3: contrato,
         precoBolsa: "",
         cotacaoB3Fonte: "",
         cotacaoB3AtualizadaEm: ""
@@ -2987,7 +3024,7 @@ function Confinex() {
         /* @__PURE__ */ jsx("div", { className: "sec-t", children: "Iniciar neg\xF3cio \u2014 Supabase" }),
         /* @__PURE__ */ jsxs("div", { className: "g3", children: [
           /* @__PURE__ */ jsx(F, { label: "Cen\xE1rio selecionado", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: cenarios[scAtivo]?.nome || "\u2014" }) }),
-          /* @__PURE__ */ jsx(F, { label: "Estimativa original", hint: "Ser\xE1 congelada e n\xE3o poder\xE1 ser sobrescrita", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: resultados[scAtivo] ? `${fP(resultados[scAtivo].rMliq)} a.m. \xB7 ${fP(resultados[scAtivo].rTliq)} total \xB7 ${fR(resultados[scAtivo].lucroLiquido)}` : "\u2014" }) }),
+          /* @__PURE__ */ jsx(F, { label: "Estimativa original", hint: "Ser\xE1 congelada e n\xE3o poder\xE1 ser sobrescrita", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: resultados[scAtivo] ? `${fP(resultados[scAtivo].rentMensal)} a.m. bruta \xB7 ${fP(resultados[scAtivo].rentTotal)} total bruta \xB7 ${fR(resultados[scAtivo].lucroBruto)}` : "\u2014" }) }),
           /* @__PURE__ */ jsx(F, { label: "Confirmar abertura", children: /* @__PURE__ */ jsx("button", { className: "tb on", style: { width: "100%", padding: "10px 13px" }, onClick: iniciarNegocioSupabase, children: "Iniciar neg\xF3cio" }) })
         ] }),
         /* @__PURE__ */ jsx("div", { className: "hint", style: { marginTop: 10 }, children: statusSupabase })

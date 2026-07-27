@@ -42,3 +42,31 @@ export function mesclarCotacoesBgiAutomaticas(atuais, obtidas, atualizadaEm) {
 
   return { cotacoes, atualizados, preservados };
 }
+
+export function atualizarContratoBgiPorPrazo({
+  cenario,
+  campoAlterado,
+  valor,
+  contratoSugerido,
+  cotacoes = {},
+} = {}) {
+  const proximo = { ...(cenario || {}), [campoAlterado]: valor };
+  const mudouPrazo = campoAlterado === "dataEntrada" || campoAlterado === "diasCiclo";
+  if (
+    !mudouPrazo
+    || proximo.tipo === "revenda"
+    || proximo.modoPreco !== "bolsa"
+    || !contratoSugerido
+  ) {
+    return proximo;
+  }
+
+  const cotacao = cotacoes?.[contratoSugerido];
+  return {
+    ...proximo,
+    contratoB3: contratoSugerido,
+    precoBolsa: cotacaoBgiValida(cotacao) ? String(cotacao.preco) : "",
+    cotacaoB3Fonte: cotacao?.fonte || "",
+    cotacaoB3AtualizadaEm: cotacao?.atualizadaEm || "",
+  };
+}

@@ -71,7 +71,7 @@ class ClarezaInterfaceConfinexTests(unittest.TestCase):
         ):
                 self.assertIn(f"onClick: {funcao}", self.fonte) if funcao not in ("importarJSON", "carregarVersoesSheets(true)") else self.assertIn(funcao, self.fonte)
 
-    def test_resumo_prioriza_resultado_liquido_sem_duplicar_custo(self):
+    def test_resumo_prioriza_rentabilidade_bruta_e_mantem_liquido_complementar(self):
         for texto in (
             'children: "Lucro l\\xEDquido"',
             'children: "Custo financeiro total"',
@@ -84,8 +84,23 @@ class ClarezaInterfaceConfinexTests(unittest.TestCase):
             self.fonte.index('className: "rank-row"'):
             self.fonte.index('className: "cmp-tbl"')
         ]
+        self.assertIn("fP(r.rentMensal)", trecho_cartoes)
+        self.assertIn('"rent. líquida: "', trecho_cartoes)
         self.assertNotIn('r.pagamentoConfinamentoRotulo', trecho_cartoes)
         self.assertNotIn('"limite compra VP: "', trecho_cartoes)
+
+    def test_ranking_e_relatorio_usam_rentabilidade_bruta(self):
+        ordenacao = "b.r.rentMensal - a.r.rentMensal || b.r.lucroBruto - a.r.lucroBruto || b.r.rentTotal - a.r.rentTotal"
+        self.assertGreaterEqual(self.fonte.count(ordenacao), 2)
+        self.assertNotIn("sort((a, b) => b.r.rMliq", self.fonte)
+        for texto in (
+            "Resumo por rentabilidade mensal bruta",
+            "Rent. bruta mensal",
+            "Rentabilidade mensal bruta",
+            "Rentabilidade mensal líquida",
+            "rentabilidadeMensalBruta: rM",
+        ):
+            self.assertIn(texto, self.fonte)
 
     def test_comparativo_explica_limite_vp_e_revenda_equivalente(self):
         for texto in (

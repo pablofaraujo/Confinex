@@ -29,7 +29,7 @@ Atualizado em 2026-07-23. A fonte executável é
 | Lucro bruto/líquido | custo financeiro positivo | bruto − líquido = custo financeiro total, sem desconto duplicado | regressão pura + Chromium desktop/celular |
 | Lucro bruto/líquido | custo financeiro zero | bruto e líquido são iguais e o custo exibido é zero | regressão pura + Chromium desktop/celular |
 | Contrato financeiro | vazio, negativo e entrada inválida | vazio produz zeros; valor negativo ou não numérico falha explicitamente | `tools/test_confinex_resultado_financeiro.mjs` |
-| Consistência | cartões, comparativo, evolução, ranking e PDF | todos usam `lucroLiquido`, `rTliq`, `rMliq` e o mesmo custo financeiro | Chromium + evidência de impressão |
+| Consistência | cartões, comparativo, evolução, ranking e PDF | todos priorizam `lucroBruto`, `rentabilidadeTotalBruta` e `rentabilidadeMensalBruta`; métricas líquidas permanecem complementares | Chromium + evidência de impressão |
 | Financeiro | dados positivos | KPIs, agenda, dívidas, parcelas, saldos, renegociação, lembretes e conciliação ficam legíveis | regressão JavaScript + Chromium desktop/celular |
 | Financeiro | valor monetário multimilionário | o número cabe dentro do próprio cartão, sem corte visual | medição de `scrollWidth` × `clientWidth` + PNG desktop/celular |
 | Financeiro | pagamentos parcial e total | original, pago e saldo não se confundem; realizado zera saldo | `tools/test_gestao_frontend.js` + Chromium |

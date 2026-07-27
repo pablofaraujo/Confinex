@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  calcularRentabilidadeBruta,
   calcularResultadoFinanceiro,
   calcularValorPresente,
 } from "../js/confinex-resultado-financeiro.mjs";
@@ -24,6 +25,36 @@ assert.equal(comFinanceiro.lucroBruto, 500);
 assert.equal(comFinanceiro.custoFinanceiro, 90);
 assert.equal(comFinanceiro.lucroLiquido, 410);
 assert.equal(comFinanceiro.diferencaBrutoLiquido, 90);
+
+// A rentabilidade principal usa o lucro bruto e não muda com o custo financeiro.
+const rentabilidadeBruta = calcularRentabilidadeBruta({
+  lucroBruto: comFinanceiro.lucroBruto,
+  capitalInvestido: 1000,
+  mesesCapital: 2,
+});
+const maisCustoFinanceiro = calcularResultadoFinanceiro({
+  receita: 1500,
+  custosOperacionais: 1000,
+  custosFinanceiros: [{ nome: "custo do dinheiro", valor: 190 }],
+});
+const rentabilidadeComMaisCusto = calcularRentabilidadeBruta({
+  lucroBruto: maisCustoFinanceiro.lucroBruto,
+  capitalInvestido: 1000,
+  mesesCapital: 2,
+});
+assert.deepEqual(rentabilidadeComMaisCusto, rentabilidadeBruta);
+assert.equal(rentabilidadeBruta.rentabilidadeTotalBruta, 50);
+perto(
+  rentabilidadeBruta.rentabilidadeMensalBruta,
+  (Math.sqrt(1.5) - 1) * 100,
+  "rentabilidade mensal bruta",
+);
+assert.equal(maisCustoFinanceiro.lucroBruto, comFinanceiro.lucroBruto);
+assert.ok(maisCustoFinanceiro.lucroLiquido < comFinanceiro.lucroLiquido);
+assert.equal(
+  maisCustoFinanceiro.lucroBruto - maisCustoFinanceiro.lucroLiquido,
+  maisCustoFinanceiro.custoFinanceiro,
+);
 
 // Sem custo financeiro, bruto e líquido podem ser iguais e a causa é explícita.
 const semFinanceiro = calcularResultadoFinanceiro({
@@ -81,4 +112,4 @@ assert.throws(
   /taxaMensal/,
 );
 
-console.log("Contrato bruto/líquido/VP: 15 verificações aprovadas.");
+console.log("Contrato bruto/líquido/VP: 24 verificações aprovadas.");
