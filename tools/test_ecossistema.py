@@ -123,6 +123,7 @@ def validar_local() -> None:
     executar(["node", "tools/test_confinex_supabase_adaptador.mjs"])
     executar(["node", "tools/test_confinex_supabase_ponte.mjs"])
     executar([sys.executable, "-m", "unittest", "tools.test_consolidar_fontes_operacionais"])
+    executar([sys.executable, "-m", "unittest", "tools.test_analisar_extrato_ofx"])
 
     html = (ROOT / "revisoes.html").read_text(encoding="utf-8")
     scripts = scripts_inline(html)
