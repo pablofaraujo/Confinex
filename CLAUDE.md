@@ -14,6 +14,7 @@ Leia conforme a tarefa:
 - `docs/memoria-agentes.md` — contrato de memória reutilizável para Juan/Ceci e auditoria somente leitura
 - `docs/contratos-automatizados.md` — pré-análise segura de contratos, versões, Drive e regra Finpec
 - `docs/google-sheets-legado.md` — papel transitório de Sheets/Apps Script e gate para migração
+- `docs/consolidacao-fontes-operacionais.md` — dry-run que cruza Juan, banco, GTAs, documentos e Supabase sem executar vínculos
 - `docs/fila-revisoes-prioridades.md` — inventário sanitizado, prioridade operacional e plano dry-run de saneamento
 - `tools/sanear_fila_revisoes.py` — rotina dry-run para vincular rascunhos e pendências somente com correspondência forte, sem tocar tabelas operacionais
 - `docs/regras-de-negocio.md` — fórmulas e regras de cálculo (arrobas, capim, frete, GMD, Funrural, B3, VP)
