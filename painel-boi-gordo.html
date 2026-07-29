@@ -62,8 +62,6 @@ ul.ctx li::before{content:"•";position:absolute;left:4px;color:var(--green)}
   <a href="https://br.tradingview.com/symbols/BMFBOVESPA-BGI1!/contracts/" target="_blank">BGI na B3 (TradingView)</a>
 </div>
 
-<button id="atualizarPainel" class="voltar-central" type="button">↻ Atualizar</button>
-
 <a href="./" class="voltar-central">⌂ Central</a>
 
 <script id="painel-data" type="application/json">
@@ -112,7 +110,6 @@ const atualizador = window.PainelBoiGordo && window.PainelBoiGordo.criarAtualiza
   agora: () => new Date(),
   limiteDias: 2
 });
-document.getElementById('atualizarPainel').addEventListener('click', () => atualizador && atualizador.atualizar());
 if (atualizador) {
   document.getElementById('estadoAtualizacao').textContent = atualizador.defasado() ? 'dado defasado · tentando atualizar' : 'último dado válido';
   atualizador.atualizar();

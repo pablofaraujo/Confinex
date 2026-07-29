@@ -151,8 +151,6 @@ async function carregar(){
 el('filtroSituacao').addEventListener('change', renderObrigacoes);
 el('filtroTexto').addEventListener('input', renderObrigacoes);
 el('filtroBanco').addEventListener('input', renderTransacoes);
-el('atualizarBtn').addEventListener('click', carregar);
 el('entrarBtn').addEventListener('click', function(){ entrar(); });
-el('sairBtn').addEventListener('click', function(){ sair(); });
 CFAgro.authInit(carregar);
 })();

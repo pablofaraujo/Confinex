@@ -72,10 +72,30 @@ class RegressaoNavegacaoTests(unittest.TestCase):
         self.assertIn("data-shell-sair hidden", shell)
         self.assertIn("window.db.auth.getSession()", shell)
         self.assertIn("resultado.data.session", shell)
-        for nome in ("index.html", "confinados.html"):
+        paginas_sem_acoes_duplicadas = (
+            "index.html",
+            "confinados.html",
+            "bb.html",
+            "bgi.html",
+            "abate.html",
+            "ops.html",
+            "fazenda-ametista.html",
+            "financeiro.html",
+            "eventos.html",
+            "pendencias.html",
+            "confinamento.html",
+            "parceria-ricardo.html",
+            "parceria-xande.html",
+            "revisoes.html",
+            "ocr-pesagem.html",
+            "painel-boi-gordo.html",
+        )
+        for nome in paginas_sem_acoes_duplicadas:
             pagina = (ROOT / nome).read_text(encoding="utf-8")
             self.assertNotIn('onclick="sair()"', pagina)
             self.assertNotIn('onclick="carregar()">↻ Atualizar', pagina)
+            self.assertNotIn('id="atualizarBtn"', pagina)
+            self.assertNotIn('id="sairBtn"', pagina)
 
 
 if __name__ == "__main__":

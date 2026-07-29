@@ -8,7 +8,8 @@ const artefato = JSON.parse(fs.readFileSync('dados/painel-boi-gordo.json', 'utf8
 assert.ok(artefato.fonte && artefato.atualizadoEm, 'artefato sem fonte/data');
 assert.ok(html.includes('dados/painel-boi-gordo.json'));
 assert.ok(html.includes('cache: \'no-store\''));
-assert.ok(html.includes('atualizarPainel'));
+assert.ok(!html.includes('id="atualizarPainel"'), 'painel ainda repete a ação global Atualizar');
+assert.ok(html.includes('atualizador.atualizar();'), 'painel deixou de atualizar automaticamente ao abrir');
 const contexto = { Promise, Date, Number, globalThis: {} };
 vm.runInNewContext(fonte, contexto);
 const api = contexto.globalThis.PainelBoiGordo;
@@ -34,4 +35,3 @@ Promise.all([atualizador.atualizar(), atualizador.atualizar()]).then(resultados 
   assert.strictEqual(resultados[0].fonte, 'remota');
   console.log('Painel Boi Gordo: 9 verificações aprovadas.');
 }).catch(error => { console.error(error); process.exitCode = 1; });
-

@@ -60,8 +60,6 @@ el('filtroSituacao').addEventListener('change', render);
 el('filtroTipo').addEventListener('change', render);
 el('filtroPeriodo').addEventListener('change', render);
 el('filtroTexto').addEventListener('input', render);
-el('atualizarBtn').addEventListener('click', carregar);
 el('entrarBtn').addEventListener('click', function(){ entrar(); });
-el('sairBtn').addEventListener('click', function(){ sair(); });
 CFAgro.authInit(carregar);
 })();
