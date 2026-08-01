@@ -503,7 +503,6 @@ async function buscarTradingViewB3(contrato) {
   const ticker = `BMFBOVESPA:BGI${match[1]}20${match[2]}`;
   const response = await fetchComTimeout("https://scanner.tradingview.com/futures/scan", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       symbols: { tickers: [ticker], query: { types: [] } },
       columns: ["name", "close", "update_mode"]
