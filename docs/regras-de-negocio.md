@@ -131,6 +131,9 @@ As duas leituras são auxiliares e não mudam lucro, custos totais, caixa ou ran
 
 ## Contratos B3 / BGI
 
+- O rateio aceita códigos com espaços acidentais e separadores humanos, como `CF-AA-NNN 5,2 cts`, `CF-AA-NNN: 5,2` e `CF-AA- NNN - 5,2`. A cobertura por lote usa as quantidades explicitamente informadas; quando há um único lote sem quantidade, usa todos os contratos da posição. Vários lotes sem quantidade não recebem rateio inventado.
+- Na transição do Portfólio B3, um registro gerenciado (`termo` iniciado por `bgp:`) prevalece visualmente sobre seu par legado somente quando contrato, direção, quantidade, entrada e status coincidem. Posições gerenciadas distintas são preservadas.
+
 - Código do contrato: `BGI` + letra do mês (F,G,H,J,K,M,N,Q,U,V,X,Z) + ano 2 dígitos, sugerido pela **data de saída** (`dataEntrada + diasCiclo`); alterar entrada ou permanência re-sugere o vencimento e carrega somente sua própria cotação. Sem cotação disponível, o preço fica vazio em vez de reutilizar o contrato anterior.
 - A cotação é única por **contrato/vencimento dentro do estudo**, não única para todos os cenários: cenários que usam o mesmo código BGI compartilham obrigatoriamente o mesmo índice e a mesma fonte/data de consulta.
 - A seção geral **Mercado BGI** reúne os vencimentos usados e atualiza a curva em um único lote de consulta. O diferencial de base continua individual por cenário.

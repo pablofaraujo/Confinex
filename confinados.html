@@ -12,6 +12,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="./js/cfagro-core.js"></script>
 <script src="./js/cfagro-shell.js?v=20260726-1" defer></script>
+<script src="./js/confinados-hedge.js?v=20260801-1"></script>
 </head>
 <body>
 
@@ -69,7 +70,7 @@ document.getElementById('subtitle').textContent = 'Carregando...';
 const [ops, expo, posicoes, estoque, pend, acertos, fluxo] = await Promise.all([
 db.from('operacoes').select('id,codigo,status,sexo,modalidade,confinamentos(nome)'),
 db.from('v_exposicao_hedge').select('*'),
-db.from('posicoes_hedge').select('contrato,direcao,contratos_qtd,preco_entrada,preco_saida,data_saida,status,resultado_realizado,categoria,negocio_rateio').or('status.in.(aberta,rolada),origem.eq.bgi-portfolio').order('status').order('contrato'),
+db.from('posicoes_hedge').select('id,termo,origem,contrato,direcao,contratos_qtd,preco_entrada,preco_saida,data_saida,status,resultado_realizado,categoria,negocio_rateio').or('status.in.(aberta,rolada),origem.eq.bgi-portfolio').order('status').order('contrato'),
 db.from('v_estoque_atual').select('*'),
 db.from('pendencias_documentos').select('id,tipo,status,cobrancas,created_at,operacoes(codigo),contatos(nome),compras(quantidade,data)').not('status','in','("validado","cancelado")'),
 db.from('acertos').select('*,operacoes(codigo),confinamentos(nome)').order('created_at'),
@@ -82,10 +83,12 @@ document.getElementById('subtitle').textContent =
 `Dados atualizados às ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`;
 
 // ---- KPIs
+const posicoesVisiveis = ConfinadosHedge.deduplicarPosicoes(posicoes.data);
+const exposicaoEfetiva = ConfinadosHedge.reconciliarExposicao(expo.data, posicoesVisiveis);
 const cab = estoque.data.reduce((s,e)=>s+Number(e.cabecas||0),0);
 const ativos = ops.data.filter(o=>['comprada','em_confinamento'].includes(o.status));
-const descob = expo.data.reduce((s,e)=>s+Math.max(Number(e.cts_descobertos||0),0),0);
-const credit = expo.data.reduce((s,e)=>s+Number(e.hedge_realizado_creditado||0),0);
+const descob = exposicaoEfetiva.reduce((s,e)=>s+Math.max(Number(e.cts_descobertos||0),0),0);
+const credit = exposicaoEfetiva.reduce((s,e)=>s+Number(e.hedge_realizado_creditado||0),0);
 const pendAbertas = pend.data.filter(p=>p.status==='aguardando_vendedor');
 const acAguard = acertos.data.filter(a=>['aguardando','divergente'].includes(a.status));
 const fluxoReal = fluxo.data.filter(f=>f.realizado);
@@ -102,7 +105,7 @@ document.getElementById('kpis').innerHTML = [
 // ---- Exposição
 document.getElementById('tbExpo').innerHTML =
 '<tr><th>Lote</th><th class="num">@ previstas</th><th class="num">Cts necessários</th><th class="num">Cts abertos</th><th class="num">Descoberto</th><th class="num">Creditado (realizado)</th><th>Status</th></tr>'+
-expo.data.sort((a,b)=>a.codigo.localeCompare(b.codigo)).map(e=>{
+exposicaoEfetiva.sort((a,b)=>a.codigo.localeCompare(b.codigo)).map(e=>{
 const d=Number(e.cts_descobertos||0);
 return `<tr><td><b>${e.codigo}</b></td><td class="num">${fmtN(e.arrobas_previstas)}</td>
 <td class="num">${fmtN(e.cts_necessarios,2)}</td><td class="num">${fmtN(e.cts_abertos,2)}</td>
@@ -114,7 +117,7 @@ return `<tr><td><b>${e.codigo}</b></td><td class="num">${fmtN(e.arrobas_prevista
 // ---- Posições B3 (hedge × especulação)
 document.getElementById('tbPos').innerHTML =
 '<tr><th>Contrato</th><th>Lado</th><th class="num">Cts</th><th class="num">Entrada</th><th class="num">Saída</th><th>Status</th><th class="num">Resultado líq.</th><th>Tipo</th><th>Negócio/Rateio</th></tr>'+
-posicoes.data.map(p=>{
+posicoesVisiveis.map(p=>{
 const lado = p.direcao==='comprado'?'Comprado':p.direcao==='termo'?'Termo':'Vendido';
 return `<tr><td><b>${p.contrato}</b></td><td>${lado}</td>
 <td class="num">${fmtN(p.contratos_qtd,2)}</td><td class="num">${fmtN(p.preco_entrada,2)}</td>
