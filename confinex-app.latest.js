@@ -497,6 +497,29 @@ async function buscarB3HistoricoIntradiario(contrato) {
     data: `${dataBase}T${ultima?.dtTm || "12:00:00"}`
   };
 }
+async function buscarTradingViewB3(contrato) {
+  const match = /^BGI([FGHJKMNQUVXZ])(\d{2})$/.exec(String(contrato || "").toUpperCase());
+  if (!match) throw new Error("Contrato BGI invalido para TradingView");
+  const ticker = `BMFBOVESPA:BGI${match[1]}20${match[2]}`;
+  const response = await fetchComTimeout("https://scanner.tradingview.com/futures/scan", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      symbols: { tickers: [ticker], query: { types: [] } },
+      columns: ["name", "close", "update_mode"]
+    })
+  });
+  if (!response.ok) throw new Error("TradingView nao respondeu");
+  const data = await response.json();
+  const preco = data?.data?.[0]?.d?.[1];
+  if (!Number.isFinite(preco) || preco <= 0) throw new Error("TradingView sem preco");
+  return {
+    preco,
+    fonte: "TradingView (B3 com 15 min de atraso)",
+    symbol: contrato,
+    data: (/* @__PURE__ */ new Date()).toISOString()
+  };
+}
 async function buscarYahooB3(contrato) {
   const symbol = `${contrato}.SA`;
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`;
@@ -537,7 +560,7 @@ async function buscarCepeaBoiGordo() {
 }
 async function buscarPrecoB3PorContrato(contrato) {
   const erros = [];
-  for (const buscar of [buscarB3Publica, buscarB3HistoricoIntradiario, buscarYahooB3]) {
+  for (const buscar of [buscarB3Publica, buscarB3HistoricoIntradiario, buscarTradingViewB3, buscarYahooB3]) {
     try {
       return await buscar(contrato);
     } catch (err) {
