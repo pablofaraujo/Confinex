@@ -126,6 +126,7 @@ def validar_local() -> None:
     executar([sys.executable, "-m", "unittest", "tools.test_consolidar_fontes_operacionais"])
     executar([sys.executable, "-m", "unittest", "tools.test_analisar_extrato_ofx"])
     executar([sys.executable, "-m", "unittest", "tools.test_analisar_ficha_ima"])
+    executar([sys.executable, "-m", "unittest", "tools.test_sanear_duplicidades_bgi"])
 
     html = (ROOT / "revisoes.html").read_text(encoding="utf-8")
     scripts = scripts_inline(html)
