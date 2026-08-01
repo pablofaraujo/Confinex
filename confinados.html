@@ -78,17 +78,17 @@ db.from('fluxo_caixa').select('data,descricao,tipo,valor,realizado,categoria').o
 ]);
 const errs=[ops,expo,posicoes,estoque,pend,acertos,fluxo].filter(r=>r.error);
 if(errs.length){ document.getElementById('subtitle').textContent='Erro: '+errs[0].error.message; return; }
-
 document.getElementById('subtitle').textContent =
 `Dados atualizados às ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`;
 
 // ---- KPIs
 const posicoesVisiveis = ConfinadosHedge.deduplicarPosicoes(posicoes.data);
 const exposicaoEfetiva = ConfinadosHedge.reconciliarExposicao(expo.data, posicoesVisiveis);
+const expoConfinamento = exposicaoEfetiva.filter(e=>!String(e.codigo||'').toUpperCase().startsWith('BB-'));
 const cab = estoque.data.reduce((s,e)=>s+Number(e.cabecas||0),0);
 const ativos = ops.data.filter(o=>['comprada','em_confinamento'].includes(o.status));
-const descob = exposicaoEfetiva.reduce((s,e)=>s+Math.max(Number(e.cts_descobertos||0),0),0);
-const credit = exposicaoEfetiva.reduce((s,e)=>s+Number(e.hedge_realizado_creditado||0),0);
+const descob = expoConfinamento.reduce((s,e)=>s+Math.max(Number(e.cts_descobertos||0),0),0);
+const credit = expoConfinamento.reduce((s,e)=>s+Number(e.hedge_realizado_creditado||0),0);
 const pendAbertas = pend.data.filter(p=>p.status==='aguardando_vendedor');
 const acAguard = acertos.data.filter(a=>['aguardando','divergente'].includes(a.status));
 const fluxoReal = fluxo.data.filter(f=>f.realizado);
@@ -105,7 +105,7 @@ document.getElementById('kpis').innerHTML = [
 // ---- Exposição
 document.getElementById('tbExpo').innerHTML =
 '<tr><th>Lote</th><th class="num">@ previstas</th><th class="num">Cts necessários</th><th class="num">Cts abertos</th><th class="num">Descoberto</th><th class="num">Creditado (realizado)</th><th>Status</th></tr>'+
-exposicaoEfetiva.sort((a,b)=>a.codigo.localeCompare(b.codigo)).map(e=>{
+expoConfinamento.sort((a,b)=>a.codigo.localeCompare(b.codigo)).map(e=>{
 const d=Number(e.cts_descobertos||0);
 return `<tr><td><b>${e.codigo}</b></td><td class="num">${fmtN(e.arrobas_previstas)}</td>
 <td class="num">${fmtN(e.cts_necessarios,2)}</td><td class="num">${fmtN(e.cts_abertos,2)}</td>
