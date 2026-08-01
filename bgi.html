@@ -115,17 +115,29 @@ expo.data.sort((a,b)=>a.codigo.localeCompare(b.codigo)).map(e=>{
 const d=Number(e.cts_descobertos||0);
 return `<tr><td><b>${e.codigo}</b></td><td class="num">${fmtN(e.arrobas_previstas,1)}</td><td class="num">${fmtN(e.cts_necessarios)}</td><td class="num">${fmtN(e.cts_abertos)}</td><td class="num ${d>0.1?'neg':'pos'}">${fmtN(d)}</td><td class="num ${cls(e.hedge_realizado_creditado)}">${fmtR$(e.hedge_realizado_creditado)}</td></tr>`}).join('');
 
+// Última cotação por contrato. Também alimenta a marcação a mercado das
+// posições abertas, que antes exibiam apenas o resultado realizado.
+const ultimas={};
+cot.data.forEach(c=>{const k=c.referencia_fisica?'FISICO':c.contrato; if(!ultimas[k])ultimas[k]=c;});
+
 // Posições
-document.getElementById('tbPos').innerHTML='<tr><th>Contrato</th><th>Dir.</th><th class="num">Cts</th><th class="num">Entrada</th><th class="num">Saída</th><th class="num">Resultado</th><th>Lotes</th><th>Status</th><th>Ações</th></tr>'+
+let resultadoAberto=0;
+let posicoesCotadas=0;
+document.getElementById('tbPos').innerHTML='<tr><th>Contrato</th><th>Dir.</th><th class="num">Cts</th><th class="num">Entrada</th><th class="num">Atual</th><th class="num">Saída</th><th class="num">Resultado</th><th>Lotes</th><th>Status</th><th>Ações</th></tr>'+
 POS.map(p=>{
 const lotes=(p.alocacoes_hedge||[]).map(a=>a.operacoes?.codigo).filter(Boolean).join(', ')||'—';
 const st=p.status==='aberta'?'<span class="badge b-green">Aberta</span>':p.status==='rolada'?'<span class="badge b-blue">Rolada</span>':'<span class="badge b-amber">Encerrada</span>';
-const acoes=p.status==='aberta'?`<button class="btn mini warn" onclick="encerrar('${p.id}')">Encerrar</button> <button class="btn mini sec" onclick="encerrarParcial('${p.id}')">Encerrar parcial</button> <button class="btn mini sec" onclick="rolar('${p.id}')">Rolar</button>`:'';
-return `<tr><td><b>${p.contrato}</b></td><td>${p.direcao}</td><td class="num">${fmtN(p.contratos_qtd)}</td><td class="num">${fmtN(p.preco_entrada)}</td><td class="num">${p.preco_saida?fmtN(p.preco_saida):'—'}</td><td class="num ${cls(p.resultado_realizado)}">${p.resultado_realizado!=null?fmtR$(p.resultado_realizado):'—'}</td><td>${lotes}</td><td>${st}</td><td>${acoes}</td></tr>`}).join('');
+const cotacao=p.status==='aberta'?ultimas[p.contrato]:null;
+const atual=cotacao?Number(cotacao.preco):null;
+const parcial=atual==null?null:Math.round((p.direcao==='vendido'?Number(p.preco_entrada)-atual:atual-Number(p.preco_entrada))*Number(p.contratos_qtd)*330*100)/100;
+if(parcial!=null){resultadoAberto+=parcial;posicoesCotadas++;}
+const resultado=p.status==='aberta'?parcial:p.resultado_realizado;
+const acoes=`<button class="btn mini" onclick="editar('${p.id}')">Editar</button> `+(p.status==='aberta'?`<button class="btn mini warn" onclick="encerrar('${p.id}')">Encerrar</button> <button class="btn mini sec" onclick="encerrarParcial('${p.id}')">Encerrar parcial</button> <button class="btn mini sec" onclick="rolar('${p.id}')">Rolar</button>`:'');
+return `<tr><td><b>${p.contrato}</b></td><td>${p.direcao}</td><td class="num">${fmtN(p.contratos_qtd)}</td><td class="num">${fmtN(p.preco_entrada)}</td><td class="num">${atual!=null?fmtN(atual):'—'}</td><td class="num">${p.preco_saida?fmtN(p.preco_saida):'—'}</td><td class="num ${cls(resultado)}">${resultado!=null?fmtR$(resultado):(p.status==='aberta'?'Sem cotação':'—')}</td><td>${lotes}</td><td>${st}</td><td>${acoes}</td></tr>`}).join('');
+
+document.getElementById('kpis').insertAdjacentHTML('beforeend',`<div class="kpi"><div class="l">Resultado em aberto</div><div class="v ${cls(resultadoAberto)}">${posicoesCotadas?fmtR$(resultadoAberto):'Sem cotação'}</div></div>`);
 
 // Cotações + basis
-const ultimas={};
-cot.data.forEach(c=>{const k=c.referencia_fisica?'FISICO':c.contrato; if(!ultimas[k])ultimas[k]=c;});
 const fisica=ultimas['FISICO'];
 document.getElementById('tbCot').innerHTML='<tr><th>Contrato</th><th class="num">Preço</th><th>Data</th><th>Fonte</th><th class="num">Basis vs física</th></tr>'+
 Object.entries(ultimas).map(([k,c])=>{
@@ -146,6 +158,70 @@ const {data:ins,error}=await db.from('posicoes_hedge').insert({contrato,direcao:
 if(error){document.getElementById('msgTrava').textContent='Erro: '+error.message;return;}
 if(loteId){await db.from('alocacoes_hedge').insert({posicao_id:ins.id,operacao_id:loteId,contratos_qtd:cts});}
 document.getElementById('msgTrava').textContent=`✓ Trava registrada (${contrato}, ${cts} cts).`;
+carregar();
+}
+
+function numeroInformado(texto, atual){
+const valor=prompt(texto,String(atual??'').replace('.',','));
+if(valor===null)return null;
+const numero=parseFloat(String(valor).replace(',','.'));
+return Number.isFinite(numero)?numero:NaN;
+}
+
+async function editar(id){
+const p=POS.find(x=>x.id===id);
+if(!p){alert('Posição não encontrada — atualize a página.');return;}
+const contrato=prompt('Contrato:',p.contrato);
+if(contrato===null)return;
+const direcao=prompt('Direção (vendido ou comprado):',p.direcao);
+if(direcao===null)return;
+const dir=String(direcao).trim().toLowerCase();
+if(!['vendido','comprado'].includes(dir)){alert('Direção inválida. Use vendido ou comprado.');return;}
+const cts=numeroInformado('Quantidade de contratos:',p.contratos_qtd);
+if(cts===null)return;
+const entrada=numeroInformado('Preço de entrada (R$/@):',p.preco_entrada);
+if(entrada===null)return;
+const dataEntrada=prompt('Data de entrada (AAAA-MM-DD):',p.data_entrada||'');
+if(dataEntrada===null)return;
+const obs=prompt('Observações:',p.obs||'');
+if(obs===null)return;
+if(!String(contrato).trim()||!Number.isFinite(cts)||cts<=0||!Number.isFinite(entrada)||entrada<=0){alert('Contrato, quantidade ou preço inválido.');return;}
+
+const alteracoes={contrato:String(contrato).trim().toUpperCase(),direcao:dir,contratos_qtd:cts,preco_entrada:entrada,data_entrada:dataEntrada||null,obs:obs||null};
+let resultadoCorrigido=null;
+if(p.status!=='aberta'){
+  const saida=numeroInformado('Preço de saída (R$/@):',p.preco_saida);
+  if(saida===null)return;
+  if(!Number.isFinite(saida)||saida<=0){alert('Preço de saída inválido.');return;}
+  const mult=dir==='vendido'?1:-1;
+  alteracoes.preco_saida=saida;
+  resultadoCorrigido=Math.round(mult*(entrada-saida)*cts*330*100)/100;
+  alteracoes.resultado_realizado=resultadoCorrigido;
+}
+if(!confirm(`Salvar alterações em ${alteracoes.contrato}: ${fmtN(cts)} cts ${dir} @ R$ ${fmtN(entrada)}?`))return;
+
+const {error}=await db.from('posicoes_hedge').update(alteracoes).eq('id',id);
+if(error){alert('Erro ao salvar: '+error.message);return;}
+
+// Mantém o rateio proporcional quando a quantidade total é corrigida.
+const alocs=p.alocacoes_hedge||[];
+const totalAnterior=alocs.reduce((s,a)=>s+Number(a.contratos_qtd||0),0);
+if(totalAnterior>0&&cts!==Number(p.contratos_qtd)){
+  const {data:linhas}=await db.from('alocacoes_hedge').select('id,contratos_qtd').eq('posicao_id',id);
+  for(const a of (linhas||[])){
+    const qtdCorrigida=Math.round(Number(a.contratos_qtd)*cts/totalAnterior*100)/100;
+    const credito=resultadoCorrigido==null?undefined:Math.round(resultadoCorrigido*qtdCorrigida/cts*100)/100;
+    const ajuste={contratos_qtd:qtdCorrigida};
+    if(credito!==undefined)ajuste.resultado_creditado=credito;
+    await db.from('alocacoes_hedge').update(ajuste).eq('id',a.id);
+  }
+}else if(resultadoCorrigido!=null&&totalAnterior>0){
+  const {data:linhas}=await db.from('alocacoes_hedge').select('id,contratos_qtd').eq('posicao_id',id);
+  for(const a of (linhas||[])){
+    await db.from('alocacoes_hedge').update({resultado_creditado:Math.round(resultadoCorrigido*Number(a.contratos_qtd)/totalAnterior*100)/100}).eq('id',a.id);
+  }
+}
+alert('Posição atualizada com sucesso.');
 carregar();
 }
 
