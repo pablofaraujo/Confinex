@@ -100,9 +100,11 @@ const htmlBgi = fs.readFileSync(path.join(__dirname, '..', 'bgi.html'), 'utf8');
 assert.ok(htmlBgi.includes('./js/confinados-hedge.js?v=20260803-1'));
 assert.ok(htmlBgi.includes('POS=ConfinadosHedge.deduplicarPosicoes(pos.data)'));
 assert.ok(htmlBgi.includes('ConfinadosHedge.resumirCobertura(POS,nec)'));
-assert.ok(htmlBgi.includes('ConfinadosHedge.reconciliarExposicao(exposicaoBase,POS)'));
+assert.ok(htmlBgi.includes('ConfinadosHedge.reconciliarExposicao(expoConfinamento,POS)'));
 assert.ok(htmlBgi.includes('ConfinadosHedge.calcularResultadoAberto(p,ultimas[p.contrato]?.preco)'));
-assert.ok(htmlBgi.includes("startsWith('BB-')"));
+assert.ok(htmlBgi.includes("const ehLoteBoiBalanca = codigo => /^BB(?:-|\\d)/i.test"));
+assert.ok(htmlBgi.includes("filter(e=>!ehLoteBoiBalanca(e.codigo))"));
+assert.ok(htmlBgi.includes("filter(o=>!ehLoteBoiBalanca(o.codigo))"));
 assert.ok(!htmlBgi.includes('const ab=expo.data.reduce'));
 assert.ok(!htmlBgi.includes('POS=pos.data'));
 
