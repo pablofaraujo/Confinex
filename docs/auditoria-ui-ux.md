@@ -3,6 +3,19 @@
 **Data:** 12/07/2026 · **Escopo:** index, confinex (bundle), bb, bgi, painel, ops, central
 **Objetivo:** base para a diretriz "um único sistema CFAgro" — sem redesign, com evolução incremental.
 
+## Situação consolidada em 03/08/2026
+
+O inventário automático encontra 20 arquivos HTML: 18 páginas ativas e os
+redirecionamentos legados `central.html` e `painel.html`. Todas as páginas
+ativas possuem acesso no menu compartilhado; não há página funcional solta ou
+oculta. **BGI** e **Portfolio B3** são produtos distintos: o primeiro permanece
+no Confinex e o segundo abre o app CFAgro externo na mesma janela.
+
+Esse resultado agora é um contrato permanente da auditoria. Um novo HTML ativo
+sem item de menu reprova `tools/test_ecossistema.py`; redirecionamentos antigos
+precisam continuar classificados explicitamente. Assim, uma tela não pode voltar
+a ser publicada sem que o ecossistema saiba como acessá-la.
+
 ---
 
 ## 1. Sumário executivo

@@ -10,6 +10,10 @@ assert.ok(html.includes('dados/painel-boi-gordo.json'));
 assert.ok(html.includes('cache: \'no-store\''));
 assert.ok(!html.includes('id="atualizarPainel"'), 'painel ainda repete a ação global Atualizar');
 assert.ok(html.includes('atualizador.atualizar();'), 'painel deixou de atualizar automaticamente ao abrir');
+assert.ok(html.includes('aplicar: renderizarPainel'), 'arquivo atualizado não redesenha o painel completo');
+for (const alvo of ['cards', 'tbodyBGI', 'manchetes', 'contexto', 'chartBGI']) {
+  assert.ok(html.includes(`getElementById('${alvo}')`), `renderização atualizada não cobre ${alvo}`);
+}
 const contexto = { Promise, Date, Number, globalThis: {} };
 vm.runInNewContext(fonte, contexto);
 const api = contexto.globalThis.PainelBoiGordo;
@@ -33,5 +37,5 @@ Promise.all([atualizador.atualizar(), atualizador.atualizar()]).then(resultados 
   assert.strictEqual(chamadas, 1, 'atualizações concorrentes não foram consolidadas');
   assert.strictEqual(aplicacoes, 1);
   assert.strictEqual(resultados[0].fonte, 'remota');
-  console.log('Painel Boi Gordo: 9 verificações aprovadas.');
+  console.log('Painel Boi Gordo: 15 verificações aprovadas.');
 }).catch(error => { console.error(error); process.exitCode = 1; });

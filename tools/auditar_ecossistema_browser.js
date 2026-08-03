@@ -1304,6 +1304,72 @@ async function auditarEventos(browser, viewport, resultados) {
   }
 }
 
+async function auditarAtualizacaoPainelBoiGordo(browser, viewport, resultados) {
+  const context = await browser.newContext({
+    viewport: { width: viewport.largura, height: viewport.altura },
+  });
+  const page = await context.newPage();
+  const erros = [];
+  page.on('pageerror', erro => erros.push(erro.message));
+  page.on('console', mensagem => {
+    if (mensagem.type() === 'error') erros.push(mensagem.text());
+  });
+  await page.route('**/dados/painel-boi-gordo.json*', rota => rota.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      atualizadoEm: '03/08/2026 07:00',
+      fonte: 'Fonte simulada da auditoria',
+      indicadores: [{ label: 'Indicador atualizado', valor: 'R$ 399,90/@', delta: 'teste controlado', dir: 'up' }],
+      curvaBGI: [{ venc: 'BGIX26', mes: 'nov/26', valor: 399.9, agio: null }],
+      manchetes: [],
+      contexto: ['Contexto atualizado sem cache.'],
+    }),
+  }));
+  try {
+    await page.goto(new URL('painel-boi-gordo.html', baseUrl).href, {
+      waitUntil: 'load',
+      timeout: 30000,
+    });
+    await page.waitForFunction(
+      () => document.getElementById('cards')?.textContent.includes('Indicador atualizado'),
+      null,
+      { timeout: 10000 },
+    );
+    const estado = await page.evaluate(() => ({
+      data: document.getElementById('ts')?.textContent,
+      fonte: document.getElementById('estadoAtualizacao')?.textContent,
+      cards: document.getElementById('cards')?.textContent,
+      curva: document.getElementById('tbodyBGI')?.textContent,
+      contexto: document.getElementById('contexto')?.textContent,
+    }));
+    const atualizado = estado.data === '03/08/2026 07:00' &&
+      estado.fonte.includes('Fonte simulada da auditoria') &&
+      estado.cards.includes('R$ 399,90/@') &&
+      estado.curva.includes('BGIX26') &&
+      estado.contexto.includes('Contexto atualizado sem cache.');
+    resultados.push(item(
+      `browser:${viewport.nome}:painel-boi-gordo:atualizacao-completa`,
+      'Atualização completa do Painel Boi Gordo',
+      `arquivo novo em ${viewport.nome}`,
+      'cartões, curva, contexto, fonte e horário refletem o arquivo sem cache',
+      atualizado && erros.length === 0,
+      `data=${estado.data} cartões=${estado.cards.includes('R$ 399,90/@')} curva=${estado.curva.includes('BGIX26')} contexto=${estado.contexto.includes('Contexto atualizado sem cache.')} erros=${erros.length}`,
+    ));
+  } catch (erro) {
+    resultados.push(item(
+      `browser:${viewport.nome}:painel-boi-gordo:atualizacao-completa`,
+      'Atualização completa do Painel Boi Gordo',
+      `arquivo novo em ${viewport.nome}`,
+      'o cenário automatizado termina',
+      false,
+      erro.stack || erro.message,
+    ));
+  } finally {
+    await context.close();
+  }
+}
+
 (async () => {
   const browser = await chromium.launch({
     headless: true,
@@ -1330,6 +1396,7 @@ async function auditarEventos(browser, viewport, resultados) {
         await auditarFinanceiro(browser, viewport, resultados);
         await auditarPendencias(browser, viewport, resultados);
         await auditarEventos(browser, viewport, resultados);
+        await auditarAtualizacaoPainelBoiGordo(browser, viewport, resultados);
       }
     }
   } finally {

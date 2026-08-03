@@ -322,6 +322,39 @@ def auditar_estatico(
             )
         )
 
+    destinos_menu = {
+        destino_local(item.href, root)[0].resolve()
+        for item in menu
+        if not eh_url_externa(item.href)
+    }
+    for pagina in paginas:
+        redirect = redirect_da_pagina(pagina)
+        if redirect:
+            saida.append(
+                resultado(
+                    f"rota:{pagina.name}:legada",
+                    "Redirecionamentos antigos são classificados",
+                    f"inventariar {pagina.name}",
+                    "a página é identificada como redirecionamento legado",
+                    True,
+                    f"redireciona para {redirect}",
+                )
+            )
+            continue
+        exposta = pagina.name == "index.html" or pagina.resolve() in destinos_menu
+        saida.append(
+            resultado(
+                f"rota:{pagina.name}:menu",
+                "Toda página ativa possui acesso conhecido",
+                f"inventariar {pagina.name}",
+                "a página inicializa o sistema ou aparece no menu compartilhado",
+                exposta,
+                "rota inicial" if pagina.name == "index.html" else
+                "presente no menu" if exposta else
+                "página ativa sem acesso no menu",
+            )
+        )
+
     inventario = {
         "paginas": [
             {

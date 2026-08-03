@@ -12,7 +12,7 @@ Atualizado em 2026-07-23.
 - **painel.html** — Painel Vivo: KPIs, exposição BGI, posições B3 (hedge × especulação), estoque, pendências, acertos, fluxo de caixa com Chart.js.
 - **ops.html** — Ops: heartbeats (`ecossistema_status`, vivo se ≤10 min), inventário (`ecossistema_inventario`), "Ponte VPS" — fila `vps_briefings` (status pendente/em_andamento/concluido) consumida por um Claude Code rodando na VPS via cron (~5–10 min).
 - **central.html** — versão legada da Central (3 cards). Ficou para trás no commit `fc9b66c`.
-- **painel-boi-gordo.html** — Painel Boi Gordo: KPIs de mercado (arroba CEPEA/B3, bezerro, relação de troca, exportação), curva futura BGI com gráfico Chart.js, manchetes e contexto. Sem Supabase/login — dados vêm de um bloco JSON estático (`#painel-data`) embutido no HTML. Integrado ao DS/shell nesta sessão; antes vivia como artifact solto do Cowork.
+- **painel-boi-gordo.html** — Painel Boi Gordo: KPIs de mercado (arroba CEPEA/B3, bezerro, relação de troca, exportação), curva futura BGI com gráfico Chart.js, manchetes e contexto. Sem Supabase/login. Um bloco JSON embutido mantém o último fallback; a abertura busca `dados/painel-boi-gordo.json` sem cache e redesenha todos os quadros, não apenas o horário.
 - **financeiro.html** — visão autenticada e somente leitura de `fluxo_caixa`, `emprestimos`, `promissorias` e `transacoes_banco`. Separa previsto/realizado e a pagar/receber, calcula saldos parciais, reúne vencimentos, dívidas e renegociações já representáveis nas fontes e deriva lembretes para 30 dias. Não executa pagamentos, baixas, renegociações nem conciliação.
 - **pendencias.html** — agregador autenticado e somente leitura de itens abertos em `operation_drafts`, `pending_actions` e `pendencias_documentos`; encaminha correções para Revisões.
 - **eventos.html** — histórico autenticado e somente leitura de `eventos`, com filtros e projeção humana que omite JSON e identificadores técnicos.
@@ -160,4 +160,4 @@ endpoint `DailyFluctuationHistory` responde com erro transitório.
 8. Deploy publica tudo, inclusive `promissoria-skill.zip`.
 9. Sem lint ou package.json; a bateria Python/Node cobre o fluxo crítico e
    roda pelo GitHub Actions, mas ainda não há análise estática geral dos apps.
-10. `painel-boi-gordo.html` foi movido para o repo, mas a tarefa agendada `atualiza-painel-boi-gordo` (Cowork, seg-sex 6h32) ainda atualiza um artifact Cowork separado — o arquivo do repo não recebe as atualizações diárias até a automação ser redirecionada para editar este arquivo (e alguém commitar/push, já que a pasta do Drive não tem `.git`/push).
+10. `.github/workflows/atualizar-painel-boi-gordo.yml` já roda em dias úteis e publica `dados/painel-boi-gordo.json`, mas a variável `PAINEL_BOI_GORDO_SOURCE_URL` ainda precisa apontar para uma fonte JSON confiável. Sem ela, a agenda registra aviso e preserva o último dado válido, sem apresentar cotação antiga como nova.

@@ -61,6 +61,34 @@ class AuditoriaEcossistemaTests(unittest.TestCase):
         self.assertEqual("falhou", por_id["inventario:menu"].status)
         self.assertEqual([], inventario["paginas"])
 
+    def test_pagina_ativa_fora_do_menu_reprova_inventario(self):
+        root = self.preparar(
+            {
+                "index.html": "<main></main>",
+                "financeiro.html": "<main></main>",
+                "pagina-solta.html": "<main></main>",
+            }
+        )
+        resultados, _ = auditar_estatico(root)
+        por_id = {item.id: item for item in resultados}
+        self.assertEqual("aprovado", por_id["rota:index.html:menu"].status)
+        self.assertEqual("aprovado", por_id["rota:financeiro.html:menu"].status)
+        self.assertEqual("falhou", por_id["rota:pagina-solta.html:menu"].status)
+        self.assertIn("sem acesso no menu", por_id["rota:pagina-solta.html:menu"].evidencia)
+
+    def test_redirect_legado_nao_e_tratado_como_pagina_solta(self):
+        root = self.preparar(
+            {
+                "index.html": "<main></main>",
+                "financeiro.html": "<main></main>",
+                "central.html": "<script>location.replace('./')</script>",
+            }
+        )
+        resultados, _ = auditar_estatico(root)
+        por_id = {item.id: item for item in resultados}
+        self.assertEqual("aprovado", por_id["rota:central.html:legada"].status)
+        self.assertNotIn("rota:central.html:menu", por_id)
+
     def test_falha_do_modo_descoberta_distingue_ausente_e_inesperada(self):
         root = self.preparar({"index.html": "<main></main>"})
         resultados, _ = auditar_estatico(root)
