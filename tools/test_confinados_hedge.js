@@ -1,6 +1,7 @@
 const assert = require('assert');
 const {
   calcularResultadoAberto,
+  calcularResultadoRealizado,
   deduplicarPosicoes,
   extrairRateios,
   reconciliarExposicao,
@@ -96,16 +97,29 @@ const resultadoAtual = [
 assert.ok(Math.abs(resultadoAtual - 33905.85) < 1e-9);
 assert.strictEqual(Math.round(resultadoAtual), 33906);
 
+const resultadoRealizado = calcularResultadoRealizado([
+  { ...base, status: 'encerrada', resultado_realizado: 57420, termo: null },
+  { ...base, status: 'encerrada', resultado_realizado: 57420, termo: 'bgp:encerrada' },
+  { ...base, contrato: 'BGIV26', status: 'fechada', resultado_realizado: 20708, termo: 'bgp:fechada' },
+  { ...base, contrato: 'BGIU26', direcao: 'comprado', status: 'encerrada', resultado_realizado: -34980, termo: 'bgp:perda' },
+  { ...base, contrato: 'BGIX26', status: 'aberta', resultado_realizado: 999999, termo: 'bgp:aberta' },
+]);
+assert.strictEqual(resultadoRealizado, 43148);
+
 const htmlBgi = fs.readFileSync(path.join(__dirname, '..', 'bgi.html'), 'utf8');
 assert.ok(htmlBgi.includes('./js/confinados-hedge.js?v=20260803-1'));
 assert.ok(htmlBgi.includes('POS=ConfinadosHedge.deduplicarPosicoes(pos.data)'));
 assert.ok(htmlBgi.includes('ConfinadosHedge.resumirCobertura(POS,nec)'));
 assert.ok(htmlBgi.includes('ConfinadosHedge.reconciliarExposicao(expoConfinamento,POS)'));
 assert.ok(htmlBgi.includes('ConfinadosHedge.calcularResultadoAberto(p,ultimas[p.contrato]?.preco)'));
+assert.ok(htmlBgi.includes('ConfinadosHedge.calcularResultadoRealizado(POS)'));
+assert.ok(htmlBgi.includes("['Contratos necessários',fmtN(nec)+' cts'],['Cobertura cts bolsa'"));
+assert.ok(htmlBgi.indexOf('Resultado líquido em aberto') < htmlBgi.indexOf('Resultado realizado'));
+assert.ok(!htmlBgi.includes("['Realizado creditado',fmtR$(cred)]"));
 assert.ok(htmlBgi.includes("const ehLoteBoiBalanca = codigo => /^BB(?:-|\\d)/i.test"));
 assert.ok(htmlBgi.includes("filter(e=>!ehLoteBoiBalanca(e.codigo))"));
 assert.ok(htmlBgi.includes("filter(o=>!ehLoteBoiBalanca(o.codigo))"));
 assert.ok(!htmlBgi.includes('const ab=expo.data.reduce'));
 assert.ok(!htmlBgi.includes('POS=pos.data'));
 
-console.log('Confinados hedge e cabeçalho BGI: 30 verificações aprovadas.');
+console.log('Confinados hedge e cabeçalho BGI: 35 verificações aprovadas.');

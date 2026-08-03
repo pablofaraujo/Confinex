@@ -106,11 +106,11 @@ const nec=exposicaoAtual.reduce((a,e)=>a+Number(e.cts_necessarios||0),0);
 const resumoCobertura=ConfinadosHedge.resumirCobertura(POS,nec);
 const ab=resumoCobertura.coberturaLiquida;
 const desc=resumoCobertura.descobertos;
-const cred=exposicaoAtual.reduce((a,e)=>a+Number(e.hedge_realizado_creditado||0),0);
+const realizado=ConfinadosHedge.calcularResultadoRealizado(POS);
 document.getElementById('kpis').innerHTML=[
-['Contratos necessários',fmtN(nec)+' cts'],['Cobertura líquida aberta',fmtN(ab)+' cts'],
+['Contratos necessários',fmtN(nec)+' cts'],['Cobertura cts bolsa',fmtN(ab)+' cts'],
 ['Contratos descobertos',`<span class="${desc>0.5?'neg':'pos'}">${fmtN(desc)} cts</span>`],
-['Arrobas descobertas',fmtN(desc*330,0)+' @'],['Realizado creditado',fmtR$(cred)]
+['Arrobas descobertas',fmtN(desc*330,0)+' @']
 ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div></div>`).join('');
 
 // Exposição
@@ -139,7 +139,10 @@ const resultado=p.status==='aberta'?parcial:p.resultado_realizado;
 const acoes=`<button class="btn mini" onclick="editar('${p.id}')">Editar</button> `+(p.status==='aberta'?`<button class="btn mini warn" onclick="encerrar('${p.id}')">Encerrar</button> <button class="btn mini sec" onclick="encerrarParcial('${p.id}')">Encerrar parcial</button> <button class="btn mini sec" onclick="rolar('${p.id}')">Rolar</button>`:'');
 return `<tr><td><b>${p.contrato}</b></td><td>${p.direcao}</td><td class="num">${fmtN(p.contratos_qtd)}</td><td class="num">${fmtN(p.preco_entrada)}</td><td class="num">${atual!=null?fmtN(atual):'—'}</td><td class="num">${p.preco_saida?fmtN(p.preco_saida):'—'}</td><td class="num ${cls(resultado)}">${resultado!=null?fmtR$(resultado):(p.status==='aberta'?'Sem cotação':'—')}</td><td>${lotes}</td><td>${st}</td><td>${acoes}</td></tr>`}).join('');
 
-document.getElementById('kpis').insertAdjacentHTML('beforeend',`<div class="kpi"><div class="l">Resultado líquido em aberto</div><div class="v ${cls(resultadoAberto)}">${posicoesCotadas?fmtR$(resultadoAberto):'Sem cotação'}</div></div>`);
+document.getElementById('kpis').insertAdjacentHTML('beforeend',
+  `<div class="kpi"><div class="l">Resultado líquido em aberto</div><div class="v ${cls(resultadoAberto)}">${posicoesCotadas?fmtR$(resultadoAberto):'Sem cotação'}</div></div>`+
+  `<div class="kpi"><div class="l">Resultado realizado</div><div class="v ${cls(realizado)}">${fmtR$(realizado)}</div></div>`
+);
 
 // Cotações + basis
 const fisica=ultimas['FISICO'];
