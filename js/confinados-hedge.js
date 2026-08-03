@@ -130,6 +130,12 @@
     };
   }
 
+  function calcularResultadoRealizado(posicoes) {
+    return deduplicarPosicoes(posicoes)
+      .filter((item) => ['encerrada', 'fechada', 'rolada'].includes(String(item.status || '').toLowerCase()))
+      .reduce((total, item) => total + numero(item.resultado_realizado), 0);
+  }
+
   function reconciliarExposicao(exposicao, posicoes) {
     const abertosPorLote = contratosAbertosPorLote(posicoes);
     return (Array.isArray(exposicao) ? exposicao : []).map((item) => {
@@ -147,6 +153,7 @@
     codigoLote,
     contratosAbertosPorLote,
     calcularResultadoAberto,
+    calcularResultadoRealizado,
     deduplicarPosicoes,
     extrairRateios,
     reconciliarExposicao,
