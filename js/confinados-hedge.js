@@ -132,7 +132,10 @@
 
   function calcularResultadoRealizado(posicoes) {
     return deduplicarPosicoes(posicoes)
-      .filter((item) => ['encerrada', 'fechada', 'rolada'].includes(String(item.status || '').toLowerCase()))
+      .filter((item) => (
+        String(item.termo || '').startsWith('bgp:')
+        && ['encerrada', 'fechada', 'rolada'].includes(String(item.status || '').toLowerCase())
+      ))
       .reduce((total, item) => total + numero(item.resultado_realizado), 0);
   }
 
