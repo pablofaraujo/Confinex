@@ -4,7 +4,7 @@ const html = await readFile(new URL('../confinex.html', import.meta.url), 'utf8'
 const fonte = await readFile(new URL('../confinex-app.latest.js', import.meta.url), 'utf8');
 assert.match(html, /confinex-supabase-ponte-inline\.js\?v=/);
 assert.match(html, /confinex-app\.mobile\.js\?v=/);
-assert.match(html, /__CONFINEX_BUILD = "20260803-sheets-1"/);
+assert.match(html, /__CONFINEX_BUILD = "20260803-bgi-2"/);
 assert.match(html, /__CONFINEX_CARREGAR_APP/);
 assert.match(html, /recarga=/);
 assert.doesNotMatch(html, /<script defer src="\.\/confinex-app\.mobile\.js/);

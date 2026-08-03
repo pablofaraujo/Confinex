@@ -1,12 +1,21 @@
 import assert from "node:assert/strict";
 import {
   atualizarContratoBgiPorPrazo,
+  contratoB3PorData,
   cotacaoBgiValida,
   criarCotacaoBgiManual,
   mesclarCotacoesBgiAutomaticas,
 } from "../js/confinex-bgi.mjs";
 
 const agora = "2026-07-26T12:00:00.000Z";
+
+assert.equal(contratoB3PorData("2026-09-30"), "BGIU26");
+assert.equal(contratoB3PorData("2026-10-01"), "BGIV26", "V identifica outubro");
+assert.equal(contratoB3PorData("2026-10-31"), "BGIV26");
+assert.equal(contratoB3PorData("2026-11-01"), "BGIX26", "X identifica novembro");
+assert.equal(contratoB3PorData("2026-11-30"), "BGIX26");
+assert.equal(contratoB3PorData("2026-12-01"), "BGIZ26");
+assert.equal(contratoB3PorData(""), "");
 
 assert.equal(cotacaoBgiValida({ preco: "350" }), true);
 assert.equal(cotacaoBgiValida({ preco: "" }), false);
@@ -75,4 +84,4 @@ const edicaoManual = atualizarContratoBgiPorPrazo({
 assert.equal(edicaoManual.contratoB3, "BGIV26");
 assert.equal(edicaoManual.precoBolsa, "321");
 
-console.log("Mercado BGI: 19 verificações aprovadas.");
+console.log("Mercado BGI: 26 verificações aprovadas.");

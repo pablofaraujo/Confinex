@@ -1,3 +1,12 @@
+const CODIGOS_MESES_BGI = ["F", "G", "H", "J", "K", "M", "N", "Q", "U", "V", "X", "Z"];
+
+export function contratoB3PorData(dataISO) {
+  if (!dataISO) return "";
+  const data = new Date(`${dataISO}T12:00:00`);
+  if (Number.isNaN(data.getTime())) return "";
+  return `BGI${CODIGOS_MESES_BGI[data.getMonth()]}${String(data.getFullYear()).slice(-2)}`;
+}
+
 export function cotacaoBgiValida(registro) {
   const preco = Number.parseFloat(registro?.preco);
   return Number.isFinite(preco) && preco > 0;

@@ -12,6 +12,7 @@ import {
 import { compararRevendaComConfinamento } from "./js/confinex-revenda-equivalente.mjs";
 import {
   atualizarContratoBgiPorPrazo,
+  contratoB3PorData,
   cotacaoBgiValida,
   criarCotacaoBgiManual,
   mesclarCotacoesBgiAutomaticas
@@ -281,14 +282,6 @@ function compararContratosB3(a, b) {
   const ordemA = parseInt(contratoA[2], 10) * 12 + B3_MONTH_CODES.indexOf(contratoA[1]);
   const ordemB = parseInt(contratoB[2], 10) * 12 + B3_MONTH_CODES.indexOf(contratoB[1]);
   return ordemA - ordemB;
-}
-function contratoB3PorData(dataISO) {
-  if (!dataISO) return "";
-  const data = new Date(`${dataISO}T12:00:00`);
-  if (Number.isNaN(data.getTime())) return "";
-  const mes = data.getMonth();
-  const ano = data.getFullYear();
-  return `BGI${B3_MONTH_CODES[mes]}${String(ano).slice(-2)}`;
 }
 function mesSaidaLabel(dataISO) {
   if (!dataISO) return "\u2014";
