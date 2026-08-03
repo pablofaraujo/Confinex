@@ -6,6 +6,8 @@ MISSAO-VPS-pesagem-caderno.md
 .DS_Store
 **/.DS_Store
 node_modules/
+__pycache__/
+*.py[cod]
 artifacts/
 playwright-report/
 test-results/
