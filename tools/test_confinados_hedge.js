@@ -107,7 +107,7 @@ const resultadoRealizado = calcularResultadoRealizado([
 assert.strictEqual(resultadoRealizado, 43148);
 
 const htmlBgi = fs.readFileSync(path.join(__dirname, '..', 'bgi.html'), 'utf8');
-assert.ok(htmlBgi.includes('./js/confinados-hedge.js?v=20260803-1'));
+assert.ok(htmlBgi.includes('./js/confinados-hedge.js?v=20260803-2'));
 assert.ok(htmlBgi.includes('POS=ConfinadosHedge.deduplicarPosicoes(pos.data)'));
 assert.ok(htmlBgi.includes('ConfinadosHedge.resumirCobertura(POS,nec)'));
 assert.ok(htmlBgi.includes('ConfinadosHedge.reconciliarExposicao(expoConfinamento,POS)'));
