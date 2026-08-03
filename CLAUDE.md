@@ -34,7 +34,7 @@ Leia conforme a tarefa:
 | `fazenda-ametista.html` | Fazenda Ametista — ledger de entrada/saída de cabeças do rebanho próprio (gado que ainda não foi pra cocho/confinamento nem pra parceria). KPI de estoque atual = soma de entradas − saídas. Tabela `fazenda_ametista`. Existia só como arquivo solto no Drive desde 12/07/2026 (nunca commitado, tabela nunca criada) até ser trazido ao repo em 18/07/2026 — histórico retroativo de movimentação ainda não foi lançado |
 | `confinamento.html` | Confinamento — visão operacional ao vivo por confinamento/parceiro: lotes, currais, entradas (GTA/NF/peso/perda de transporte), custos, acompanhamento por lote e fechamentos previsto×realizado. O acompanhamento é somente leitura e consolida as fontes atuais; o contrato puro fica em `js/confinex-acompanhamento.mjs` |
 | `bb.html` | Boi Balança — giro rápido balança→gancho |
-| `bgi.html` | BGI — posições de hedge B3 (módulo principal; o portfolio externo `boi-gordo-portfolio` virou link secundário na topbar) |
+| `bgi.html` | BGI — exposição e gestão operacional de hedge por lote. O item separado **Portfolio B3** abre o app de portfólio na mesma janela; não há botão duplicado dentro do BGI. |
 | `ocr-pesagem.html` | OCR Pesagem — leitura de tickets de balança (tema escuro próprio, ainda fora do DS) |
 | `painel-boi-gordo.html` | Painel Boi Gordo — arroba CEPEA/B3, bezerro, relação de troca, curva futura BGI, manchetes e contexto de mercado (dados estáticos no DS, sem Supabase; atualizados por automação — ver Armadilhas) |
 | `financeiro.html` | Financeiro — consulta somente leitura de fluxo previsto/realizado, contas a pagar/receber, dívidas, promissórias, vencimentos, saldos parciais, renegociações e transações bancárias; não quita, concilia nem cria registros |

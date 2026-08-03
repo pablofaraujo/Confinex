@@ -20,9 +20,9 @@ var NAV = [
   { href:'./confinex.html', rotulo:'Confinex',     icone:'calculator' },
   { href:'./confinamento.html', rotulo:'Confinamento', icone:'curral' },
   { href:'./fazenda-ametista.html', rotulo:'Fazenda Ametista', icone:'porteira' },
-  // O portfólio B3 usa a tela BGI local para preservar o shell e a navegação
-  // do Confinex; links externos continuam explicitamente marcados como ext.
-  { href:'bgi.html?visao=portfolio', rotulo:'Portfolio B3', icone:'briefcase' },
+  // O portfólio é um app CFAgro separado, mas navega na mesma janela. Somente
+  // ferramentas de terceiros usam ext:true e abrem outra aba.
+  { href:'https://pablofaraujo.github.io/boi-gordo-portfolio/', rotulo:'Portfolio B3', icone:'briefcase' },
   { href:'./bgi.html',      rotulo:'BGI',           icone:'chart' },
   { href:'./bb.html',       rotulo:'Boi Balança',   icone:'scale' },
   { href:'./abate.html',    rotulo:'Abate',         icone:'scan' },
@@ -65,8 +65,8 @@ function montar(){
   // nesse caso nenhum link "interno" bate por nome de arquivo, e o próprio
   // item externo correspondente fica marcado como atual
   var onPortfolio = /\/boi-gordo-portfolio\//.test(location.pathname);
-  var visaoPortfolio = new URLSearchParams(location.search).get('visao') === 'portfolio';
   var aqui = onPortfolio ? '' : (location.pathname.split('/').pop() || 'index.html');
+  var ehVisaoGeral = !onPortfolio && aqui === 'index.html';
 
   var aside = document.createElement('aside');
   aside.className = 'shell-side';
@@ -77,8 +77,8 @@ function montar(){
       var full = resolveHref(n.href);
       var arquivo = full.split('#')[0].split('/').pop() || 'index.html';
       var portfolio = n.rotulo === 'Portfolio B3';
-      var ativa = onPortfolio || visaoPortfolio
-        ? (portfolio === (onPortfolio || visaoPortfolio) ? ' ativa' : '')
+      var ativa = onPortfolio
+        ? (portfolio ? ' ativa' : '')
         : (!portfolio && !n.ext && n.href.indexOf('#')<0 && arquivo===aqui ? ' ativa' : '');
       var alvo = n.ext ? ' target="_blank" rel="noopener"' : '';
       var ext = n.ext ? '<span class="ext">↗</span>' : '';
@@ -90,10 +90,10 @@ function montar(){
   topo.innerHTML =
     '<a class="shell-brand" href="'+BASE+'"><img src="'+BASE+'confinex-logo.jpg" alt="Logo Confinex"><span>CONFINEX</span></a>'+
     '<div class="shell-context">Ecossistema pecuário CFAgro</div>'+
-    '<div class="shell-actions" aria-label="Ações da sessão">'+
+    (ehVisaoGeral ? '<div class="shell-actions" aria-label="Ações da sessão">'+
       '<button type="button" class="shell-action" data-shell-atualizar hidden>Atualizar</button>'+
       '<button type="button" class="shell-action" data-shell-sair hidden>Sair</button>'+
-    '</div>';
+    '</div>' : '');
 
   document.body.prepend(topo, aside);
   document.body.appendChild(main);
@@ -101,6 +101,7 @@ function montar(){
 
   var atualizar = topo.querySelector('[data-shell-atualizar]');
   var sair = topo.querySelector('[data-shell-sair]');
+  if(!atualizar || !sair) return;
   atualizar.addEventListener('click', function(){
     if(typeof window.carregar === 'function') window.carregar();
     else location.reload();

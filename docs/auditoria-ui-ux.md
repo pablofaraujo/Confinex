@@ -107,7 +107,7 @@ Decisões embutidas:
 
 - **index.html deixa de ser menu de cards e vira a Home/dashboard** — absorve os KPIs e tabelas do painel.html (posição financeira, B3, exposição, estoque, eventos, pendências, caixa, alertas). painel.html passa a redirecionar para a home.
 - **central.html aposentada**: vira redirect para `./`. Corrigir o link do bgi.html imediatamente (custo zero).
-- **BGI**: hoje há dois BGIs (bgi.html no repo + boi-gordo-portfolio externo). Decidir: trazer o portfolio para dentro do repo/DS, ou consolidar tudo no bgi.html. Enquanto isso, a sidebar aponta para o interno e o externo vira link "abrir portfolio ↗".
+- **BGI e Portfolio B3 (decisão concluída):** `bgi.html` permanece como gestão operacional de hedge por lote; o Portfolio B3 permanece como app CFAgro separado. Os dois têm itens próprios no menu, navegam na mesma janela e não se repetem dentro das páginas.
 - **Login único**: o guard do cfagro-core.js mostra uma única tela de login padronizada em qualquer página protegida; sessão já é compartilhada hoje.
 
 ## 8. Plano de migração (sem quebrar nada)

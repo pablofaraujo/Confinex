@@ -13,6 +13,10 @@
 | `js/cfagro-core.js` | Client Supabase único, formatadores (`fmtR$`, `fmtN`, `fmtD`…) e auth compartilhado (`CFAgro.authInit`). |
 | `js/cfagro-shell.js` | Sidebar fixa de navegação (mesma em todos os módulos). Carregar com `defer`; o manifest de navegação vive dentro dele. |
 
+As ações de sessão **Atualizar** e **Sair** aparecem somente na Visão Geral. Os
+módulos não repetem esses controles. O Portfolio B3 é um app CFAgro separado,
+mas navega na mesma janela e mantém seu item ativo no shell.
+
 ## Como montar uma página
 
 ```html
