@@ -53,7 +53,7 @@ async function carregar(){
   }
   itens = CFAgroGestao.eventosLegiveis(resposta.data).sort(function(a,b){ return String(b.data || '').localeCompare(String(a.data || '')); });
   montarFiltros(); render();
-  el('subtitle').textContent = 'Atualizado '+CFAgro.fmtDT(new Date().toISOString())+' · '+itens.length+' eventos';
+  el('subtitle').textContent = 'Histórico das decisões e operações';
 }
 
 el('filtroSituacao').addEventListener('change', render);

@@ -12,7 +12,7 @@ const inlineScripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script
   .map(match => match[1].trim())
   .filter(Boolean);
 assert.equal(inlineScripts.length, 0, 'revisoes.html nao deve manter script inline');
-assert.match(html, /<script src="\.\/revisoes\.js\?v=20260723-1"><\/script>/);
+assert.match(html, /<script src="\.\/revisoes\.js\?v=20260803-1"><\/script>/);
 
 const context = {
   CFAgro: {authInit() {}},

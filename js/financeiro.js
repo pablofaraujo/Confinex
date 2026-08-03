@@ -144,7 +144,7 @@ async function carregar(){
   }
   renderTudo();
   if(!falhasPrincipais.length){
-    el('subtitle').textContent = 'Atualizado '+CFAgro.fmtDT(new Date().toISOString())+' · consulta somente leitura';
+    el('subtitle').textContent = 'Fluxo, compromissos e movimentações financeiras';
   }
 }
 

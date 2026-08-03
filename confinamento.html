@@ -16,7 +16,7 @@
 
 <div id="login" class="login-box card">
 <img src="./confinex-logo.jpg" alt="Logo" class="logo-img" style="width:72px;height:72px;margin-bottom:10px">
-<h1 style="margin-bottom:2px">CFAgro <span>— PABLO FERREIRA</span></h1>
+<h1 style="margin-bottom:2px">Confinamento</h1>
 <div class="hub-sub" style="margin-bottom:18px">Central de Operações</div>
 <input type="email" id="email" placeholder="seu email" autocomplete="username">
 <input type="password" id="senha" placeholder="senha" autocomplete="current-password">
@@ -29,7 +29,7 @@
 <div class="ident">
 <img src="./confinex-logo.jpg" alt="Logo" class="logo-img" style="width:48px;height:48px">
 <div>
-<h1>Confinamento <span>— CFAGRO</span></h1>
+<h1>Confinamento</h1>
 <div class="sub" id="subtitle"></div>
 </div>
 </div>
@@ -139,8 +139,7 @@ async function carregar(){
   const errs=[ops,entradas,custos,eventos,fechamentos,avaliacoes,consolidacoes,desvios].filter(r=>r.error);
   if(errs.length){ document.getElementById('subtitle').textContent='Erro: '+errs[0].error.message; return; }
 
-  document.getElementById('subtitle').textContent =
-    `Atualizado ${new Date().toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})} · ${ops.data.length} lotes de confinamento no banco`;
+  document.getElementById('subtitle').textContent = 'Acompanhamento operacional dos lotes';
 
   // ---- agrupa entradas por operação
   const entradasPorOp = {};

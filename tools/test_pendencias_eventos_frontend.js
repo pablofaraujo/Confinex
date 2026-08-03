@@ -33,8 +33,8 @@ assert.ok(!/\.(insert|update|delete|upsert|rpc)\s*\(/.test(eventosJs));
 for(const html of [pendenciasHtml,eventosHtml]){
   assert.ok(html.includes('cfagro-gestao.js?v=20260724-6'));
 }
-assert.ok(pendenciasHtml.includes('pendencias.js?v=20260724-3'));
-assert.ok(eventosHtml.includes('eventos.js?v=20260724-3'));
+assert.ok(pendenciasHtml.includes('pendencias.js?v=20260803-1'));
+assert.ok(eventosHtml.includes('eventos.js?v=20260803-1'));
 assert.ok(auditoriaBrowser.includes('linhasRestauradas === 4'));
 assert.ok(auditoriaBrowser.includes('linhasRestauradas === 3'));
 

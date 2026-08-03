@@ -19,7 +19,7 @@ td{vertical-align:top}
 
 <div id="login" class="login-box card">
   <img src="./confinex-logo.jpg" alt="Logo" style="width:72px;height:72px;border-radius:50%;object-fit:cover;margin-bottom:10px">
-  <h1 style="margin-bottom:2px">Ops <span>— ECOSSISTEMA</span></h1>
+  <h1 style="margin-bottom:2px">Agentes e operações</h1>
   <div class="sub" style="margin-bottom:18px;letter-spacing:2px;text-transform:uppercase;font-size:10px">Agentes · automações · segurança</div>
   <input type="email" id="email" placeholder="seu email" autocomplete="username">
   <input type="password" id="senha" placeholder="senha" autocomplete="current-password">
@@ -32,7 +32,7 @@ td{vertical-align:top}
     <div style="display:flex;align-items:center;gap:12px">
       <img src="./confinex-logo.jpg" alt="Logo" style="width:48px;height:48px;border-radius:50%;object-fit:cover">
       <div>
-        <h1>Ops <span>— ECOSSISTEMA CFAGRO</span></h1>
+        <h1>Agentes e operações</h1>
         <div class="sub" id="subtitle"></div>
       </div>
     </div>
@@ -92,7 +92,7 @@ async function carregar(){
   ]);
   const errs=[inv,sts,ponte].filter(r=>r.error);
   if(errs.length){document.getElementById('subtitle').textContent='Erro: '+errs[0].error.message;return;}
-  document.getElementById('subtitle').textContent=`Atualizado ${fmtDT(new Date().toISOString())} · ${inv.data.length} itens no inventário`;
+  document.getElementById('subtitle').textContent='Agentes, automações e segurança';
 
   // KPIs
   const orfaos=inv.data.filter(i=>i.status==='orfao');

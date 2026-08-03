@@ -53,7 +53,7 @@ async function carregar(){
   if(falhas.length === respostas.length){
     el('subtitle').textContent = CFAgroGestao.erroLegivel(falhas[0].error);
   }else{
-    el('subtitle').textContent = 'Atualizado '+CFAgro.fmtDT(new Date().toISOString())+' · '+itens.length+' itens';
+    el('subtitle').textContent = 'Itens que exigem conferência ou próxima ação';
     if(falhas.length){
       el('erroFontes').textContent = falhas.length+' fonte(s) não puderam ser carregadas. Os demais itens continuam disponíveis.';
     }

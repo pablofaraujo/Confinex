@@ -2435,41 +2435,14 @@ function Confinex() {
   useEffect(() => {
     storeSheetsBackendUrl(backendUrl);
   }, [backendUrl]);
-  // ==================== PATCH Fase 0 (R1/R4): carregar ANTES de salvar ====================
-  // cloudReadyRef: auto-save fica bloqueado até o estado da nuvem ser carregado
-  // (ou o usuário decidir explicitamente sobrescrever). Mata o bug de abrir o app
-  // num navegador novo e apagar Bases/Historico na nuvem 1,2s depois.
+  // A cópia online só é ativada por ação explícita do usuário. Abrir o Confinex
+  // não consulta nem grava o Apps Script legado em segundo plano. Depois de
+  // Carregar cópia ou Salvar cópia, cloudReadyRef libera a sincronização da
+  // sessão atual sem transformar o Sheets em fonte operacional paralela.
   const cloudReadyRef = useRef(false);
   const cloudUpdatedAtRef = useRef("");
   const skipNextAutoSaveRef = useRef(true);
-  useEffect(() => {
-    const url = backendUrl.trim();
-    if (!url) return;
-    cloudReadyRef.current = false;
-    let cancelado = false;
-    (async () => {
-      try {
-        const data = await sheetsJsonp(url, { action: "getState" });
-        if (cancelado) return;
-        cloudUpdatedAtRef.current = String(data?.updated_at || "");
-        const temNuvem = data?.state && (data.state.cenarios?.length || data.state.confinamentos?.length || data.state.historico?.length);
-        const temLocal = cenarios.length > 1 || confinamentos.length || historico.length || (lote.origemNome || "");
-        if (temNuvem && !temLocal) {
-          skipNextAutoSaveRef.current = true;
-          aplicarEstadoSheets(data);
-          setStatusSheets("Cópia online carregada.");
-        } else if (temNuvem && temLocal) {
-          setStatusSheets("Há mudanças neste aparelho e na cópia online. Escolha qual versão deseja manter.");
-        }
-        cloudReadyRef.current = true;
-        carregarVersoesSheets(false);
-      } catch {
-        if (!cancelado) setStatusSheets("Sem conexão com a cópia online. As mudanças continuam salvas neste aparelho.");
-      }
-    })();
-    return () => { cancelado = true; };
-  }, [backendUrl]);
-  // Auto-save: 10s de debounce (era 1,2s), só depois do load da nuvem,
+  // Auto-save: 10s de debounce, somente após uma ação manual habilitar a cópia,
   // com carimbo do estado-base para o backend detectar conflito (R4).
   useEffect(() => {
     const url = backendUrl.trim();

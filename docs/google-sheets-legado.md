@@ -14,8 +14,11 @@ compartilhado, renomeado ou alterado.
 - Código: GitHub; a pasta de código no Drive é somente um espelho antigo.
 
 Enquanto a migração não for autorizada e homologada, o Apps Script deve
-permanecer ativo. A interface continua protegendo o carregamento inicial,
-conflitos por horário, versões nomeadas e restauração local.
+permanecer ativo. Abrir o Confinex não consulta nem grava essa cópia em segundo
+plano. A conexão ocorre somente quando a pessoa escolhe **Carregar cópia**,
+**Salvar cópia** ou uma ação de versões dentro da seção recolhida **Cópia
+online e segurança**. Depois dessa escolha explícita, a sessão mantém as
+proteções de conflito por horário, versões nomeadas e restauração local.
 
 ## Gate para uma migração futura
 

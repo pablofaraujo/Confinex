@@ -16,7 +16,7 @@
 
 <div id="login" class="login-box card">
 <img src="./confinex-logo.jpg" alt="Logo" style="width:72px;height:72px;border-radius:50%;object-fit:cover;margin-bottom:10px">
-<h1 style="margin-bottom:2px">BGI <span>— PABLO FERREIRA</span></h1>
+<h1 style="margin-bottom:2px">BGI</h1>
 <div class="sub" style="margin-bottom:18px;letter-spacing:2px;text-transform:uppercase;font-size:10px">Gerenciamento de Posições</div>
 <input type="email" id="email" placeholder="seu email" autocomplete="username">
 <input type="password" id="senha" placeholder="senha" autocomplete="current-password">
@@ -29,7 +29,7 @@
 <div style="display:flex;align-items:center;gap:12px">
 <img src="./confinex-logo.jpg" style="width:44px;height:44px;border-radius:50%;object-fit:cover">
 <div>
-<h1>BGI <span>— Gerenciamento de Posições</span></h1>
+<h1>BGI</h1>
 <div class="sub" id="subtitle"></div>
 </div>
 </div>
@@ -94,7 +94,7 @@ const err=[expo,pos,cot,ops].find(r=>r.error);
 if(err){document.getElementById('subtitle').textContent='Erro: '+err.error.message;return;}
 const expoConfinamento=exposicaoDeConfinamento(expo.data);
 LOTES=ops.data.filter(o=>!String(o.codigo||'').toUpperCase().startsWith('BB-')); POS=pos.data;
-document.getElementById('subtitle').textContent=`Atualizado ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`;
+document.getElementById('subtitle').textContent='Exposição, posições e cotações de hedge';
 document.getElementById('fLote').innerHTML='<option value="">(sem alocação)</option>'+LOTES.map(l=>`<option value="${l.id}">${l.codigo}</option>`).join('');
 
 // KPIs

@@ -71,6 +71,16 @@ class ClarezaInterfaceConfinexTests(unittest.TestCase):
         ):
                 self.assertIn(f"onClick: {funcao}", self.fonte) if funcao not in ("importarJSON", "carregarVersoesSheets(true)") else self.assertIn(funcao, self.fonte)
 
+    def test_copia_online_nao_conecta_automaticamente_ao_abrir(self):
+        self.assertIn("A cópia online só é ativada por ação explícita", self.fonte)
+        inicio = self.fonte.index("const cloudReadyRef = useRef(false)")
+        fim = self.fonte.index("// Auto-save:", inicio)
+        inicializacao = self.fonte[inicio:fim]
+        self.assertNotIn("sheetsJsonp", inicializacao)
+        self.assertNotIn("getState", inicializacao)
+        self.assertIn("if (!cloudReadyRef.current) return", self.fonte)
+        self.assertIn("if (!url || !cloudReadyRef.current) return", self.fonte)
+
     def test_resumo_prioriza_rentabilidade_bruta_e_mantem_liquido_complementar(self):
         for texto in (
             'children: "Lucro l\\xEDquido"',

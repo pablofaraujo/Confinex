@@ -17,6 +17,10 @@ As ações de sessão **Atualizar** e **Sair** aparecem somente na Visão Geral.
 módulos não repetem esses controles. O Portfolio B3 é um app CFAgro separado,
 mas navega na mesma janela e mantém seu item ativo no shell.
 
+O subtítulo do módulo descreve sua finalidade; não repete horário nem quantidade
+que já aparece nos quadros. A Visão Geral pode informar a atualização do resumo,
+e telas de mercado podem informar a data da fonte quando isso muda a decisão.
+
 ## Como montar uma página
 
 ```html
