@@ -82,7 +82,8 @@
 const fmtN = (v,d=2) => CFAgro.fmtN(v,d); // BGI usa 2 casas por padrão (contratos/preços)
 
 let LOTES=[], POS=[];
-const exposicaoDeConfinamento = linhas => (linhas||[]).filter(e=>!String(e.codigo||'').toUpperCase().startsWith('BB-'));
+const ehLoteBoiBalanca = codigo => /^BB(?:-|\d)/i.test(String(codigo||'').trim());
+const exposicaoDeConfinamento = linhas => (linhas||[]).filter(e=>!ehLoteBoiBalanca(e.codigo));
 async function carregar(){
 document.getElementById('subtitle').textContent='Carregando...';
 const [expo, pos, cot, ops] = await Promise.all([
@@ -96,7 +97,7 @@ if(err){document.getElementById('subtitle').textContent='Erro: '+err.error.messa
 const expoConfinamento=exposicaoDeConfinamento(expo.data);
 POS=ConfinadosHedge.deduplicarPosicoes(pos.data);
 const exposicaoAtual=ConfinadosHedge.reconciliarExposicao(expoConfinamento,POS);
-LOTES=ops.data.filter(o=>!String(o.codigo||'').toUpperCase().startsWith('BB-'));
+LOTES=ops.data.filter(o=>!ehLoteBoiBalanca(o.codigo));
 document.getElementById('subtitle').textContent='Exposição, posições e cotações de hedge';
 document.getElementById('fLote').innerHTML='<option value="">(sem alocação)</option>'+LOTES.map(l=>`<option value="${l.id}">${l.codigo}</option>`).join('');
 
@@ -333,4 +334,3 @@ CFAgro.authInit(carregar);
 <a href="./" class="voltar-central">⌂ Central</a>
 </body>
 </html>
-
