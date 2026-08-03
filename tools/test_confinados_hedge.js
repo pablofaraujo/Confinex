@@ -102,6 +102,7 @@ const resultadoRealizado = calcularResultadoRealizado([
   { ...base, status: 'encerrada', resultado_realizado: 57420, termo: 'bgp:encerrada' },
   { ...base, contrato: 'BGIV26', status: 'fechada', resultado_realizado: 20708, termo: 'bgp:fechada' },
   { ...base, contrato: 'BGIU26', direcao: 'comprado', status: 'encerrada', resultado_realizado: -34980, termo: 'bgp:perda' },
+  { ...base, contrato: 'BGIU26', direcao: 'comprado', status: 'encerrada', resultado_realizado: -818, termo: null },
   { ...base, contrato: 'BGIX26', status: 'aberta', resultado_realizado: 999999, termo: 'bgp:aberta' },
 ]);
 assert.strictEqual(resultadoRealizado, 43148);
