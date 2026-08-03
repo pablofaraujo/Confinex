@@ -69,6 +69,67 @@
     return totais;
   }
 
+  function ehEspeculacao(posicao) {
+    return String(posicao.categoria || '').toLowerCase() === 'especulacao'
+      || /espec/i.test(String(posicao.negocio_rateio || posicao.obs || ''));
+  }
+
+  function resumirCobertura(posicoes, contratosNecessarios) {
+    let vendidosHedge = 0;
+    let compradosHedge = 0;
+    let termosHedge = 0;
+    let contratosB3Brutos = 0;
+
+    deduplicarPosicoes(posicoes)
+      .filter((item) => ['aberta', 'rolada'].includes(String(item.status || '').toLowerCase()))
+      .forEach((item) => {
+        const quantidade = Math.abs(numero(item.contratos_qtd));
+        if (!quantidade) return;
+        const direcao = String(item.direcao || '').toLowerCase();
+        const termo = direcao === 'termo';
+        if (!termo) contratosB3Brutos += quantidade;
+        if (ehEspeculacao(item)) return;
+        if (termo) termosHedge += quantidade;
+        else if (direcao === 'comprado') compradosHedge += quantidade;
+        else if (direcao === 'vendido') vendidosHedge += quantidade;
+      });
+
+    const necessarios = Math.max(numero(contratosNecessarios), 0);
+    const coberturaLiquida = vendidosHedge + termosHedge - compradosHedge;
+    const descobertos = Math.max(necessarios - coberturaLiquida, 0);
+    return {
+      necessarios,
+      vendidosHedge,
+      compradosHedge,
+      termosHedge,
+      coberturaLiquida,
+      descobertos,
+      arrobasDescobertas: descobertos * 330,
+      contratosB3Brutos,
+      arrobasB3Brutas: contratosB3Brutos * 330,
+    };
+  }
+
+  function calcularResultadoAberto(posicao, cotacaoAtual) {
+    if (String(posicao.status || '').toLowerCase() !== 'aberta') return null;
+    const quantidade = Math.abs(numero(posicao.contratos_qtd));
+    const entrada = numero(posicao.preco_entrada);
+    const direcao = String(posicao.direcao || '').toLowerCase();
+    const custos = numero(posicao.custo_corretagem) + numero(posicao.custo_finpec);
+    if (direcao === 'termo') {
+      return { atual: entrada, bruto: 0, custos, resultado: -custos };
+    }
+    const atual = numero(cotacaoAtual);
+    if (!quantidade || !entrada || !atual) return null;
+    const bruto = (direcao === 'vendido' ? entrada - atual : atual - entrada) * quantidade * 330;
+    return {
+      atual,
+      bruto,
+      custos,
+      resultado: Math.round((bruto - custos) * 100) / 100,
+    };
+  }
+
   function reconciliarExposicao(exposicao, posicoes) {
     const abertosPorLote = contratosAbertosPorLote(posicoes);
     return (Array.isArray(exposicao) ? exposicao : []).map((item) => {
@@ -85,8 +146,10 @@
   return {
     codigoLote,
     contratosAbertosPorLote,
+    calcularResultadoAberto,
     deduplicarPosicoes,
     extrairRateios,
     reconciliarExposicao,
+    resumirCobertura,
   };
 }));

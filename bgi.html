@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="./design/components.css?v=20260720-1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="./js/cfagro-core.js"></script>
+<script src="./js/confinados-hedge.js?v=20260803-1"></script>
 <script src="./js/cfagro-shell.js?v=20260803-1" defer></script>
 </head>
 <body data-w="md">
@@ -93,24 +94,27 @@ db.from('operacoes').select('id,codigo').in('status',['comprada','em_confinament
 const err=[expo,pos,cot,ops].find(r=>r.error);
 if(err){document.getElementById('subtitle').textContent='Erro: '+err.error.message;return;}
 const expoConfinamento=exposicaoDeConfinamento(expo.data);
-LOTES=ops.data.filter(o=>!String(o.codigo||'').toUpperCase().startsWith('BB-')); POS=pos.data;
+POS=ConfinadosHedge.deduplicarPosicoes(pos.data);
+const exposicaoAtual=ConfinadosHedge.reconciliarExposicao(expoConfinamento,POS);
+LOTES=ops.data.filter(o=>!String(o.codigo||'').toUpperCase().startsWith('BB-'));
 document.getElementById('subtitle').textContent='Exposição, posições e cotações de hedge';
 document.getElementById('fLote').innerHTML='<option value="">(sem alocação)</option>'+LOTES.map(l=>`<option value="${l.id}">${l.codigo}</option>`).join('');
 
 // KPIs
-const nec=expoConfinamento.reduce((a,e)=>a+Number(e.cts_necessarios||0),0);
-const ab=expoConfinamento.reduce((a,e)=>a+Number(e.cts_abertos||0),0);
-const desc=expoConfinamento.reduce((a,e)=>a+Math.max(Number(e.cts_descobertos||0),0),0);
-const cred=expoConfinamento.reduce((a,e)=>a+Number(e.hedge_realizado_creditado||0),0);
+const nec=exposicaoAtual.reduce((a,e)=>a+Number(e.cts_necessarios||0),0);
+const resumoCobertura=ConfinadosHedge.resumirCobertura(POS,nec);
+const ab=resumoCobertura.coberturaLiquida;
+const desc=resumoCobertura.descobertos;
+const cred=exposicaoAtual.reduce((a,e)=>a+Number(e.hedge_realizado_creditado||0),0);
 document.getElementById('kpis').innerHTML=[
-['Necessário',fmtN(nec)+' cts'],['Aberto',fmtN(ab)+' cts'],
-['Descoberto',`<span class="${desc>0.5?'neg':'pos'}">${fmtN(desc)} cts</span>`],
-['Exposição',fmtN(desc*330,0)+' @'],['Realizado creditado',fmtR$(cred)]
+['Contratos necessários',fmtN(nec)+' cts'],['Cobertura líquida aberta',fmtN(ab)+' cts'],
+['Contratos descobertos',`<span class="${desc>0.5?'neg':'pos'}">${fmtN(desc)} cts</span>`],
+['Arrobas descobertas',fmtN(desc*330,0)+' @'],['Realizado creditado',fmtR$(cred)]
 ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div></div>`).join('');
 
 // Exposição
 document.getElementById('tbExpo').innerHTML='<tr><th>Lote</th><th class="num">@ previstas</th><th class="num">Necessário</th><th class="num">Aberto</th><th class="num">Descoberto</th><th class="num">Creditado</th></tr>'+
-expoConfinamento.sort((a,b)=>a.codigo.localeCompare(b.codigo)).map(e=>{
+exposicaoAtual.sort((a,b)=>a.codigo.localeCompare(b.codigo)).map(e=>{
 const d=Number(e.cts_descobertos||0);
 return `<tr><td><b>${e.codigo}</b></td><td class="num">${fmtN(e.arrobas_previstas,1)}</td><td class="num">${fmtN(e.cts_necessarios)}</td><td class="num">${fmtN(e.cts_abertos)}</td><td class="num ${d>0.1?'neg':'pos'}">${fmtN(d)}</td><td class="num ${cls(e.hedge_realizado_creditado)}">${fmtR$(e.hedge_realizado_creditado)}</td></tr>`}).join('');
 
@@ -126,15 +130,15 @@ document.getElementById('tbPos').innerHTML='<tr><th>Contrato</th><th>Dir.</th><t
 POS.map(p=>{
 const lotes=(p.alocacoes_hedge||[]).map(a=>a.operacoes?.codigo).filter(Boolean).join(', ')||'—';
 const st=p.status==='aberta'?'<span class="badge b-green">Aberta</span>':p.status==='rolada'?'<span class="badge b-blue">Rolada</span>':'<span class="badge b-amber">Encerrada</span>';
-const cotacao=p.status==='aberta'?ultimas[p.contrato]:null;
-const atual=cotacao?Number(cotacao.preco):null;
-const parcial=atual==null?null:Math.round((p.direcao==='vendido'?Number(p.preco_entrada)-atual:atual-Number(p.preco_entrada))*Number(p.contratos_qtd)*330*100)/100;
+const marcacao=ConfinadosHedge.calcularResultadoAberto(p,ultimas[p.contrato]?.preco);
+const atual=marcacao?.atual??null;
+const parcial=marcacao?.resultado??null;
 if(parcial!=null){resultadoAberto+=parcial;posicoesCotadas++;}
 const resultado=p.status==='aberta'?parcial:p.resultado_realizado;
 const acoes=`<button class="btn mini" onclick="editar('${p.id}')">Editar</button> `+(p.status==='aberta'?`<button class="btn mini warn" onclick="encerrar('${p.id}')">Encerrar</button> <button class="btn mini sec" onclick="encerrarParcial('${p.id}')">Encerrar parcial</button> <button class="btn mini sec" onclick="rolar('${p.id}')">Rolar</button>`:'');
 return `<tr><td><b>${p.contrato}</b></td><td>${p.direcao}</td><td class="num">${fmtN(p.contratos_qtd)}</td><td class="num">${fmtN(p.preco_entrada)}</td><td class="num">${atual!=null?fmtN(atual):'—'}</td><td class="num">${p.preco_saida?fmtN(p.preco_saida):'—'}</td><td class="num ${cls(resultado)}">${resultado!=null?fmtR$(resultado):(p.status==='aberta'?'Sem cotação':'—')}</td><td>${lotes}</td><td>${st}</td><td>${acoes}</td></tr>`}).join('');
 
-document.getElementById('kpis').insertAdjacentHTML('beforeend',`<div class="kpi"><div class="l">Resultado em aberto</div><div class="v ${cls(resultadoAberto)}">${posicoesCotadas?fmtR$(resultadoAberto):'Sem cotação'}</div></div>`);
+document.getElementById('kpis').insertAdjacentHTML('beforeend',`<div class="kpi"><div class="l">Resultado líquido em aberto</div><div class="v ${cls(resultadoAberto)}">${posicoesCotadas?fmtR$(resultadoAberto):'Sem cotação'}</div></div>`);
 
 // Cotações + basis
 const fisica=ultimas['FISICO'];
@@ -329,3 +333,4 @@ CFAgro.authInit(carregar);
 <a href="./" class="voltar-central">⌂ Central</a>
 </body>
 </html>
+
