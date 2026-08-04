@@ -178,7 +178,7 @@ class ContratosEcossistemaTests(unittest.TestCase):
         )
         self.assertIn("python3 tools/test_ecossistema.py", workflow)
         self.assertRegex(workflow, r"(?m)^\s+schedule:")
-        self.assertIn("timeout-minutes:", workflow)
+        self.assertIn("timeout-minutes: 20", workflow)
 
 
     def test_imports_de_ci_ignoram_caminhos_privados_sem_permissao(self):
