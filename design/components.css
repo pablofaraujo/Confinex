@@ -17,9 +17,11 @@ h2{font-size:var(--fs-13);font-weight:700;color:var(--navy);text-transform:upper
 #app{display:none}
 
 /* ---------- Topbar ---------- */
-.topbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;padding-bottom:18px;border-bottom:1px solid var(--border)}
+.topbar{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px;padding-bottom:18px;border-bottom:1px solid var(--border)}
+.topbar h1{margin:0;color:var(--text);font-family:var(--font);font-size:28px;font-weight:700;line-height:1.2;letter-spacing:-.02em}
+.topbar .sub{margin-top:4px;color:var(--muted);font-family:var(--font);font-size:var(--fs-13);font-weight:400;line-height:1.35;letter-spacing:0;text-transform:none}
 .topbar .acoes{display:flex;gap:8px}
-.topbar .ident{display:flex;align-items:center;gap:12px}
+.topbar .ident{display:flex;align-items:flex-start;gap:12px}
 .logo-img{border-radius:50%;object-fit:cover;flex-shrink:0}
 
 /* ---------- Cards e KPIs ---------- */
@@ -220,6 +222,7 @@ body.has-shell .shell-content .topbar .logo-img{display:none}
   .shell-link{flex:0 0 auto;white-space:nowrap}
   .shell-content{padding:20px 14px}
   h1{font-size:24px}
+  .topbar h1{font-size:24px}
   .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
   .kpi .v{font-size:22px}
   .kpis-overview{grid-template-columns:repeat(2,minmax(0,1fr))}

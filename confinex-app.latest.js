@@ -45,9 +45,10 @@ var css = `
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{background:${T.bg};color:${T.text};font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;line-height:1.55;min-height:100vh;overflow-x:hidden}
 .app{max-width:1180px;min-width:0;margin:0 auto;padding:28px 16px 100px}
-.hdr{display:flex;align-items:flex-start;gap:20px;margin-bottom:32px;padding-bottom:20px;border-bottom:1px solid ${T.border}}
-.logo{font-family:'Plus Jakarta Sans',sans-serif;font-size:24px;font-weight:700;color:${T.accent};letter-spacing:-.5px;line-height:1}
-.logo-sub{font-size:10px;color:${T.muted};letter-spacing:2px;text-transform:uppercase;margin-top:3px;font-weight:400}
+body.has-shell .shell-content .app{padding:0 0 100px}
+.hdr{display:flex;align-items:flex-start;gap:0;margin-bottom:16px;padding-bottom:18px;border-bottom:1px solid var(--border)}
+.logo{font-family:var(--font);font-size:28px;font-weight:700;color:var(--text);letter-spacing:-.02em;line-height:1.2}
+.logo-sub{font-family:var(--font);font-size:var(--fs-13);color:var(--muted);letter-spacing:0;text-transform:none;margin-top:4px;font-weight:400;line-height:1.35}
 .sec{min-width:0;max-width:100%;background:${T.card};border:1px solid ${T.border};border-top:3px solid #F2C500;border-radius:14px;padding:22px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
 .sec-t{font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:${T.accent};margin-bottom:18px;display:flex;align-items:center;gap:10px}
 .sec-t::after{content:'';flex:1;height:1px;background:${T.border}}
@@ -58,7 +59,7 @@ body{background:${T.bg};color:${T.text};font-family:'Plus Jakarta Sans',sans-ser
 .g2>*,.g3>*,.g4>*{min-width:0}
 @media(max-width:680px){.g2,.g3,.g4{grid-template-columns:1fr 1fr}}
 @media(max-width:680px){.hdr{flex-direction:column;gap:14px}.hdr>div:last-child{margin-left:0!important;width:100%;flex-wrap:wrap}}
-@media(max-width:520px){.g2,.g3,.g4{grid-template-columns:1fr}.g2>.fld,.g3>.fld,.g4>.fld{grid-column:auto!important}.app{padding-left:8px;padding-right:8px}.sec{padding:18px}.logo{font-size:21px}}
+@media(max-width:520px){.g2,.g3,.g4{grid-template-columns:1fr}.g2>.fld,.g3>.fld,.g4>.fld{grid-column:auto!important}.app{padding-left:8px;padding-right:8px}.sec{padding:18px}.logo{font-size:24px}}
 .fld{display:flex;min-width:0;flex-direction:column;gap:5px}
 .lbl{font-size:10px;font-weight:600;color:${T.label};letter-spacing:.5px;text-transform:uppercase}
 input,select{min-width:0;max-width:100%;background:${T.surface};border:1px solid ${T.border};border-radius:8px;color:${T.text};font-family:'DM Mono',monospace;font-size:13px;padding:9px 12px;width:100%;outline:none;transition:border-color .15s;box-shadow:0 1px 2px rgba(0,0,0,.04)}

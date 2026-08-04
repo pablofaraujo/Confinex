@@ -7,7 +7,7 @@
 <link rel="icon" type="image/png" href="./confinex-logo.jpg">
 <link rel="apple-touch-icon" href="./confinex-logo.jpg">
 <link rel="stylesheet" href="./design/tokens.css?v=20260720-1">
-<link rel="stylesheet" href="./design/components.css?v=20260720-1">
+<link rel="stylesheet" href="./design/components.css?v=20260804-1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="./js/cfagro-core.js?v=20260720-1"></script>
 <script src="./js/cfagro-shell.js?v=20260803-1" defer></script>
@@ -39,7 +39,7 @@ body{max-width:1480px}.toolbar{display:grid;grid-template-columns:1.2fr .8fr .8f
 </div>
 
 <div id="app">
-  <div class="topbar"><div style="display:flex;align-items:center;gap:12px"><img src="./confinex-logo.jpg" alt="Logo" style="width:48px;height:48px;border-radius:50%;object-fit:cover"><div><h1>Revisões</h1><div class="sub" id="subtitle">Conferência, ajuste e aprovação antes do lançamento.</div></div></div></div>
+  <div class="topbar"><div class="ident"><div><h1>Revisões</h1><div class="sub" id="subtitle">Conferência, ajuste e aprovação antes do lançamento.</div></div></div></div>
   <div class="kpis" id="kpis"></div>
   <div class="kpis"><div id="quickFilters"></div><div id="contextSummary"></div></div>
   <div class="toolbar card"><div class="fld"><label>Busca</label><input id="busca" placeholder="Fornecedor, CF, grupo, resumo..." oninput="renderLista()"></div><div class="fld"><label>Contexto</label><select id="fContexto" onchange="renderLista()"><option value="">Todos</option></select></div><div class="fld"><label>Status</label><select id="fStatus" onchange="renderLista()"><option value="abertos">Todos os abertos</option><option value="todos">Todo o histórico</option><option value="prioridade_alta">Precisa da sua conferência</option><option value="aguardando_revisao">Aguardando revisão</option><option value="campos_faltantes">Com campos faltantes</option><option value="promocao_aguardando">Promoção aguardando confirmação</option><option value="em_execucao">Promoção em andamento</option><option value="executado">Promoção concluída</option><option value="erro_pos_gravacao">Precisa conferir lançamento</option><option value="rejeitados_cancelados">Rejeitados ou cancelados</option><option value="confirmado_telegram">Confirmado no Telegram</option><option value="em_revisao">Em revisão</option><option value="realizado">Realizado</option></select></div><button class="btn" onclick="carregar()">Carregar</button></div>

@@ -96,6 +96,17 @@ e o resumo de parcerias usa o aperto de mãos. As ações globais “Atualizar�
 
 ## Convenções de comportamento
 
+### Cabeçalho das áreas
+
+- A **Visão Geral** é a referência visual para todas as áreas: título à esquerda
+  e subtítulo imediatamente abaixo, dentro de `.topbar > .ident`.
+- O título usa 28 px no desktop e 24 px no celular, peso 700 e `--text`.
+- O subtítulo usa `--fs-13`, peso 400 e `--muted`, sem caixa alta nem
+  espaçamento decorativo entre letras.
+- O brinco CFAgro aparece somente no cabeçalho global do shell. As áreas não
+  repetem logo, nome do responsável ou marca dentro do próprio cabeçalho.
+- Ações próprias da tela permanecem em `.topbar > .acoes`, alinhadas ao topo.
+
 - Título da aba: `CFAgro — {Módulo}`.
 - Toda página-satélite tem `.voltar-central` apontando para `./`.
 - Loading: texto no `.sub` ("Carregando..."). Empty state: `<td colspan=N>` com frase curta. (Skeletons e toasts entram na fase 5.)
