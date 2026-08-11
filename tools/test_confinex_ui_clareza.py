@@ -112,6 +112,22 @@ class ClarezaInterfaceConfinexTests(unittest.TestCase):
         ):
             self.assertIn(texto, self.fonte)
 
+    def test_sensibilidade_nomeia_e_usa_apenas_metricas_brutas_principais(self):
+        inicio = self.fonte.index('children: "An\\xE1lise de Sensibilidade"')
+        fim = self.fonte.index("function EvolucaoTempo", inicio)
+        trecho = self.fonte[inicio:fim]
+        for texto in (
+            'children: "Rent. mensal bruta"',
+            'children: "Rent. total bruta"',
+            'children: "Lucro bruto"',
+            "resultado.rentMensal",
+            "resultado.rentTotal",
+            "resultado.lucroBruto",
+        ):
+            self.assertIn(texto, trecho)
+        self.assertNotIn('children: "Rent. Mensal"', trecho)
+        self.assertNotIn('children: "Lucro Total"', trecho)
+
     def test_comparativo_explica_limite_vp_e_revenda_equivalente(self):
         for texto in (
             "Pre\\xE7o atual de compra",

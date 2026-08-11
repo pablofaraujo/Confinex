@@ -1635,7 +1635,7 @@ function SensPanel({ lote, cenarios, resultados, historico = [], setHistorico = 
       },
       rentMensal: resultado.rentMensal,
       rentTotal: resultado.rentTotal,
-      lucro: resultado.lucroBruto,
+      lucroBruto: resultado.lucroBruto,
       investInicial: resultado.investInicial,
       receita: resultado.receita,
       custos: resultado.custos
@@ -1707,16 +1707,16 @@ function SensPanel({ lote, cenarios, resultados, historico = [], setHistorico = 
       ] }, sl.k)),
       resultado && /* @__PURE__ */ jsxs("div", { className: "sens-result", children: [
         /* @__PURE__ */ jsxs("div", { className: "sens-kpi", children: [
-          /* @__PURE__ */ jsx("div", { className: "sens-kpi-l", children: "Rent. Mensal" }),
+          /* @__PURE__ */ jsx("div", { className: "sens-kpi-l", children: "Rent. mensal bruta" }),
           /* @__PURE__ */ jsx("div", { className: "sens-kpi-v", style: { color: resultado.rentMensal >= 0 ? T.green : T.red }, children: fP(resultado.rentMensal) })
         ] }),
         /* @__PURE__ */ jsxs("div", { className: "sens-kpi", children: [
-          /* @__PURE__ */ jsx("div", { className: "sens-kpi-l", children: "Rent. Total" }),
+          /* @__PURE__ */ jsx("div", { className: "sens-kpi-l", children: "Rent. total bruta" }),
           /* @__PURE__ */ jsx("div", { className: `sens-kpi-v ${resultado.rentTotal >= 0 ? "pos" : "neg"}`, children: fP(resultado.rentTotal) })
         ] }),
         /* @__PURE__ */ jsxs("div", { className: "sens-kpi", children: [
-          /* @__PURE__ */ jsx("div", { className: "sens-kpi-l", children: "Lucro Total" }),
-          /* @__PURE__ */ jsx("div", { className: `sens-kpi-v ${resultado.lucro >= 0 ? "pos" : "neg"}`, children: fR(resultado.lucro) })
+          /* @__PURE__ */ jsx("div", { className: "sens-kpi-l", children: "Lucro bruto" }),
+          /* @__PURE__ */ jsx("div", { className: `sens-kpi-v ${resultado.lucroBruto >= 0 ? "pos" : "neg"}`, children: fR(resultado.lucroBruto) })
         ] }),
         /* @__PURE__ */ jsxs("div", { className: "sens-kpi", children: [
           /* @__PURE__ */ jsx("div", { className: "sens-kpi-l", children: "Capital" }),
@@ -1749,8 +1749,8 @@ function SensPanel({ lote, cenarios, resultados, historico = [], setHistorico = 
           /* @__PURE__ */ jsx("th", { children: "RC%" }),
           /* @__PURE__ */ jsx("th", { children: "Perda%" }),
           /* @__PURE__ */ jsx("th", { children: "Venda R$/@" }),
-          /* @__PURE__ */ jsx("th", { children: "Rent. Mensal" }),
-          /* @__PURE__ */ jsx("th", { children: "Lucro" }),
+          /* @__PURE__ */ jsx("th", { children: "Rent. mensal bruta" }),
+          /* @__PURE__ */ jsx("th", { children: "Lucro bruto" }),
           /* @__PURE__ */ jsx("th", { children: "Capital" }),
           /* @__PURE__ */ jsx("th", {})
         ] }) }),
@@ -1777,7 +1777,7 @@ function SensPanel({ lote, cenarios, resultados, historico = [], setHistorico = 
           ] }),
           /* @__PURE__ */ jsx("td", { children: fN(t.inputs.precoVenda, 0) }),
           /* @__PURE__ */ jsx("td", { className: t.rentMensal >= 0 ? "pos" : "neg", style: { fontWeight: 700 }, children: fP(t.rentMensal) }),
-          /* @__PURE__ */ jsx("td", { className: t.lucro >= 0 ? "pos" : "neg", children: fR(t.lucro) }),
+          /* @__PURE__ */ jsx("td", { className: (t.lucroBruto ?? t.lucro) >= 0 ? "pos" : "neg", children: fR(t.lucroBruto ?? t.lucro) }),
           /* @__PURE__ */ jsx("td", { children: fR(t.investInicial) }),
           /* @__PURE__ */ jsxs("td", { style: { display: "flex", gap: 6, justifyContent: "flex-end" }, children: [
             /* @__PURE__ */ jsx("button", { className: "hist-load-btn", onClick: () => carregarTeste(t), title: "Carregar nos sliders", children: "\u2191 usar" }),
