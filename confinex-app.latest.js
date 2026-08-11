@@ -1139,7 +1139,7 @@ function contratosB3DaEvolucao(cenarios) {
   const contratos = /* @__PURE__ */ new Set();
   (cenarios || []).forEach((sc) => {
     if (!sc || sc.tipo === "revenda" || sc.modoPreco !== "bolsa") return;
-    for (let dias = 60; dias <= 240; dias += 15) {
+    for (let dias = 60; dias <= 150; dias += 15) {
       const contrato = contratoB3PorData(addDiasISO(sc.dataEntrada, dias));
       if (contrato) contratos.add(contrato);
     }
@@ -1150,8 +1150,8 @@ function calcEvolucaoTempo(lote, sc) {
   if (!sc || sc.tipo === "revenda") return [];
   const diasAtual = Math.round(parseFloat(sc.diasCiclo) || 0);
   const prazos = /* @__PURE__ */ new Set();
-  for (let dias = 60; dias <= 240; dias += 15) prazos.add(dias);
-  if (diasAtual >= 60 && diasAtual <= 240) prazos.add(diasAtual);
+  for (let dias = 60; dias <= 150; dias += 15) prazos.add(dias);
+  if (diasAtual >= 60 && diasAtual <= 150) prazos.add(diasAtual);
   return [...prazos].sort((a, b) => a - b).map((dias) => {
     const dataSaida = addDiasISO(sc.dataEntrada, dias);
     const contrato = contratoB3PorData(dataSaida);
@@ -1792,7 +1792,7 @@ function EvolucaoTempo({ lote, cenarios }) {
   const ativos = cenarios.filter((sc) => sc.tipo !== "revenda");
   if (!ativos.length) return null;
   return /* @__PURE__ */ jsxs("div", { className: "sec", style: { marginTop: 18 }, children: [
-    /* @__PURE__ */ jsx("div", { className: "sec-t", children: "Evolução entre 60 e 240 dias" }),
+    /* @__PURE__ */ jsx("div", { className: "sec-t", children: "Evolução entre 60 e 150 dias" }),
     /* @__PURE__ */ jsx("div", { className: "hint", style: { marginBottom: 16 }, children: "Cada prazo usa a cotação BGI do próprio mês de saída. A linha fica pendente quando a curva não possui aquele vencimento." }),
     ativos.map((sc) => {
       const evolucao = calcEvolucaoTempo(lote, sc);

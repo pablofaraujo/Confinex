@@ -128,6 +128,22 @@ class ClarezaInterfaceConfinexTests(unittest.TestCase):
         self.assertNotIn('children: "Rent. Mensal"', trecho)
         self.assertNotIn('children: "Lucro Total"', trecho)
 
+    def test_evolucao_da_tela_e_pdf_termina_em_150_dias(self):
+        inicio = self.fonte.index("function contratosB3DaEvolucao")
+        fim = self.fonte.index("function ScPanel", inicio)
+        calculo = self.fonte[inicio:fim]
+        self.assertEqual(calculo.count("dias <= 150"), 2)
+        self.assertIn("diasAtual <= 150", calculo)
+        self.assertNotIn("dias <= 240", calculo)
+        self.assertIn('children: "Evolução entre 60 e 150 dias"', self.fonte)
+        relatorio = self.fonte[self.fonte.index("function RelatorioComparativo"):]
+        self.assertIn("const evolucao = calcEvolucaoTempo(lote, sc)", relatorio)
+        pacote_movel = (ROOT / "confinex-app.mobile.js").read_text(encoding="utf-8")
+        self.assertEqual(pacote_movel.count("<=150"), 3)
+        self.assertNotIn("<=240", pacote_movel)
+        self.assertIn("60 e 150 dias", pacote_movel)
+        self.assertIn("max:240", pacote_movel)  # O limite do cenário não foi alterado.
+
     def test_comparativo_explica_limite_vp_e_revenda_equivalente(self):
         for texto in (
             "Pre\\xE7o atual de compra",

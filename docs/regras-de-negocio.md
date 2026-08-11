@@ -102,7 +102,7 @@ As duas leituras são auxiliares e não mudam lucro, custos totais, caixa ou ran
 - O próprio cenário de revenda desconta os tributos e encargos percentuais informados antes de calcular lucro líquido e rentabilidade. O preço digitado é bruto; `precoVendaLiq` é o valor líquido por arroba após esses descontos.
 - Se o preço algébrico de empate for negativo porque o confinamento tem prejuízo maior que todos os custos da revenda, a interface não apresenta preço negativo como referência comercial: mostra que a revenda já supera o lucro-alvo mesmo com preço igual a zero.
 - A antiga indicação isolada de “ponto ótimo” foi removida. Ela não respeitava o mínimo produtivo e mantinha a mesma cotação ao mudar o mês de saída.
-- A evolução temporal compara 60 a 240 dias em intervalos de 15 dias, incluindo também o ciclo atual quando estiver dentro dessa faixa. Cada prazo recalcula a saída e usa a cotação do contrato BGI daquele mês; sem cotação, o ponto fica pendente e não gera resultado enganoso.
+- A evolução temporal da tela e do PDF compara 60 a 150 dias em intervalos de 15 dias, incluindo também o ciclo atual quando estiver dentro dessa faixa. Cada prazo recalcula a saída e usa a cotação do contrato BGI daquele mês; sem cotação, o ponto fica pendente e não gera resultado enganoso. O limite vale somente para a tabela de evolução e não altera um cenário informado com prazo diferente.
 - Depois da aprovação, o prazo operacional pode ser ajustado repetidamente em **Operações → Confinamento**. A estimativa original permanece congelada; cada ajuste exige motivo e registra prazo anterior, novo prazo, saída anterior, nova saída, autor e horário. O prazo atual é sempre o último ajuste válido.
 
 ## Agenda financeira e dívidas

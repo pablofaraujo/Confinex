@@ -5,9 +5,9 @@ const fonte = await readFile(new URL('../confinex-app.latest.js', import.meta.ur
 const deploy = await readFile(new URL('../.github/workflows/deploy.yml', import.meta.url), 'utf8');
 assert.match(html, /confinex-supabase-ponte-inline\.js\?v=/);
 assert.match(html, /confinex-app\.mobile\.js\?v=/);
-assert.match(html, /__CONFINEX_BUILD = "20260811-sensibilidade-bruta-1"/);
-assert.match(deploy, /__CONFINEX_BUILD = "20260811-sensibilidade-bruta-1"/);
-assert.match(deploy, /confinex-app\.mobile\.js\?v=20260811-sensibilidade-bruta-1/);
+assert.match(html, /__CONFINEX_BUILD = "20260811-evolucao-150-1"/);
+assert.match(deploy, /__CONFINEX_BUILD = "20260811-evolucao-150-1"/);
+assert.match(deploy, /confinex-app\.mobile\.js\?v=20260811-evolucao-150-1/);
 assert.match(html, /__CONFINEX_CARREGAR_APP/);
 assert.match(html, /recarga=/);
 assert.doesNotMatch(html, /<script defer src="\.\/confinex-app\.mobile\.js/);
