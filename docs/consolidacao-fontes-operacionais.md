@@ -33,6 +33,42 @@ O relatório não autoriza conciliar banco, criar GTA, vincular documento,
 alterar rascunho ou lançar operação. Uma data de corte anterior à referência é
 um bloqueio de atualização, não um dado a ser preenchido por inferência.
 
+## Conciliação documental por registro
+
+`tools/conciliar_documentos_operacionais.py` complementa o inventário agregado
+com um cruzamento por registro entre exportação fiscal do Agronotas, ficha
+detalhada do IMA, extrato OFX e planilha de negócios. Ele aceita `.xlsx`, `.csv`
+ou `.json` nas fontes tabulares, lê o `.xlsx` sem executar macros e grava apenas
+um plano privado em JSON e Markdown.
+
+```bash
+python3 tools/conciliar_documentos_operacionais.py \
+  --agronotas /caminho/privado/documentos.xlsx \
+  --aba-agronotas "Fiscal GTAs" \
+  --ima-pdf /caminho/privado/ficha-detalhada.pdf \
+  --ofx /caminho/privado/extrato.ofx \
+  --negocios /caminho/privado/negocios.xlsx \
+  --aba-negocios "Negocios" \
+  --data-referencia AAAA-MM-DD \
+  --saida-json docs/privado/conciliacao-documentos.json \
+  --saida-md docs/privado/conciliacao-documentos.md
+```
+
+As regras permanentes são:
+
+- GTA igual na nota e no IMA é vínculo documental forte;
+- NF ou GTA igual ao negócio é candidato forte, ainda não confirmado;
+- valor bancário igual e único em até 90 dias é somente candidato provável;
+- valor e data sem identificador documental nunca formam vínculo forte;
+- duas ou mais correspondências ficam ambíguas e intactas;
+- documentos sem relação com gado são ignorados, mas contabilizados;
+- fonte desatualizada vira pendência explícita;
+- não existe argumento `--executar`, chamada de rede ou escrita operacional.
+
+Números de GTA, NF, lançamentos e negócios permanecem somente nos relatórios em
+`docs/privado/`, que não são versionados. O repositório público guarda apenas o
+código, testes e regras sanitizadas.
+
 ## Atualização por OFX
 
 `tools/analisar_extrato_ofx.py` compara um OFX recém-baixado com um snapshot
@@ -78,5 +114,6 @@ python3 tools/analisar_ficha_ima.py \
   --saida-md /caminho/privado/relatorio-ima.md
 ```
 
-O modo `--pdf` exige `pdftotext`. Ambientes sem Poppler podem fornecer o texto
-previamente extraído por meio de `--texto-extraido`.
+O modo `--pdf` usa `pdftotext -layout` quando Poppler está disponível. Se não
+estiver, usa `pypdf` opcional em modo de preservação de layout; como última
+alternativa, o texto pode ser fornecido por `--texto-extraido`.

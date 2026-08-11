@@ -21,15 +21,26 @@ def normalizar_numero(valor: Any) -> str:
 
 def extrair_texto_pdf(caminho: Path, destino: Path) -> str:
     executavel = shutil.which("pdftotext")
-    if not executavel:
-        raise RuntimeError("pdftotext não encontrado; informe --texto-extraido")
-    subprocess.run(
-        [executavel, "-layout", str(caminho), str(destino)],
-        check=True,
-        capture_output=True,
-        text=True,
+    if executavel:
+        subprocess.run(
+            [executavel, "-layout", str(caminho), str(destino)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return destino.read_text(encoding="utf-8", errors="replace")
+    try:
+        from pypdf import PdfReader
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "leitor de PDF não encontrado; instale pypdf ou informe --texto-extraido"
+        ) from exc
+    texto = "\n".join(
+        pagina.extract_text(extraction_mode="layout") or ""
+        for pagina in PdfReader(str(caminho)).pages
     )
-    return destino.read_text(encoding="utf-8", errors="replace")
+    destino.write_text(texto, encoding="utf-8")
+    return texto
 
 
 def ler_ficha(texto: str, sha256: str) -> dict[str, Any]:

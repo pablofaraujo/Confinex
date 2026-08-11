@@ -1,7 +1,12 @@
+import sys
+import tempfile
 import unittest
 from datetime import date
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
-from tools.analisar_ficha_ima import gerar_plano, ler_ficha
+from tools.analisar_ficha_ima import extrair_texto_pdf, gerar_plano, ler_ficha
 
 
 TEXTO = """
@@ -46,6 +51,21 @@ class AnalisarFichaImaTest(unittest.TestCase):
     def test_rejeita_ficha_sem_periodo(self):
         with self.assertRaisesRegex(ValueError, "período"):
             ler_ficha("Total: 10", "hash")
+
+    def test_extrai_pdf_com_pypdf_em_layout_quando_poppler_nao_existe(self):
+        pagina = SimpleNamespace(extract_text=lambda **kwargs: (
+            TEXTO if kwargs.get("extraction_mode") == "layout" else ""
+        ))
+        leitor = lambda _: SimpleNamespace(pages=[pagina])
+        with tempfile.TemporaryDirectory() as pasta:
+            entrada = Path(pasta) / "ficha.pdf"
+            saida = Path(pasta) / "ficha.txt"
+            entrada.write_bytes(b"%PDF-1.4\n")
+            with patch("tools.analisar_ficha_ima.shutil.which", return_value=None), \
+                 patch.dict(sys.modules, {"pypdf": SimpleNamespace(PdfReader=leitor)}):
+                texto = extrair_texto_pdf(entrada, saida)
+            self.assertIn("Período", texto)
+            self.assertEqual(saida.read_text(encoding="utf-8"), texto)
 
 
 if __name__ == "__main__":

@@ -14,7 +14,7 @@ Leia conforme a tarefa:
 - `docs/memoria-agentes.md` — contrato de memória reutilizável para Juan/Ceci e auditoria somente leitura
 - `docs/contratos-automatizados.md` — pré-análise segura de contratos, versões, Drive e regra Finpec
 - `docs/google-sheets-legado.md` — papel transitório de Sheets/Apps Script e gate para migração
-- `docs/consolidacao-fontes-operacionais.md` — dry-run que cruza Juan, banco, GTAs, documentos e Supabase sem executar vínculos
+- `docs/consolidacao-fontes-operacionais.md` — dry-runs agregados e por registro para cruzar Juan, NF/Agronotas, banco, GTAs/IMA, negócios e Supabase sem executar vínculos
 - `docs/fila-revisoes-prioridades.md` — inventário sanitizado, prioridade operacional e plano dry-run de saneamento
 - `tools/sanear_fila_revisoes.py` — rotina dry-run para vincular rascunhos e pendências somente com correspondência forte, sem tocar tabelas operacionais
 - `docs/regras-de-negocio.md` — fórmulas e regras de cálculo (arrobas, capim, frete, GMD, Funrural, B3, VP)
@@ -53,6 +53,7 @@ Leia conforme a tarefa:
 - A idempotência persistente de compras foi aplicada em 25/07/2026 por `supabase/migrations/202607250001_compras_idempotencia.sql`: compras antigas permaneceram com chave nula e RLS, políticas e permissões foram preservados. O cliente e o executor foram implantados na VPS com backup, testes simulados e prévia real somente leitura. A prévia não executou promoção, não persistiu chave e manteve idênticas as assinaturas das tabelas auditadas. Timeout ou falha incerta bloqueiam repetição até reconciliação; o contrato está em `docs/idempotencia-compras.md`.
 - A automação de contratos está limitada à pré-análise em `tools/contratos_workflow.py`, também instalada como skill do Wey com backup: calcula hash, detecta repetição, compara dados do negócio e termos aprovados, propõe destino privado no Drive e faz triagem jurídica/Finpec. Ela nunca move, envia, assina, autentica no gov.br ou cria garantia. O fluxo e os gates humanos estão em `docs/contratos-automatizados.md`.
 - O OCR de pesagem usa OpenClaw/OpenAI como canal principal e Anthropic como fallback. Antes do fallback, fotos e páginas de PDF são normalizadas para JPEG e reduzidas ao limite visual aceito; `tools/test_juan_vps.py` valida permanentemente esse pré-processamento com uma imagem sintética grande, sem transmissão ou escrita operacional.
+- A conciliação documental local usa `tools/conciliar_documentos_operacionais.py` para ler exportações `.xlsx`/`.csv`/`.json`, ficha detalhada do IMA e OFX. O resultado fica em `docs/privado/`: GTA exata é forte, valor/data é somente provável, ambiguidades não são escolhidas e não existe caminho de escrita ou chamada ao Supabase.
 
 O contexto de conversa segue os campos `contexto_canonico`, `contexto_nome`,
 `origem_canal`, `origem_conversa_id`, `origem_mensagem_id`, `agente` e
