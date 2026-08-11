@@ -349,6 +349,41 @@ def carregar_aliases(caminho: Path | None) -> dict[str, str]:
     return {normalizar_texto(chave): normalizar_texto(valor) for chave, valor in pares.items()}
 
 
+def validar_plano_documental(documentos: dict[str, Any] | None) -> dict[str, Any]:
+    if not documentos:
+        return {
+            "fornecido": False,
+            "somente_leitura": True,
+            "plano_id": None,
+            "assinatura_sha256": None,
+        }
+    somente_leitura = (
+        documentos.get("plano_gera_escrita") is False
+        and documentos.get("escritas_executadas") == 0
+        and documentos.get("tabelas_operacionais_alteradas") == 0
+    )
+    if not somente_leitura:
+        raise ValueError("o plano documental precisa comprovar zero escrita operacional")
+    assinavel = {chave: valor for chave, valor in documentos.items() if chave != "gerado_em"}
+    fontes = documentos.get("fontes") or {}
+    return {
+        "fornecido": True,
+        "somente_leitura": True,
+        "plano_id": documentos.get("plano_id"),
+        "assinatura_sha256": hashlib.sha256(
+            json.dumps(assinavel, ensure_ascii=False, sort_keys=True).encode()
+        ).hexdigest(),
+        "vinculos_nf_gta": len(documentos.get("vinculos_nf_gta") or []),
+        "candidatos_banco": len(documentos.get("candidatos_banco") or []),
+        "candidatos_negocio": len(documentos.get("candidatos_negocio") or []),
+        "transacoes_banco": (fontes.get("banco") or {}).get("transacoes"),
+        "notas_agronotas": (fontes.get("agronotas") or {}).get("notas"),
+        "notas_com_gta": (fontes.get("agronotas") or {}).get("com_gta"),
+        "movimentos_ima": (fontes.get("ima") or {}).get("movimentos"),
+        "negocios_fonte": (fontes.get("negocios") or {}).get("registros"),
+    }
+
+
 def cruzar_gtas(mensagens: list[dict[str, Any]], documentos: dict[str, Any] | None) -> dict[str, Any]:
     referencias: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for mensagem in mensagens:
@@ -406,6 +441,7 @@ def cortes_fontes(documentos: dict[str, Any] | None, complemento_ima: dict[str, 
 def gerar_plano(exportacoes: list[dict[str, Any]], aliases: dict[str, str],
                 documentos: dict[str, Any] | None = None,
                 complemento_ima: dict[str, Any] | None = None) -> dict[str, Any]:
+    validacao_documental = validar_plano_documental(documentos)
     mensagens = [mensagem for exportacao in exportacoes for mensagem in exportacao["mensagens"]]
     for ordem_global, mensagem in enumerate(mensagens):
         mensagem["ordem_global"] = ordem_global
@@ -439,6 +475,7 @@ def gerar_plano(exportacoes: list[dict[str, Any]], aliases: dict[str, str],
             "anexos_omitidos": item["anexos_omitidos"],
         } for item in exportacoes],
         "cortes": cortes_fontes(documentos, complemento_ima),
+        "validacao_documental": validacao_documental,
         "resumo": {
             "mensagens": len(mensagens),
             "mensagens_texto_unicas": len({item["texto_sha256"] for item in mensagens if item["texto_sha256"]}),
@@ -491,6 +528,7 @@ def gerar_plano(exportacoes: list[dict[str, Any]], aliases: dict[str, str],
 
 def relatorio_markdown(plano: dict[str, Any]) -> str:
     resumo, cortes, gta = plano["resumo"], plano["cortes"], plano["cruzamento_gta"]
+    documental = plano["validacao_documental"]
     fontes = "\n".join(
         f"- {item['contexto']}: {item['mensagens']} mensagens, "
         f"{item['anexos_referenciados']} anexos, de {item['primeira_data']} a {item['ultima_data']}."
@@ -539,6 +577,21 @@ Plano `{plano['plano_id']}`. Modo somente leitura; nenhuma escrita foi executada
 - {resumo['grupos_ambiguos']} grupos permanecem ambíguos;
 - {resumo['correcoes_explicitas_preferidas']} grupos têm correção posterior explicitamente indicada;
 - {gta['vinculos_exatos']} vínculos GTA exatos com a fonte documental.
+
+## Conferência das fontes documentais
+
+- plano documental fornecido: {'sim' if documental['fornecido'] else 'não'};
+- plano documental somente leitura: {'sim' if documental['somente_leitura'] else 'não'};
+- vínculos NF/GTA na fonte: {documental.get('vinculos_nf_gta') or 0};
+- notas do Agronotas: {documental.get('notas_agronotas') or 0}, das quais {documental.get('notas_com_gta') or 0} com GTA;
+- transações no extrato: {documental.get('transacoes_banco') or 0};
+- candidatos bancários automáticos: {documental.get('candidatos_banco') or 0};
+- negócios na fonte de referência: {documental.get('negocios_fonte') or 0};
+- candidatos de negócio automáticos: {documental.get('candidatos_negocio') or 0};
+- movimentos na ficha detalhada do IMA: {documental.get('movimentos_ima') or 0}.
+
+A ausência de candidatos automáticos não é preenchida por aproximação de valor
+ou data; ela permanece como pendência de conciliação.
 
 ## Fila privada de conferência por negócio
 

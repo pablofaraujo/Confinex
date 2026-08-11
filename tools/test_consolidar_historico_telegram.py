@@ -9,6 +9,7 @@ from tools.consolidar_historico_telegram import (
     gerar_plano,
     ler_exportacao,
     relatorio_markdown,
+    validar_plano_documental,
 )
 
 
@@ -144,9 +145,13 @@ class ConsolidarHistoricoTelegramTest(unittest.TestCase):
             "mensagens": [], "anexos": [], "anexos_omitidos": 0,
             "primeira_data": None, "ultima_data": None,
         }
-        documentos = {"fontes": {
-            "agronotas": {"data_final": "2026-06-12"},
-            "banco": {"data_final": "2026-07-24"},
+        documentos = {
+            "plano_gera_escrita": False,
+            "escritas_executadas": 0,
+            "tabelas_operacionais_alteradas": 0,
+            "fontes": {
+            "agronotas": {"data_final": "2026-06-12", "notas": 4, "com_gta": 3},
+            "banco": {"data_final": "2026-07-24", "transacoes": 5},
             "ima": {"periodo_final": "2026-07-26", "saldo_rebanho": 253},
         }}
         plano = gerar_plano([exportacao], {}, documentos,
@@ -158,6 +163,42 @@ class ConsolidarHistoricoTelegramTest(unittest.TestCase):
         self.assertEqual(plano["escritas_executadas"], 0)
         self.assertEqual(plano["tabelas_operacionais_alteradas"], 0)
         self.assertFalse(plano["plano_gera_escrita"])
+        self.assertTrue(plano["validacao_documental"]["somente_leitura"])
+
+    def test_rejeita_plano_documental_que_nao_comprova_zero_escrita(self):
+        for documentos in (
+            {"plano_gera_escrita": True, "escritas_executadas": 0,
+             "tabelas_operacionais_alteradas": 0},
+            {"plano_gera_escrita": False, "escritas_executadas": 1,
+             "tabelas_operacionais_alteradas": 0},
+            {"plano_gera_escrita": False, "escritas_executadas": 0,
+             "tabelas_operacionais_alteradas": 1},
+        ):
+            with self.subTest(documentos=documentos):
+                with self.assertRaisesRegex(ValueError, "zero escrita operacional"):
+                    validar_plano_documental(documentos)
+
+    def test_assina_e_resume_fontes_documentais_sem_dados_reais(self):
+        documentos = {
+            "plano_id": "plano-teste",
+            "plano_gera_escrita": False,
+            "escritas_executadas": 0,
+            "tabelas_operacionais_alteradas": 0,
+            "fontes": {
+                "agronotas": {"notas": 10, "com_gta": 8},
+                "banco": {"transacoes": 12},
+                "ima": {"movimentos": 4},
+                "negocios": {"registros": 3},
+            },
+            "vinculos_nf_gta": [{"gta": "000001"}],
+            "candidatos_banco": [],
+            "candidatos_negocio": [],
+        }
+        resultado = validar_plano_documental(documentos)
+        self.assertTrue(resultado["somente_leitura"])
+        self.assertEqual(resultado["vinculos_nf_gta"], 1)
+        self.assertEqual(resultado["transacoes_banco"], 12)
+        self.assertEqual(len(resultado["assinatura_sha256"]), 64)
 
     def test_plano_id_e_deterministico_e_nao_ha_opcao_executar(self):
         exportacao = {

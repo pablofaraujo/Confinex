@@ -103,6 +103,12 @@ divergência financeira recebe prioridade alta; nenhuma linha mistura campos de
 mensagens diferentes. O JSON privado preserva cada versão e seus respectivos
 IDs de mensagem para auditoria.
 
+Quando recebe `--documentos-plano`, o importador exige que o plano declare
+explicitamente zero escrita e zero alteração operacional. A assinatura SHA-256
+do conteúdo documental, sem o horário de geração, integra o novo plano. O
+relatório resume as contagens de NF/GTA, extrato, negócios e IMA; ausência de
+candidato exato continua pendente e nunca é preenchida por aproximação.
+
 As regras permanentes do importador são:
 
 - mensagens agrupadas herdam o autor anterior e mantêm ID, ordem e contexto;
