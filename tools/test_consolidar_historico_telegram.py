@@ -8,6 +8,7 @@ from tools.consolidar_historico_telegram import (
     extrair_compra,
     gerar_plano,
     ler_exportacao,
+    relatorio_markdown,
 )
 
 
@@ -74,6 +75,9 @@ class ConsolidarHistoricoTelegramTest(unittest.TestCase):
         self.assertEqual(grupo["versao_preferida"]["quantidade"], 11)
         self.assertFalse(grupo["confirmado"])
         self.assertTrue(grupo["requer_revisao"])
+        self.assertEqual(grupo["situacao_revisao"], "conferir correção explícita")
+        self.assertEqual(grupo["prioridade_revisao"], "alta")
+        self.assertIn("cabeças", grupo["campos_divergentes_humanos"])
 
     def test_mesmo_fornecedor_e_data_com_dados_distintos_fica_ambiguo(self):
         primeira = extrair_compra(mensagem(
@@ -86,6 +90,10 @@ class ConsolidarHistoricoTelegramTest(unittest.TestCase):
         self.assertEqual(grupo["classificacao"], "ambiguo_multiplas_versoes")
         self.assertIsNone(grupo["versao_preferida"])
         self.assertFalse(grupo["confirmado"])
+        self.assertEqual(grupo["situacao_revisao"], "escolher a versão correta")
+        self.assertIn("peso total", grupo["campos_divergentes_humanos"])
+        self.assertIn("valor total", grupo["campos_ausentes_humanos"])
+        self.assertEqual(len(grupo["versoes_revisao"]), 2)
 
     def test_gta_exata_e_candidata_forte_mas_nao_confirmada(self):
         mensagens = [{
@@ -164,6 +172,28 @@ class ConsolidarHistoricoTelegramTest(unittest.TestCase):
         self.assertNotIn("--executar", fonte)
         self.assertNotIn("ConfinexClient", fonte)
         self.assertNotIn("requests.", fonte)
+
+    def test_relatorio_traz_fila_humana_sem_combinar_versoes(self):
+        primeira = extrair_compra(mensagem(
+            "Compra – Fornecedor\nQuantidade: 10 cabeças\nNegociação: 01/08/2026",
+            1, "m1"), {})
+        segunda = extrair_compra(mensagem(
+            "Compra – Fornecedor\nQuantidade: 12 cabeças\nNegociação: 01/08/2026",
+            2, "m2"), {})
+        exportacao = {
+            "contexto": "Grupo de Teste", "arquivo": "messages.html",
+            "arquivo_sha256": "a" * 64, "mensagens": [], "anexos": [],
+            "anexos_omitidos": 0, "primeira_data": None, "ultima_data": None,
+        }
+        plano = gerar_plano([exportacao], {})
+        plano["grupos_compras"] = agrupar_compras([primeira, segunda])
+        plano["resumo"]["grupos_compras"] = 1
+        plano["resumo"]["grupos_ambiguos"] = 1
+        texto = relatorio_markdown(plano)
+        self.assertIn("Fila privada de conferência por negócio", texto)
+        self.assertIn("escolher a versão correta", texto)
+        self.assertIn("não combina campos de versões diferentes", texto)
+        self.assertNotIn("{\"", texto)
 
 
 if __name__ == "__main__":

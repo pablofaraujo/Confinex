@@ -31,8 +31,9 @@ não se sobrepõem.
 - **Histórico Telegram:** exports HTML preservam contexto, ordem, autor e
   anexos; repetições são deduplicadas dentro do contexto; correção posterior
   não vira confirmação; negócios diferentes do mesmo fornecedor/data ficam
-  ambíguos; GTA exata é apenas candidato documental; o plano não possui opção
-  de execução nem cliente de escrita.
+  ambíguos; a fila privada identifica campos divergentes e ausentes sem
+  combinar versões; GTA exata é apenas candidato documental; o plano não
+  possui opção de execução nem cliente de escrita.
 - **Fila de Revisões:** rascunhos permanecem separados pelo nome do contexto;
   IDs de grupo e JSON não aparecem na apresentação; cada campo obrigatório
   ausente recebe aviso e destaque; salvar ajustes não promove; preparação fica

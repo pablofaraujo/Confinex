@@ -96,6 +96,13 @@ atual. A ficha sintética do IMA pode complementar o saldo e a data, mas uma
 variação sem ficha detalhada correspondente permanece inexplicada e não gera
 movimentação compensatória.
 
+O relatório Markdown privado inclui uma fila por negócio, ordenada por
+prioridade. Ela mostra contexto humano, data-base, quantidade de versões,
+campos divergentes, campos ausentes em todas as versões e a próxima ação. Uma
+divergência financeira recebe prioridade alta; nenhuma linha mistura campos de
+mensagens diferentes. O JSON privado preserva cada versão e seus respectivos
+IDs de mensagem para auditoria.
+
 As regras permanentes do importador são:
 
 - mensagens agrupadas herdam o autor anterior e mantêm ID, ordem e contexto;

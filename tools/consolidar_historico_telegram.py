@@ -28,6 +28,16 @@ PADROES = {
     "rascunho": re.compile(r"rascunho", re.I),
 }
 
+CAMPOS_COMPRA = {
+    "quantidade": "cabeças",
+    "peso_total_kg": "peso total",
+    "preco_arroba": "preço por arroba",
+    "valor_total": "valor total",
+    "data_negociacao": "data da negociação",
+    "data_pesagem": "data da pesagem",
+    "pagamento": "pagamento",
+}
+
 
 def normalizar_texto(valor: Any) -> str:
     texto = unicodedata.normalize("NFKD", str(valor or ""))
@@ -252,10 +262,31 @@ def dia_mensagem(valor: str | None) -> str | None:
 
 
 def assinatura_campos(compra: dict[str, Any]) -> tuple[Any, ...]:
-    return tuple(compra.get(campo) for campo in (
-        "quantidade", "peso_total_kg", "preco_arroba", "valor_total",
-        "data_negociacao", "data_pesagem", "pagamento",
-    ))
+    return tuple(compra.get(campo) for campo in CAMPOS_COMPRA)
+
+
+def campos_divergentes(versoes: list[dict[str, Any]]) -> list[str]:
+    return [
+        campo for campo in CAMPOS_COMPRA
+        if len({versao.get(campo) for versao in versoes}) > 1
+    ]
+
+
+def campos_ausentes_em_todas(versoes: list[dict[str, Any]]) -> list[str]:
+    return [
+        campo for campo in CAMPOS_COMPRA
+        if all(versao.get(campo) in (None, "") for versao in versoes)
+    ]
+
+
+def classificar_revisao(classificacao: str, divergentes: list[str]) -> tuple[str, str, str]:
+    if classificacao == "repeticao_deduplicavel":
+        return "repetição sem conflito", "baixa", "manter uma evidência e preservar as referências"
+    if classificacao == "correcao_explicita_mais_recente":
+        return "conferir correção explícita", "alta", "comparar a correção com a fonte e confirmar"
+    financeiros = {"quantidade", "preco_arroba", "valor_total", "pagamento"}
+    prioridade = "alta" if financeiros.intersection(divergentes) else "média"
+    return "escolher a versão correta", prioridade, "conferir as mensagens e escolher sem combinar valores"
 
 
 def agrupar_compras(compras: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -278,14 +309,33 @@ def agrupar_compras(compras: list[dict[str, Any]]) -> list[dict[str, Any]]:
         else:
             classificacao = "ambiguo_multiplas_versoes"
             preferida = None
+        divergentes = campos_divergentes(versoes)
+        ausentes = campos_ausentes_em_todas(versoes)
+        situacao, prioridade, acao = classificar_revisao(classificacao, divergentes)
         saida.append({
             "chave_provisoria": chave,
+            "contexto": versoes[0]["contexto"],
+            "negocio": versoes[0]["rotulo"],
+            "data_base": versoes[0]["data_negociacao"] or dia_mensagem(versoes[0]["data_mensagem"]),
             "classificacao": classificacao,
+            "situacao_revisao": situacao,
+            "prioridade_revisao": prioridade,
+            "acao_recomendada": acao,
             "versoes": len(versoes),
             "campos_distintos": len(assinaturas),
+            "campos_divergentes": divergentes,
+            "campos_divergentes_humanos": [CAMPOS_COMPRA[campo] for campo in divergentes],
+            "campos_ausentes_em_todas": ausentes,
+            "campos_ausentes_humanos": [CAMPOS_COMPRA[campo] for campo in ausentes],
             "confirmado": False,
             "requer_revisao": classificacao != "repeticao_deduplicavel",
             "versao_preferida": preferida,
+            "versoes_revisao": [{
+                "mensagem_id": item["mensagem_id"],
+                "data_mensagem": item["data_mensagem"],
+                "eh_correcao_explicita": item["eh_correcao_explicita"],
+                "dados": {campo: item.get(campo) for campo in CAMPOS_COMPRA},
+            } for item in versoes],
             "mensagens": [item["mensagem_id"] for item in versoes],
         })
     return saida
@@ -411,6 +461,18 @@ def gerar_plano(exportacoes: list[dict[str, Any]], aliases: dict[str, str],
     plano["resumo"]["grupos_compras"] = len(plano["grupos_compras"])
     plano["resumo"]["grupos_ambiguos"] = ambiguos
     plano["resumo"]["correcoes_explicitas_preferidas"] = correcoes
+    fila_revisao = [grupo for grupo in plano["grupos_compras"] if grupo["requer_revisao"]]
+    plano["resumo_revisao"] = {
+        "negocios_para_revisar": len(fila_revisao),
+        "prioridade_alta": sum(grupo["prioridade_revisao"] == "alta" for grupo in fila_revisao),
+        "prioridade_media": sum(grupo["prioridade_revisao"] == "média" for grupo in fila_revisao),
+        "correcoes_explicitas": sum(
+            grupo["classificacao"] == "correcao_explicita_mais_recente" for grupo in fila_revisao
+        ),
+        "ambiguidades_sem_preferencia": sum(
+            grupo["classificacao"] == "ambiguo_multiplas_versoes" for grupo in fila_revisao
+        ),
+    }
     if ambiguos:
         plano["pendencias"].append("compras_com_multiplas_versoes_exigem_revisao")
     if plano["resumo"]["anexos_omitidos"]:
@@ -435,6 +497,24 @@ def relatorio_markdown(plano: dict[str, Any]) -> str:
         for item in plano["fontes"]
     )
     pendencias = "\n".join(f"- {item}" for item in plano["pendencias"]) or "- nenhuma"
+    fila = [grupo for grupo in plano["grupos_compras"] if grupo["requer_revisao"]]
+    linhas_revisao = []
+    for grupo in sorted(
+        fila,
+        key=lambda item: ({"alta": 0, "média": 1, "baixa": 2}[item["prioridade_revisao"]], item["chave_provisoria"]),
+    ):
+        divergentes = ", ".join(grupo["campos_divergentes_humanos"]) or "nenhum"
+        ausentes = ", ".join(grupo["campos_ausentes_humanos"]) or "nenhum"
+        linhas_revisao.append(
+            f"| {grupo['prioridade_revisao']} | {grupo['situacao_revisao']} | "
+            f"{grupo['contexto']} | {grupo['negocio']} | "
+            f"{grupo['data_base'] or 'sem data'} | {grupo['versoes']} | {divergentes} | {ausentes} | "
+            f"{grupo['acao_recomendada']} |"
+        )
+    tabela_revisao = (
+        "\n".join(linhas_revisao)
+        or "| — | — | — | — | — | 0 | — | — | nenhuma revisão |"
+    )
     return f"""# Consolidação privada do histórico Telegram
 
 Plano `{plano['plano_id']}`. Modo somente leitura; nenhuma escrita foi executada.
@@ -459,6 +539,15 @@ Plano `{plano['plano_id']}`. Modo somente leitura; nenhuma escrita foi executada
 - {resumo['grupos_ambiguos']} grupos permanecem ambíguos;
 - {resumo['correcoes_explicitas_preferidas']} grupos têm correção posterior explicitamente indicada;
 - {gta['vinculos_exatos']} vínculos GTA exatos com a fonte documental.
+
+## Fila privada de conferência por negócio
+
+| Prioridade | Situação | Contexto | Negócio | Data-base | Versões | O que diverge | Ausente em todas | Próxima ação |
+|---|---|---|---|---|---:|---|---|---|
+{tabela_revisao}
+
+Esta fila não combina campos de versões diferentes. A versão indicada por uma
+correção explícita continua pendente de confirmação na fonte.
 
 ## Regras validadas
 
