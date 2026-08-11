@@ -1,6 +1,6 @@
 # Bateria de testes do ecossistema
 
-Atualizado em 2026-07-23. A entrada única é:
+Atualizado em 2026-08-11. A entrada única é:
 
 ```bash
 python3 tools/test_ecossistema.py
@@ -28,6 +28,11 @@ não se sobrepõem.
   `pdf`, `image`, `file_fetch` e OCR interno não podem ser usados antes nem
   depois do roteador. Compra usa OCR OpenClaw/OpenAI, calcula somente com base
   suficiente e informa peso, data ou pagamento ausentes sem inventar.
+- **Histórico Telegram:** exports HTML preservam contexto, ordem, autor e
+  anexos; repetições são deduplicadas dentro do contexto; correção posterior
+  não vira confirmação; negócios diferentes do mesmo fornecedor/data ficam
+  ambíguos; GTA exata é apenas candidato documental; o plano não possui opção
+  de execução nem cliente de escrita.
 - **Fila de Revisões:** rascunhos permanecem separados pelo nome do contexto;
   IDs de grupo e JSON não aparecem na apresentação; cada campo obrigatório
   ausente recebe aviso e destaque; salvar ajustes não promove; preparação fica

@@ -69,6 +69,47 @@ Números de GTA, NF, lançamentos e negócios permanecem somente nos relatórios
 `docs/privado/`, que não são versionados. O repositório público guarda apenas o
 código, testes e regras sanitizadas.
 
+## Histórico exportado do Telegram
+
+`tools/consolidar_historico_telegram.py` transforma um ou mais arquivos
+`messages.html` exportados pelo Telegram Desktop em um plano privado e
+reexecutável. Ele trabalha apenas com os arquivos locais: não chama o Telegram,
+o Supabase ou qualquer serviço de OCR.
+
+```bash
+python3 tools/consolidar_historico_telegram.py \
+  --telegram-html /caminho/privado/grupo/messages.html \
+  --contexto "Nome humano do grupo" \
+  --aliases /caminho/privado/aliases.json \
+  --documentos-plano /caminho/privado/conciliacao-documentos.json \
+  --complemento-ima /caminho/privado/saldo-ima.json \
+  --saida-json /caminho/privado/consolidacao-telegram.json \
+  --saida-md /caminho/privado/consolidacao-telegram.md
+```
+
+Para vários exports, repita `--telegram-html` e `--contexto` na mesma ordem.
+Partes sucessivas do mesmo chat devem receber o mesmo nome humano. Apelidos de
+fornecedor ficam num JSON privado explícito, nunca embutidos no código público.
+
+O plano registra os cortes informados pelas fontes em vez de assumir posição
+atual. A ficha sintética do IMA pode complementar o saldo e a data, mas uma
+variação sem ficha detalhada correspondente permanece inexplicada e não gera
+movimentação compensatória.
+
+As regras permanentes do importador são:
+
+- mensagens agrupadas herdam o autor anterior e mantêm ID, ordem e contexto;
+- anexos presentes recebem hash; anexos omitidos viram pendência;
+- conteúdo repetido é deduplicado somente dentro do mesmo contexto;
+- testes, homologações e modelos não entram nos negócios reais;
+- duas versões iguais são repetição; campos divergentes permanecem ambíguos;
+- uma correção explicitamente posterior pode ser indicada como preferida, mas
+  continua não confirmada e revisável;
+- mesmo fornecedor e mesma data nunca bastam para unir compras distintas;
+- GTA com número exatamente igual ao plano documental é candidato forte, sem
+  confirmação ou escrita automática;
+- não existe argumento `--executar` nem caminho de promoção operacional.
+
 ## Atualização por OFX
 
 `tools/analisar_extrato_ofx.py` compara um OFX recém-baixado com um snapshot
