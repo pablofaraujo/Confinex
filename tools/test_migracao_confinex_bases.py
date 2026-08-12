@@ -20,6 +20,9 @@ class MigracaoBasesOnlineTests(unittest.TestCase):
         self.assertIn("enable row level security", self.sql)
         self.assertGreaterEqual(self.sql.count("criado_por = auth.uid()"), 2)
         self.assertNotIn("to anon", self.sql)
+        self.assertIn("revoke all on public.confinex_bases from anon", self.sql)
+        self.assertIn("revoke all on public.confinex_bases from public", self.sql)
+        self.assertIn("revoke all on function public.salvar_base_confinex", self.sql)
 
     def test_chave_e_nome_sao_obrigatorios(self):
         self.assertIn("primary key (criado_por, chave)", self.sql)

@@ -72,8 +72,9 @@ aplicação protegida e reversão estão em `docs/contextos-por-grupo.md`.
 As bases de confinamento deixam de depender somente do navegador:
 `confinex_bases` mantém um catálogo pessoal, isolado por usuário, enquanto o
 `localStorage` permanece como contingência offline. A migração aditiva
-`supabase/migrations/202608120001_confinex_bases_online.sql` precisa de
-aplicação autorizada. Ela não transporta automaticamente as bases antigas; no
+`supabase/migrations/202608120001_confinex_bases_online.sql` foi aplicada em
+12/08/2026 com RLS e permissões exclusivas para `authenticated`. Ela não
+transporta automaticamente as bases antigas; no
 aparelho que já as possui, **Sincronizar bases** faz a primeira cópia
 consciente. Abrir o app pode ler somente esse catálogo, sem carregar nem
 substituir o estudo completo salvo no Sheets.

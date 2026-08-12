@@ -28,14 +28,17 @@ O Google Sheets permanece como compatibilidade temporária. A estimativa origina
 
 Negócios cancelados continuam no banco para auditoria, mas as páginas operacionais os excluem das listas.
 
-## Bases do simulador — migração preparada, não aplicada
+## Bases do simulador — migração aplicada
 
 `migrations/202608120001_confinex_bases_online.sql` cria somente o catálogo
 pessoal `confinex_bases` e a função de salvamento com proteção contra uma cópia
 antiga sobrescrever a versão online mais nova. A RLS isola cada usuário e não
 há leitura ou escrita em compras, vendas, abates, pesagens ou avaliações.
 
-Não aplicar sem autorização explícita. Depois da aplicação, entrar no
-ecossistema no aparelho que contém as bases e usar **Sincronizar bases** uma
-vez; em computadores novos, o catálogo será carregado automaticamente após o
-login.
+Aplicada em 12/08/2026 depois de autorização explícita, sem criar bases nem
+alterar tabelas operacionais. RLS, política, função `security invoker`, acesso
+de `authenticated` e bloqueio de `anon` foram conferidos em modo leitura.
+
+No aparelho que contém as bases antigas, entrar no ecossistema e usar
+**Sincronizar bases** uma vez; em computadores novos, o catálogo será carregado
+automaticamente após o login.

@@ -38,8 +38,14 @@ A migração é aditiva e cria somente:
 - RLS por `auth.uid()`;
 - função `public.salvar_base_confinex`.
 
-Ela não foi aplicada durante a preparação desta mudança. Depois de autorização
-explícita, aplicar somente esse arquivo e verificar em modo leitura:
+O papel anônimo e `public` não possuem permissão sobre a tabela nem execução da
+função; somente `authenticated` recebe as permissões necessárias, sempre sob
+RLS.
+
+Ela foi aplicada em 12/08/2026 depois de autorização explícita. A conferência
+somente leitura comprovou tabela vazia, RLS ativa, uma política por usuário,
+função `security invoker`, acesso completo para `authenticated`, ausência de
+acesso para `anon` e assinaturas operacionais inalteradas:
 
 ```sql
 select table_name
@@ -51,7 +57,7 @@ from pg_policies
 where schemaname = 'public' and tablename = 'confinex_bases';
 ```
 
-Não é necessário criar registro de teste real para confirmar a estrutura.
+Não foi necessário criar registro de teste real para confirmar a estrutura.
 
 ## Reversão
 

@@ -11,7 +11,7 @@ compartilhado, renomeado ou alterado.
 - Dados operacionais confirmados: Supabase.
 - Simulação local e recuperação offline: `localStorage`.
 - Bases reutilizáveis de confinamento entre aparelhos: `confinex_bases` no
-  Supabase, depois da aplicação autorizada da migração correspondente.
+  Supabase, com a migração aplicada em 12/08/2026.
 - Sheets/Apps Script: compatibilidade entre dispositivos e histórico antigo.
 - Código: GitHub; a pasta de código no Drive é somente um espelho antigo.
 

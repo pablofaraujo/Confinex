@@ -24,6 +24,8 @@ create policy confinex_bases_do_usuario
   using (criado_por = auth.uid())
   with check (criado_por = auth.uid());
 
+revoke all on public.confinex_bases from public;
+revoke all on public.confinex_bases from anon;
 grant select, insert, update, delete on public.confinex_bases to authenticated;
 
 create or replace function public.salvar_base_confinex(
@@ -66,6 +68,8 @@ begin
 end;
 $$;
 
+revoke all on function public.salvar_base_confinex(text, text, jsonb, timestamptz) from public;
+revoke all on function public.salvar_base_confinex(text, text, jsonb, timestamptz) from anon;
 grant execute on function public.salvar_base_confinex(text, text, jsonb, timestamptz)
   to authenticated;
 
