@@ -18,6 +18,12 @@ import {
   mesclarCotacoesBgiAutomaticas
 } from "./js/confinex-bgi.mjs";
 import { calcularReferenciasTransporte } from "./js/confinex-referencias-transporte.mjs";
+import {
+  apagarBaseOnline,
+  listarBasesOnline,
+  mesclarBasesConfinamento,
+  salvarBaseOnline
+} from "./js/confinex-bases-online.mjs";
 
 // confinex_work.jsx
 import { useEffect, useState, useMemo, useRef } from "react";
@@ -1097,7 +1103,8 @@ var CAMPOS_MODELO_CONFINAMENTO = [
   "modoCapimVenda"
 ];
 function modeloFromSc(sc, nome) {
-  const modelo = { id: Date.now(), nome: nome || sc.nome || "Confinamento" };
+  const agora = (/* @__PURE__ */ new Date()).toISOString();
+  const modelo = { id: Date.now(), nome: nome || sc.nome || "Confinamento", atualizadoEm: agora };
   CAMPOS_MODELO_CONFINAMENTO.forEach((k) => {
     modelo[k] = sc[k];
   });
@@ -1296,7 +1303,7 @@ function Ck({ checked, onChange, label }) {
     /* @__PURE__ */ jsx("span", { children: label })
   ] });
 }
-function ScPanel({ sc, upd, sexo, custoDinheiro, resultado, confinamentos, modeloSelecionado, setModeloSelecionado, aplicarModelo, salvarModelo, atualizarModelo, apagarModelo, calcularDistancia, statusDistancia }) {
+function ScPanel({ sc, upd, sexo, custoDinheiro, resultado, confinamentos, modeloSelecionado, setModeloSelecionado, aplicarModelo, salvarModelo, atualizarModelo, apagarModelo, sincronizarBasesOnline, statusBasesOnline, calcularDistancia, statusDistancia }) {
   const u = (k) => (v) => upd(k, v && v.target ? v.target.value : v);
   const isRev = sc.tipo === "revenda";
   const freteDeles = sc.respFrete === "confinamento";
@@ -1327,8 +1334,10 @@ function ScPanel({ sc, upd, sexo, custoDinheiro, resultado, confinamentos, model
           /* @__PURE__ */ jsx("button", { className: "tb", style: { padding: "10px 13px", color: T.red }, disabled: !modeloSelecionado, onClick: apagarModelo, children: "Apagar" })
         ] }) })
       ] }),
-      confinamentos.length === 0 && /* @__PURE__ */ jsx("div", { className: "hint", style: { marginTop: 8 }, children: "Ajuste dist\xE2ncia, modalidade e custos abaixo, depois salve como base." }),
-      confinamentos.length > 0 && /* @__PURE__ */ jsx("div", { className: "hint", style: { marginTop: 8 }, children: `${confinamentos.length} base(s) salva(s). Resetar inicia um novo estudo, mas mantem estas bases disponiveis.` }),
+      /* @__PURE__ */ jsxs("div", { style: { display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginTop: 8 }, children: [
+        /* @__PURE__ */ jsx("div", { className: "hint", style: { flex: 1, minWidth: 220 }, children: confinamentos.length === 0 ? `Ajuste distância, modalidade e custos abaixo, depois salve como base. ${statusBasesOnline}` : `${confinamentos.length} base(s) disponível(is). ${statusBasesOnline}` }),
+        /* @__PURE__ */ jsx("button", { className: "tb", style: { padding: "7px 10px" }, onClick: sincronizarBasesOnline, children: "Sincronizar bases" })
+      ] }),
       /* @__PURE__ */ jsx("div", { className: "dvdr" })
     ] }),
     !isRev && /* @__PURE__ */ jsxs(Fragment, { children: [
@@ -2193,6 +2202,7 @@ function Confinex() {
   const [backendUrl, setBackendUrl] = useState(getStoredSheetsBackendUrl);
   const [statusSheets, setStatusSheets] = useState(backendUrl ? "Cópia online disponível." : "Salvo somente neste aparelho.");
   const [statusSupabase, setStatusSupabase] = useState("Supabase: aguardando um negócio ser iniciado.");
+  const [statusBasesOnline, setStatusBasesOnline] = useState("Procurando bases online...");
   const [versoesSalvas, setVersoesSalvas] = useState(carregarVersoesNomeadas);
   const [versaoSelecionada, setVersaoSelecionada] = useState("");
   const contratosB3Estudo = [...new Set([...cenarios.map(contratoB3DoCenario).filter(Boolean), ...contratosB3DaEvolucao(cenarios)])].sort(compararContratosB3);
@@ -2237,6 +2247,85 @@ function Confinex() {
   const aplicarEstadoSheets = (data) => {
     aplicarEstado(normalizeSheetsState(data));
   };
+  const clienteSupabase = () => window.CFAgro?.db || null;
+  const carregarBasesOnline = async ({ mostrarStatus = true } = {}) => {
+    const db = clienteSupabase();
+    if (!db) {
+      if (mostrarStatus) setStatusBasesOnline("A conexão online ainda não carregou; as bases deste aparelho foram mantidas.");
+      return [];
+    }
+    try {
+      const online = await listarBasesOnline({ supabase: db });
+      setConfinamentos((locais) => mesclarBasesConfinamento(locais, online));
+      if (mostrarStatus) setStatusBasesOnline(`${online.length} base(s) online sincronizada(s).`);
+      return online;
+    } catch (err) {
+      const mensagem = String(err?.message || "");
+      if (/Entre no ecossistema/i.test(mensagem)) {
+        setStatusBasesOnline("Entre no ecossistema neste aparelho para carregar suas bases online.");
+      } else if (/confinex_bases|salvar_base_confinex|relation/i.test(mensagem)) {
+        setStatusBasesOnline("O catálogo online ainda não foi ativado; as bases deste aparelho seguem disponíveis.");
+      } else if (mostrarStatus) {
+        setStatusBasesOnline("Não foi possível consultar as bases online; as bases deste aparelho foram mantidas.");
+      }
+      return [];
+    }
+  };
+  const salvarBaseNaNuvem = async (base) => {
+    const db = clienteSupabase();
+    if (!db) {
+      setStatusBasesOnline("Base salva neste aparelho. Entre no ecossistema e sincronize para usá-la em outro computador.");
+      return null;
+    }
+    try {
+      const salva = await salvarBaseOnline({ supabase: db, base });
+      setStatusBasesOnline("Base salva neste aparelho e online.");
+      return salva;
+    } catch (err) {
+      const mensagem = String(err?.message || "");
+      setStatusBasesOnline(/Entre no ecossistema/i.test(mensagem) ? "Base salva neste aparelho. Entre no ecossistema e sincronize para usá-la em outro computador." : "Base salva neste aparelho; o catálogo online não respondeu.");
+      return null;
+    }
+  };
+  const sincronizarBasesOnline = async () => {
+    const db = clienteSupabase();
+    if (!db) {
+      setStatusBasesOnline("A conexão online ainda não carregou. Tente novamente em alguns segundos.");
+      return;
+    }
+    setStatusBasesOnline("Sincronizando bases...");
+    try {
+      const online = await listarBasesOnline({ supabase: db });
+      const lista = mesclarBasesConfinamento(confinamentos, online);
+      const salvas = [];
+      for (const base of lista) salvas.push(await salvarBaseOnline({ supabase: db, base }));
+      const final = mesclarBasesConfinamento(lista, salvas);
+      setConfinamentos(final);
+      setStatusBasesOnline(`${final.length} base(s) disponível(is) neste aparelho e online.`);
+    } catch (err) {
+      const mensagem = String(err?.message || "");
+      setStatusBasesOnline(/Entre no ecossistema/i.test(mensagem) ? "Entre no ecossistema neste aparelho para sincronizar suas bases." : "Não foi possível sincronizar agora; nenhuma base deste aparelho foi perdida.");
+    }
+  };
+  useEffect(() => {
+    let cancelado = false;
+    let tentativas = 0;
+    let timer = null;
+    const tentar = async () => {
+      if (cancelado) return;
+      if (!clienteSupabase() && tentativas < 40) {
+        tentativas += 1;
+        timer = setTimeout(tentar, 250);
+        return;
+      }
+      if (!cancelado) await carregarBasesOnline({ mostrarStatus: true });
+    };
+    tentar();
+    return () => {
+      cancelado = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
   const salvarPontoRetorno = () => {
     localStorage.setItem(RESTORE_STORAGE_KEY, JSON.stringify(estadoAtual()));
   };
@@ -2659,26 +2748,38 @@ function Confinex() {
     setCenarios((p) => p.map((s, j) => j === scAtivo ? scFromModelo(s, modelo) : s));
     setResultados([]);
   };
-  const salvarModelo = () => {
+  const salvarModelo = async () => {
     const nome = window.prompt("Nome da base do confinamento", cenarios[scAtivo]?.nome || "Confinamento");
     if (!nome) return;
     const novo = modeloFromSc(cenarios[scAtivo], nome.trim());
-    setConfinamentos((p) => [...p, novo]);
+    setConfinamentos((p) => mesclarBasesConfinamento(p, [novo]));
     setModeloSelecionado(String(novo.id));
+    await salvarBaseNaNuvem(novo);
   };
-  const atualizarModelo = () => {
+  const atualizarModelo = async () => {
     const modelo = confinamentos.find((m) => String(m.id) === String(modeloSelecionado));
     if (!modelo) return;
-    setConfinamentos((p) => p.map(
-      (m) => String(m.id) === String(modeloSelecionado) ? { ...modeloFromSc(cenarios[scAtivo], m.nome), id: m.id } : m
-    ));
+    const atualizada = { ...modeloFromSc(cenarios[scAtivo], modelo.nome), id: modelo.id };
+    setConfinamentos((p) => p.map((m) => String(m.id) === String(modeloSelecionado) ? atualizada : m));
+    await salvarBaseNaNuvem(atualizada);
   };
-  const apagarModelo = () => {
+  const apagarModelo = async () => {
     const modelo = confinamentos.find((m) => String(m.id) === String(modeloSelecionado));
     if (!modelo) return;
     if (!window.confirm(`Apagar a base "${modelo.nome}"?`)) return;
     setConfinamentos((p) => p.filter((m) => String(m.id) !== String(modeloSelecionado)));
     setModeloSelecionado("");
+    const db = clienteSupabase();
+    if (!db) {
+      setStatusBasesOnline("Base apagada deste aparelho. Entre no ecossistema para removê-la também da cópia online.");
+      return;
+    }
+    try {
+      await apagarBaseOnline({ supabase: db, chave: modelo.id });
+      setStatusBasesOnline("Base apagada deste aparelho e online.");
+    } catch {
+      setStatusBasesOnline("Base apagada deste aparelho; não foi possível removê-la da cópia online.");
+    }
   };
   const exportarJSON = () => {
     const dados = { lote, cenarios, confinamentos, historico, versao: "1.3-supabase", data: (/* @__PURE__ */ new Date()).toISOString() };
@@ -2993,6 +3094,8 @@ function Confinex() {
               salvarModelo,
               atualizarModelo,
               apagarModelo,
+              sincronizarBasesOnline,
+              statusBasesOnline,
               calcularDistancia,
               statusDistancia
             },

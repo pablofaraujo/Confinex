@@ -27,3 +27,15 @@ há políticas de `insert`, `update` ou `delete`.
 O Google Sheets permanece como compatibilidade temporária. A estimativa original submetida é imutável; mudanças completas de premissas e resultado usam `revisar_estimativa_confinex`, enquanto mudanças rotineiras do prazo operacional usam `ajustar_prazo_confinex`. Ambas exigem motivo. Agentes e integrações externas não devem chamar `iniciar_negocio_confinex`: devem submeter para aprovação.
 
 Negócios cancelados continuam no banco para auditoria, mas as páginas operacionais os excluem das listas.
+
+## Bases do simulador — migração preparada, não aplicada
+
+`migrations/202608120001_confinex_bases_online.sql` cria somente o catálogo
+pessoal `confinex_bases` e a função de salvamento com proteção contra uma cópia
+antiga sobrescrever a versão online mais nova. A RLS isola cada usuário e não
+há leitura ou escrita em compras, vendas, abates, pesagens ou avaliações.
+
+Não aplicar sem autorização explícita. Depois da aplicação, entrar no
+ecossistema no aparelho que contém as bases e usar **Sincronizar bases** uma
+vez; em computadores novos, o catálogo será carregado automaticamente após o
+login.

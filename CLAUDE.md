@@ -67,6 +67,17 @@ aplicação protegida e reversão estão em `docs/contextos-por-grupo.md`.
 
 ## Deploy
 
+### Bases reutilizáveis entre aparelhos
+
+As bases de confinamento deixam de depender somente do navegador:
+`confinex_bases` mantém um catálogo pessoal, isolado por usuário, enquanto o
+`localStorage` permanece como contingência offline. A migração aditiva
+`supabase/migrations/202608120001_confinex_bases_online.sql` precisa de
+aplicação autorizada. Ela não transporta automaticamente as bases antigas; no
+aparelho que já as possui, **Sincronizar bases** faz a primeira cópia
+consciente. Abrir o app pode ler somente esse catálogo, sem carregar nem
+substituir o estudo completo salvo no Sheets.
+
 Push na `main` → workflow `deploy.yml` publica o repositório inteiro no GitHub Pages (sem build). O workflow também aceita execução manual para recuperar uma implantação travada sem criar commit vazio. Cuidado: tudo que estiver commitado fica público.
 
 ## Regra permanente — Design System

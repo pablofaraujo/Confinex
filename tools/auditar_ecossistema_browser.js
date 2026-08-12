@@ -153,6 +153,97 @@ async function auditarSafari14Confinex(browser, viewport, resultados) {
   ));
 }
 
+async function auditarBasesOnlineConfinex(browser, viewport, resultados) {
+  const context = await browser.newContext({
+    viewport: { width: viewport.largura, height: viewport.altura },
+  });
+  await context.addInitScript(() => {
+    localStorage.clear();
+    Object.defineProperty(window, 'CONFINEX_SHEETS_API_URL', {
+      configurable: false,
+      get: () => '',
+      set: () => {},
+    });
+    const atualizadaEm = '2026-08-12T10:00:00.000Z';
+    const base = { id: 'base-online-teste', nome: 'Base online controlada', km: '145', atualizadoEm: atualizadaEm };
+    window.__BASES_ONLINE_CHAMADAS = [];
+    window.CFAgro = {
+      db: {
+        auth: {
+          getSession: async () => ({ data: { session: { user: { id: 'usuario-controlado' } } }, error: null }),
+        },
+        from: tabela => {
+          window.__BASES_ONLINE_CHAMADAS.push(['from', tabela]);
+          return {
+            select: () => ({
+              order: async () => ({
+                data: [{ chave: base.id, nome: base.nome, dados: base, atualizado_em: atualizadaEm }],
+                error: null,
+              }),
+            }),
+            delete: () => ({ eq: async () => ({ error: null }) }),
+          };
+        },
+        rpc: async (funcao, payload) => {
+          window.__BASES_ONLINE_CHAMADAS.push(['rpc', funcao]);
+          return {
+            data: [{ chave: payload.p_chave, nome: payload.p_nome, dados: payload.p_dados, atualizado_em: payload.p_atualizado_em }],
+            error: null,
+          };
+        },
+      },
+    };
+  });
+  const page = await context.newPage();
+  const erros = [];
+  page.on('console', msg => { if (msg.type() === 'error') erros.push(`console: ${msg.text()}`); });
+  page.on('pageerror', erro => erros.push(`javascript: ${erro.message}`));
+  await page.route('**/supabase-js@*/**', rota => rota.fulfill({ status: 200, contentType: 'application/javascript', body: '' }));
+  await page.route('**/js/cfagro-core.js*', rota => rota.fulfill({ status: 200, contentType: 'application/javascript', body: '' }));
+  try {
+    await page.goto(new URL('confinex.html?validacao=bases-online', baseUrl).href, { waitUntil: 'load', timeout: 30000 });
+    const seletor = page.locator('.fld').filter({ hasText: 'Selecionar base' }).locator('select').first();
+    await seletor.locator('option', { hasText: 'Base online controlada' }).waitFor({ state: 'attached', timeout: 15000 });
+    const antes = await page.evaluate(() => ({
+      estadoLocalInicial: localStorage.getItem('confinex:last-state:v3'),
+      chamadas: window.__BASES_ONLINE_CHAMADAS.slice(),
+    }));
+    await page.getByRole('button', { name: 'Sincronizar bases', exact: true }).first().click();
+    await page.waitForFunction(() => window.__BASES_ONLINE_CHAMADAS.some(chamada => chamada[0] === 'rpc'));
+    const depois = await page.evaluate(() => ({
+      chamadas: window.__BASES_ONLINE_CHAMADAS.slice(),
+      texto: document.querySelector('#root')?.textContent || '',
+    }));
+    const tabelas = depois.chamadas.filter(chamada => chamada[0] === 'from').map(chamada => chamada[1]);
+    const funcoes = depois.chamadas.filter(chamada => chamada[0] === 'rpc').map(chamada => chamada[1]);
+    const ok = antes.chamadas.some(chamada => chamada[0] === 'from' && chamada[1] === 'confinex_bases') &&
+      funcoes.includes('salvar_base_confinex') &&
+      tabelas.every(tabela => tabela === 'confinex_bases') &&
+      depois.texto.includes('Base online controlada') &&
+      depois.texto.includes('disponível(is) neste aparelho e online') &&
+      erros.length === 0;
+    resultados.push(item(
+      `browser:${viewport.nome}:confinex:bases-online`,
+      'Bases do Confinex entre aparelhos',
+      `computador novo em ${viewport.nome}, com armazenamento local vazio`,
+      'carrega a base autenticada, sincroniza somente o catálogo e não acessa tabelas operacionais',
+      ok,
+      `tabelas=${JSON.stringify(tabelas)} funções=${JSON.stringify(funcoes)} baseVisível=${depois.texto.includes('Base online controlada')} erros=${erros.length}`,
+    ));
+  } catch (erro) {
+    resultados.push(item(
+      `browser:${viewport.nome}:confinex:bases-online`,
+      'Bases do Confinex entre aparelhos',
+      `computador novo em ${viewport.nome}, com armazenamento local vazio`,
+      'o cenário automatizado termina',
+      false,
+      erro.stack || erro.message,
+    ));
+  } finally {
+    await context.close();
+  }
+}
+
 async function auditarPagina(browser, pagina, viewport, resultados) {
   const context = await browser.newContext({
     viewport: { width: viewport.largura, height: viewport.altura },
@@ -1393,6 +1484,7 @@ async function auditarAtualizacaoPainelBoiGordo(browser, viewport, resultados) {
           await auditarSafari14Confinex(browser, viewport, resultados);
         }
         await auditarPagamentoConfinamento(browser, viewport, resultados);
+        await auditarBasesOnlineConfinex(browser, viewport, resultados);
         await auditarFinanceiro(browser, viewport, resultados);
         await auditarPendencias(browser, viewport, resultados);
         await auditarEventos(browser, viewport, resultados);

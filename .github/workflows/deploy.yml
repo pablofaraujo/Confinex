@@ -42,14 +42,14 @@ jobs:
           confinex_html="$(mktemp)"
           confinex_bundle="$(mktemp)"
           curl --fail --silent --show-error --location --retry 5 --retry-delay 5 "$base/confinex.html" --output "$confinex_html"
-          grep -q '__CONFINEX_BUILD = "20260811-evolucao-150-1"' "$confinex_html"
+          grep -q '__CONFINEX_BUILD = "20260812-bases-online-1"' "$confinex_html"
           grep -q '__CONFINEX_CARREGAR_APP' "$confinex_html"
           grep -q 'confinex-supabase-ponte-inline.js' "$confinex_html"
           if grep -q '\\n[[:space:]]*<script' "$confinex_html"; then
             echo "confinex.html contem quebra de linha literal entre scripts" >&2
             exit 1
           fi
-          curl --fail --silent --show-error --location --retry 5 --retry-delay 5 "$base/confinex-app.mobile.js?v=20260811-evolucao-150-1" --output "$confinex_bundle"
+          curl --fail --silent --show-error --location --retry 5 --retry-delay 5 "$base/confinex-app.mobile.js?v=20260812-bases-online-1" --output "$confinex_bundle"
           if grep -q 'Object\.hasOwn' "$confinex_bundle"; then
             echo "bundle publicado exige Object.hasOwn e nao suporta Safari 14" >&2
             exit 1

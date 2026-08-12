@@ -81,6 +81,21 @@ class ClarezaInterfaceConfinexTests(unittest.TestCase):
         self.assertIn("if (!cloudReadyRef.current) return", self.fonte)
         self.assertIn("if (!url || !cloudReadyRef.current) return", self.fonte)
 
+    def test_bases_de_confinamento_sao_sincronizadas_entre_aparelhos(self):
+        for texto in (
+            'from "./js/confinex-bases-online.mjs"',
+            "listarBasesOnline",
+            "salvarBaseOnline",
+            "apagarBaseOnline",
+            "mesclarBasesConfinamento",
+            "Sincronizar bases",
+            "Entre no ecossistema neste aparelho",
+        ):
+            self.assertIn(texto, self.fonte)
+        self.assertIn("useEffect(() => {", self.fonte)
+        self.assertIn("await carregarBasesOnline({ mostrarStatus: true })", self.fonte)
+        self.assertIn("await salvarBaseNaNuvem(novo)", self.fonte)
+
     def test_resumo_prioriza_rentabilidade_bruta_e_mantem_liquido_complementar(self):
         for texto in (
             'children: "Lucro l\\xEDquido"',
