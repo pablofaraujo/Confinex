@@ -8,6 +8,7 @@ from tools.consolidar_historico_telegram import (
     carregar_aliases,
     cruzar_gtas,
     extrair_compra,
+    finalizar_plano,
     inferir_destino,
     inferir_sexo_categoria,
     gerar_plano,
@@ -156,6 +157,45 @@ class ConsolidarHistoricoTelegramTest(unittest.TestCase):
         self.assertEqual(atualizado["classificacao"], "incompleto_campos_obrigatorios")
         self.assertTrue(atualizado["requer_revisao"])
         self.assertEqual(atualizado["mensagens"], ["m1"])
+
+    def test_vinculo_gta_nf_e_associado_ao_negocio_sem_confirmar(self):
+        compra = extrair_compra(mensagem(
+            "Compra – Fornecedor\nQuantidade: 10 garrotes\nNegociação: 01/08/2026",
+            1, "m1"), {})
+        plano = {
+            "gerado_em": "2026-08-12T00:00:00-03:00",
+            "modo": "dry_run_somente_leitura",
+            "plano_gera_escrita": False,
+            "escritas_executadas": 0,
+            "tabelas_operacionais_alteradas": 0,
+            "resumo": {"anexos_omitidos": 0},
+            "cortes": {},
+            "grupos_compras": agrupar_compras([compra]),
+            "cruzamento_gta": {"vinculos_exatos": 2, "vinculos": [
+                {
+                    "gta": "000001", "nf": "100", "linha_documento": 9,
+                    "referencias_telegram": [{"mensagem_id": "m1"}],
+                },
+                {
+                    "gta": "000002", "nf": "101", "linha_documento": 10,
+                    "referencias_telegram": [{"mensagem_id": "fora-do-negocio"}],
+                },
+            ]},
+            "pendencias": [],
+        }
+        atualizado = finalizar_plano(plano)
+        grupo = atualizado["grupos_compras"][0]
+        self.assertTrue(grupo["tem_vinculo_gta_nf_candidato"])
+        self.assertFalse(grupo["vinculos_documentais_candidatos"][0]["confirmado"])
+        self.assertIn("GTA/NF candidata", grupo["acao_recomendada"])
+        self.assertEqual(
+            atualizado["resumo_revisao"]["negocios_com_vinculo_gta_nf_candidato"], 1
+        )
+        self.assertEqual(
+            atualizado["resumo_revisao"]["vinculos_gta_nf_sem_negocio_identificado"], 1
+        )
+        self.assertIn("vinculos_gta_nf_sem_negocio_identificado", atualizado["pendencias"])
+        self.assertEqual(atualizado["escritas_executadas"], 0)
 
     def test_separa_mesma_origem_por_sexo_categoria_e_destino(self):
         config = {"regras_mensagens": {

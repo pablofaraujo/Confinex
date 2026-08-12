@@ -125,6 +125,14 @@ python3 tools/consolidar_historico_telegram.py \
 Esse modo rejeita qualquer plano que não declare explicitamente zero escrita e
 zero alteração de tabelas operacionais.
 
+Quando uma GTA citada numa mensagem coincide exatamente com a GTA do plano
+documental, o candidato NF/GTA passa a aparecer no respectivo negócio, e não
+apenas no contador geral. O vínculo permanece `confirmado: false`: ele orienta
+a conferência, mas não preenche peso, valor, pagamento ou qualquer outro campo.
+Se a mensagem que cita a GTA não fizer parte de nenhum bloco de compra, o plano
+contabiliza o vínculo como **sem negócio identificado** em vez de aproximá-lo
+por nome, valor ou data.
+
 Quando recebe `--documentos-plano`, o importador exige que o plano declare
 explicitamente zero escrita e zero alteração operacional. A assinatura SHA-256
 do conteúdo documental, sem o horário de geração, integra o novo plano. O
@@ -151,7 +159,8 @@ As regras permanentes do importador são:
   continua não confirmada e revisável;
 - mesmo fornecedor e mesma data nunca bastam para unir compras distintas;
 - GTA com número exatamente igual ao plano documental é candidato forte, sem
-  confirmação ou escrita automática;
+  confirmação ou escrita automática, associado aos respectivos códigos quando
+  a mensagem de origem permite o vínculo;
 - não existe argumento `--executar` nem caminho de promoção operacional.
 
 ## Atualização por OFX

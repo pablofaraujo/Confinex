@@ -688,6 +688,45 @@ def cortes_fontes(documentos: dict[str, Any] | None, complemento_ima: dict[str, 
 def finalizar_plano(plano: dict[str, Any]) -> dict[str, Any]:
     """Recalcula a fila e a assinatura sem criar ou alterar dado operacional."""
     grupos = atualizar_grupos_existentes(plano["grupos_compras"])
+    vinculos_por_mensagem: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for vinculo in (plano.get("cruzamento_gta") or {}).get("vinculos") or []:
+        evidencia = {
+            "gta": vinculo.get("gta"),
+            "nf": vinculo.get("nf"),
+            "linha_documento": vinculo.get("linha_documento"),
+            "criterio": "numero_gta_exato",
+            "confirmado": False,
+        }
+        for referencia in vinculo.get("referencias_telegram") or []:
+            mensagem_id = referencia.get("mensagem_id")
+            if mensagem_id:
+                vinculos_por_mensagem[mensagem_id].append(evidencia)
+    for grupo in grupos:
+        unicos: dict[tuple[Any, ...], dict[str, Any]] = {}
+        for mensagem_id in grupo.get("mensagens") or []:
+            for evidencia in vinculos_por_mensagem.get(mensagem_id, []):
+                chave = (
+                    evidencia.get("gta"), evidencia.get("nf"),
+                    evidencia.get("linha_documento"),
+                )
+                unicos[chave] = evidencia
+        grupo["vinculos_documentais_candidatos"] = list(unicos.values())
+        grupo["tem_vinculo_gta_nf_candidato"] = bool(unicos)
+        if unicos and grupo.get("classificacao") == "incompleto_campos_obrigatorios":
+            grupo["acao_recomendada"] = (
+                "conferir a GTA/NF candidata e localizar os demais campos sem aproximação"
+            )
+    assinaturas_associadas = {
+        (
+            evidencia.get("gta"), evidencia.get("nf"), evidencia.get("linha_documento")
+        )
+        for grupo in grupos
+        for evidencia in grupo["vinculos_documentais_candidatos"]
+    }
+    assinaturas_documentais = {
+        (vinculo.get("gta"), vinculo.get("nf"), vinculo.get("linha_documento"))
+        for vinculo in (plano.get("cruzamento_gta") or {}).get("vinculos") or []
+    }
     ambiguos = sum(grupo["classificacao"] == "ambiguo_multiplas_versoes" for grupo in grupos)
     correcoes = sum(
         grupo["classificacao"] == "correcao_explicita_mais_recente" for grupo in grupos
@@ -711,6 +750,12 @@ def finalizar_plano(plano: dict[str, Any]) -> dict[str, Any]:
             grupo["classificacao"] == "ambiguo_multiplas_versoes" for grupo in fila_revisao
         ),
         "campos_obrigatorios_faltantes": incompletos,
+        "negocios_com_vinculo_gta_nf_candidato": sum(
+            grupo["tem_vinculo_gta_nf_candidato"] for grupo in grupos
+        ),
+        "vinculos_gta_nf_sem_negocio_identificado": len(
+            assinaturas_documentais - assinaturas_associadas
+        ),
     }
     pendencias = []
     if ambiguos:
@@ -724,6 +769,8 @@ def finalizar_plano(plano: dict[str, Any]) -> dict[str, Any]:
         pendencias.append("saldo_ima_variou_sem_ficha_detalhada_correspondente")
     if plano["cruzamento_gta"]["vinculos_exatos"]:
         pendencias.append("vinculos_gta_documentais_exigem_conferencia")
+    if plano["resumo_revisao"]["vinculos_gta_nf_sem_negocio_identificado"]:
+        pendencias.append("vinculos_gta_nf_sem_negocio_identificado")
     plano["pendencias"] = pendencias
     assinavel = {
         chave: valor
@@ -816,17 +863,18 @@ def relatorio_markdown(plano: dict[str, Any]) -> str:
     ):
         divergentes = ", ".join(grupo["campos_divergentes_humanos"]) or "nenhum"
         ausentes = ", ".join(grupo["campos_ausentes_humanos"]) or "nenhum"
+        documentos = len(grupo.get("vinculos_documentais_candidatos") or [])
         linhas_revisao.append(
             f"| {grupo['codigo_negocio']} | {grupo.get('negocio_origem') or '—'} | "
             f"{grupo['prioridade_revisao']} | {grupo['situacao_revisao']} | "
             f"{grupo['contexto']} | {grupo['negocio']} | {grupo['sexo']} | {grupo['categoria']} | "
             f"{grupo['destino']} | {grupo['data_base'] or 'sem data'} | {grupo['versoes']} | "
-            f"{grupo['evidencias']} | {divergentes} | {ausentes} | "
+            f"{grupo['evidencias']} | {divergentes} | {ausentes} | {documentos} | "
             f"{grupo['acao_recomendada']} |"
         )
     tabela_revisao = (
         "\n".join(linhas_revisao)
-        or "| — | — | — | — | — | — | — | — | — | 0 | 0 | — | — | nenhuma revisão |"
+        or "| — | — | — | — | — | — | — | — | — | 0 | 0 | — | — | 0 | nenhuma revisão |"
     )
     return f"""# Consolidação privada do histórico Telegram
 
@@ -854,6 +902,8 @@ Plano `{plano['plano_id']}`. Modo somente leitura; nenhuma escrita foi executada
 - {resumo['grupos_incompletos']} grupos sem conflito ainda têm campos mínimos ausentes;
 - {resumo['correcoes_explicitas_preferidas']} grupos têm correção posterior explicitamente indicada;
 - {gta['vinculos_exatos']} vínculos GTA exatos com a fonte documental.
+- {plano['resumo_revisao']['negocios_com_vinculo_gta_nf_candidato']} negócios da fila têm candidato GTA/NF associado.
+- {plano['resumo_revisao']['vinculos_gta_nf_sem_negocio_identificado']} vínculos GTA/NF continuam sem negócio identificável pela mensagem.
 
 ## Conferência das fontes documentais
 
@@ -872,8 +922,8 @@ ou data; ela permanece como pendência de conciliação.
 
 ## Fila privada de conferência por negócio
 
-| Código | Vínculo de origem | Prioridade | Situação | Contexto | Negócio | Sexo | Categoria | Destino | Data-base | Versões | Evidências | O que diverge | Ausente em todas | Próxima ação |
-|---|---|---|---|---|---|---|---|---|---|---:|---:|---|---|---|
+| Código | Vínculo de origem | Prioridade | Situação | Contexto | Negócio | Sexo | Categoria | Destino | Data-base | Versões | Evidências | O que diverge | Ausente em todas | GTA/NF candidata | Próxima ação |
+|---|---|---|---|---|---|---|---|---|---|---:|---:|---|---|---:|---|
 {tabela_revisao}
 
 Esta fila não combina campos de versões diferentes. A versão indicada por uma
