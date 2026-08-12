@@ -1336,6 +1336,7 @@ function ScPanel({ sc, upd, sexo, custoDinheiro, resultado, confinamentos, model
       ] }),
       /* @__PURE__ */ jsxs("div", { style: { display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginTop: 8 }, children: [
         /* @__PURE__ */ jsx("div", { className: "hint", style: { flex: 1, minWidth: 220 }, children: confinamentos.length === 0 ? `Ajuste distância, modalidade e custos abaixo, depois salve como base. ${statusBasesOnline}` : `${confinamentos.length} base(s) disponível(is). ${statusBasesOnline}` }),
+        statusBasesOnline.includes("Entre no ecossistema") && /* @__PURE__ */ jsx("a", { className: "tb", href: "./index.html", style: { padding: "7px 10px", textDecoration: "none" }, children: "Entrar pela Visão Geral" }),
         /* @__PURE__ */ jsx("button", { className: "tb", style: { padding: "7px 10px" }, onClick: sincronizarBasesOnline, children: "Sincronizar bases" })
       ] }),
       /* @__PURE__ */ jsx("div", { className: "dvdr" })

@@ -90,6 +90,8 @@ class ClarezaInterfaceConfinexTests(unittest.TestCase):
             "mesclarBasesConfinamento",
             "Sincronizar bases",
             "Entre no ecossistema neste aparelho",
+            'href: "./index.html"',
+            "Entrar pela Visão Geral",
         ):
             self.assertIn(texto, self.fonte)
         self.assertIn("useEffect(() => {", self.fonte)

@@ -244,6 +244,54 @@ async function auditarBasesOnlineConfinex(browser, viewport, resultados) {
   }
 }
 
+async function auditarEntradaBasesOnline(browser, viewport, resultados) {
+  const context = await browser.newContext({ viewport: { width: viewport.largura, height: viewport.altura } });
+  await context.addInitScript(() => {
+    localStorage.clear();
+    Object.defineProperty(window, 'CONFINEX_SHEETS_API_URL', { configurable: false, get: () => '', set: () => {} });
+    window.__BASES_SEM_SESSAO_ESCRITAS = 0;
+    window.CFAgro = {
+      db: {
+        auth: { getSession: async () => ({ data: { session: null }, error: null }) },
+        from: () => { window.__BASES_SEM_SESSAO_ESCRITAS += 1; throw new Error('consulta não deveria ocorrer'); },
+        rpc: async () => { window.__BASES_SEM_SESSAO_ESCRITAS += 1; throw new Error('escrita não deveria ocorrer'); },
+      },
+    };
+  });
+  const page = await context.newPage();
+  await page.route('**/supabase-js@*/**', rota => rota.fulfill({ status: 200, contentType: 'application/javascript', body: '' }));
+  await page.route('**/js/cfagro-core.js*', rota => rota.fulfill({ status: 200, contentType: 'application/javascript', body: '' }));
+  try {
+    await page.goto(new URL('confinex.html?validacao=entrada-bases', baseUrl).href, { waitUntil: 'load', timeout: 30000 });
+    const link = page.getByRole('link', { name: 'Entrar pela Visão Geral', exact: true });
+    await link.waitFor({ state: 'visible', timeout: 10000 });
+    const estado = await page.evaluate(() => ({
+      texto: document.querySelector('#root')?.textContent || '',
+      escritas: window.__BASES_SEM_SESSAO_ESCRITAS,
+    }));
+    const href = await link.getAttribute('href');
+    resultados.push(item(
+      `browser:${viewport.nome}:confinex:bases-login`,
+      'Entrada para bases online em computador novo',
+      `sessão ausente em ${viewport.nome}`,
+      'explica o login, liga à Visão Geral e não tenta gravar',
+      href === './index.html' && estado.texto.includes('Entre no ecossistema neste aparelho') && estado.escritas === 0,
+      `href=${href} mensagem=${estado.texto.includes('Entre no ecossistema neste aparelho')} escritas=${estado.escritas}`,
+    ));
+  } catch (erro) {
+    resultados.push(item(
+      `browser:${viewport.nome}:confinex:bases-login`,
+      'Entrada para bases online em computador novo',
+      `sessão ausente em ${viewport.nome}`,
+      'o cenário automatizado termina',
+      false,
+      erro.stack || erro.message,
+    ));
+  } finally {
+    await context.close();
+  }
+}
+
 async function auditarPagina(browser, pagina, viewport, resultados) {
   const context = await browser.newContext({
     viewport: { width: viewport.largura, height: viewport.altura },
@@ -1485,6 +1533,7 @@ async function auditarAtualizacaoPainelBoiGordo(browser, viewport, resultados) {
         }
         await auditarPagamentoConfinamento(browser, viewport, resultados);
         await auditarBasesOnlineConfinex(browser, viewport, resultados);
+        await auditarEntradaBasesOnline(browser, viewport, resultados);
         await auditarFinanceiro(browser, viewport, resultados);
         await auditarPendencias(browser, viewport, resultados);
         await auditarEventos(browser, viewport, resultados);
