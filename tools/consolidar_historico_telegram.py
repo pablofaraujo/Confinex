@@ -38,6 +38,18 @@ CAMPOS_COMPRA = {
     "pagamento": "pagamento",
 }
 
+# O histórico só pode ser considerado consolidado quando contém os elementos
+# necessários para conferir a compra e seu efeito financeiro. Uma única versão
+# sem conflito não equivale a um negócio completo.
+CAMPOS_MINIMOS_CONSOLIDACAO = (
+    "quantidade",
+    "peso_total_kg",
+    "preco_arroba",
+    "valor_total",
+    "data_negociacao",
+    "pagamento",
+)
+
 IDENTIDADE_COMPRA = {
     "sexo": "sexo",
     "categoria": "categoria",
@@ -364,7 +376,12 @@ def extrair_compra(mensagem: dict[str, Any], configuracao: dict[str, Any]) -> di
 
 def dia_mensagem(valor: str | None) -> str | None:
     achado = re.match(r"(\d{2})\.(\d{2})\.(\d{4})", valor or "")
-    return f"{achado.group(3)}-{achado.group(2)}-{achado.group(1)}" if achado else None
+    return f"{achado.group(1)}/{achado.group(2)}/{achado.group(3)}" if achado else None
+
+
+def data_humana(valor: str | None) -> str | None:
+    achado = re.fullmatch(r"(20\d{2})-(\d{2})-(\d{2})", valor or "")
+    return f"{achado.group(3)}/{achado.group(2)}/{achado.group(1)}" if achado else valor
 
 
 def assinatura_campos(compra: dict[str, Any]) -> tuple[Any, ...]:
@@ -415,14 +432,81 @@ def campos_ausentes_em_todas(versoes: list[dict[str, Any]]) -> list[str]:
     ]
 
 
-def classificar_revisao(classificacao: str, divergentes: list[str]) -> tuple[str, str, str]:
+def classificar_revisao(
+    classificacao: str,
+    divergentes: list[str],
+    ausentes_minimos: list[str],
+) -> tuple[str, str, str]:
     if classificacao == "repeticao_deduplicavel":
         return "repetição sem conflito", "baixa", "manter uma evidência e preservar as referências"
+    if classificacao == "incompleto_campos_obrigatorios":
+        financeiros = {"quantidade", "preco_arroba", "valor_total", "pagamento"}
+        prioridade = "alta" if financeiros.intersection(ausentes_minimos) else "média"
+        return (
+            "completar dados do negócio",
+            prioridade,
+            "localizar os campos ausentes nas fontes sem preencher por aproximação",
+        )
     if classificacao == "correcao_explicita_mais_recente":
         return "conferir correção explícita", "alta", "comparar a correção com a fonte e confirmar"
     financeiros = {"quantidade", "preco_arroba", "valor_total", "pagamento"}
     prioridade = "alta" if financeiros.intersection(divergentes) else "média"
     return "escolher a versão correta", prioridade, "conferir as mensagens e escolher sem combinar valores"
+
+
+def atribuir_codigos_negocios(grupos: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Atribui códigos anuais estáveis sem renumerar a conferência já aberta."""
+    contadores_ano: Counter[str] = Counter()
+    classes_historicas = {"ambiguo_multiplas_versoes", "correcao_explicita_mais_recente"}
+    ordem_codigo = [
+        *[
+            grupo for grupo in grupos
+            if grupo.get("negocio_origem") or grupo.get("classificacao") in classes_historicas
+        ],
+        *[
+            grupo for grupo in grupos
+            if not grupo.get("negocio_origem")
+            and grupo.get("classificacao") == "incompleto_campos_obrigatorios"
+        ],
+        *[
+            grupo for grupo in grupos
+            if not grupo.get("negocio_origem")
+            and grupo.get("classificacao") == "repeticao_deduplicavel"
+        ],
+    ]
+    for grupo in ordem_codigo:
+        referencia = grupo.get("negocio_origem") or grupo.get("data_base") or ""
+        ano = primeiro(r"NEG-(\d{2})-", str(referencia))
+        if not ano:
+            ano_completo = primeiro(
+                r"(?:^|\D)(20\d{2})(?:\D|$)", str(grupo.get("data_base") or "")
+            )
+            ano = ano_completo[-2:] if ano_completo else "00"
+        contadores_ano[ano] += 1
+        grupo["codigo_negocio"] = f"NEG-{ano}-{contadores_ano[ano]:03d}"
+    return grupos
+
+
+def atualizar_grupos_existentes(grupos: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Atualiza um plano privado antigo sem reler ou combinar suas evidências."""
+    for grupo in grupos:
+        grupo["data_base"] = data_humana(grupo.get("data_base"))
+        ausentes = grupo.get("campos_ausentes_em_todas") or []
+        ausentes_minimos = [campo for campo in CAMPOS_MINIMOS_CONSOLIDACAO if campo in ausentes]
+        grupo["campos_minimos_ausentes"] = ausentes_minimos
+        grupo["campos_minimos_ausentes_humanos"] = [
+            CAMPOS_COMPRA[campo] for campo in ausentes_minimos
+        ]
+        if grupo.get("classificacao") == "repeticao_deduplicavel" and ausentes_minimos:
+            grupo["classificacao"] = "incompleto_campos_obrigatorios"
+            situacao, prioridade, acao = classificar_revisao(
+                grupo["classificacao"], grupo.get("campos_divergentes") or [], ausentes_minimos
+            )
+            grupo["situacao_revisao"] = situacao
+            grupo["prioridade_revisao"] = prioridade
+            grupo["acao_recomendada"] = acao
+            grupo["requer_revisao"] = True
+    return atribuir_codigos_negocios(grupos)
 
 
 def agrupar_compras(compras: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -439,8 +523,13 @@ def agrupar_compras(compras: list[dict[str, Any]]) -> list[dict[str, Any]]:
         versoes_semanticas = consolidar_versoes_semanticas(versoes)
         representantes = [grupo["representante"] for grupo in versoes_semanticas]
         ultima = representantes[-1]
+        ausentes = campos_ausentes_em_todas(representantes)
+        ausentes_minimos = [campo for campo in CAMPOS_MINIMOS_CONSOLIDACAO if campo in ausentes]
         if len(versoes_semanticas) == 1:
-            classificacao = "repeticao_deduplicavel"
+            classificacao = (
+                "incompleto_campos_obrigatorios"
+                if ausentes_minimos else "repeticao_deduplicavel"
+            )
             preferida = ultima
         elif ultima["eh_correcao_explicita"]:
             classificacao = "correcao_explicita_mais_recente"
@@ -449,8 +538,9 @@ def agrupar_compras(compras: list[dict[str, Any]]) -> list[dict[str, Any]]:
             classificacao = "ambiguo_multiplas_versoes"
             preferida = None
         divergentes = campos_divergentes(representantes)
-        ausentes = campos_ausentes_em_todas(representantes)
-        situacao, prioridade, acao = classificar_revisao(classificacao, divergentes)
+        situacao, prioridade, acao = classificar_revisao(
+            classificacao, divergentes, ausentes_minimos
+        )
         saida.append({
             "chave_provisoria": chave,
             "contexto": versoes[0]["contexto"],
@@ -472,6 +562,10 @@ def agrupar_compras(compras: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "campos_divergentes_humanos": [CAMPOS_COMPRA[campo] for campo in divergentes],
             "campos_ausentes_em_todas": ausentes,
             "campos_ausentes_humanos": [CAMPOS_COMPRA[campo] for campo in ausentes],
+            "campos_minimos_ausentes": ausentes_minimos,
+            "campos_minimos_ausentes_humanos": [
+                CAMPOS_COMPRA[campo] for campo in ausentes_minimos
+            ],
             "confirmado": False,
             "requer_revisao": classificacao != "repeticao_deduplicavel",
             "versao_preferida": preferida,
@@ -488,7 +582,7 @@ def agrupar_compras(compras: list[dict[str, Any]]) -> list[dict[str, Any]]:
             } for grupo in versoes_semanticas],
             "mensagens": [item["mensagem_id"] for item in versoes],
         })
-    return saida
+    return atribuir_codigos_negocios(saida)
 
 
 def carregar_aliases(caminho: Path | None) -> dict[str, Any]:
@@ -591,6 +685,57 @@ def cortes_fontes(documentos: dict[str, Any] | None, complemento_ima: dict[str, 
     return corte
 
 
+def finalizar_plano(plano: dict[str, Any]) -> dict[str, Any]:
+    """Recalcula a fila e a assinatura sem criar ou alterar dado operacional."""
+    grupos = atualizar_grupos_existentes(plano["grupos_compras"])
+    ambiguos = sum(grupo["classificacao"] == "ambiguo_multiplas_versoes" for grupo in grupos)
+    correcoes = sum(
+        grupo["classificacao"] == "correcao_explicita_mais_recente" for grupo in grupos
+    )
+    incompletos = sum(
+        grupo["classificacao"] == "incompleto_campos_obrigatorios" for grupo in grupos
+    )
+    plano["resumo"]["grupos_compras"] = len(grupos)
+    plano["resumo"]["grupos_ambiguos"] = ambiguos
+    plano["resumo"]["correcoes_explicitas_preferidas"] = correcoes
+    plano["resumo"]["grupos_incompletos"] = incompletos
+    fila_revisao = [grupo for grupo in grupos if grupo["requer_revisao"]]
+    plano["resumo_revisao"] = {
+        "negocios_para_revisar": len(fila_revisao),
+        "prioridade_alta": sum(grupo["prioridade_revisao"] == "alta" for grupo in fila_revisao),
+        "prioridade_media": sum(grupo["prioridade_revisao"] == "média" for grupo in fila_revisao),
+        "correcoes_explicitas": sum(
+            grupo["classificacao"] == "correcao_explicita_mais_recente" for grupo in fila_revisao
+        ),
+        "ambiguidades_sem_preferencia": sum(
+            grupo["classificacao"] == "ambiguo_multiplas_versoes" for grupo in fila_revisao
+        ),
+        "campos_obrigatorios_faltantes": incompletos,
+    }
+    pendencias = []
+    if ambiguos:
+        pendencias.append("compras_com_multiplas_versoes_exigem_revisao")
+    if incompletos:
+        pendencias.append("compras_incompletas_exigem_complemento_documental")
+    if plano["resumo"]["anexos_omitidos"]:
+        pendencias.append("exportacoes_com_anexos_omitidos")
+    variacao = plano["cortes"].get("variacao_ima_sem_detalhamento")
+    if variacao not in (None, 0):
+        pendencias.append("saldo_ima_variou_sem_ficha_detalhada_correspondente")
+    if plano["cruzamento_gta"]["vinculos_exatos"]:
+        pendencias.append("vinculos_gta_documentais_exigem_conferencia")
+    plano["pendencias"] = pendencias
+    assinavel = {
+        chave: valor
+        for chave, valor in plano.items()
+        if chave not in {"gerado_em", "plano_id"}
+    }
+    plano["plano_id"] = hashlib.sha256(
+        json.dumps(assinavel, ensure_ascii=False, sort_keys=True, default=serializar).encode()
+    ).hexdigest()[:12]
+    return plano
+
+
 def gerar_plano(exportacoes: list[dict[str, Any]], aliases: dict[str, Any],
                 documentos: dict[str, Any] | None = None,
                 complemento_ima: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -651,37 +796,7 @@ def gerar_plano(exportacoes: list[dict[str, Any]], aliases: dict[str, Any],
         "anexos": anexos,
         "pendencias": [],
     }
-    ambiguos = sum(grupo["classificacao"] == "ambiguo_multiplas_versoes" for grupo in plano["grupos_compras"])
-    correcoes = sum(grupo["classificacao"] == "correcao_explicita_mais_recente" for grupo in plano["grupos_compras"])
-    plano["resumo"]["grupos_compras"] = len(plano["grupos_compras"])
-    plano["resumo"]["grupos_ambiguos"] = ambiguos
-    plano["resumo"]["correcoes_explicitas_preferidas"] = correcoes
-    fila_revisao = [grupo for grupo in plano["grupos_compras"] if grupo["requer_revisao"]]
-    plano["resumo_revisao"] = {
-        "negocios_para_revisar": len(fila_revisao),
-        "prioridade_alta": sum(grupo["prioridade_revisao"] == "alta" for grupo in fila_revisao),
-        "prioridade_media": sum(grupo["prioridade_revisao"] == "média" for grupo in fila_revisao),
-        "correcoes_explicitas": sum(
-            grupo["classificacao"] == "correcao_explicita_mais_recente" for grupo in fila_revisao
-        ),
-        "ambiguidades_sem_preferencia": sum(
-            grupo["classificacao"] == "ambiguo_multiplas_versoes" for grupo in fila_revisao
-        ),
-    }
-    if ambiguos:
-        plano["pendencias"].append("compras_com_multiplas_versoes_exigem_revisao")
-    if plano["resumo"]["anexos_omitidos"]:
-        plano["pendencias"].append("exportacoes_com_anexos_omitidos")
-    variacao = plano["cortes"].get("variacao_ima_sem_detalhamento")
-    if variacao not in (None, 0):
-        plano["pendencias"].append("saldo_ima_variou_sem_ficha_detalhada_correspondente")
-    if plano["cruzamento_gta"]["vinculos_exatos"]:
-        plano["pendencias"].append("vinculos_gta_documentais_exigem_conferencia")
-    assinavel = {chave: valor for chave, valor in plano.items() if chave != "gerado_em"}
-    plano["plano_id"] = hashlib.sha256(
-        json.dumps(assinavel, ensure_ascii=False, sort_keys=True, default=serializar).encode()
-    ).hexdigest()[:12]
-    return plano
+    return finalizar_plano(plano)
 
 
 def relatorio_markdown(plano: dict[str, Any]) -> str:
@@ -702,7 +817,8 @@ def relatorio_markdown(plano: dict[str, Any]) -> str:
         divergentes = ", ".join(grupo["campos_divergentes_humanos"]) or "nenhum"
         ausentes = ", ".join(grupo["campos_ausentes_humanos"]) or "nenhum"
         linhas_revisao.append(
-            f"| {grupo['prioridade_revisao']} | {grupo['situacao_revisao']} | "
+            f"| {grupo['codigo_negocio']} | {grupo.get('negocio_origem') or '—'} | "
+            f"{grupo['prioridade_revisao']} | {grupo['situacao_revisao']} | "
             f"{grupo['contexto']} | {grupo['negocio']} | {grupo['sexo']} | {grupo['categoria']} | "
             f"{grupo['destino']} | {grupo['data_base'] or 'sem data'} | {grupo['versoes']} | "
             f"{grupo['evidencias']} | {divergentes} | {ausentes} | "
@@ -710,7 +826,7 @@ def relatorio_markdown(plano: dict[str, Any]) -> str:
         )
     tabela_revisao = (
         "\n".join(linhas_revisao)
-        or "| — | — | — | — | — | — | — | 0 | 0 | — | — | nenhuma revisão |"
+        or "| — | — | — | — | — | — | — | — | — | 0 | 0 | — | — | nenhuma revisão |"
     )
     return f"""# Consolidação privada do histórico Telegram
 
@@ -735,6 +851,7 @@ Plano `{plano['plano_id']}`. Modo somente leitura; nenhuma escrita foi executada
 - {resumo['resumos_agregados_preservados']} resumos agregados preservados apenas como evidência;
 - {resumo['grupos_compras']} grupos provisórios;
 - {resumo['grupos_ambiguos']} grupos permanecem ambíguos;
+- {resumo['grupos_incompletos']} grupos sem conflito ainda têm campos mínimos ausentes;
 - {resumo['correcoes_explicitas_preferidas']} grupos têm correção posterior explicitamente indicada;
 - {gta['vinculos_exatos']} vínculos GTA exatos com a fonte documental.
 
@@ -755,8 +872,8 @@ ou data; ela permanece como pendência de conciliação.
 
 ## Fila privada de conferência por negócio
 
-| Prioridade | Situação | Contexto | Negócio | Sexo | Categoria | Destino | Data-base | Versões | Evidências | O que diverge | Ausente em todas | Próxima ação |
-|---|---|---|---|---|---|---|---|---:|---:|---|---|---|
+| Código | Vínculo de origem | Prioridade | Situação | Contexto | Negócio | Sexo | Categoria | Destino | Data-base | Versões | Evidências | O que diverge | Ausente em todas | Próxima ação |
+|---|---|---|---|---|---|---|---|---|---|---:|---:|---|---|---|
 {tabela_revisao}
 
 Esta fila não combina campos de versões diferentes. A versão indicada por uma
@@ -767,6 +884,8 @@ correção explícita continua pendente de confirmação na fonte.
 - correção explícita posterior pode ser preferida, mas nunca confirmada automaticamente;
 - mesmo fornecedor e mesma data com campos diferentes permanece ambíguo;
 - versões iguais ou parciais compatíveis viram uma única alternativa, preservando todas as mensagens;
+- versão única com campo mínimo ausente continua na fila para complemento documental;
+- códigos anuais `NEG-AA-NNN` são determinísticos e não dependem da planilha;
 - sexo, categoria e destino fazem parte da identidade do negócio;
 - resumo agregado não vira uma avaliação adicional;
 - GTA exata forma candidato documental forte, ainda não confirmado;
@@ -782,7 +901,9 @@ correção explícita continua pendente de confirmação na fonte.
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--telegram-html", action="append", required=True, type=Path)
+    origem = parser.add_mutually_exclusive_group(required=True)
+    origem.add_argument("--telegram-html", action="append", type=Path)
+    origem.add_argument("--plano-existente", type=Path)
     parser.add_argument("--contexto", action="append")
     parser.add_argument("--aliases", type=Path)
     parser.add_argument("--documentos-plano", type=Path)
@@ -790,13 +911,29 @@ def main() -> None:
     parser.add_argument("--saida-json", required=True, type=Path)
     parser.add_argument("--saida-md", required=True, type=Path)
     args = parser.parse_args()
-    if args.contexto and len(args.contexto) != len(args.telegram_html):
-        parser.error("--contexto deve ser repetido uma vez para cada --telegram-html")
-    contextos = args.contexto or [None] * len(args.telegram_html)
-    exportacoes = [ler_exportacao(caminho, contexto) for caminho, contexto in zip(args.telegram_html, contextos)]
-    documentos = json.loads(args.documentos_plano.read_text()) if args.documentos_plano else None
-    complemento = json.loads(args.complemento_ima.read_text()) if args.complemento_ima else None
-    plano = gerar_plano(exportacoes, carregar_aliases(args.aliases), documentos, complemento)
+    if args.plano_existente:
+        if args.contexto or args.aliases or args.documentos_plano or args.complemento_ima:
+            parser.error("--plano-existente não aceita fontes adicionais")
+        plano = json.loads(args.plano_existente.read_text(encoding="utf-8"))
+        if not (
+            plano.get("plano_gera_escrita") is False
+            and plano.get("escritas_executadas") == 0
+            and plano.get("tabelas_operacionais_alteradas") == 0
+        ):
+            parser.error("--plano-existente exige comprovação de zero escrita operacional")
+        plano["gerado_em"] = datetime.now().astimezone().isoformat()
+        plano = finalizar_plano(plano)
+    else:
+        if args.contexto and len(args.contexto) != len(args.telegram_html):
+            parser.error("--contexto deve ser repetido uma vez para cada --telegram-html")
+        contextos = args.contexto or [None] * len(args.telegram_html)
+        exportacoes = [
+            ler_exportacao(caminho, contexto)
+            for caminho, contexto in zip(args.telegram_html, contextos)
+        ]
+        documentos = json.loads(args.documentos_plano.read_text()) if args.documentos_plano else None
+        complemento = json.loads(args.complemento_ima.read_text()) if args.complemento_ima else None
+        plano = gerar_plano(exportacoes, carregar_aliases(args.aliases), documentos, complemento)
     args.saida_json.parent.mkdir(parents=True, exist_ok=True)
     args.saida_md.parent.mkdir(parents=True, exist_ok=True)
     args.saida_json.write_text(

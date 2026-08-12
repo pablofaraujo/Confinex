@@ -102,7 +102,28 @@ quantidade de versões semanticamente distintas, quantidade total de evidências
 campos divergentes, campos ausentes e a próxima ação. Uma divergência financeira
 recebe prioridade alta; nenhuma linha mistura campos de mensagens diferentes.
 O JSON privado preserva cada versão, suas repetições e todos os respectivos IDs
-de mensagem para auditoria. Códigos humanos seguem o padrão anual `NEG-AA-NNN`.
+de mensagem para auditoria. Códigos humanos seguem o padrão anual `NEG-AA-NNN`,
+são atribuídos deterministicamente e mantêm `negocio_origem` separado para
+ligar lotes que vieram de um mesmo acerto. Ao ampliar a conferência, os códigos
+já apresentados permanecem estáveis e os novos entram depois deles.
+
+Uma versão única sem conflito não é tratada como concluída quando ainda faltam
+cabeças, peso, preço por arroba, valor total, data da negociação ou pagamento.
+Ela permanece na conferência como **completar dados do negócio**. Isso impede
+que a deduplicação esconda uma compra incompleta.
+
+Um plano privado antigo e comprovadamente somente leitura pode receber esse
+contrato novo sem reler os documentos nem combinar evidências:
+
+```bash
+python3 tools/consolidar_historico_telegram.py \
+  --plano-existente /caminho/privado/plano-anterior.json \
+  --saida-json /caminho/privado/plano-atualizado.json \
+  --saida-md /caminho/privado/relatorio-atualizado.md
+```
+
+Esse modo rejeita qualquer plano que não declare explicitamente zero escrita e
+zero alteração de tabelas operacionais.
 
 Quando recebe `--documentos-plano`, o importador exige que o plano declare
 explicitamente zero escrita e zero alteração operacional. A assinatura SHA-256
@@ -118,6 +139,7 @@ As regras permanentes do importador são:
 - testes, homologações e modelos não entram nos negócios reais;
 - versões iguais ou parciais compatíveis viram uma única alternativa, mas todas
   as mensagens permanecem como evidência;
+- uma versão única incompleta continua pendente de complemento documental;
 - sexo, categoria e destino participam da identidade: novilha, vaca e garrote,
   ou destinos como confinamento, fazenda e abate, não são unidos;
 - um resumo que soma categorias ou destinos distintos permanece evidência

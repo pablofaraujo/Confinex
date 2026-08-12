@@ -4,6 +4,7 @@ from pathlib import Path
 
 from tools.consolidar_historico_telegram import (
     agrupar_compras,
+    atualizar_grupos_existentes,
     carregar_aliases,
     cruzar_gtas,
     extrair_compra,
@@ -90,14 +91,16 @@ class ConsolidarHistoricoTelegramTest(unittest.TestCase):
     def test_repeticoes_semanticas_iguais_viram_uma_alternativa(self):
         completa = extrair_compra(mensagem(
             "Compra – Fornecedor\nQuantidade: 10 garrotes\nPeso bruto total: 3.000 kg\n"
-            "Preço: R$ 300/@\nNegociação: 01/08/2026",
+            "Preço: R$ 300/@\nValor total: R$ 60.000,00\nNegociação: 01/08/2026\n"
+            "Pagamento: 31/08/2026",
             1, "m1"), {})
         parcial = extrair_compra(mensagem(
             "Compra – Fornecedor\nQuantidade informada: 10 garrotes\nNegociação: 01/08/2026",
             2, "m2"), {})
         repetida = extrair_compra(mensagem(
             "Compra – Fornecedor\nQuantidade: 10 garrotes\nPeso bruto total: 3.000 kg\n"
-            "Preço: R$ 300,00/@\nNegociação: 01/08/2026",
+            "Preço: R$ 300,00/@\nValor total: R$ 60.000,00\nNegociação: 01/08/2026\n"
+            "Pagamento: 31/08/2026",
             3, "m3"), {})
         grupo = agrupar_compras([completa, parcial, repetida])[0]
         self.assertEqual(grupo["versoes"], 1)
@@ -106,6 +109,53 @@ class ConsolidarHistoricoTelegramTest(unittest.TestCase):
         self.assertEqual(grupo["versoes_revisao"][0]["ocorrencias"], 3)
         self.assertEqual(grupo["versoes_revisao"][0]["mensagens"], ["m1", "m2", "m3"])
         self.assertFalse(grupo["requer_revisao"])
+
+    def test_versao_unica_incompleta_permanece_na_conferencia(self):
+        incompleta = extrair_compra(mensagem(
+            "Compra – Fornecedor\nQuantidade: 10 garrotes\nNegociação: 01/08/2026",
+            1, "m1"), {})
+        grupo = agrupar_compras([incompleta])[0]
+        self.assertEqual(grupo["classificacao"], "incompleto_campos_obrigatorios")
+        self.assertEqual(grupo["situacao_revisao"], "completar dados do negócio")
+        self.assertTrue(grupo["requer_revisao"])
+        self.assertEqual(grupo["prioridade_revisao"], "alta")
+        self.assertIn("valor total", grupo["campos_minimos_ausentes_humanos"])
+
+    def test_codigos_anuais_sao_deterministicos_e_preservam_vinculo(self):
+        config = {"regras_mensagens": {
+            "m1": {"negocio_origem": "NEG-26-001", "destino": "confinamento"},
+            "m2": {"negocio_origem": "NEG-26-001", "destino": "fazenda"},
+        }}
+        compras = [
+            extrair_compra(mensagem(
+                "Compra – Fornecedor\nQuantidade: 10 garrotes\nNegociação: 01/08/2026",
+                1, "m1"), config),
+            extrair_compra(mensagem(
+                "Compra – Fornecedor\nQuantidade: 5 garrotes\nNegociação: 01/08/2026",
+                2, "m2"), config),
+        ]
+        grupos = agrupar_compras(compras)
+        self.assertEqual([item["codigo_negocio"] for item in grupos], [
+            "NEG-26-001", "NEG-26-002",
+        ])
+        self.assertEqual({item["negocio_origem"] for item in grupos}, {"NEG-26-001"})
+
+    def test_plano_antigo_e_reclassificado_sem_combinar_evidencias(self):
+        grupo = {
+            "negocio_origem": None,
+            "data_base": "2026-08-01",
+            "classificacao": "repeticao_deduplicavel",
+            "campos_ausentes_em_todas": ["peso_total_kg", "valor_total"],
+            "campos_divergentes": [],
+            "requer_revisao": False,
+            "mensagens": ["m1"],
+        }
+        atualizado = atualizar_grupos_existentes([grupo])[0]
+        self.assertEqual(atualizado["codigo_negocio"], "NEG-26-001")
+        self.assertEqual(atualizado["data_base"], "01/08/2026")
+        self.assertEqual(atualizado["classificacao"], "incompleto_campos_obrigatorios")
+        self.assertTrue(atualizado["requer_revisao"])
+        self.assertEqual(atualizado["mensagens"], ["m1"])
 
     def test_separa_mesma_origem_por_sexo_categoria_e_destino(self):
         config = {"regras_mensagens": {
