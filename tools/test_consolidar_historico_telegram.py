@@ -4,8 +4,11 @@ from pathlib import Path
 
 from tools.consolidar_historico_telegram import (
     agrupar_compras,
+    carregar_aliases,
     cruzar_gtas,
     extrair_compra,
+    inferir_destino,
+    inferir_sexo_categoria,
     gerar_plano,
     ler_exportacao,
     relatorio_markdown,
@@ -47,6 +50,112 @@ def mensagem(texto, ordem=1, mensagem_id="m1"):
 
 
 class ConsolidarHistoricoTelegramTest(unittest.TestCase):
+    def test_inferir_sexo_categoria_e_destino_sem_inventar(self):
+        self.assertEqual(inferir_sexo_categoria("14 garrotes"), ("macho", "garrote"))
+        self.assertEqual(inferir_sexo_categoria("19 vacas"), ("fêmea", "vaca"))
+        self.assertEqual(inferir_sexo_categoria("60 novilhas"), ("fêmea", "novilha"))
+        self.assertEqual(inferir_sexo_categoria("20 cabeças"), ("não informado", "não informado"))
+        self.assertEqual(inferir_destino("lote destinado ao confinamento"), "confinamento")
+        self.assertEqual(inferir_destino("gado para o abate no boi balança"), "abate / boi balança")
+        self.assertEqual(inferir_destino("garrotes para a fazenda"), "fazenda")
+        self.assertEqual(inferir_destino("Compra da Fazenda Ametista"), "não informado")
+
+    def test_extrai_valor_calculado_e_pagamento_em_bloco(self):
+        compra = extrair_compra(mensagem(
+            "Compra – Fornecedor\nQuantidade: 19 vacas\nPreço: R$ 300/@\n"
+            "Valor total: 307,57 × 300 = R$ 92.270,00\n📅 Pagamento\n• À vista",
+            1, "m1"), {})
+        self.assertEqual(float(compra["valor_total"]), 92270)
+        self.assertEqual(compra["pagamento"], "à vista")
+
+    def test_peso_com_ponto_de_milhar_permanece_numero(self):
+        compra = extrair_compra(mensagem(
+            "Compra – Fornecedor\nQuantidade: 60 novilhas\n"
+            "Peso bruto total: 22.297 kg\nPreço: R$ 300/@",
+            1, "m1"), {})
+        self.assertEqual(float(compra["peso_total_kg"]), 22297)
+
+    def test_normaliza_formas_equivalentes_de_pagamento(self):
+        por_prazo = extrair_compra(mensagem(
+            "Compra – Fornecedor\nQuantidade: 10 garrotes\nNegociação: 01/08/2026\n"
+            "Pagamento: 30 dias", 1, "m1"), {})
+        por_data = extrair_compra(mensagem(
+            "Compra – Fornecedor\nQuantidade: 10 garrotes\nNegociação: 01/08/2026\n"
+            "Pagamento\n• Data: 31 de agosto de 2026", 2, "m2"), {})
+        grupo = agrupar_compras([por_prazo, por_data])[0]
+        self.assertEqual(por_prazo["pagamento"], "31/08/2026")
+        self.assertEqual(por_data["pagamento"], "31/08/2026")
+        self.assertEqual(grupo["versoes"], 1)
+
+    def test_repeticoes_semanticas_iguais_viram_uma_alternativa(self):
+        completa = extrair_compra(mensagem(
+            "Compra – Fornecedor\nQuantidade: 10 garrotes\nPeso bruto total: 3.000 kg\n"
+            "Preço: R$ 300/@\nNegociação: 01/08/2026",
+            1, "m1"), {})
+        parcial = extrair_compra(mensagem(
+            "Compra – Fornecedor\nQuantidade informada: 10 garrotes\nNegociação: 01/08/2026",
+            2, "m2"), {})
+        repetida = extrair_compra(mensagem(
+            "Compra – Fornecedor\nQuantidade: 10 garrotes\nPeso bruto total: 3.000 kg\n"
+            "Preço: R$ 300,00/@\nNegociação: 01/08/2026",
+            3, "m3"), {})
+        grupo = agrupar_compras([completa, parcial, repetida])[0]
+        self.assertEqual(grupo["versoes"], 1)
+        self.assertEqual(grupo["evidencias"], 3)
+        self.assertEqual(grupo["repeticoes_consolidadas"], 2)
+        self.assertEqual(grupo["versoes_revisao"][0]["ocorrencias"], 3)
+        self.assertEqual(grupo["versoes_revisao"][0]["mensagens"], ["m1", "m2", "m3"])
+        self.assertFalse(grupo["requer_revisao"])
+
+    def test_separa_mesma_origem_por_sexo_categoria_e_destino(self):
+        config = {"regras_mensagens": {
+            "m1": {"negocio_origem": "NEG-26-001", "destino": "confinamento"},
+            "m2": {"negocio_origem": "NEG-26-001", "destino": "abate / boi balança"},
+            "m3": {"negocio_origem": "NEG-26-001", "destino": "confinamento"},
+            "m4": {"negocio_origem": "NEG-26-001", "destino": "fazenda"},
+        }}
+        textos = (
+            "Compra – Fornecedor\nQuantidade: 10 novilhas\nNegociação: 01/08/2026",
+            "Compra – Fornecedor\nQuantidade: 10 vacas\nNegociação: 01/08/2026",
+            "Compra – Fornecedor\nQuantidade: 10 garrotes\nNegociação: 01/08/2026",
+            "Compra – Fornecedor\nQuantidade: 5 garrotes\nNegociação: 01/08/2026",
+        )
+        compras = [extrair_compra(mensagem(texto, indice, f"m{indice}"), config)
+                   for indice, texto in enumerate(textos, 1)]
+        grupos = agrupar_compras(compras)
+        identidades = {(item["sexo"], item["categoria"], item["destino"]) for item in grupos}
+        self.assertEqual(len(grupos), 4)
+        self.assertEqual(identidades, {
+            ("fêmea", "novilha", "confinamento"),
+            ("fêmea", "vaca", "abate / boi balança"),
+            ("macho", "garrote", "confinamento"),
+            ("macho", "garrote", "fazenda"),
+        })
+
+    def test_resumo_agregado_e_preservado_sem_criar_negocio(self):
+        compra = extrair_compra(mensagem(
+            "Compra – Fornecedor\nQuantidade: 40 garrotes\nNegociação: 01/08/2026",
+            1, "m1"), {"regras_mensagens": {"m1": {"tipo_evidencia": "resumo_agregado"}}})
+        exportacao = {
+            "contexto": "Grupo", "arquivo": "messages.html", "arquivo_sha256": "a" * 64,
+            "mensagens": [mensagem(compra and "Compra – Fornecedor\nQuantidade: 40 garrotes", 1, "m1")],
+            "anexos": [], "anexos_omitidos": 0, "primeira_data": None, "ultima_data": None,
+        }
+        plano = gerar_plano(
+            [exportacao], {"regras_mensagens": {"m1": {"tipo_evidencia": "resumo_agregado"}}}
+        )
+        self.assertEqual(plano["resumo"]["resumos_agregados_preservados"], 1)
+        self.assertEqual(plano["resumo"]["grupos_compras"], 0)
+        self.assertEqual(plano["evidencias_agregadas"][0]["quantidade"], 40)
+
+    def test_carrega_regras_privadas_sem_expor_na_saida_publica(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            caminho = Path(pasta) / "aliases.json"
+            caminho.write_text('{"aliases":{"Apelido":"Nome"},"regras_mensagens":{"m1":{"destino":"fazenda"}}}')
+            config = carregar_aliases(caminho)
+        self.assertEqual(config["aliases"]["apelido"], "nome")
+        self.assertEqual(config["regras_mensagens"]["m1"]["destino"], "fazenda")
+
     def test_le_exportacao_herda_autor_e_confere_anexo(self):
         with tempfile.TemporaryDirectory() as pasta:
             raiz = Path(pasta)

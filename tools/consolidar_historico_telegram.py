@@ -9,7 +9,7 @@ import json
 import re
 import unicodedata
 from collections import Counter, defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from html.parser import HTMLParser
 from pathlib import Path
@@ -38,6 +38,14 @@ CAMPOS_COMPRA = {
     "pagamento": "pagamento",
 }
 
+IDENTIDADE_COMPRA = {
+    "sexo": "sexo",
+    "categoria": "categoria",
+    "destino": "destino",
+}
+
+NAO_INFORMADO = "não informado"
+
 
 def normalizar_texto(valor: Any) -> str:
     texto = unicodedata.normalize("NFKD", str(valor or ""))
@@ -61,6 +69,10 @@ def numero_decimal(texto: str | None) -> Decimal | None:
         valor = valor.replace(".", "").replace(",", ".")
     elif "," in valor:
         valor = valor.replace(",", ".")
+    elif "." in valor:
+        partes = valor.split(".")
+        if len(partes) > 2 or (len(partes) == 2 and len(partes[1]) == 3):
+            valor = "".join(partes)
     try:
         return Decimal(valor)
     except InvalidOperation:
@@ -76,6 +88,35 @@ def serializar(objeto: Any) -> Any:
 def primeiro(padrao: str, texto: str) -> str | None:
     achado = re.search(padrao, texto, re.I)
     return achado.group(1).strip() if achado else None
+
+
+def normalizar_pagamento(valor: str | None, data_negociacao: str | None) -> str | None:
+    if not valor:
+        return None
+    texto = re.sub(r"^(?:data|pagamento)\s*:\s*", "", valor.strip(), flags=re.I)
+    simples = normalizar_texto(texto)
+    if simples in {"a vista", "avista"}:
+        return "à vista"
+    meses = {
+        "janeiro": 1, "fevereiro": 2, "marco": 3, "abril": 4, "maio": 5, "junho": 6,
+        "julho": 7, "agosto": 8, "setembro": 9, "outubro": 10, "novembro": 11, "dezembro": 12,
+    }
+    data_extenso = re.fullmatch(r"(\d{1,2})\s+de\s+([a-zç]+)\s+de\s+(\d{4})", texto, re.I)
+    if data_extenso:
+        mes = meses.get(normalizar_texto(data_extenso.group(2)))
+        if mes:
+            return f"{int(data_extenso.group(1)):02d}/{mes:02d}/{data_extenso.group(3)}"
+    data_numerica = re.fullmatch(r"(\d{1,2})/(\d{1,2})/(\d{4})", texto)
+    if data_numerica:
+        return f"{int(data_numerica.group(1)):02d}/{int(data_numerica.group(2)):02d}/{data_numerica.group(3)}"
+    prazo = re.fullmatch(r"(\d+)\s+dias?", simples)
+    if prazo and data_negociacao:
+        try:
+            base = datetime.strptime(data_negociacao, "%d/%m/%Y")
+            return (base + timedelta(days=int(prazo.group(1)))).strftime("%d/%m/%Y")
+        except ValueError:
+            pass
+    return texto
 
 
 def extrair_gtas(texto: str) -> list[str]:
@@ -207,7 +248,53 @@ def rotulo_valido(rotulo: str) -> bool:
     return not any(item in valor for item in invalidos)
 
 
-def extrair_compra(mensagem: dict[str, Any], aliases: dict[str, str]) -> dict[str, Any] | None:
+def separar_configuracao(configuracao: dict[str, Any]) -> tuple[dict[str, str], dict[str, Any]]:
+    if "aliases" not in configuracao and "regras_mensagens" not in configuracao:
+        return configuracao, {}
+    return configuracao.get("aliases", {}), configuracao.get("regras_mensagens", {})
+
+
+def inferir_sexo_categoria(texto: str) -> tuple[str, str]:
+    valor = normalizar_texto(texto)
+    regras = (
+        (r"\bnovilh[ao]s?\b", "fêmea", "novilha"),
+        (r"\bvacas?\b", "fêmea", "vaca"),
+        (r"\bbezerras?\b", "fêmea", "bezerro"),
+        (r"\bgarrotas?\b", "fêmea", "garrote"),
+        (r"\bgarrotes?\b", "macho", "garrote"),
+        (r"\bbezerros?\b", "macho", "bezerro"),
+        (r"\bbois?\b", "macho", "boi"),
+        (r"\btouros?\b", "macho", "touro"),
+    )
+    for padrao, sexo, categoria in regras:
+        if re.search(padrao, valor):
+            return sexo, categoria
+    return NAO_INFORMADO, NAO_INFORMADO
+
+
+def inferir_destino(texto: str) -> str:
+    valor = normalizar_texto(texto)
+    if re.search(r"\b(?:para|destino|vai para|destinado ao?)\s+(?:o\s+)?(?:abate|boi balanca|frigorifico)\b", valor):
+        return "abate / boi balança"
+    if re.search(r"\b(?:para|destino|vai para|destinado a)\s+(?:a\s+)?fazenda\b", valor):
+        return "fazenda"
+    if re.search(r"\b(?:para|destino|vai para|destinado ao?)\s+(?:o\s+)?confinamento\b", valor):
+        return "confinamento"
+    return NAO_INFORMADO
+
+
+def aplicar_regra_privada(compra: dict[str, Any], regra: dict[str, Any]) -> dict[str, Any]:
+    permitidos = {
+        "rotulo_canonico", "negocio_origem", "sexo", "categoria", "destino",
+        "tipo_evidencia", "observacao_classificacao",
+    }
+    for campo in permitidos:
+        if regra.get(campo) not in (None, ""):
+            compra[campo] = regra[campo]
+    return compra
+
+
+def extrair_compra(mensagem: dict[str, Any], configuracao: dict[str, Any]) -> dict[str, Any] | None:
     texto = mensagem["texto"]
     if not re.search(r"(?:🐄\s*)?Compra\s*[–—-]|COMPRA LIDA", texto, re.I):
         return None
@@ -217,16 +304,28 @@ def extrair_compra(mensagem: dict[str, Any], aliases: dict[str, str]) -> dict[st
     if not rotulo_valido(rotulo):
         return None
     quantidade = numero_decimal(primeiro(r"Quantidade(?:\s+informada)?:\s*(\d+(?:[.,]\d+)?)", texto))
+    if quantidade is None:
+        quantidade = numero_decimal(primeiro(r"Fechamento:\s*(?:•\s*)?(\d+(?:[.,]\d+)?)\s+(?:novilh\w*|vacas?|garrot\w*|bezerr\w*|bois?)", texto))
     peso_total = numero_decimal(primeiro(r"Peso (?:bruto|de balança) total:\s*([\d.,]+)", texto))
     if peso_total is None:
         peso_total = numero_decimal(primeiro(r"Peso total:\s*([\d.,]+)", texto))
+    if peso_total is None:
+        peso_total = numero_decimal(primeiro(r"(?:•\s*)?([\d.,]+)\s*kg\s+bruto", texto))
     preco = numero_decimal(primeiro(r"Pre[çc]o:\s*R\$\s*([\d.,]+)\s*/?@", texto))
     if preco is None:
         preco = numero_decimal(primeiro(r"a\s*R\$\s*([\d.,]+)\s*/?@", texto))
     valor = numero_decimal(primeiro(r"Valor(?: total)?:\s*R\$\s*([\d.,]+)", texto))
+    if valor is None:
+        valor = numero_decimal(primeiro(r"Valor(?: total)?:[^\n]*?=\s*R\$\s*([\d.,]+)", texto))
     negociacao = primeiro(r"Negocia[çc][aã]o:\s*(\d{1,2}/\d{1,2}/\d{4})", texto)
     pesagem = primeiro(r"Pesagem:\s*(\d{1,2}/\d{1,2}/\d{4})", texto)
     pagamento = primeiro(r"Pagamento:\s*([^\n]+)", texto)
+    if pagamento is None:
+        pagamento = primeiro(r"Pagamento\s*(?:\n|•)+\s*(?:•\s*)?([^\n]+)", texto)
+    if pagamento:
+        pagamento = re.sub(r"^[•\-–—]\s*", "", pagamento).strip()
+    pagamento = normalizar_pagamento(pagamento, negociacao)
+    aliases, regras_mensagens = separar_configuracao(configuracao)
     canonico = aliases.get(normalizar_texto(rotulo), normalizar_texto(rotulo))
     eh_teste = bool(re.search(r"fict[ií]ci|homologa|\bteste\b|CF-\d+-999", texto, re.I))
     campos = {
@@ -238,10 +337,16 @@ def extrair_compra(mensagem: dict[str, Any], aliases: dict[str, str]) -> dict[st
         "data_pesagem": pesagem,
         "pagamento": pagamento,
     }
-    return {
+    sexo, categoria = inferir_sexo_categoria(texto)
+    compra = {
         "contexto": mensagem["contexto"],
         "rotulo": rotulo,
         "rotulo_canonico": canonico,
+        "negocio_origem": None,
+        "sexo": sexo,
+        "categoria": categoria,
+        "destino": inferir_destino(texto),
+        "tipo_evidencia": "negocio",
         "vendedor": vendedor,
         **campos,
         "campos_preenchidos": sum(valor not in (None, "") for valor in campos.values()),
@@ -254,6 +359,7 @@ def extrair_compra(mensagem: dict[str, Any], aliases: dict[str, str]) -> dict[st
         "texto_sha256": mensagem["texto_sha256"],
         "gtas": mensagem["gtas"],
     }
+    return aplicar_regra_privada(compra, regras_mensagens.get(mensagem["mensagem_id"], {}))
 
 
 def dia_mensagem(valor: str | None) -> str | None:
@@ -262,13 +368,43 @@ def dia_mensagem(valor: str | None) -> str | None:
 
 
 def assinatura_campos(compra: dict[str, Any]) -> tuple[Any, ...]:
-    return tuple(compra.get(campo) for campo in CAMPOS_COMPRA)
+    return tuple(compra.get(campo) for campo in (*IDENTIDADE_COMPRA, *CAMPOS_COMPRA))
+
+
+def versoes_compativeis(primeira: dict[str, Any], segunda: dict[str, Any]) -> bool:
+    for campo in CAMPOS_COMPRA:
+        a, b = primeira.get(campo), segunda.get(campo)
+        if a not in (None, "") and b not in (None, "") and a != b:
+            return False
+    return True
+
+
+def consolidar_versoes_semanticas(versoes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Une repetições iguais ou parciais compatíveis sem combinar dados."""
+    ordenadas = sorted(
+        versoes,
+        key=lambda item: (item["campos_preenchidos"], item["ordem"]),
+        reverse=True,
+    )
+    grupos: list[dict[str, Any]] = []
+    for item in ordenadas:
+        compativeis = [grupo for grupo in grupos if versoes_compativeis(grupo["representante"], item)]
+        if len(compativeis) == 1:
+            grupo = compativeis[0]
+            grupo["evidencias"].append(item)
+            if (item["campos_preenchidos"], item["ordem"]) > (
+                grupo["representante"]["campos_preenchidos"], grupo["representante"]["ordem"]
+            ):
+                grupo["representante"] = item
+        else:
+            grupos.append({"representante": item, "evidencias": [item]})
+    return sorted(grupos, key=lambda grupo: grupo["representante"]["ordem"])
 
 
 def campos_divergentes(versoes: list[dict[str, Any]]) -> list[str]:
     return [
         campo for campo in CAMPOS_COMPRA
-        if len({versao.get(campo) for versao in versoes}) > 1
+        if len({versao.get(campo) for versao in versoes if versao.get(campo) not in (None, "")}) > 1
     ]
 
 
@@ -293,14 +429,17 @@ def agrupar_compras(compras: list[dict[str, Any]]) -> list[dict[str, Any]]:
     grupos: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for compra in compras:
         data_base = compra["data_negociacao"] or dia_mensagem(compra["data_mensagem"]) or "sem_data"
-        chave = f"{normalizar_texto(compra['contexto'])}|{compra['rotulo_canonico']}|{data_base}"
+        origem = compra.get("negocio_origem") or f"{compra['rotulo_canonico']}|{data_base}"
+        identidade = "|".join(compra.get(campo) or NAO_INFORMADO for campo in IDENTIDADE_COMPRA)
+        chave = f"{normalizar_texto(compra['contexto'])}|{origem}|{identidade}"
         grupos[chave].append(compra)
     saida = []
     for chave, versoes in sorted(grupos.items()):
         versoes.sort(key=lambda item: item["ordem"])
-        assinaturas = {assinatura_campos(item) for item in versoes}
-        ultima = versoes[-1]
-        if len(assinaturas) == 1:
+        versoes_semanticas = consolidar_versoes_semanticas(versoes)
+        representantes = [grupo["representante"] for grupo in versoes_semanticas]
+        ultima = representantes[-1]
+        if len(versoes_semanticas) == 1:
             classificacao = "repeticao_deduplicavel"
             preferida = ultima
         elif ultima["eh_correcao_explicita"]:
@@ -309,20 +448,26 @@ def agrupar_compras(compras: list[dict[str, Any]]) -> list[dict[str, Any]]:
         else:
             classificacao = "ambiguo_multiplas_versoes"
             preferida = None
-        divergentes = campos_divergentes(versoes)
-        ausentes = campos_ausentes_em_todas(versoes)
+        divergentes = campos_divergentes(representantes)
+        ausentes = campos_ausentes_em_todas(representantes)
         situacao, prioridade, acao = classificar_revisao(classificacao, divergentes)
         saida.append({
             "chave_provisoria": chave,
             "contexto": versoes[0]["contexto"],
             "negocio": versoes[0]["rotulo"],
+            "negocio_origem": versoes[0].get("negocio_origem"),
+            "sexo": versoes[0]["sexo"],
+            "categoria": versoes[0]["categoria"],
+            "destino": versoes[0]["destino"],
             "data_base": versoes[0]["data_negociacao"] or dia_mensagem(versoes[0]["data_mensagem"]),
             "classificacao": classificacao,
             "situacao_revisao": situacao,
             "prioridade_revisao": prioridade,
             "acao_recomendada": acao,
-            "versoes": len(versoes),
-            "campos_distintos": len(assinaturas),
+            "versoes": len(versoes_semanticas),
+            "evidencias": len(versoes),
+            "repeticoes_consolidadas": len(versoes) - len(versoes_semanticas),
+            "campos_distintos": len(versoes_semanticas),
             "campos_divergentes": divergentes,
             "campos_divergentes_humanos": [CAMPOS_COMPRA[campo] for campo in divergentes],
             "campos_ausentes_em_todas": ausentes,
@@ -331,22 +476,30 @@ def agrupar_compras(compras: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "requer_revisao": classificacao != "repeticao_deduplicavel",
             "versao_preferida": preferida,
             "versoes_revisao": [{
-                "mensagem_id": item["mensagem_id"],
-                "data_mensagem": item["data_mensagem"],
-                "eh_correcao_explicita": item["eh_correcao_explicita"],
-                "dados": {campo: item.get(campo) for campo in CAMPOS_COMPRA},
-            } for item in versoes],
+                "mensagem_id": grupo["representante"]["mensagem_id"],
+                "mensagens": [
+                    item["mensagem_id"]
+                    for item in sorted(grupo["evidencias"], key=lambda evidencia: evidencia["ordem"])
+                ],
+                "ocorrencias": len(grupo["evidencias"]),
+                "data_mensagem": grupo["representante"]["data_mensagem"],
+                "eh_correcao_explicita": any(item["eh_correcao_explicita"] for item in grupo["evidencias"]),
+                "dados": {campo: grupo["representante"].get(campo) for campo in CAMPOS_COMPRA},
+            } for grupo in versoes_semanticas],
             "mensagens": [item["mensagem_id"] for item in versoes],
         })
     return saida
 
 
-def carregar_aliases(caminho: Path | None) -> dict[str, str]:
+def carregar_aliases(caminho: Path | None) -> dict[str, Any]:
     if not caminho:
         return {}
     bruto = json.loads(caminho.read_text(encoding="utf-8"))
     pares = bruto.get("aliases", bruto)
-    return {normalizar_texto(chave): normalizar_texto(valor) for chave, valor in pares.items()}
+    aliases = {normalizar_texto(chave): normalizar_texto(valor) for chave, valor in pares.items()}
+    if "aliases" not in bruto and "regras_mensagens" not in bruto:
+        return aliases
+    return {"aliases": aliases, "regras_mensagens": bruto.get("regras_mensagens", {})}
 
 
 def validar_plano_documental(documentos: dict[str, Any] | None) -> dict[str, Any]:
@@ -438,7 +591,7 @@ def cortes_fontes(documentos: dict[str, Any] | None, complemento_ima: dict[str, 
     return corte
 
 
-def gerar_plano(exportacoes: list[dict[str, Any]], aliases: dict[str, str],
+def gerar_plano(exportacoes: list[dict[str, Any]], aliases: dict[str, Any],
                 documentos: dict[str, Any] | None = None,
                 complemento_ima: dict[str, Any] | None = None) -> dict[str, Any]:
     validacao_documental = validar_plano_documental(documentos)
@@ -449,12 +602,15 @@ def gerar_plano(exportacoes: list[dict[str, Any]], aliases: dict[str, str],
     compras_brutas = [compra for mensagem in mensagens if (compra := extrair_compra(mensagem, aliases))]
     vistos: set[tuple[str, str]] = set()
     compras = []
+    evidencias_agregadas = []
     for compra in compras_brutas:
         chave_deduplicacao = (compra["contexto"], compra["texto_sha256"])
         if chave_deduplicacao in vistos:
             continue
         vistos.add(chave_deduplicacao)
-        if not compra["eh_teste"]:
+        if compra["tipo_evidencia"] == "resumo_agregado":
+            evidencias_agregadas.append(compra)
+        elif not compra["eh_teste"]:
             compras.append(compra)
     hashes_anexos = Counter(item["sha256"] for item in anexos if item["sha256"])
     categorias = Counter(categoria for mensagem in mensagens for categoria in mensagem["categorias"])
@@ -487,8 +643,10 @@ def gerar_plano(exportacoes: list[dict[str, Any]], aliases: dict[str, str],
             "duplicatas_anexos": sum(quantidade - 1 for quantidade in hashes_anexos.values()),
             "blocos_compra_brutos": len(compras_brutas),
             "blocos_compra_reais_deduplicados": len(compras),
+            "resumos_agregados_preservados": len(evidencias_agregadas),
         },
         "grupos_compras": agrupar_compras(compras),
+        "evidencias_agregadas": evidencias_agregadas,
         "cruzamento_gta": cruzar_gtas(mensagens, documentos),
         "anexos": anexos,
         "pendencias": [],
@@ -545,13 +703,14 @@ def relatorio_markdown(plano: dict[str, Any]) -> str:
         ausentes = ", ".join(grupo["campos_ausentes_humanos"]) or "nenhum"
         linhas_revisao.append(
             f"| {grupo['prioridade_revisao']} | {grupo['situacao_revisao']} | "
-            f"{grupo['contexto']} | {grupo['negocio']} | "
-            f"{grupo['data_base'] or 'sem data'} | {grupo['versoes']} | {divergentes} | {ausentes} | "
+            f"{grupo['contexto']} | {grupo['negocio']} | {grupo['sexo']} | {grupo['categoria']} | "
+            f"{grupo['destino']} | {grupo['data_base'] or 'sem data'} | {grupo['versoes']} | "
+            f"{grupo['evidencias']} | {divergentes} | {ausentes} | "
             f"{grupo['acao_recomendada']} |"
         )
     tabela_revisao = (
         "\n".join(linhas_revisao)
-        or "| — | — | — | — | — | 0 | — | — | nenhuma revisão |"
+        or "| — | — | — | — | — | — | — | 0 | 0 | — | — | nenhuma revisão |"
     )
     return f"""# Consolidação privada do histórico Telegram
 
@@ -573,6 +732,7 @@ Plano `{plano['plano_id']}`. Modo somente leitura; nenhuma escrita foi executada
 - {resumo['mensagens']} mensagens processadas;
 - {resumo['anexos_existentes']} anexos encontrados e {resumo['anexos_omitidos']} omitidos;
 - {resumo['blocos_compra_reais_deduplicados']} blocos reais de compra deduplicados;
+- {resumo['resumos_agregados_preservados']} resumos agregados preservados apenas como evidência;
 - {resumo['grupos_compras']} grupos provisórios;
 - {resumo['grupos_ambiguos']} grupos permanecem ambíguos;
 - {resumo['correcoes_explicitas_preferidas']} grupos têm correção posterior explicitamente indicada;
@@ -595,8 +755,8 @@ ou data; ela permanece como pendência de conciliação.
 
 ## Fila privada de conferência por negócio
 
-| Prioridade | Situação | Contexto | Negócio | Data-base | Versões | O que diverge | Ausente em todas | Próxima ação |
-|---|---|---|---|---|---:|---|---|---|
+| Prioridade | Situação | Contexto | Negócio | Sexo | Categoria | Destino | Data-base | Versões | Evidências | O que diverge | Ausente em todas | Próxima ação |
+|---|---|---|---|---|---|---|---|---:|---:|---|---|---|
 {tabela_revisao}
 
 Esta fila não combina campos de versões diferentes. A versão indicada por uma
@@ -606,6 +766,9 @@ correção explícita continua pendente de confirmação na fonte.
 
 - correção explícita posterior pode ser preferida, mas nunca confirmada automaticamente;
 - mesmo fornecedor e mesma data com campos diferentes permanece ambíguo;
+- versões iguais ou parciais compatíveis viram uma única alternativa, preservando todas as mensagens;
+- sexo, categoria e destino fazem parte da identidade do negócio;
+- resumo agregado não vira uma avaliação adicional;
 - GTA exata forma candidato documental forte, ainda não confirmado;
 - valor/data isolados não são usados por este importador;
 - testes e exemplos são excluídos dos negócios reais;

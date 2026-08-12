@@ -97,11 +97,12 @@ variação sem ficha detalhada correspondente permanece inexplicada e não gera
 movimentação compensatória.
 
 O relatório Markdown privado inclui uma fila por negócio, ordenada por
-prioridade. Ela mostra contexto humano, data-base, quantidade de versões,
-campos divergentes, campos ausentes em todas as versões e a próxima ação. Uma
-divergência financeira recebe prioridade alta; nenhuma linha mistura campos de
-mensagens diferentes. O JSON privado preserva cada versão e seus respectivos
-IDs de mensagem para auditoria.
+prioridade. Ela mostra contexto humano, sexo, categoria, destino, data-base,
+quantidade de versões semanticamente distintas, quantidade total de evidências,
+campos divergentes, campos ausentes e a próxima ação. Uma divergência financeira
+recebe prioridade alta; nenhuma linha mistura campos de mensagens diferentes.
+O JSON privado preserva cada versão, suas repetições e todos os respectivos IDs
+de mensagem para auditoria. Códigos humanos seguem o padrão anual `NEG-AA-NNN`.
 
 Quando recebe `--documentos-plano`, o importador exige que o plano declare
 explicitamente zero escrita e zero alteração operacional. A assinatura SHA-256
@@ -115,7 +116,15 @@ As regras permanentes do importador são:
 - anexos presentes recebem hash; anexos omitidos viram pendência;
 - conteúdo repetido é deduplicado somente dentro do mesmo contexto;
 - testes, homologações e modelos não entram nos negócios reais;
-- duas versões iguais são repetição; campos divergentes permanecem ambíguos;
+- versões iguais ou parciais compatíveis viram uma única alternativa, mas todas
+  as mensagens permanecem como evidência;
+- sexo, categoria e destino participam da identidade: novilha, vaca e garrote,
+  ou destinos como confinamento, fazenda e abate, não são unidos;
+- um resumo que soma categorias ou destinos distintos permanece evidência
+  agregada e não cria uma avaliação adicional;
+- números brasileiros com ponto de milhar, como peso em kg, são convertidos em
+  número e nunca em data na planilha de conferência;
+- campos realmente divergentes permanecem ambíguos;
 - uma correção explicitamente posterior pode ser indicada como preferida, mas
   continua não confirmada e revisável;
 - mesmo fornecedor e mesma data nunca bastam para unir compras distintas;
