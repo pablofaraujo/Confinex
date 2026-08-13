@@ -47,9 +47,8 @@ var RESTORE_STORAGE_KEY = "confinex:restore-before-reset:v1";
 var VERSION_STORAGE_KEY = "confinex:named-versions:v1";
 var LEGACY_STORAGE_KEYS = ["confinex:last-state:v2"];
 var css = `
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{background:${T.bg};color:${T.text};font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;line-height:1.55;min-height:100vh;overflow-x:hidden}
+body{background:${T.bg};color:${T.text};font-family:var(--font);font-size:13px;line-height:1.55;min-height:100vh;overflow-x:hidden}
 .app{max-width:1180px;min-width:0;margin:0 auto;padding:28px 16px 100px}
 body.has-shell .shell-content .app{padding:0 0 100px}
 .hdr{display:flex;align-items:flex-start;gap:0;margin-bottom:16px;padding-bottom:18px;border-bottom:1px solid var(--border)}

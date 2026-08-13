@@ -161,6 +161,13 @@ class ClarezaInterfaceConfinexTests(unittest.TestCase):
         self.assertIn("60 e 150 dias", pacote_movel)
         self.assertIn("max:240", pacote_movel)  # O limite do cenário não foi alterado.
 
+    def test_bundles_nao_importam_fonte_externa_adicional(self):
+        pacote_movel = (ROOT / "confinex-app.mobile.js").read_text(encoding="utf-8")
+        for pacote in (self.fonte, pacote_movel):
+            self.assertNotIn("fonts.googleapis.com", pacote)
+            self.assertNotIn("fonts.gstatic.com", pacote)
+            self.assertIn("font-family:var(--font)", pacote)
+
     def test_comparativo_explica_limite_vp_e_revenda_equivalente(self):
         for texto in (
             "Pre\\xE7o atual de compra",
