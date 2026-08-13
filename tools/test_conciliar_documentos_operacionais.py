@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from datetime import date
@@ -12,6 +13,7 @@ from tools.conciliar_documentos_operacionais import (
     extrair_gtas_campo,
     gerar_plano,
     ler_agronotas,
+    ler_negocios,
 )
 
 
@@ -78,6 +80,28 @@ class ConciliarDocumentosOperacionaisTest(unittest.TestCase):
         self.assertEqual(candidato["classificacao"], "ambiguo")
         self.assertNotIn("fitid_hash", candidato)
         self.assertFalse(candidato["confirmado"])
+
+    def test_documento_anterior_ao_periodo_ima_nao_infla_pendencias(self):
+        notas = [
+            {"linha": 2, "nf": "100", "gtas": ["111111"],
+             "data": "2026-07-20", "valor": None, "quantidade": None},
+            {"linha": 3, "nf": "101", "gtas": [],
+             "data": "2026-08-10", "valor": None, "quantidade": None},
+        ]
+        plano = gerar_plano(
+            fonte_agronotas(notas), fonte_ima([]), fonte_banco([]), None,
+            date(2026, 8, 11),
+        )
+        self.assertEqual(plano["resumo"]["vinculos_nf_gta"], {
+            "fora_periodo_ima": 1,
+            "pendente": 1,
+        })
+        historico, pendente = plano["vinculos_nf_gta"]
+        self.assertEqual(historico["criterio"], "documento_fora_do_periodo_ima")
+        self.assertEqual(historico["data_nf"], "2026-07-20")
+        self.assertEqual(pendente["criterio"], "gta_ausente_na_nf")
+        self.assertIn("nfs_ou_gtas_sem_correspondencia_exigem_revisao",
+                      plano["pendencias"])
 
     def test_plano_id_e_deterministico(self):
         nota = {"linha": 2, "nf": "123", "gtas": [], "data": None,
@@ -153,6 +177,20 @@ class ConciliarDocumentosOperacionaisTest(unittest.TestCase):
         self.assertEqual(resultado["registros"][0]["nf"], None)
         self.assertEqual(resultado["registros"][0]["gtas"], ["654321"])
 
+    def test_insumo_com_palavra_boi_ou_gado_nao_exige_gta(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            caminho = Path(pasta) / "documentos.json"
+            caminho.write_text(json.dumps([
+                {"numero": "100", "dataEmissao": "2026-08-10",
+                 "valorTotal": "100", "descricao": "suplemento para boi e gado"},
+                {"numero": "101", "dataEmissao": "2026-08-10",
+                 "valorTotal": "200", "descricao": "20 bovinos"},
+            ]), encoding="utf-8")
+            resultado = ler_agronotas(caminho)
+        self.assertEqual(resultado["ignorados_nao_pecuarios"], 1)
+        self.assertEqual(len(resultado["registros"]), 1)
+        self.assertEqual(resultado["registros"][0]["nf"], "101")
+
     def test_combina_exportacoes_agronotas_sem_duplicar_documento(self):
         item = {"linha": 2, "nf": "123", "gtas": ["654321"],
                 "data": "2026-08-10", "valor": Decimal("1200.00"),
@@ -207,6 +245,36 @@ class ConciliarDocumentosOperacionaisTest(unittest.TestCase):
             resultado = ler_agronotas(caminho)
         self.assertEqual(resultado["registros"][0]["data"], "2026-08-06")
         self.assertEqual(resultado["registros"][0]["valor"], Decimal("1500.00"))
+
+    def test_reconhece_codigos_de_negocio_das_planilhas_operacionais(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            caminho = Path(pasta) / "negocios.csv"
+            caminho.write_text(
+                "negocio_id;numero_gta;numero_nf\n"
+                "NEG-26-001;654321;900\n",
+                encoding="utf-8",
+            )
+            resultado = ler_negocios(caminho)
+        self.assertEqual(resultado["registros"][0]["codigo"], "NEG-26-001")
+        self.assertEqual(resultado["registros"][0]["gtas"], ["654321"])
+        self.assertEqual(resultado["registros"][0]["nfs"], ["900"])
+        self.assertEqual(resultado["codigos_unicos"], 1)
+        self.assertEqual(resultado["codigos_operacionais"], 1)
+        self.assertEqual(resultado["contextos_agregadores"], 0)
+
+    def test_contexto_agregador_nao_e_contado_como_negocio_operacional(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            caminho = Path(pasta) / "negocios.csv"
+            caminho.write_text(
+                "negocio_id;numero_gta\n"
+                "FAZENDA;654321\n"
+                "CF-26-009;654322\n",
+                encoding="utf-8",
+            )
+            resultado = ler_negocios(caminho)
+        self.assertEqual(resultado["codigos_unicos"], 2)
+        self.assertEqual(resultado["codigos_operacionais"], 1)
+        self.assertEqual(resultado["contextos_agregadores"], 1)
 
 
 if __name__ == "__main__":

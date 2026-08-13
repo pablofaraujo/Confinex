@@ -63,10 +63,17 @@ As regras permanentes são:
 
 - GTA igual na nota e no IMA é vínculo documental forte;
 - NF ou GTA igual ao negócio é candidato forte, ainda não confirmado;
+- códigos `CF-AA-NNN` e `NEG-AA-NNN` representam negócios; rótulos de fazenda,
+  parceria ou rateio permanecem contextos agregadores e não inflam a contagem;
 - valor bancário igual e único em até 90 dias é somente candidato provável;
 - valor e data sem identificador documental nunca formam vínculo forte;
 - duas ou mais correspondências ficam ambíguas e intactas;
+- documento anterior ou posterior ao período coberto pela ficha IMA fica
+  classificado como histórico fora da cobertura, não como pendência;
 - documentos sem relação com gado são ignorados, mas contabilizados;
+- as palavras isoladas **boi** ou **gado** em insumos não caracterizam
+  movimentação animal; é preciso GTA, vínculo existente, bovino/bubalino,
+  categoria animal ou indicação de animais vivos;
 - a data do último documento é diferente da data até a qual o Agronotas foi
   consultado; dias sem nota não geram falso atraso quando a consulta foi atual;
 - fonte não consultada até a referência vira pendência explícita;

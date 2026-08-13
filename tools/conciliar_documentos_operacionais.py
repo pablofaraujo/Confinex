@@ -35,7 +35,10 @@ ALIASES = {
     "valor": ("valor", "valor total", "valor_total", "valortotal", "valor documento", "valor_documento", "valor nf", "valor_nf", "valor compra", "valor_compra"),
     "quantidade": ("quantidade", "cabecas", "quantidade cabecas", "quantidade_cabecas", "qtde", "qtde gta", "qtde_gta"),
     "observacao": ("observacao", "observacoes", "comentario", "comentarios", "historico", "informacoes complementares", "dados adicionais", "descricao"),
-    "codigo": ("codigo", "negocio", "negocio id", "negocio_id", "operacao", "operacao id", "operacao_id", "codigo operacao", "codigo_operacao"),
+    "codigo": ("codigo", "negocio", "negocio id", "negocio_id",
+               "numero negocio compra", "numero_negocio_compra",
+               "operacao", "operacao id", "operacao_id", "codigo operacao",
+               "codigo_operacao"),
 }
 
 
@@ -301,7 +304,7 @@ def ler_agronotas(caminho: Path, aba: str | None = None) -> dict[str, Any]:
             "compra_id", "confinamento_id", "venda_id", "abate_id"))
         texto_normalizado = normalizar_texto(texto_completo)
         relacionado_a_gado = bool(re.search(
-            r"\b(bovino|bubalino|gado|boi|bezerro|garrote|novilho|vaca|animais vivos para abate)\b",
+            r"\b(bovinos?|bubalinos?|bezerros?|garrotes?|novilh[oa]s?|vacas?|animais? vivos?)\b",
             texto_normalizado,
         ))
         if not gtas and not possui_vinculo and not relacionado_a_gado:
@@ -381,7 +384,16 @@ def ler_negocios(caminho: Path, abas: list[str] | None = None) -> dict[str, Any]
                 "data": data_valor(valor_campo(bruto, "data")),
                 "valor": decimal_valor(valor_campo(bruto, "valor")),
             })
-    return {"arquivo": caminho.name, "sha256": sha256_arquivo(caminho), "registros": negocios}
+    codigos = {str(item["codigo"]) for item in negocios if item.get("codigo")}
+    padrao_operacional = re.compile(r"^(?:CF|NEG)-\d{2}-\d{3}$", re.I)
+    return {
+        "arquivo": caminho.name,
+        "sha256": sha256_arquivo(caminho),
+        "registros": negocios,
+        "codigos_unicos": len(codigos),
+        "codigos_operacionais": sum(bool(padrao_operacional.fullmatch(c)) for c in codigos),
+        "contextos_agregadores": sum(not padrao_operacional.fullmatch(c) for c in codigos),
+    }
 
 
 def ler_ofx_detalhado(caminho: Path) -> dict[str, Any]:
@@ -454,9 +466,23 @@ def gerar_plano(agronotas: dict[str, Any], ficha: dict[str, Any], banco: dict[st
 
     vinculos_nf_gta = []
     for nota in agronotas["registros"]:
+        data_nf = nota.get("data")
+        fora_periodo_ima = bool(
+            data_nf and (
+                data_nf < ficha["periodo_inicial"]
+                or data_nf > ficha["periodo_final"]
+            )
+        )
         if not nota["gtas"]:
-            vinculos_nf_gta.append({"nf": nota["nf"], "linha_agronotas": nota["linha"],
-                                    "classificacao": "pendente", "criterio": "gta_ausente_na_nf"})
+            vinculos_nf_gta.append({
+                "nf": nota["nf"], "linha_agronotas": nota["linha"],
+                "data_nf": data_nf,
+                "classificacao": "fora_periodo_ima" if fora_periodo_ima else "pendente",
+                "criterio": (
+                    "documento_fora_do_periodo_ima"
+                    if fora_periodo_ima else "gta_ausente_na_nf"
+                ),
+            })
         for gta in nota["gtas"]:
             correspondencias = por_gta_ima.get(gta, [])
             if len(correspondencias) == 1:
@@ -475,8 +501,15 @@ def gerar_plano(agronotas: dict[str, Any], ficha: dict[str, Any], banco: dict[st
                     "classificacao": "ambiguo", "criterio": "gta_repetida_no_ima",
                     "correspondencias": len(correspondencias)})
             else:
-                vinculos_nf_gta.append({"nf": nota["nf"], "gta": gta, "linha_agronotas": nota["linha"],
-                    "classificacao": "pendente", "criterio": "gta_nao_encontrada_no_ima"})
+                vinculos_nf_gta.append({
+                    "nf": nota["nf"], "gta": gta,
+                    "linha_agronotas": nota["linha"], "data_nf": data_nf,
+                    "classificacao": "fora_periodo_ima" if fora_periodo_ima else "pendente",
+                    "criterio": (
+                        "documento_fora_do_periodo_ima"
+                        if fora_periodo_ima else "gta_nao_encontrada_no_ima"
+                    ),
+                })
 
     candidatos_banco = []
     for nota in agronotas["registros"]:
@@ -552,7 +585,10 @@ def gerar_plano(agronotas: dict[str, Any], ficha: dict[str, Any], banco: dict[st
                 "duplicados_ignorados": banco.get("duplicados_ignorados", 0),
                 "data_final": max((i["data"] for i in banco["transacoes"]), default=None)},
             "negocios": {"arquivo": (negocios or {}).get("arquivo"), "sha256": (negocios or {}).get("sha256"),
-                "registros": len(registros_negocio)},
+                "registros": len(registros_negocio),
+                "codigos_unicos": (negocios or {}).get("codigos_unicos", 0),
+                "codigos_operacionais": (negocios or {}).get("codigos_operacionais", 0),
+                "contextos_agregadores": (negocios or {}).get("contextos_agregadores", 0)},
         },
         "resumo": {"vinculos_nf_gta": contagem(vinculos_nf_gta),
             "candidatos_banco": contagem(candidatos_banco), "candidatos_negocio": contagem(candidatos_negocio)},
@@ -587,7 +623,7 @@ leitura. Nenhuma escrita foi executada e nenhuma tabela operacional foi alterada
 - Agronotas: {fontes['agronotas']['notas']} notas, {fontes['agronotas']['com_gta']} com GTA, último documento em {fontes['agronotas']['data_final']}, consulta até {fontes['agronotas'].get('consultado_ate') or fontes['agronotas']['data_final']};
 - IMA: {fontes['ima']['movimentos']} movimentações, período até {fontes['ima']['periodo_final']};
 - banco: {fontes['banco']['transacoes']} lançamentos, corte {fontes['banco']['data_final']};
-- negócios de referência: {fontes['negocios']['registros']} registros;
+- negócios de referência: {fontes['negocios']['registros']} linhas, {fontes['negocios']['codigos_unicos']} agrupamentos, {fontes['negocios']['codigos_operacionais']} códigos operacionais e {fontes['negocios']['contextos_agregadores']} contextos agregadores;
 - data de referência solicitada: {plano['data_referencia']}.
 
 ## Resultado do cruzamento
@@ -604,6 +640,8 @@ leitura. Nenhuma escrita foi executada e nenhuma tabela operacional foi alterada
 - negócio por GTA ou NF igual é forte, mas permanece não confirmado;
 - correspondência apenas por valor e data é provável;
 - múltiplas correspondências ficam ambíguas e não são escolhidas;
+- documento fora do período da ficha IMA fica preservado como histórico fora
+  da cobertura, não como pendência operacional;
 - ausência de dado permanece pendência, sem preenchimento por inferência.
 
 ## Pendências
