@@ -20,10 +20,10 @@ from zipfile import ZipFile
 
 try:
     from analisar_extrato_ofx import campo_ofx, data_ofx
-    from analisar_ficha_ima import extrair_texto_pdf, ler_ficha
+    from analisar_ficha_ima import carregar_ficha_pdf, combinar_fichas
 except ModuleNotFoundError:
     from tools.analisar_extrato_ofx import campo_ofx, data_ofx
-    from tools.analisar_ficha_ima import extrair_texto_pdf, ler_ficha
+    from tools.analisar_ficha_ima import carregar_ficha_pdf, combinar_fichas
 
 
 NS_PLANILHA = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
@@ -283,6 +283,7 @@ def carregar_registros(caminho: Path, aba: str | None = None) -> list[dict[str, 
 
 def ler_agronotas(caminho: Path, aba: str | None = None) -> dict[str, Any]:
     registros, vistos, duplicados, ignorados = [], set(), 0, 0
+    fonte_sha256 = sha256_arquivo(caminho)
     for bruto in carregar_registros(caminho, aba):
         observacoes = " | ".join(textos_campo(bruto, "observacao"))
         texto_completo = " | ".join(str(valor) for valor in bruto.values()
@@ -317,14 +318,18 @@ def ler_agronotas(caminho: Path, aba: str | None = None) -> dict[str, Any]:
             "data": data_valor(valor_campo(bruto, "data")),
             "valor": decimal_valor(valor_campo(bruto, "valor")),
             "quantidade": decimal_valor(valor_campo(bruto, "quantidade")),
+            "fonte_arquivo": caminho.name,
         }
+        item["registro_id"] = hashlib.sha256(
+            f"{fonte_sha256}|{item['linha']}|{item['nf']}|{item['data']}".encode()
+        ).hexdigest()[:12]
         chave = (item["nf"], tuple(gtas), item["data"], str(item["valor"]))
         if chave in vistos:
             duplicados += 1
         else:
             vistos.add(chave)
             registros.append(item)
-    return {"arquivo": caminho.name, "sha256": sha256_arquivo(caminho),
+    return {"arquivo": caminho.name, "sha256": fonte_sha256,
             "registros": registros, "duplicados": duplicados,
             "ignorados_nao_pecuarios": ignorados}
 
@@ -464,8 +469,35 @@ def gerar_plano(agronotas: dict[str, Any], ficha: dict[str, Any], banco: dict[st
     for movimento in ficha["movimentos"]:
         por_gta_ima[normalizar_numero(movimento.get("gta"))].append(movimento)
 
+    def chave_movimento(movimento: dict[str, Any]) -> tuple[Any, ...]:
+        return (
+            normalizar_numero(movimento.get("gta")), movimento.get("data"),
+            movimento.get("quantidade"), movimento.get("sentido"),
+        )
+
+    candidatos_sem_gta: dict[str, list[dict[str, Any]]] = {}
+    usos_movimento: dict[tuple[Any, ...], list[str]] = defaultdict(list)
+    for posicao, nota in enumerate(agronotas["registros"]):
+        identificador = str(nota.get("registro_id") or f"registro-{posicao}")
+        quantidade = nota.get("quantidade")
+        quantidade_plausivel = bool(
+            quantidade is not None
+            and quantidade == quantidade.to_integral_value()
+            and Decimal("1") <= quantidade <= Decimal("500")
+        )
+        candidatos = [
+            movimento for movimento in ficha["movimentos"]
+            if not nota["gtas"] and quantidade_plausivel
+            and movimento.get("data") == nota.get("data")
+            and Decimal(str(movimento.get("quantidade"))) == quantidade
+        ]
+        candidatos_sem_gta[identificador] = candidatos
+        for movimento in candidatos:
+            usos_movimento[chave_movimento(movimento)].append(identificador)
+
     vinculos_nf_gta = []
-    for nota in agronotas["registros"]:
+    for posicao, nota in enumerate(agronotas["registros"]):
+        identificador = str(nota.get("registro_id") or f"registro-{posicao}")
         data_nf = nota.get("data")
         fora_periodo_ima = bool(
             data_nf and (
@@ -474,14 +506,36 @@ def gerar_plano(agronotas: dict[str, Any], ficha: dict[str, Any], banco: dict[st
             )
         )
         if not nota["gtas"]:
-            vinculos_nf_gta.append({
-                "nf": nota["nf"], "linha_agronotas": nota["linha"],
-                "data_nf": data_nf,
-                "classificacao": "fora_periodo_ima" if fora_periodo_ima else "pendente",
-                "criterio": (
+            candidatos = candidatos_sem_gta[identificador]
+            compartilhado = bool(candidatos and any(
+                len(usos_movimento[chave_movimento(movimento)]) > 1
+                for movimento in candidatos
+            ))
+            if not fora_periodo_ima and len(candidatos) == 1 and not compartilhado:
+                movimento = candidatos[0]
+                classificacao = "provavel"
+                criterio = "data_e_quantidade_exatas_sem_gta"
+            elif not fora_periodo_ima and candidatos:
+                movimento = None
+                classificacao = "ambiguo"
+                criterio = "data_e_quantidade_compartilhadas_sem_gta"
+            else:
+                movimento = None
+                classificacao = "fora_periodo_ima" if fora_periodo_ima else "pendente"
+                criterio = (
                     "documento_fora_do_periodo_ima"
                     if fora_periodo_ima else "gta_ausente_na_nf"
-                ),
+                )
+            vinculos_nf_gta.append({
+                "nf": nota["nf"], "linha_agronotas": nota["linha"],
+                "fonte_agronotas": nota.get("fonte_arquivo"),
+                "registro_id": nota.get("registro_id"),
+                "data_nf": data_nf,
+                "classificacao": classificacao,
+                "criterio": criterio,
+                "candidatos_ima": len(candidatos),
+                "gta_candidata": movimento.get("gta") if movimento else None,
+                "confirmado": False,
             })
         for gta in nota["gtas"]:
             correspondencias = por_gta_ima.get(gta, [])
@@ -491,6 +545,8 @@ def gerar_plano(agronotas: dict[str, Any], ficha: dict[str, Any], banco: dict[st
                     Decimal(str(movimento.get("quantidade"))) == nota["quantidade"])
                 vinculos_nf_gta.append({
                     "nf": nota["nf"], "gta": gta, "linha_agronotas": nota["linha"],
+                    "fonte_agronotas": nota.get("fonte_arquivo"),
+                    "registro_id": nota.get("registro_id"),
                     "classificacao": "forte", "criterio": "gta_exata_nf_ima",
                     "data_nf": nota["data"], "data_gta": movimento.get("data"),
                     "quantidade_nf": nota["quantidade"], "quantidade_gta": movimento.get("quantidade"),
@@ -498,12 +554,16 @@ def gerar_plano(agronotas: dict[str, Any], ficha: dict[str, Any], banco: dict[st
                 })
             elif correspondencias:
                 vinculos_nf_gta.append({"nf": nota["nf"], "gta": gta, "linha_agronotas": nota["linha"],
+                    "fonte_agronotas": nota.get("fonte_arquivo"),
+                    "registro_id": nota.get("registro_id"),
                     "classificacao": "ambiguo", "criterio": "gta_repetida_no_ima",
                     "correspondencias": len(correspondencias)})
             else:
                 vinculos_nf_gta.append({
                     "nf": nota["nf"], "gta": gta,
                     "linha_agronotas": nota["linha"], "data_nf": data_nf,
+                    "fonte_agronotas": nota.get("fonte_arquivo"),
+                    "registro_id": nota.get("registro_id"),
                     "classificacao": "fora_periodo_ima" if fora_periodo_ima else "pendente",
                     "criterio": (
                         "documento_fora_do_periodo_ima"
@@ -578,7 +638,10 @@ def gerar_plano(agronotas: dict[str, Any], ficha: dict[str, Any], banco: dict[st
                 "consultado_ate": agronotas.get("consultado_ate")},
             "ima": {"arquivo_sha256": ficha["sha256"], "periodo_inicial": ficha["periodo_inicial"],
                 "periodo_final": ficha["periodo_final"], "movimentos": len(ficha["movimentos"]),
-                "saldo_rebanho": ficha["saldo_rebanho"]},
+                "saldo_rebanho": ficha["saldo_rebanho"],
+                "gtas_canceladas": len(ficha.get("gtas_canceladas", [])),
+                "movimentos_duplicados_ignorados": ficha.get("movimentos_duplicados_ignorados", 0),
+                "lacunas_periodo": ficha.get("lacunas_periodo", [])},
             "banco": {"arquivo": banco["arquivo"], "sha256": banco["sha256"],
                 "arquivos": banco.get("arquivos", [banco["arquivo"]]),
                 "transacoes": len(banco["transacoes"]),
@@ -599,8 +662,10 @@ def gerar_plano(agronotas: dict[str, Any], ficha: dict[str, Any], banco: dict[st
                        or plano["fontes"]["agronotas"]["data_final"])
     if corte_agronotas != referencia.isoformat(): plano["pendencias"].append("agronotas_nao_consultado_ate_data_de_referencia")
     if ficha["periodo_final"] != referencia.isoformat(): plano["pendencias"].append("ima_nao_chega_a_data_de_referencia")
+    if ficha.get("lacunas_periodo"): plano["pendencias"].append("fichas_ima_possuem_lacuna_de_periodo")
     if plano["fontes"]["banco"]["data_final"] != referencia.isoformat(): plano["pendencias"].append("extrato_nao_chega_a_data_de_referencia")
     if plano["resumo"]["vinculos_nf_gta"].get("pendente"): plano["pendencias"].append("nfs_ou_gtas_sem_correspondencia_exigem_revisao")
+    if plano["resumo"]["vinculos_nf_gta"].get("provavel"): plano["pendencias"].append("vinculos_nf_gta_provaveis_exigem_confirmacao")
     if any(plano["resumo"][chave].get("ambiguo") for chave in plano["resumo"]): plano["pendencias"].append("referencias_ambiguas_preservadas_sem_vinculo")
     if candidatos_banco: plano["pendencias"].append("pagamentos_candidatos_exigem_confirmacao")
     if candidatos_negocio: plano["pendencias"].append("negocios_candidatos_exigem_confirmacao")
@@ -621,7 +686,7 @@ leitura. Nenhuma escrita foi executada e nenhuma tabela operacional foi alterada
 ## Fontes e cortes
 
 - Agronotas: {fontes['agronotas']['notas']} notas, {fontes['agronotas']['com_gta']} com GTA, último documento em {fontes['agronotas']['data_final']}, consulta até {fontes['agronotas'].get('consultado_ate') or fontes['agronotas']['data_final']};
-- IMA: {fontes['ima']['movimentos']} movimentações, período até {fontes['ima']['periodo_final']};
+- IMA: {fontes['ima']['movimentos']} movimentações válidas, período até {fontes['ima']['periodo_final']}, {fontes['ima'].get('gtas_canceladas', 0)} canceladas excluídas e {fontes['ima'].get('movimentos_duplicados_ignorados', 0)} sobreposições deduplicadas;
 - banco: {fontes['banco']['transacoes']} lançamentos, corte {fontes['banco']['data_final']};
 - negócios de referência: {fontes['negocios']['registros']} linhas, {fontes['negocios']['codigos_unicos']} agrupamentos, {fontes['negocios']['codigos_operacionais']} códigos operacionais e {fontes['negocios']['contextos_agregadores']} contextos agregadores;
 - data de referência solicitada: {plano['data_referencia']}.
@@ -660,7 +725,8 @@ def main() -> None:
     parser.add_argument("--aba-agronotas")
     parser.add_argument("--agronotas-consultado-ate", type=date.fromisoformat,
                         help="data final confirmada pela consulta, mesmo sem documento no dia")
-    parser.add_argument("--ima-pdf", required=True, type=Path)
+    parser.add_argument("--ima-pdf", required=True, type=Path, action="append",
+                        help="pode ser repetido para combinar períodos complementares")
     parser.add_argument("--ofx", required=True, type=Path, action="append",
                         help="pode ser repetido para combinar contas ou períodos")
     parser.add_argument("--negocios", type=Path)
@@ -669,11 +735,13 @@ def main() -> None:
     parser.add_argument("--saida-json", required=True, type=Path)
     parser.add_argument("--saida-md", required=True, type=Path)
     args = parser.parse_args()
-    temporario = args.saida_json.with_suffix(".ima.txt.tmp")
-    try:
-        texto_ima = extrair_texto_pdf(args.ima_pdf, temporario)
-    finally:
-        temporario.unlink(missing_ok=True)
+    fichas_ima = []
+    for indice, caminho in enumerate(args.ima_pdf, start=1):
+        temporario = args.saida_json.with_suffix(f".ima.{indice}.txt.tmp")
+        try:
+            fichas_ima.append(carregar_ficha_pdf(caminho, temporario))
+        finally:
+            temporario.unlink(missing_ok=True)
     fonte_agronotas = combinar_agronotas([
             ler_agronotas(caminho, args.aba_agronotas) for caminho in args.agronotas
         ])
@@ -681,7 +749,7 @@ def main() -> None:
         fonte_agronotas["consultado_ate"] = args.agronotas_consultado_ate.isoformat()
     plano = gerar_plano(
         fonte_agronotas,
-        ler_ficha(texto_ima, sha256_arquivo(args.ima_pdf)),
+        combinar_fichas(fichas_ima),
         combinar_extratos([ler_ofx_detalhado(caminho) for caminho in args.ofx]),
         ler_negocios(args.negocios, args.aba_negocios) if args.negocios else None,
         args.data_referencia,

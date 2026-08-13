@@ -81,6 +81,37 @@ class ConciliarDocumentosOperacionaisTest(unittest.TestCase):
         self.assertNotIn("fitid_hash", candidato)
         self.assertFalse(candidato["confirmado"])
 
+    def test_data_e_cabecas_exatas_geram_apenas_candidato_provavel(self):
+        nota = {"linha": 2, "nf": "123", "gtas": [], "data": "2026-08-10",
+                "valor": None, "quantidade": Decimal("20.00"), "registro_id": "nota-a"}
+        plano = gerar_plano(
+            fonte_agronotas([nota]),
+            fonte_ima([{"gta": "654321", "data": "2026-08-10",
+                        "quantidade": 20, "sentido": "saida"}]),
+            fonte_banco([]), None, date(2026, 8, 11),
+        )
+        candidato = plano["vinculos_nf_gta"][0]
+        self.assertEqual(candidato["classificacao"], "provavel")
+        self.assertEqual(candidato["criterio"], "data_e_quantidade_exatas_sem_gta")
+        self.assertFalse(candidato["confirmado"])
+        self.assertIn("vinculos_nf_gta_provaveis_exigem_confirmacao", plano["pendencias"])
+
+    def test_duas_notas_disputando_mesma_gta_ficam_ambiguas(self):
+        notas = [
+            {"linha": i, "nf": str(120 + i), "gtas": [], "data": "2026-08-10",
+             "valor": None, "quantidade": Decimal("65.00"), "registro_id": f"nota-{i}"}
+            for i in (2, 3)
+        ]
+        plano = gerar_plano(
+            fonte_agronotas(notas),
+            fonte_ima([{"gta": "654321", "data": "2026-08-10",
+                        "quantidade": 65, "sentido": "saida"}]),
+            fonte_banco([]), None, date(2026, 8, 11),
+        )
+        self.assertEqual(plano["resumo"]["vinculos_nf_gta"], {"ambiguo": 2})
+        self.assertTrue(all(not item["confirmado"] for item in plano["vinculos_nf_gta"]))
+        self.assertIn("referencias_ambiguas_preservadas_sem_vinculo", plano["pendencias"])
+
     def test_documento_anterior_ao_periodo_ima_nao_infla_pendencias(self):
         notas = [
             {"linha": 2, "nf": "100", "gtas": ["111111"],
@@ -139,7 +170,9 @@ class ConciliarDocumentosOperacionaisTest(unittest.TestCase):
                     '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
                     f'<sheetData>{xml_linhas}</sheetData></worksheet>')
             resultado = ler_agronotas(caminho, "Notas")
-        self.assertEqual(len(resultado["registros"]), 1)
+            self.assertEqual(len(resultado["registros"]), 1)
+            self.assertEqual(resultado["registros"][0]["fonte_arquivo"], "notas.xlsx")
+            self.assertEqual(len(resultado["registros"][0]["registro_id"]), 12)
         self.assertEqual(resultado["registros"][0]["gtas"], ["654321"])
         self.assertEqual(resultado["registros"][0]["valor"], Decimal("1500.00"))
 
