@@ -486,9 +486,18 @@ async function auditarPagamentoConfinamento(browser, viewport, resultados) {
   const page = await context.newPage();
   const erros = [];
   page.on('console', msg => {
-    if (msg.type() === 'error') erros.push(`console: ${msg.text()}`);
+    if (msg.type() === 'error') {
+      const origem = msg.location()?.url || 'origem não informada';
+      erros.push(`console: ${msg.text()} — ${origem}`);
+    }
   });
   page.on('pageerror', erro => erros.push(`javascript: ${erro.message}`));
+  page.on('requestfailed', req => {
+    erros.push(`rede: ${req.url()} — ${req.failure()?.errorText || 'falhou'}`);
+  });
+  page.on('response', res => {
+    if (res.status() >= 400) erros.push(`http ${res.status()}: ${res.url()}`);
+  });
 
   try {
     await page.goto(new URL('confinex.html', baseUrl).href, {
