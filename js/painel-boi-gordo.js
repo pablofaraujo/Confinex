@@ -28,11 +28,13 @@
         if (emAndamento) return emAndamento;
         emAndamento = Promise.resolve().then(buscar).then(function (payload) {
           atual = normalizarDados(payload);
-          aplicar(atual, false);
-          return { dados: atual, fonte: 'remota', defasado: false };
+          var defasado = estaDefasado(atual, agora(), limiteDias);
+          aplicar(atual, false, defasado);
+          return { dados: atual, fonte: 'remota', defasado: defasado };
         }).catch(function () {
-          aplicar(atual, true);
-          return { dados: atual, fonte: 'último dado válido', defasado: estaDefasado(atual, agora(), limiteDias) };
+          var defasado = estaDefasado(atual, agora(), limiteDias);
+          aplicar(atual, true, defasado);
+          return { dados: atual, fonte: 'último dado válido', defasado: defasado };
         }).finally(function () { emAndamento = null; });
         return emAndamento;
       }
@@ -41,4 +43,3 @@
 
   global.PainelBoiGordo = { normalizarDados: normalizarDados, estaDefasado: estaDefasado, criarAtualizador: criarAtualizador };
 }(typeof globalThis !== 'undefined' ? globalThis : this));
-
