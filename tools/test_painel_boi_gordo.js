@@ -8,6 +8,7 @@ const artefato = JSON.parse(fs.readFileSync('dados/painel-boi-gordo.json', 'utf8
 assert.ok(artefato.fonte && artefato.atualizadoEm, 'artefato sem fonte/data');
 assert.ok(html.includes('dados/painel-boi-gordo.json'));
 assert.ok(html.includes('cache: \'no-store\''));
+assert.ok(html.includes('js/painel-boi-gordo.js?v=20260812-1'), 'versão do script não invalida o cache anterior');
 assert.ok(!html.includes('id="atualizarPainel"'), 'painel ainda repete a ação global Atualizar');
 assert.ok(html.includes('atualizador.atualizar();'), 'painel deixou de atualizar automaticamente ao abrir');
 assert.ok(html.includes('aplicar: renderizarPainel'), 'arquivo atualizado não redesenha o painel completo');
