@@ -31,8 +31,8 @@ NS_REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 ALIASES = {
     "nf": ("nf", "nfe", "nota", "nota fiscal", "numero", "numero nf", "numero nota fiscal", "numero_documento", "nf venda", "numero_nf", "n nota fiscal"),
     "gta": ("gta", "numero gta", "numero_gta", "gta numero", "gta_numero"),
-    "data": ("data", "data emissao", "data_emissao", "data movimento", "data movimentacao", "data_movimentacao", "data negocio", "data_negocio"),
-    "valor": ("valor", "valor total", "valor_total", "valor documento", "valor_documento", "valor nf", "valor_nf", "valor compra", "valor_compra"),
+    "data": ("data", "data emissao", "data_emissao", "dataemissao", "data movimento", "data movimentacao", "data_movimentacao", "data negocio", "data_negocio"),
+    "valor": ("valor", "valor total", "valor_total", "valortotal", "valor documento", "valor_documento", "valor nf", "valor_nf", "valor compra", "valor_compra"),
     "quantidade": ("quantidade", "cabecas", "quantidade cabecas", "quantidade_cabecas", "qtde", "qtde gta", "qtde_gta"),
     "observacao": ("observacao", "observacoes", "comentario", "comentarios", "historico", "informacoes complementares", "dados adicionais", "descricao"),
     "codigo": ("codigo", "negocio", "negocio id", "negocio_id", "operacao", "operacao id", "operacao_id", "codigo operacao", "codigo_operacao"),
@@ -326,6 +326,38 @@ def ler_agronotas(caminho: Path, aba: str | None = None) -> dict[str, Any]:
             "ignorados_nao_pecuarios": ignorados}
 
 
+def combinar_agronotas(fontes: list[dict[str, Any]]) -> dict[str, Any]:
+    """Combina exportações históricas/incrementais sem duplicar documentos."""
+    registros: list[dict[str, Any]] = []
+    vistos: set[tuple[Any, ...]] = set()
+    duplicados = 0
+    for fonte in fontes:
+        duplicados += int(fonte.get("duplicados") or 0)
+        for item in fonte.get("registros") or []:
+            if item.get("nf"):
+                chave = ("nf", item.get("nf"), item.get("data"), str(item.get("valor")))
+            else:
+                chave = ("gta", tuple(item.get("gtas") or []), item.get("data"),
+                         str(item.get("quantidade")))
+            if chave in vistos:
+                duplicados += 1
+                continue
+            vistos.add(chave)
+            registros.append(item)
+    arquivos = [fonte["arquivo"] for fonte in fontes]
+    hashes = [fonte["sha256"] for fonte in fontes]
+    return {
+        "arquivo": ", ".join(arquivos),
+        "arquivos": arquivos,
+        "sha256": hashlib.sha256("|".join(hashes).encode()).hexdigest(),
+        "registros": registros,
+        "duplicados": duplicados,
+        "ignorados_nao_pecuarios": sum(
+            int(fonte.get("ignorados_nao_pecuarios") or 0) for fonte in fontes
+        ),
+    }
+
+
 def ler_negocios(caminho: Path, abas: list[str] | None = None) -> dict[str, Any]:
     matrizes = ler_matrizes_xlsx(caminho) if caminho.suffix.lower() == ".xlsx" else None
     nomes = abas or ([escolher_aba(matrizes, None)] if matrizes else [None])
@@ -367,6 +399,31 @@ def ler_ofx_detalhado(caminho: Path) -> dict[str, Any]:
                                "data": data, "valor": valor})
     return {"arquivo": caminho.name, "sha256": hashlib.sha256(bytes_).hexdigest(),
             "transacoes": transacoes}
+
+
+def combinar_extratos(fontes: list[dict[str, Any]]) -> dict[str, Any]:
+    """Combina contas/períodos OFX e remove sobreposições pelo FITID."""
+    transacoes: list[dict[str, Any]] = []
+    vistos: set[str] = set()
+    duplicados = 0
+    for fonte in fontes:
+        for item in fonte.get("transacoes") or []:
+            chave = str(item.get("fitid_hash") or "")
+            if chave and chave in vistos:
+                duplicados += 1
+                continue
+            if chave:
+                vistos.add(chave)
+            transacoes.append(item)
+    arquivos = [fonte["arquivo"] for fonte in fontes]
+    hashes = [fonte["sha256"] for fonte in fontes]
+    return {
+        "arquivo": ", ".join(arquivos),
+        "arquivos": arquivos,
+        "sha256": hashlib.sha256("|".join(hashes).encode()).hexdigest(),
+        "transacoes": transacoes,
+        "duplicados_ignorados": duplicados,
+    }
 
 
 def distancia_dias(data_a: str | None, data_b: str | None) -> int | None:
@@ -480,15 +537,19 @@ def gerar_plano(agronotas: dict[str, Any], ficha: dict[str, Any], banco: dict[st
         "escritas_executadas": 0, "tabelas_operacionais_alteradas": 0,
         "fontes": {
             "agronotas": {"arquivo": agronotas["arquivo"], "sha256": agronotas["sha256"],
+                "arquivos": agronotas.get("arquivos", [agronotas["arquivo"]]),
                 "notas": len(agronotas["registros"]), "duplicados_ignorados": agronotas["duplicados"],
                 "documentos_nao_pecuarios_ignorados": agronotas.get("ignorados_nao_pecuarios", 0),
                 "com_gta": sum(bool(i["gtas"]) for i in agronotas["registros"]),
-                "data_final": max((i["data"] for i in agronotas["registros"] if i["data"]), default=None)},
+                "data_final": max((i["data"] for i in agronotas["registros"] if i["data"]), default=None),
+                "consultado_ate": agronotas.get("consultado_ate")},
             "ima": {"arquivo_sha256": ficha["sha256"], "periodo_inicial": ficha["periodo_inicial"],
                 "periodo_final": ficha["periodo_final"], "movimentos": len(ficha["movimentos"]),
                 "saldo_rebanho": ficha["saldo_rebanho"]},
             "banco": {"arquivo": banco["arquivo"], "sha256": banco["sha256"],
+                "arquivos": banco.get("arquivos", [banco["arquivo"]]),
                 "transacoes": len(banco["transacoes"]),
+                "duplicados_ignorados": banco.get("duplicados_ignorados", 0),
                 "data_final": max((i["data"] for i in banco["transacoes"]), default=None)},
             "negocios": {"arquivo": (negocios or {}).get("arquivo"), "sha256": (negocios or {}).get("sha256"),
                 "registros": len(registros_negocio)},
@@ -498,7 +559,9 @@ def gerar_plano(agronotas: dict[str, Any], ficha: dict[str, Any], banco: dict[st
         "vinculos_nf_gta": vinculos_nf_gta, "candidatos_banco": candidatos_banco,
         "candidatos_negocio": candidatos_negocio, "pendencias": [],
     }
-    if plano["fontes"]["agronotas"]["data_final"] != referencia.isoformat(): plano["pendencias"].append("agronotas_nao_chega_a_data_de_referencia")
+    corte_agronotas = (plano["fontes"]["agronotas"].get("consultado_ate")
+                       or plano["fontes"]["agronotas"]["data_final"])
+    if corte_agronotas != referencia.isoformat(): plano["pendencias"].append("agronotas_nao_consultado_ate_data_de_referencia")
     if ficha["periodo_final"] != referencia.isoformat(): plano["pendencias"].append("ima_nao_chega_a_data_de_referencia")
     if plano["fontes"]["banco"]["data_final"] != referencia.isoformat(): plano["pendencias"].append("extrato_nao_chega_a_data_de_referencia")
     if plano["resumo"]["vinculos_nf_gta"].get("pendente"): plano["pendencias"].append("nfs_ou_gtas_sem_correspondencia_exigem_revisao")
@@ -521,7 +584,7 @@ leitura. Nenhuma escrita foi executada e nenhuma tabela operacional foi alterada
 
 ## Fontes e cortes
 
-- Agronotas: {fontes['agronotas']['notas']} notas, {fontes['agronotas']['com_gta']} com GTA, corte {fontes['agronotas']['data_final']};
+- Agronotas: {fontes['agronotas']['notas']} notas, {fontes['agronotas']['com_gta']} com GTA, último documento em {fontes['agronotas']['data_final']}, consulta até {fontes['agronotas'].get('consultado_ate') or fontes['agronotas']['data_final']};
 - IMA: {fontes['ima']['movimentos']} movimentações, período até {fontes['ima']['periodo_final']};
 - banco: {fontes['banco']['transacoes']} lançamentos, corte {fontes['banco']['data_final']};
 - negócios de referência: {fontes['negocios']['registros']} registros;
@@ -554,10 +617,14 @@ rascunho ou evento. Os candidatos precisam ser conferidos antes de qualquer aç�
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--agronotas", required=True, type=Path)
+    parser.add_argument("--agronotas", required=True, type=Path, action="append",
+                        help="pode ser repetido para combinar histórico e atualização")
     parser.add_argument("--aba-agronotas")
+    parser.add_argument("--agronotas-consultado-ate", type=date.fromisoformat,
+                        help="data final confirmada pela consulta, mesmo sem documento no dia")
     parser.add_argument("--ima-pdf", required=True, type=Path)
-    parser.add_argument("--ofx", required=True, type=Path)
+    parser.add_argument("--ofx", required=True, type=Path, action="append",
+                        help="pode ser repetido para combinar contas ou períodos")
     parser.add_argument("--negocios", type=Path)
     parser.add_argument("--aba-negocios", action="append")
     parser.add_argument("--data-referencia", required=True, type=date.fromisoformat)
@@ -569,10 +636,15 @@ def main() -> None:
         texto_ima = extrair_texto_pdf(args.ima_pdf, temporario)
     finally:
         temporario.unlink(missing_ok=True)
+    fonte_agronotas = combinar_agronotas([
+            ler_agronotas(caminho, args.aba_agronotas) for caminho in args.agronotas
+        ])
+    if args.agronotas_consultado_ate:
+        fonte_agronotas["consultado_ate"] = args.agronotas_consultado_ate.isoformat()
     plano = gerar_plano(
-        ler_agronotas(args.agronotas, args.aba_agronotas),
+        fonte_agronotas,
         ler_ficha(texto_ima, sha256_arquivo(args.ima_pdf)),
-        ler_ofx_detalhado(args.ofx),
+        combinar_extratos([ler_ofx_detalhado(caminho) for caminho in args.ofx]),
         ler_negocios(args.negocios, args.aba_negocios) if args.negocios else None,
         args.data_referencia,
     )

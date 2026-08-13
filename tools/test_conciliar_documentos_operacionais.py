@@ -6,6 +6,8 @@ from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from tools.conciliar_documentos_operacionais import (
+    combinar_agronotas,
+    combinar_extratos,
     extrair_gtas,
     extrair_gtas_campo,
     gerar_plano,
@@ -150,6 +152,61 @@ class ConciliarDocumentosOperacionaisTest(unittest.TestCase):
         self.assertEqual(resultado["ignorados_nao_pecuarios"], 1)
         self.assertEqual(resultado["registros"][0]["nf"], None)
         self.assertEqual(resultado["registros"][0]["gtas"], ["654321"])
+
+    def test_combina_exportacoes_agronotas_sem_duplicar_documento(self):
+        item = {"linha": 2, "nf": "123", "gtas": ["654321"],
+                "data": "2026-08-10", "valor": Decimal("1200.00"),
+                "quantidade": Decimal("20.00")}
+        antiga = fonte_agronotas([item])
+        antiga["arquivo"] = "historico.xlsx"
+        nova = fonte_agronotas([{**item, "linha": 1}])
+        nova["arquivo"] = "atualizacao.json"
+        combinada = combinar_agronotas([antiga, nova])
+        self.assertEqual(len(combinada["registros"]), 1)
+        self.assertEqual(combinada["duplicados"], 1)
+        self.assertEqual(combinada["arquivos"], ["historico.xlsx", "atualizacao.json"])
+
+    def test_combina_extratos_e_remove_sobreposicao_por_fitid(self):
+        primeiro = fonte_banco([
+            {"fitid_hash": "id-a", "data": "2026-08-10", "valor": Decimal("-10")},
+        ])
+        segundo = fonte_banco([
+            {"fitid_hash": "id-a", "data": "2026-08-10", "valor": Decimal("-10")},
+            {"fitid_hash": "id-b", "data": "2026-08-11", "valor": Decimal("20")},
+        ])
+        segundo["arquivo"] = "outra-conta.ofx"
+        combinado = combinar_extratos([primeiro, segundo])
+        self.assertEqual(len(combinado["transacoes"]), 2)
+        self.assertEqual(combinado["duplicados_ignorados"], 1)
+        self.assertEqual(combinado["arquivos"], ["extrato.ofx", "outra-conta.ofx"])
+
+    def test_consulta_atual_sem_documento_no_dia_nao_gera_falso_atraso(self):
+        agronotas = fonte_agronotas([{
+            "linha": 2, "nf": "123", "gtas": [], "data": "2026-08-06",
+            "valor": None, "quantidade": None,
+        }])
+        agronotas["consultado_ate"] = "2026-08-12"
+        ima = fonte_ima([])
+        ima["periodo_final"] = "2026-08-12"
+        plano = gerar_plano(agronotas, ima, fonte_banco([
+            {"fitid_hash": "id-a", "data": "2026-08-12", "valor": Decimal("1")},
+        ]), None, date(2026, 8, 12))
+        self.assertNotIn("agronotas_nao_consultado_ate_data_de_referencia",
+                         plano["pendencias"])
+        self.assertEqual(plano["fontes"]["agronotas"]["data_final"], "2026-08-06")
+        self.assertEqual(plano["fontes"]["agronotas"]["consultado_ate"], "2026-08-12")
+
+    def test_le_json_da_api_com_campos_em_camel_case(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            caminho = Path(pasta) / "notas.json"
+            caminho.write_text(
+                '[{"numero":"900","dataEmissao":"2026-08-06",'
+                '"valorTotal":"1500.00","quantidade":"25",'
+                '"observacao":"GTA MG U 654321"}]', encoding="utf-8"
+            )
+            resultado = ler_agronotas(caminho)
+        self.assertEqual(resultado["registros"][0]["data"], "2026-08-06")
+        self.assertEqual(resultado["registros"][0]["valor"], Decimal("1500.00"))
 
 
 if __name__ == "__main__":

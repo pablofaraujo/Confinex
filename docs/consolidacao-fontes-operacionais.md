@@ -39,14 +39,19 @@ um bloqueio de atualização, não um dado a ser preenchido por inferência.
 com um cruzamento por registro entre exportação fiscal do Agronotas, ficha
 detalhada do IMA, extrato OFX e planilha de negócios. Ele aceita `.xlsx`, `.csv`
 ou `.json` nas fontes tabulares, lê o `.xlsx` sem executar macros e grava apenas
-um plano privado em JSON e Markdown.
+um plano privado em JSON e Markdown. `--agronotas` e `--ofx` podem ser
+repetidos: históricos e incrementos fiscais são deduplicados pelo documento, e
+extratos sobrepostos são deduplicados pelo identificador bancário anonimizado.
 
 ```bash
 python3 tools/conciliar_documentos_operacionais.py \
   --agronotas /caminho/privado/documentos.xlsx \
+  --agronotas /caminho/privado/documentos-incrementais.json \
   --aba-agronotas "Fiscal GTAs" \
+  --agronotas-consultado-ate AAAA-MM-DD \
   --ima-pdf /caminho/privado/ficha-detalhada.pdf \
   --ofx /caminho/privado/extrato.ofx \
+  --ofx /caminho/privado/outra-conta-ou-periodo.ofx \
   --negocios /caminho/privado/negocios.xlsx \
   --aba-negocios "Negocios" \
   --data-referencia AAAA-MM-DD \
@@ -62,7 +67,9 @@ As regras permanentes são:
 - valor e data sem identificador documental nunca formam vínculo forte;
 - duas ou mais correspondências ficam ambíguas e intactas;
 - documentos sem relação com gado são ignorados, mas contabilizados;
-- fonte desatualizada vira pendência explícita;
+- a data do último documento é diferente da data até a qual o Agronotas foi
+  consultado; dias sem nota não geram falso atraso quando a consulta foi atual;
+- fonte não consultada até a referência vira pendência explícita;
 - não existe argumento `--executar`, chamada de rede ou escrita operacional.
 
 Números de GTA, NF, lançamentos e negócios permanecem somente nos relatórios em
