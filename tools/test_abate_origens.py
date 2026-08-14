@@ -27,6 +27,10 @@ class AbateOrigensTest(unittest.TestCase):
     def test_wilson_nao_pode_ser_selecionado_em_novo_abate(self):
         self.assertNotIn("wilson", self.opcoes)
 
+    def test_wilson_legado_e_classificado_como_parceria_xande(self):
+        self.assertIn("wilson:'Parceria Xande'", self.html)
+        self.assertNotIn("wilson:'Wilson'", self.html)
+
     def test_origens_operacionais_permanecem_disponiveis(self):
         self.assertEqual(
             {
