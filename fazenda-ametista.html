@@ -54,6 +54,9 @@
   <h2>Histórico de lançamentos</h2>
   <div class="card scroll"><table id="tbHist"></table></div>
 
+  <h2>Vendas para o Confinamento</h2>
+  <div class="card scroll"><table id="tbInterunidades"></table></div>
+
   <div class="footer">Fazenda Ametista · dados ao vivo da base CFAgro · acesso protegido por login</div>
 </div>
 
@@ -81,6 +84,18 @@ async function carregar(){
   LANC=data||[];
   document.getElementById('subtitle').textContent='Controle do rebanho próprio';
   renderKpis(); renderTabela();
+  carregarInterunidades();
+}
+
+async function carregarInterunidades(){
+  const tabela=document.getElementById('tbInterunidades');
+  const {data,error}=await db.from('v_movimentacoes_interunidades')
+    .select('data_movimento,operacao_codigo,quantidade,peso_total_kg,preco_arroba,valor_total,estado')
+    .order('data_movimento',{ascending:false});
+  tabela.innerHTML='<tr><th>Data</th><th>Operação destino</th><th class="num">Cabeças</th><th class="num">Peso</th><th class="num">Preço</th><th class="num">Valor</th><th>Status</th></tr>'+
+    (error
+      ? '<tr><td colspan="7"><span class="badge b-amber">Estrutura pendente</span> A visão interunidades ainda não está publicada.</td></tr>'
+      : (data||[]).map(m=>`<tr><td>${fmtD(m.data_movimento)}</td><td><b>${esc(m.operacao_codigo||'—')}</b></td><td class="num">${fmtN(m.quantidade)}</td><td class="num">${fmtN(m.peso_total_kg)} kg</td><td class="num">${fmtR$(m.preco_arroba)}/@</td><td class="num">${fmtR$(m.valor_total)}</td><td><span class="badge ${m.estado==='confirmado'?'b-green':''}">${esc(m.estado)}</span></td></tr>`).join('') || '<tr><td colspan="7">Nenhuma venda interunidades registrada.</td></tr>');
 }
 
 function saldoAtual(){

@@ -105,6 +105,14 @@ As duas leituras são auxiliares e não mudam lucro, custos totais, caixa ou ran
 - A evolução temporal da tela e do PDF compara 60 a 150 dias em intervalos de 15 dias, incluindo também o ciclo atual quando estiver dentro dessa faixa. Cada prazo recalcula a saída e usa a cotação do contrato BGI daquele mês; sem cotação, o ponto fica pendente e não gera resultado enganoso. O limite vale somente para a tabela de evolução e não altera um cenário informado com prazo diferente.
 - Depois da aprovação, o prazo operacional pode ser ajustado repetidamente em **Operações → Confinamento**. A estimativa original permanece congelada; cada ajuste exige motivo e registra prazo anterior, novo prazo, saída anterior, nova saída, autor e horário. O prazo atual é sempre o último ajuste válido.
 
+## Fazenda e Confinamento como unidades econômicas
+
+- A ida de animais próprios da Fazenda para o Confinamento representa uma venda da Fazenda e uma compra do Confinamento, além da saída física do ledger. As apurações permanecem independentes.
+- A quantidade, o peso e o valor das duas faces precisam coincidir; o vínculo interunidades aponta para a mesma operação de destino.
+- Arrobas a 50% de rendimento são `peso_total_kg ÷ 30`. Em rendimento diferente, usar `peso_total_kg × rendimento_pct ÷ 100 ÷ 15`.
+- Uma compra agregada entra uma única vez no custo e na quantidade da operação. Seus componentes explicam origem e intermediação, mas não são somados novamente.
+- Participantes são declarados por operação. O sistema não herda vendedor, corretor, proprietário ou parceiro de outro negócio por semelhança.
+
 ## Agenda financeira e dívidas
 
 - `financeiro.html` é uma projeção somente leitura. Atualizar a página ou usar filtros nunca cria baixa, parcela, renegociação, lembrete persistente ou conciliação.
