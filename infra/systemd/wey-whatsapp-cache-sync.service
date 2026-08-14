@@ -1,0 +1,12 @@
+[Unit]
+Description=Sincroniza cache privado do WhatsApp para conciliacao do Wey
+After=network-online.target openclaw-gateway.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+UMask=0077
+ExecStart=/usr/bin/timeout --signal=TERM --kill-after=30s 10m /usr/local/bin/wacli --store /root/.local/state/wacli-confinex sync --once --idle-exit 2m --presence-mode quiet --max-db-size 2GB --max-reconnect 2m
+SuccessExitStatus=124 143
+TimeoutStartSec=11m
+TimeoutStopSec=30s

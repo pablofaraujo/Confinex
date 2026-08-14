@@ -22,6 +22,12 @@ candidato; não substituem a correspondência financeira e contextual.
 3. Confirme que o cache privado do `wacli` está autenticado e sincronizado. A
    autenticação e a sincronização podem escrever somente nesse cache técnico;
    nunca use subcomandos de envio.
+   - confira `wacli history coverage` para a conversa candidata;
+   - se o início da cobertura for posterior à data do negócio, use
+     `wacli history backfill` de forma limitada e serial;
+   - repita a busca pelo valor depois do backfill;
+   - se o aparelho não devolver o histórico, classifique como cobertura
+     incompleta, nunca como evidência de inexistência.
 4. Execute:
 
 ```bash

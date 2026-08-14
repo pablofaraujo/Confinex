@@ -61,12 +61,21 @@ webhook. O systemd impede duas instâncias simultâneas do mesmo serviço. Esse
 timer atualiza somente o cache técnico; a conciliação continua sendo uma etapa
 separada e estritamente `--read-only`.
 
+Uma busca vazia não prova que a mensagem não existe. Antes de classificar um
+valor como ausente, confira `wacli history coverage` na conversa candidata. Se
+a data mais antiga do cache for posterior à data do negócio, execute um
+`history backfill` limitado e serial e repita a busca pelo valor. O histórico
+fornecido pelo aparelho é de melhor esforço; sem resposta do aparelho, o caso
+fica com cobertura incompleta, nunca como inexistente. As unidades reproduzíveis
+do timer ficam em `infra/systemd/wey-whatsapp-cache-sync.*`.
+
 ## Interpretação
 
 - `encontrado_unico`: um único contexto técnico ou um candidato claramente
   mais forte; ainda exige leitura humana do trecho e do comprovante;
 - `ambiguo`: o mesmo valor aparece em mais de uma conversa sem desempate forte;
-- `nao_encontrado`: os históricos locais não contêm a variante procurada;
+- `nao_encontrado`: os históricos locais consultados não contêm a variante
+  procurada; só é conclusivo depois de validar a cobertura da conversa;
 - `sem_valor_para_busca`: a consolidação ainda não fornece valor utilizável.
 
 O cruzamento posterior com Juan/Telegram, extrato, GTA, NF e pesagem acontece
