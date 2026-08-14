@@ -2,7 +2,6 @@
 Description=Captura continua do WhatsApp no cache privado do Wey
 After=network-online.target openclaw-gateway.service
 Wants=network-online.target
-OnFailure=wey-whatsapp-live-notify.service
 StartLimitIntervalSec=10min
 StartLimitBurst=10
 

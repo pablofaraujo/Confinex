@@ -60,6 +60,9 @@ No ambiente do Wey, `wey-whatsapp-live-sync.service` mantém `wacli sync
 prazo e limite de 2 GB. O heartbeat `wey-whatsapp-live-health.timer` verifica a
 captura a cada cinco minutos, tenta reiniciá-la e alerta somente se o reparo
 falhar. Assim mensagens novas são persistidas na VPS sem depender do Mac.
+O heartbeat considera saudável o processo autenticado que mantém o bloqueio
+exclusivo do store; o campo `connected` de um `doctor` concorrente não é usado
+como gate porque permanece falso enquanto outro processo detém a conexão.
 
 O timer `wey-whatsapp-automation.timer` executa diariamente uma janela de
 manutenção exclusiva: pausa a captura contínua, faz uma sincronização `--once`,

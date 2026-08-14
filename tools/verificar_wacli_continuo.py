@@ -53,7 +53,7 @@ def verificar(binario: Path, store: Path, unidade: str) -> dict[str, object]:
     estado["saudavel"] = all([
         estado["servico_ativo"],
         estado["autenticado"],
-        estado["conectado"],
+        estado["bloqueio_ativo"],
     ])
     return estado
 

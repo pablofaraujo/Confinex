@@ -27,8 +27,19 @@ class VerificarWacliContinuoTest(unittest.TestCase):
 
     @patch("tools.verificar_wacli_continuo.unidade_ativa", return_value=True)
     @patch("tools.verificar_wacli_continuo.diagnosticar")
-    def test_exige_servico_autenticado_e_conectado(self, diagnosticar, _unidade):
-        diagnosticar.return_value = {"autenticado": True, "conectado": False}
+    def test_aceita_doctor_desconectado_quando_follow_detem_bloqueio(self, diagnosticar, _unidade):
+        diagnosticar.return_value = {
+            "autenticado": True, "conectado": False, "bloqueio_ativo": True
+        }
+        resultado = verificar(Path("/wacli"), Path("/privado"), "captura.service")
+        self.assertTrue(resultado["saudavel"])
+
+    @patch("tools.verificar_wacli_continuo.unidade_ativa", return_value=True)
+    @patch("tools.verificar_wacli_continuo.diagnosticar")
+    def test_reprova_servico_sem_bloqueio_do_store(self, diagnosticar, _unidade):
+        diagnosticar.return_value = {
+            "autenticado": True, "conectado": False, "bloqueio_ativo": False
+        }
         resultado = verificar(Path("/wacli"), Path("/privado"), "captura.service")
         self.assertFalse(resultado["saudavel"])
 
@@ -44,6 +55,12 @@ class VerificarWacliContinuoTest(unittest.TestCase):
             self.assertNotIn(proibido, texto)
         self.assertIn("sync --follow", texto)
         self.assertIn("OnUnitActiveSec=5min", texto)
+
+    def test_alerta_nao_contem_credencial_e_nao_envia_whatsapp(self):
+        fonte = Path(__file__).with_name("notificar_falha_wacli.sh").read_text()
+        self.assertIn("whatsapp-health.env", fonte)
+        self.assertNotIn("wacli send", fonte)
+        self.assertNotRegex(fonte, r"bot[0-9]{6,}:")
 
 
 if __name__ == "__main__":
