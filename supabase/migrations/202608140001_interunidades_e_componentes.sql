@@ -309,6 +309,12 @@ REVOKE ALL ON public.movimentacoes_interunidades FROM anon, authenticated;
 REVOKE ALL ON public.operacao_participantes FROM anon, authenticated;
 REVOKE ALL ON public.v_compras_componentes_resumo FROM anon, authenticated;
 REVOKE ALL ON public.v_movimentacoes_interunidades FROM anon, authenticated;
+REVOKE ALL ON public.compras_componentes FROM service_role;
+REVOKE ALL ON public.negocios_fazenda FROM service_role;
+REVOKE ALL ON public.movimentacoes_interunidades FROM service_role;
+REVOKE ALL ON public.operacao_participantes FROM service_role;
+REVOKE ALL ON public.v_compras_componentes_resumo FROM service_role;
+REVOKE ALL ON public.v_movimentacoes_interunidades FROM service_role;
 
 GRANT SELECT ON public.compras_componentes TO authenticated;
 GRANT SELECT ON public.negocios_fazenda TO authenticated;

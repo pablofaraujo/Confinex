@@ -51,3 +51,13 @@ de `authenticated` e bloqueio de `anon` foram conferidos em modo leitura.
 No aparelho que contém as bases antigas, entrar no ecossistema e usar
 **Sincronizar bases** uma vez; em computadores novos, o catálogo será carregado
 automaticamente após o login.
+
+## Fazenda e Confinamento interunidades — migração aplicada
+
+`migrations/202608140001_interunidades_e_componentes.sql` foi aplicada em
+14/08/2026, depois de ensaio completo com rollback. A migração criou somente
+estrutura: quatro tabelas vazias, duas views, funções, gatilhos, índices, RLS e
+grants mínimos. As tabelas-base mantiveram contagens e assinaturas idênticas.
+`anon` não possui acesso; `authenticated` tem somente leitura; `service_role`
+tem `SELECT/INSERT/UPDATE` nas tabelas e somente `SELECT` nas views, sem
+`DELETE` ou `TRUNCATE`. Nenhum negócio foi carregado nessa etapa.

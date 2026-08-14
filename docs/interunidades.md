@@ -33,6 +33,12 @@ As telas Fazenda Ametista e Confinamento consultam `v_movimentacoes_interunidade
 
 A migração `202608140001_interunidades_e_componentes.sql` é somente estrutural. Ela não contém `INSERT`, `UPDATE`, `DELETE` ou dados comerciais. Usuários autenticados recebem apenas `SELECT`; gravações são reservadas ao `service_role`. A aplicação da migração e qualquer carga operacional exigem gates separados.
 
+### Estado da implantação
+
+Aplicada em 14/08/2026 após ensaio integral com `ROLLBACK`. As quatro tabelas foram criadas vazias; as views responderam pelo PostgREST; funções, gatilhos, RLS e `security_invoker` foram conferidos. As assinaturas e contagens de contatos, compras, operações e ledger da Fazenda permaneceram iguais. As permissões padrão do Supabase foram explicitamente revogadas antes dos grants mínimos: `anon` não acessa, `authenticated` só lê e `service_role` não possui `DELETE` nem `TRUNCATE` nos objetos novos.
+
+Essa autorização cobriu apenas o esquema. Nenhum negócio foi carregado, conciliado ou promovido.
+
 Uma futura carga deve ser idempotente e ocorrer nesta ordem:
 
 1. validar contatos e operação de destino;

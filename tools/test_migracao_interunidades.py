@@ -70,6 +70,16 @@ class MigracaoInterunidadesTest(unittest.TestCase):
         self.assertEqual(self.sql.count("for select to authenticated using (true)"), 4)
         self.assertNotRegex(self.sql, r"grant\s+(insert|update|delete|all).*to authenticated")
         self.assertNotRegex(self.sql, r"grant\s+[^;]*delete[^;]*to service_role")
+        self.assertEqual(self.sql.count("revoke all on public."), 12)
+        for objeto in (
+            "compras_componentes",
+            "negocios_fazenda",
+            "movimentacoes_interunidades",
+            "operacao_participantes",
+            "v_compras_componentes_resumo",
+            "v_movimentacoes_interunidades",
+        ):
+            self.assertIn(f"revoke all on public.{objeto} from service_role", self.sql)
         self.assertEqual(self.sql.count("with (security_invoker = true)"), 2)
 
     def test_nao_contem_fatos_privados(self):
