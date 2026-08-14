@@ -15,6 +15,7 @@ Leia conforme a tarefa:
 - `docs/contratos-automatizados.md` — pré-análise segura de contratos, versões, Drive e regra Finpec
 - `docs/google-sheets-legado.md` — papel transitório de Sheets/Apps Script e gate para migração
 - `docs/consolidacao-fontes-operacionais.md` — dry-runs agregados e por registro para cruzar Juan, NF/Agronotas, banco, GTAs/IMA, negócios e Supabase sem executar vínculos
+- `docs/conciliacao-whatsapp-pix.md` — busca privada por valor de PIX nos históricos do Wey, sem mensagens ou escritas operacionais
 - `docs/fila-revisoes-prioridades.md` — inventário sanitizado, prioridade operacional e plano dry-run de saneamento
 - `tools/sanear_fila_revisoes.py` — rotina dry-run para vincular rascunhos e pendências somente com correspondência forte, sem tocar tabelas operacionais
 - `docs/regras-de-negocio.md` — fórmulas e regras de cálculo (arrobas, capim, frete, GMD, Funrural, B3, VP)
@@ -57,6 +58,7 @@ Leia conforme a tarefa:
 - Na consolidação do Telegram, ausência de divergência não significa negócio completo: se faltarem cabeças, peso, preço, valor, data ou pagamento, o grupo continua na conferência. `codigo_negocio` é anual e determinístico; `negocio_origem` permanece separado para relacionar lotes de sexo, categoria ou destino diferentes sem reuni-los novamente.
 - GTA/NF exata é anexada como candidata ao respectivo `codigo_negocio` quando a mensagem de origem coincide; permanece não confirmada e nunca completa outros campos por inferência.
 - Vínculo GTA/NF cuja mensagem não pertence a um bloco de compra permanece contado como sem negócio identificado; nome, valor e data não são usados para forçar a associação.
+- A investigação das dúvidas pelo WhatsApp usa `tools/conciliar_whatsapp_pix.py`: pesquisa primeiro o valor do PIX nos históricos locais do Wey, reforça o candidato com data e contraparte e preserva valores repetidos como ambíguos. A ferramenta não acessa a rede, não envia mensagens, não chama Supabase e apenas produz relatórios privados.
 
 O contexto de conversa segue os campos `contexto_canonico`, `contexto_nome`,
 `origem_canal`, `origem_conversa_id`, `origem_mensagem_id`, `agente` e

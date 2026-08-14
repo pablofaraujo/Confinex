@@ -33,6 +33,15 @@ O relatório não autoriza conciliar banco, criar GTA, vincular documento,
 alterar rascunho ou lançar operação. Uma data de corte anterior à referência é
 um bloqueio de atualização, não um dado a ser preenchido por inferência.
 
+## Evidências de PIX no WhatsApp
+
+`tools/conciliar_whatsapp_pix.py` complementa a consolidação pesquisando os
+históricos locais do Wey pelo valor do PIX. Ele aceita variantes brasileiras,
+considera data e contraparte apenas como reforço, mascara a chave técnica da
+conversa e mantém ocorrências em múltiplos contextos como ambíguas. O fluxo é
+somente leitura e está detalhado em
+[`docs/conciliacao-whatsapp-pix.md`](conciliacao-whatsapp-pix.md).
+
 ## Conciliação documental por registro
 
 `tools/conciliar_documentos_operacionais.py` complementa o inventário agregado
