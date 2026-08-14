@@ -62,9 +62,9 @@
       <div class="fld"><label>Frigorífico</label><input type="text" id="nFrig" placeholder="FRISA, Maxibeef..."></div>
       <div class="fld"><label>Origem</label><select id="nOrigem">
         <option value="fazenda">Fazenda própria</option>
+        <option value="boi_balanca">Boi Balança</option>
         <option value="ricardo">Parceria Ricardo</option>
         <option value="xande">Parceria Xande</option>
-        <option value="wilson">Wilson</option>
       </select></div>
       <div class="fld"><label>Romaneio</label><input type="text" id="nRom" placeholder="nº"></div>
       <div class="fld"><label>GTA</label><input type="text" id="nGta" placeholder="nº"></div>
@@ -110,7 +110,7 @@
   <h2>Histórico de abates</h2>
   <div class="card scroll"><table id="tbAbates"></table></div>
 
-  <h2>Relatório por origem — Fazenda × Parcerias</h2>
+  <h2>Relatório por origem / negócio</h2>
   <div class="card scroll"><table id="tbOrigem"></table></div>
 
   <div class="footer">Abate · dados ao vivo da base CFAgro · acesso protegido por login</div>
@@ -122,7 +122,9 @@
 // db, fmtR$, fmtN, fmtD, fmtDT, cls, esc vêm do cfagro-core.js (DS)
 let ABATES=[], ANIMAIS=[], SEL=null;
 
-const ORIGEM_LABEL = {fazenda:'Fazenda própria', ricardo:'Parceria Ricardo', xande:'Parceria Xande', wilson:'Wilson'};
+// Wilson permanece apenas como rótulo legado para registros históricos. Novos
+// abates usam Fazenda, Boi Balança ou uma das parcerias disponíveis no seletor.
+const ORIGEM_LABEL = {fazenda:'Fazenda própria', boi_balanca:'Boi Balança', ricardo:'Parceria Ricardo', xande:'Parceria Xande', wilson:'Wilson'};
 
 // peso_kg = peso de carcaça (o schema de abate_animais não guarda peso vivo/balança
 // nem hora de passagem — é o romaneio do frigorífico, animal a animal)
