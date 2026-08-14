@@ -122,9 +122,9 @@
 // db, fmtR$, fmtN, fmtD, fmtDT, cls, esc vêm do cfagro-core.js (DS)
 let ABATES=[], ANIMAIS=[], SEL=null;
 
-// Wilson permanece apenas como rótulo legado para registros históricos. Novos
-// abates usam Fazenda, Boi Balança ou uma das parcerias disponíveis no seletor.
-const ORIGEM_LABEL = {fazenda:'Fazenda própria', boi_balanca:'Boi Balança', ricardo:'Parceria Ricardo', xande:'Parceria Xande', wilson:'Wilson'};
+// O valor legado "wilson" pertence à Parceria Xande. Ele não aparece no
+// seletor, mas continua normalizado para a parceria nos registros históricos.
+const ORIGEM_LABEL = {fazenda:'Fazenda própria', boi_balanca:'Boi Balança', ricardo:'Parceria Ricardo', xande:'Parceria Xande', wilson:'Parceria Xande'};
 
 // peso_kg = peso de carcaça (o schema de abate_animais não guarda peso vivo/balança
 // nem hora de passagem — é o romaneio do frigorífico, animal a animal)
