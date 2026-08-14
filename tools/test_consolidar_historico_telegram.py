@@ -295,6 +295,56 @@ class ConsolidarHistoricoTelegramTest(unittest.TestCase):
         self.assertIn("valor total", grupo["campos_ausentes_humanos"])
         self.assertEqual(len(grupo["versoes_revisao"]), 2)
 
+    def test_lotes_completos_distintos_na_mesma_data_nao_viram_versoes(self):
+        primeiro_lote = extrair_compra(mensagem(
+            "Compra – Fornecedor\nQuantidade: 34 garrotes\nPeso bruto total: 15.270 kg\n"
+            "Preço: R$ 320/@\nValor total: R$ 154.193,75\n"
+            "Negociação: 15/05/2026\nPagamento: à vista",
+            1, "m1"), {})
+        segundo_lote = extrair_compra(mensagem(
+            "Compra – Fornecedor\nQuantidade: 61 garrotes\nPeso bruto total: 28.678 kg\n"
+            "Preço: R$ 320/@\nValor total: R$ 289.584,08\n"
+            "Negociação: 15/05/2026\nPagamento: à vista",
+            2, "m2"), {})
+        grupo = agrupar_compras([primeiro_lote, segundo_lote])[0]
+        self.assertEqual(grupo["classificacao"], "possiveis_negocios_distintos")
+        self.assertEqual(grupo["situacao_revisao"], "separar negócios possíveis")
+        self.assertIsNone(grupo["versao_preferida"])
+        self.assertIn("preservar cada lote", grupo["acao_recomendada"])
+
+    def test_media_incompativel_bloqueia_leitura_como_negocio_preferido(self):
+        compra = extrair_compra(mensagem(
+            "COMPRA LIDA - conferência automática\nVendedor: Fornecedor\n"
+            "Quantidade: 48 cabeças\nPeso total: 6.936,00 kg\n"
+            "Peso médio: 346,80 kg/cab\nData: 22/01/26",
+            1, "m1"), {})
+        grupo = agrupar_compras([compra])[0]
+        self.assertEqual(grupo["classificacao"], "inconsistente_aritmetica")
+        self.assertEqual(grupo["situacao_revisao"], "conferir leitura aritmética")
+        self.assertIsNone(grupo["versao_preferida"])
+        self.assertEqual(
+            grupo["inconsistencias_aritmeticas"][0]["tipo"],
+            "peso_medio_diverge_de_total_por_quantidade",
+        )
+
+    def test_multiplos_cabecalhos_de_compra_formam_resumo_agregado(self):
+        compra = extrair_compra(mensagem(
+            "Compra – Lote A\nQuantidade: 10 garrotes\nValor total: R$ 20.000,00\n"
+            "Compra – Lote B\nQuantidade: 8 novilhas\nValor total: R$ 15.000,00",
+            1, "m1"), {})
+        self.assertEqual(compra["tipo_evidencia"], "resumo_agregado")
+        plano = gerar_plano([{
+            "contexto": "Grupo de Teste", "arquivo": "messages.html",
+            "arquivo_sha256": "a" * 64, "mensagens": [mensagem(
+                "Compra – Lote A\nQuantidade: 10 garrotes\nValor total: R$ 20.000,00\n"
+                "Compra – Lote B\nQuantidade: 8 novilhas\nValor total: R$ 15.000,00",
+                1, "m1")],
+            "primeira_data": "01.08.2026", "ultima_data": "01.08.2026",
+            "anexos": [], "anexos_omitidos": 0,
+        }], {})
+        self.assertEqual(plano["resumo"]["resumos_agregados_preservados"], 1)
+        self.assertEqual(plano["resumo"]["grupos_compras"], 0)
+
     def test_gta_exata_e_candidata_forte_mas_nao_confirmada(self):
         mensagens = [{
             "contexto": "Grupo", "mensagem_id": "m1", "data": "01.08.2026",
