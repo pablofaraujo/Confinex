@@ -62,6 +62,14 @@ class VerificarWacliContinuoTest(unittest.TestCase):
         self.assertNotIn("wacli send", fonte)
         self.assertNotRegex(fonte, r"bot[0-9]{6,}:")
 
+    def test_sincronizacao_diaria_tem_retry_limitado(self):
+        raiz = Path(__file__).parents[1]
+        fonte = (raiz / "tools/sincronizar_wacli_com_retry.sh").read_text()
+        unidade = (raiz / "infra/systemd/wey-whatsapp-automation.service").read_text()
+        self.assertIn('MAX_TENTATIVAS="${MAX_TENTATIVAS:-3}"', fonte)
+        self.assertIn("sync --once", fonte)
+        self.assertIn("sincronizar_wacli_com_retry.sh", unidade)
+
 
 if __name__ == "__main__":
     unittest.main()

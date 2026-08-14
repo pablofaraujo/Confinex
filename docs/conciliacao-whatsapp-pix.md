@@ -72,6 +72,8 @@ valor, verifica a cobertura, tenta backfill serial e limitado, repete a busca e
 grava um relatório privado com perguntas prontas. O timer simples
 `wey-whatsapp-cache-sync.timer` deve permanecer desabilitado para não concorrer
 pelo mesmo store.
+Falhas transitórias de abertura da conexão, inclusive respostas HTTP 502, têm
+até três tentativas espaçadas antes de a janela ser marcada como falha.
 
 Uma busca vazia não prova que a mensagem não existe. Antes de classificar um
 valor como ausente, confira `wacli history coverage` na conversa candidata. Se
