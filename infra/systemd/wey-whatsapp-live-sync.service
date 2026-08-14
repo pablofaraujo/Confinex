@@ -1,0 +1,18 @@
+[Unit]
+Description=Captura continua do WhatsApp no cache privado do Wey
+After=network-online.target openclaw-gateway.service
+Wants=network-online.target
+OnFailure=wey-whatsapp-live-notify.service
+StartLimitIntervalSec=10min
+StartLimitBurst=10
+
+[Service]
+Type=simple
+UMask=0077
+ExecStart=/usr/local/bin/wacli --store /root/.local/state/wacli-confinex sync --follow --presence-mode quiet --max-db-size 2GB --max-reconnect 0 --stale-threshold 60s
+Restart=always
+RestartSec=15s
+TimeoutStopSec=30s
+
+[Install]
+WantedBy=multi-user.target

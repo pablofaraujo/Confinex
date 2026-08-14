@@ -55,9 +55,16 @@ inclusive mensagens enviadas pelo titular. Autenticação, `sync` e `history
 backfill` são etapas administrativas separadas: podem escrever somente no
 cache privado do `wacli`; jamais se usa `wacli send` neste fluxo.
 
-No ambiente do Wey, o timer `wey-whatsapp-automation.timer` executa diariamente
-uma sincronização `--once`, com presença silenciosa e limite de 2 GB, seguida
-por `tools/orquestrar_conciliacao_whatsapp.py`. O orquestrador concilia por
+No ambiente do Wey, `wey-whatsapp-live-sync.service` mantém `wacli sync
+--follow` permanentemente conectado, com presença silenciosa, reconexão sem
+prazo e limite de 2 GB. O heartbeat `wey-whatsapp-live-health.timer` verifica a
+captura a cada cinco minutos, tenta reiniciá-la e alerta somente se o reparo
+falhar. Assim mensagens novas são persistidas na VPS sem depender do Mac.
+
+O timer `wey-whatsapp-automation.timer` executa diariamente uma janela de
+manutenção exclusiva: pausa a captura contínua, faz uma sincronização `--once`,
+executa `tools/orquestrar_conciliacao_whatsapp.py` e sempre solicita a retomada
+da captura, inclusive se a conciliação falhar. O orquestrador concilia por
 valor, verifica a cobertura, tenta backfill serial e limitado, repete a busca e
 grava um relatório privado com perguntas prontas. O timer simples
 `wey-whatsapp-cache-sync.timer` deve permanecer desabilitado para não concorrer
@@ -69,7 +76,8 @@ a data mais antiga do cache for posterior à data do negócio, execute um
 `history backfill` limitado e serial e repita a busca pelo valor. O histórico
 fornecido pelo aparelho é de melhor esforço; sem resposta do aparelho, o caso
 fica com cobertura incompleta, nunca como inexistente. As unidades reproduzíveis
-ficam em `infra/systemd/wey-whatsapp-automation.*`.
+ficam em `infra/systemd/wey-whatsapp-automation.*` e
+`infra/systemd/wey-whatsapp-live-*`.
 
 O relatório `orquestracao-whatsapp.json` separa três saídas: evidência
 encontrada, cobertura ainda incompleta e conversa candidata não localizada. Nos

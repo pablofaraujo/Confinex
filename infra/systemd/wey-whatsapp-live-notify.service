@@ -1,0 +1,7 @@
+[Unit]
+Description=Alerta falha persistente na captura do WhatsApp do Wey
+
+[Service]
+Type=oneshot
+EnvironmentFile=/root/.openclaw/secrets/whatsapp-health.env
+ExecStart=/bin/sh -c 'openclaw message send --channel telegram --account ceci --target "$TELEGRAM_CHAT" --message "Falha persistente na captura do WhatsApp na VPS. O reparo automatico nao recuperou o wacli; verificar wey-whatsapp-live-sync.service."'

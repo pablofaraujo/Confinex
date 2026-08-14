@@ -1,0 +1,10 @@
+[Unit]
+Description=Verifica e repara a captura continua do WhatsApp do Wey
+After=wey-whatsapp-live-sync.service
+OnFailure=wey-whatsapp-live-notify.service
+
+[Service]
+Type=oneshot
+UMask=0077
+ExecStart=/usr/bin/python3 /root/ponte/tools/verificar_wacli_continuo.py --wacli-bin /usr/local/bin/wacli --wacli-store /root/.local/state/wacli-confinex --unidade wey-whatsapp-live-sync.service --unidade-manutencao wey-whatsapp-automation.service --reparar --espera-reparo 15
+TimeoutStartSec=60s

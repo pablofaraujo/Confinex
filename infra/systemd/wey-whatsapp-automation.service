@@ -6,8 +6,10 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 UMask=0077
+ExecStartPre=-/usr/bin/systemctl stop wey-whatsapp-live-sync.service
 ExecStartPre=/usr/bin/timeout --signal=TERM --kill-after=30s 5m /usr/local/bin/wacli --store /root/.local/state/wacli-confinex sync --once --idle-exit 45s --presence-mode quiet --max-db-size 2GB --max-reconnect 2m
 ExecStart=/usr/bin/timeout --signal=TERM --kill-after=30s 20m /usr/bin/python3 /root/ponte/tools/orquestrar_conciliacao_whatsapp.py --duvidas /root/.openclaw/workspace-wey/private/duvidas-consolidacao.json --sessions-dir /root/.openclaw/agents/wey/sessions --sessions-index /root/.openclaw/workspace-wey/private/sessoes-wey.json --wacli-bin /usr/local/bin/wacli --wacli-store /root/.local/state/wacli-confinex --conciliador /root/ponte/tools/conciliar_whatsapp_pix.py --saida-conciliacao-json /root/.openclaw/workspace-wey/private/conciliacao-whatsapp-pix.json --saida-conciliacao-md /root/.openclaw/workspace-wey/private/conciliacao-whatsapp-pix.md --saida-orquestracao /root/.openclaw/workspace-wey/private/orquestracao-whatsapp.json --estado /root/.openclaw/workspace-wey/private/estado-orquestracao-whatsapp.json --executar-backfill --max-backfills 6 --requisicoes 2 --quantidade 50 --espera 45s
+ExecStopPost=/usr/bin/systemctl --no-block start wey-whatsapp-live-sync.service
 SuccessExitStatus=124 143
 TimeoutStartSec=26m
 TimeoutStopSec=30s
