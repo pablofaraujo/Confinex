@@ -1,0 +1,7 @@
+[Unit]
+Description=Alerta falha persistente na captura do WhatsApp do Wey
+
+[Service]
+Type=oneshot
+UMask=0077
+ExecStart=/root/ponte/tools/notificar_falha_wacli.sh

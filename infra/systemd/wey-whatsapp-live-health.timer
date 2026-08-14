@@ -1,0 +1,11 @@
+[Unit]
+Description=Heartbeat da captura continua do WhatsApp do Wey
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Persistent=true
+Unit=wey-whatsapp-live-health.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,11 @@
+[Unit]
+Description=Atualizacao diaria do cache privado do WhatsApp do Wey
+
+[Timer]
+OnCalendar=*-*-* 10:20:00 UTC
+RandomizedDelaySec=10m
+Persistent=true
+Unit=wey-whatsapp-cache-sync.service
+
+[Install]
+WantedBy=timers.target
