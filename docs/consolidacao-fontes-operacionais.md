@@ -33,6 +33,15 @@ O relatório não autoriza conciliar banco, criar GTA, vincular documento,
 alterar rascunho ou lançar operação. Uma data de corte anterior à referência é
 um bloqueio de atualização, não um dado a ser preenchido por inferência.
 
+Na leitura do histórico do Telegram, três guardas impedem falsos negócios:
+
+- quantidade, peso total e peso médio incompatíveis bloqueiam a versão e exigem
+  releitura da fonte;
+- dois lotes completos do mesmo fornecedor e data são preservados como possíveis
+  negócios distintos, sem obrigar a escolha de apenas um;
+- uma mensagem com mais de um cabeçalho de compra é evidência agregada e não
+  cria candidato operacional.
+
 ## Evidências de PIX no WhatsApp
 
 `tools/conciliar_whatsapp_pix.py` complementa a consolidação pesquisando os

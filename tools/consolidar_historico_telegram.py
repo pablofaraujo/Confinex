@@ -102,6 +102,27 @@ def primeiro(padrao: str, texto: str) -> str | None:
     return achado.group(1).strip() if achado else None
 
 
+def inconsistencias_aritmeticas(compra: dict[str, Any]) -> list[dict[str, Any]]:
+    """Aponta contradições internas sem corrigir ou descartar a evidência."""
+    quantidade = compra.get("quantidade")
+    peso_total = compra.get("peso_total_kg")
+    peso_medio = compra.get("peso_medio_informado_kg")
+    if not all(isinstance(valor, Decimal) and valor > 0 for valor in (
+        quantidade, peso_total, peso_medio,
+    )):
+        return []
+    media_calculada = peso_total / quantidade
+    tolerancia = max(Decimal("1"), abs(peso_medio) * Decimal("0.01"))
+    if abs(media_calculada - peso_medio) <= tolerancia:
+        return []
+    return [{
+        "tipo": "peso_medio_diverge_de_total_por_quantidade",
+        "peso_medio_informado_kg": peso_medio,
+        "peso_medio_calculado_kg": media_calculada.quantize(Decimal("0.01")),
+        "tolerancia_kg": tolerancia.quantize(Decimal("0.01")),
+    }]
+
+
 def normalizar_pagamento(valor: str | None, data_negociacao: str | None) -> str | None:
     if not valor:
         return None
@@ -323,6 +344,10 @@ def extrair_compra(mensagem: dict[str, Any], configuracao: dict[str, Any]) -> di
         peso_total = numero_decimal(primeiro(r"Peso total:\s*([\d.,]+)", texto))
     if peso_total is None:
         peso_total = numero_decimal(primeiro(r"(?:•\s*)?([\d.,]+)\s*kg\s+bruto", texto))
+    peso_medio = numero_decimal(primeiro(
+        r"Peso m[eé]dio(?:\s+por\s+(?:cab(?:e[çc]a)?|animal))?:\s*([\d.,]+)\s*kg",
+        texto,
+    ))
     preco = numero_decimal(primeiro(r"Pre[çc]o:\s*R\$\s*([\d.,]+)\s*/?@", texto))
     if preco is None:
         preco = numero_decimal(primeiro(r"a\s*R\$\s*([\d.,]+)\s*/?@", texto))
@@ -350,6 +375,7 @@ def extrair_compra(mensagem: dict[str, Any], configuracao: dict[str, Any]) -> di
         "pagamento": pagamento,
     }
     sexo, categoria = inferir_sexo_categoria(texto)
+    cabecalhos_compra = re.findall(r"(?:🐄\s*)?Compra\s*[–—-]\s*[^\n]+", texto, re.I)
     compra = {
         "contexto": mensagem["contexto"],
         "rotulo": rotulo,
@@ -358,8 +384,13 @@ def extrair_compra(mensagem: dict[str, Any], configuracao: dict[str, Any]) -> di
         "sexo": sexo,
         "categoria": categoria,
         "destino": inferir_destino(texto),
-        "tipo_evidencia": "negocio",
+        "tipo_evidencia": "resumo_agregado" if len(cabecalhos_compra) > 1 else "negocio",
+        "observacao_classificacao": (
+            "mensagem contém mais de um cabeçalho de compra"
+            if len(cabecalhos_compra) > 1 else None
+        ),
         "vendedor": vendedor,
+        "peso_medio_informado_kg": peso_medio,
         **campos,
         "campos_preenchidos": sum(valor not in (None, "") for valor in campos.values()),
         "eh_correcao_explicita": bool(PADROES["correcao"].search(texto)),
@@ -371,7 +402,10 @@ def extrair_compra(mensagem: dict[str, Any], configuracao: dict[str, Any]) -> di
         "texto_sha256": mensagem["texto_sha256"],
         "gtas": mensagem["gtas"],
     }
-    return aplicar_regra_privada(compra, regras_mensagens.get(mensagem["mensagem_id"], {}))
+    compra = aplicar_regra_privada(compra, regras_mensagens.get(mensagem["mensagem_id"], {}))
+    compra["inconsistencias_aritmeticas"] = inconsistencias_aritmeticas(compra)
+    compra["leitura_aritmeticamente_coerente"] = not compra["inconsistencias_aritmeticas"]
+    return compra
 
 
 def dia_mensagem(valor: str | None) -> str | None:
@@ -432,6 +466,21 @@ def campos_ausentes_em_todas(versoes: list[dict[str, Any]]) -> list[str]:
     ]
 
 
+def parecem_negocios_distintos(versoes: list[dict[str, Any]]) -> bool:
+    """Preserva lotes completos distintos em vez de obrigar a escolher um."""
+    campos_distintivos = ("quantidade", "peso_total_kg", "valor_total")
+    if len(versoes) < 2 or not all(
+        all(versao.get(campo) not in (None, "") for campo in campos_distintivos)
+        for versao in versoes
+    ):
+        return False
+    assinaturas = {
+        tuple(versao.get(campo) for campo in campos_distintivos)
+        for versao in versoes
+    }
+    return len(assinaturas) == len(versoes)
+
+
 def classificar_revisao(
     classificacao: str,
     divergentes: list[str],
@@ -449,6 +498,18 @@ def classificar_revisao(
         )
     if classificacao == "correcao_explicita_mais_recente":
         return "conferir correção explícita", "alta", "comparar a correção com a fonte e confirmar"
+    if classificacao == "inconsistente_aritmetica":
+        return (
+            "conferir leitura aritmética",
+            "alta",
+            "reler a fonte; não usar quantidade, peso total ou média enquanto a conta não fechar",
+        )
+    if classificacao == "possiveis_negocios_distintos":
+        return (
+            "separar negócios possíveis",
+            "alta",
+            "preservar cada lote e confirmar se são negócios distintos; não escolher nem combinar versões",
+        )
     financeiros = {"quantidade", "preco_arroba", "valor_total", "pagamento"}
     prioridade = "alta" if financeiros.intersection(divergentes) else "média"
     return "escolher a versão correta", prioridade, "conferir as mensagens e escolher sem combinar valores"
@@ -457,7 +518,10 @@ def classificar_revisao(
 def atribuir_codigos_negocios(grupos: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Atribui códigos anuais estáveis sem renumerar a conferência já aberta."""
     contadores_ano: Counter[str] = Counter()
-    classes_historicas = {"ambiguo_multiplas_versoes", "correcao_explicita_mais_recente"}
+    classes_historicas = {
+        "ambiguo_multiplas_versoes", "correcao_explicita_mais_recente",
+        "inconsistente_aritmetica", "possiveis_negocios_distintos",
+    }
     ordem_codigo = [
         *[
             grupo for grupo in grupos
@@ -523,9 +587,17 @@ def agrupar_compras(compras: list[dict[str, Any]]) -> list[dict[str, Any]]:
         versoes_semanticas = consolidar_versoes_semanticas(versoes)
         representantes = [grupo["representante"] for grupo in versoes_semanticas]
         ultima = representantes[-1]
+        inconsistencias = [
+            inconsistencia
+            for versao in versoes
+            for inconsistencia in versao.get("inconsistencias_aritmeticas") or []
+        ]
         ausentes = campos_ausentes_em_todas(representantes)
         ausentes_minimos = [campo for campo in CAMPOS_MINIMOS_CONSOLIDACAO if campo in ausentes]
-        if len(versoes_semanticas) == 1:
+        if inconsistencias:
+            classificacao = "inconsistente_aritmetica"
+            preferida = None
+        elif len(versoes_semanticas) == 1:
             classificacao = (
                 "incompleto_campos_obrigatorios"
                 if ausentes_minimos else "repeticao_deduplicavel"
@@ -534,6 +606,9 @@ def agrupar_compras(compras: list[dict[str, Any]]) -> list[dict[str, Any]]:
         elif ultima["eh_correcao_explicita"]:
             classificacao = "correcao_explicita_mais_recente"
             preferida = ultima
+        elif parecem_negocios_distintos(representantes):
+            classificacao = "possiveis_negocios_distintos"
+            preferida = None
         else:
             classificacao = "ambiguo_multiplas_versoes"
             preferida = None
@@ -562,6 +637,7 @@ def agrupar_compras(compras: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "campos_divergentes_humanos": [CAMPOS_COMPRA[campo] for campo in divergentes],
             "campos_ausentes_em_todas": ausentes,
             "campos_ausentes_humanos": [CAMPOS_COMPRA[campo] for campo in ausentes],
+            "inconsistencias_aritmeticas": inconsistencias,
             "campos_minimos_ausentes": ausentes_minimos,
             "campos_minimos_ausentes_humanos": [
                 CAMPOS_COMPRA[campo] for campo in ausentes_minimos
@@ -727,7 +803,16 @@ def finalizar_plano(plano: dict[str, Any]) -> dict[str, Any]:
         (vinculo.get("gta"), vinculo.get("nf"), vinculo.get("linha_documento"))
         for vinculo in (plano.get("cruzamento_gta") or {}).get("vinculos") or []
     }
-    ambiguos = sum(grupo["classificacao"] == "ambiguo_multiplas_versoes" for grupo in grupos)
+    ambiguos = sum(
+        grupo["classificacao"] in {"ambiguo_multiplas_versoes", "possiveis_negocios_distintos"}
+        for grupo in grupos
+    )
+    distintos = sum(
+        grupo["classificacao"] == "possiveis_negocios_distintos" for grupo in grupos
+    )
+    inconsistentes = sum(
+        grupo["classificacao"] == "inconsistente_aritmetica" for grupo in grupos
+    )
     correcoes = sum(
         grupo["classificacao"] == "correcao_explicita_mais_recente" for grupo in grupos
     )
@@ -736,6 +821,8 @@ def finalizar_plano(plano: dict[str, Any]) -> dict[str, Any]:
     )
     plano["resumo"]["grupos_compras"] = len(grupos)
     plano["resumo"]["grupos_ambiguos"] = ambiguos
+    plano["resumo"]["possiveis_negocios_distintos"] = distintos
+    plano["resumo"]["leituras_aritmeticamente_inconsistentes"] = inconsistentes
     plano["resumo"]["correcoes_explicitas_preferidas"] = correcoes
     plano["resumo"]["grupos_incompletos"] = incompletos
     fila_revisao = [grupo for grupo in grupos if grupo["requer_revisao"]]
@@ -747,7 +834,11 @@ def finalizar_plano(plano: dict[str, Any]) -> dict[str, Any]:
             grupo["classificacao"] == "correcao_explicita_mais_recente" for grupo in fila_revisao
         ),
         "ambiguidades_sem_preferencia": sum(
-            grupo["classificacao"] == "ambiguo_multiplas_versoes" for grupo in fila_revisao
+            grupo["classificacao"] in {
+                "ambiguo_multiplas_versoes", "possiveis_negocios_distintos",
+                "inconsistente_aritmetica",
+            }
+            for grupo in fila_revisao
         ),
         "campos_obrigatorios_faltantes": incompletos,
         "negocios_com_vinculo_gta_nf_candidato": sum(
@@ -760,6 +851,8 @@ def finalizar_plano(plano: dict[str, Any]) -> dict[str, Any]:
     pendencias = []
     if ambiguos:
         pendencias.append("compras_com_multiplas_versoes_exigem_revisao")
+    if inconsistentes:
+        pendencias.append("leituras_com_inconsistencia_aritmetica_exigem_releitura")
     if incompletos:
         pendencias.append("compras_incompletas_exigem_complemento_documental")
     if plano["resumo"]["anexos_omitidos"]:
@@ -899,6 +992,8 @@ Plano `{plano['plano_id']}`. Modo somente leitura; nenhuma escrita foi executada
 - {resumo['resumos_agregados_preservados']} resumos agregados preservados apenas como evidência;
 - {resumo['grupos_compras']} grupos provisórios;
 - {resumo['grupos_ambiguos']} grupos permanecem ambíguos;
+- {resumo['possiveis_negocios_distintos']} grupos podem representar negócios distintos;
+- {resumo['leituras_aritmeticamente_inconsistentes']} leituras contradizem a própria aritmética;
 - {resumo['grupos_incompletos']} grupos sem conflito ainda têm campos mínimos ausentes;
 - {resumo['correcoes_explicitas_preferidas']} grupos têm correção posterior explicitamente indicada;
 - {gta['vinculos_exatos']} vínculos GTA exatos com a fonte documental.
@@ -932,7 +1027,9 @@ correção explícita continua pendente de confirmação na fonte.
 ## Regras validadas
 
 - correção explícita posterior pode ser preferida, mas nunca confirmada automaticamente;
-- mesmo fornecedor e mesma data com campos diferentes permanece ambíguo;
+- mesmo fornecedor e mesma data com lotes completos diferentes preserva os dois como possíveis negócios distintos;
+- quantidade, peso total e peso médio incompatíveis bloqueiam a escolha de uma versão preferida;
+- mensagem com mais de um cabeçalho de compra vira resumo agregado, não negócio;
 - versões iguais ou parciais compatíveis viram uma única alternativa, preservando todas as mensagens;
 - versão única com campo mínimo ausente continua na fila para complemento documental;
 - códigos anuais `NEG-AA-NNN` são determinísticos e não dependem da planilha;
