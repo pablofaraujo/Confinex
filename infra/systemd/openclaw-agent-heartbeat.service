@@ -8,5 +8,7 @@ Type=oneshot
 UMask=0077
 EnvironmentFile=-/root/.openclaw/gateway.systemd.env
 EnvironmentFile=-/root/.openclaw/secrets/whatsapp-health.env
+Environment=XDG_RUNTIME_DIR=/run/user/0
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/0/bus
 ExecStart=/usr/bin/python3 /root/ponte/tools/verificar_openclaw_canais.py --reparar --espera-reparo 15
 TimeoutStartSec=240s

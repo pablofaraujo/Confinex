@@ -70,6 +70,8 @@ class VerificarOpenClawCanaisTest(unittest.TestCase):
         self.assertNotIn("openclaw message send", fonte + unidade)
         self.assertNotRegex(fonte + unidade, r"-[0-9]{8,}")
         self.assertIn("--reparar", unidade)
+        self.assertIn("XDG_RUNTIME_DIR=/run/user/0", unidade)
+        self.assertIn("DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/0/bus", unidade)
 
 
 if __name__ == "__main__":
