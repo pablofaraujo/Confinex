@@ -55,11 +55,13 @@ inclusive mensagens enviadas pelo titular. Autenticação, `sync` e `history
 backfill` são etapas administrativas separadas: podem escrever somente no
 cache privado do `wacli`; jamais se usa `wacli send` neste fluxo.
 
-No ambiente do Wey, o timer `wey-whatsapp-cache-sync.timer` executa diariamente
-uma sincronização `--once`, com presença silenciosa, limite de 2 GB e sem
-webhook. O systemd impede duas instâncias simultâneas do mesmo serviço. Esse
-timer atualiza somente o cache técnico; a conciliação continua sendo uma etapa
-separada e estritamente `--read-only`.
+No ambiente do Wey, o timer `wey-whatsapp-automation.timer` executa diariamente
+uma sincronização `--once`, com presença silenciosa e limite de 2 GB, seguida
+por `tools/orquestrar_conciliacao_whatsapp.py`. O orquestrador concilia por
+valor, verifica a cobertura, tenta backfill serial e limitado, repete a busca e
+grava um relatório privado com perguntas prontas. O timer simples
+`wey-whatsapp-cache-sync.timer` deve permanecer desabilitado para não concorrer
+pelo mesmo store.
 
 Uma busca vazia não prova que a mensagem não existe. Antes de classificar um
 valor como ausente, confira `wacli history coverage` na conversa candidata. Se
@@ -67,7 +69,15 @@ a data mais antiga do cache for posterior à data do negócio, execute um
 `history backfill` limitado e serial e repita a busca pelo valor. O histórico
 fornecido pelo aparelho é de melhor esforço; sem resposta do aparelho, o caso
 fica com cobertura incompleta, nunca como inexistente. As unidades reproduzíveis
-do timer ficam em `infra/systemd/wey-whatsapp-cache-sync.*`.
+ficam em `infra/systemd/wey-whatsapp-automation.*`.
+
+O relatório `orquestracao-whatsapp.json` separa três saídas: evidência
+encontrada, cobertura ainda incompleta e conversa candidata não localizada. Nos
+dois últimos casos ele inclui uma pergunta pronta, mas não a envia. Assim o Wey
+tem um próximo passo determinístico sem assumir fatos nem depender do Mac.
+`estado-orquestracao-whatsapp.json` registra tentativas por conversa; o ciclo
+seguinte prioriza quem recebeu menos tentativas, evitando repetir sempre os
+mesmos contatos e garantindo rotação da fila.
 
 ## Interpretação
 

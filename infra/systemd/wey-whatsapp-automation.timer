@@ -1,0 +1,11 @@
+[Unit]
+Description=Automacao diaria de historico e conciliacao do WhatsApp do Wey
+
+[Timer]
+OnCalendar=*-*-* 10:20:00 UTC
+RandomizedDelaySec=10m
+Persistent=true
+Unit=wey-whatsapp-automation.service
+
+[Install]
+WantedBy=timers.target

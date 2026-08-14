@@ -41,6 +41,12 @@ python3 /root/ponte/tools/conciliar_whatsapp_pix.py \
   --saida-md /root/.openclaw/workspace-wey/private/conciliacao-whatsapp-pix.md
 ```
 
+Para o ciclo autônomo da VPS, use
+`/root/ponte/tools/orquestrar_conciliacao_whatsapp.py`. Ele executa o mesmo
+conciliador, tenta backfill limitado quando necessário e grava perguntas prontas
+no relatório privado. Nunca transforme essas perguntas em envio automático a
+terceiros.
+
 5. Leia os candidatos mais fortes e confronte valor, data, contraparte,
    comprovante e mensagens próximas.
 6. Classifique como evidência suficiente somente quando uma única conversa e o
