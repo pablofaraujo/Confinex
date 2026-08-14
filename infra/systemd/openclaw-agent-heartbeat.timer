@@ -1,0 +1,11 @@
+[Unit]
+Description=Heartbeat e autorreparo OpenClaw a cada cinco minutos
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Persistent=true
+Unit=openclaw-agent-heartbeat.service
+
+[Install]
+WantedBy=timers.target
