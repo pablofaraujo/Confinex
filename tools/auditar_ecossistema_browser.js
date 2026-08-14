@@ -5,6 +5,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { chromium } = require('playwright');
+const { recursoExternoNaoCritico } = require('./auditoria_rede');
 
 function argumento(nome) {
   const indice = process.argv.indexOf(nome);
@@ -63,6 +64,7 @@ async function auditarSafari14Confinex(browser, viewport, resultados) {
   const requisicoesSupabase = [];
   let navegacaoIntencional = true;
   page.on('console', msg => {
+    if (recursoExternoNaoCritico(msg.location()?.url)) return;
     if (['error', 'warning'].includes(msg.type())) {
       erros.push(`console ${msg.type()}: ${msg.text()}`);
     }
@@ -72,11 +74,13 @@ async function auditarSafari14Confinex(browser, viewport, resultados) {
     if (/\.supabase\.co\//i.test(req.url())) requisicoesSupabase.push(req.url());
   });
   page.on('requestfailed', req => {
+    if (recursoExternoNaoCritico(req.url())) return;
     const motivo = req.failure()?.errorText || 'falhou';
     if (navegacaoIntencional && motivo === 'net::ERR_ABORTED') return;
     erros.push(`rede: ${req.url()} — ${motivo}`);
   });
   page.on('response', res => {
+    if (recursoExternoNaoCritico(res.url())) return;
     if (res.status() >= 400) erros.push(`http ${res.status()}: ${res.url()}`);
   });
 
@@ -196,7 +200,10 @@ async function auditarBasesOnlineConfinex(browser, viewport, resultados) {
   });
   const page = await context.newPage();
   const erros = [];
-  page.on('console', msg => { if (msg.type() === 'error') erros.push(`console: ${msg.text()}`); });
+  page.on('console', msg => {
+    if (recursoExternoNaoCritico(msg.location()?.url)) return;
+    if (msg.type() === 'error') erros.push(`console: ${msg.text()}`);
+  });
   page.on('pageerror', erro => erros.push(`javascript: ${erro.message}`));
   await page.route('**/supabase-js@*/**', rota => rota.fulfill({ status: 200, contentType: 'application/javascript', body: '' }));
   await page.route('**/js/cfagro-core.js*', rota => rota.fulfill({ status: 200, contentType: 'application/javascript', body: '' }));
@@ -300,15 +307,18 @@ async function auditarPagina(browser, pagina, viewport, resultados) {
   const erros = [];
   let navegacaoIntencional = true;
   page.on('console', msg => {
+    if (recursoExternoNaoCritico(msg.location()?.url)) return;
     if (['error', 'warning'].includes(msg.type())) erros.push(`console ${msg.type()}: ${msg.text()}`);
   });
   page.on('pageerror', erro => erros.push(`javascript: ${erro.message}`));
   page.on('requestfailed', req => {
+    if (recursoExternoNaoCritico(req.url())) return;
     const motivo = req.failure()?.errorText || 'falhou';
     if (navegacaoIntencional && motivo === 'net::ERR_ABORTED') return;
     erros.push(`rede: ${req.url()} — ${motivo}`);
   });
   page.on('response', res => {
+    if (recursoExternoNaoCritico(res.url())) return;
     if (res.status() >= 400) erros.push(`http ${res.status()}: ${res.url()}`);
   });
 
@@ -486,6 +496,7 @@ async function auditarPagamentoConfinamento(browser, viewport, resultados) {
   const page = await context.newPage();
   const erros = [];
   page.on('console', msg => {
+    if (recursoExternoNaoCritico(msg.location()?.url)) return;
     if (msg.type() === 'error') {
       const origem = msg.location()?.url || 'origem não informada';
       erros.push(`console: ${msg.text()} — ${origem}`);
@@ -493,9 +504,11 @@ async function auditarPagamentoConfinamento(browser, viewport, resultados) {
   });
   page.on('pageerror', erro => erros.push(`javascript: ${erro.message}`));
   page.on('requestfailed', req => {
+    if (recursoExternoNaoCritico(req.url())) return;
     erros.push(`rede: ${req.url()} — ${req.failure()?.errorText || 'falhou'}`);
   });
   page.on('response', res => {
+    if (recursoExternoNaoCritico(res.url())) return;
     if (res.status() >= 400) erros.push(`http ${res.status()}: ${res.url()}`);
   });
 
@@ -873,15 +886,18 @@ async function abrirFinanceiroSimulado(browser, viewport, modo) {
   const page = await context.newPage();
   const erros = [];
   page.on('console', msg => {
+    if (recursoExternoNaoCritico(msg.location()?.url)) return;
     if (['error', 'warning'].includes(msg.type())) {
       erros.push(`console ${msg.type()}: ${msg.text()}`);
     }
   });
   page.on('pageerror', erro => erros.push(`javascript: ${erro.message}`));
   page.on('requestfailed', req => {
+    if (recursoExternoNaoCritico(req.url())) return;
     erros.push(`rede: ${req.url()} — ${req.failure()?.errorText || 'falhou'}`);
   });
   page.on('response', res => {
+    if (recursoExternoNaoCritico(res.url())) return;
     if (res.status() >= 400) erros.push(`http ${res.status()}: ${res.url()}`);
   });
   const destino = new URL(`financeiro.html?fixture=${modo}`, baseUrl).href;
@@ -1184,15 +1200,18 @@ async function abrirGestaoSimulada(browser, viewport, paginaNome, modo) {
   const page = await context.newPage();
   const erros = [];
   page.on('console', msg => {
+    if (recursoExternoNaoCritico(msg.location()?.url)) return;
     if (['error', 'warning'].includes(msg.type())) {
       erros.push(`console ${msg.type()}: ${msg.text()}`);
     }
   });
   page.on('pageerror', erro => erros.push(`javascript: ${erro.message}`));
   page.on('requestfailed', req => {
+    if (recursoExternoNaoCritico(req.url())) return;
     erros.push(`rede: ${req.url()} — ${req.failure()?.errorText || 'falhou'}`);
   });
   page.on('response', res => {
+    if (recursoExternoNaoCritico(res.url())) return;
     if (res.status() >= 400) erros.push(`http ${res.status()}: ${res.url()}`);
   });
   const destino = new URL(`${paginaNome}.html?fixture=${modo}`, baseUrl).href;
@@ -1460,6 +1479,7 @@ async function auditarAtualizacaoPainelBoiGordo(browser, viewport, resultados) {
   const erros = [];
   page.on('pageerror', erro => erros.push(erro.message));
   page.on('console', mensagem => {
+    if (recursoExternoNaoCritico(mensagem.location()?.url)) return;
     if (mensagem.type() === 'error') erros.push(mensagem.text());
   });
   await page.route('**/dados/painel-boi-gordo.json*', rota => rota.fulfill({

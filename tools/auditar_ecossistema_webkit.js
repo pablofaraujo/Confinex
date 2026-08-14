@@ -4,6 +4,7 @@
 
 const fs = require('node:fs');
 const { webkit } = require('playwright');
+const { recursoExternoNaoCritico } = require('./auditoria_rede');
 
 function argumento(nome) {
   const indice = process.argv.indexOf(nome);
@@ -37,10 +38,12 @@ async function abrir(context, { atrasarPrimeiroPacote = false } = {}) {
   const erros = [];
   let pacotes = 0;
   page.on('console', mensagem => {
+    if (recursoExternoNaoCritico(mensagem.location()?.url)) return;
     if (mensagem.type() === 'error') erros.push(`console: ${mensagem.text()}`);
   });
   page.on('pageerror', erro => erros.push(`javascript: ${erro.message}`));
   page.on('response', resposta => {
+    if (recursoExternoNaoCritico(resposta.url())) return;
     if (resposta.status() >= 400) erros.push(`http ${resposta.status()}: ${resposta.url()}`);
   });
   await page.route('**/confinex-app.mobile.js*', async rota => {
