@@ -97,7 +97,7 @@ ul.ctx li::before{content:"•";position:absolute;left:4px;color:var(--green)}
 }
 </script>
 
-<script src="./js/painel-boi-gordo.js?v=20260724-1"></script>
+<script src="./js/painel-boi-gordo.js?v=20260812-1"></script>
 <script>
 const D = JSON.parse(document.getElementById('painel-data').textContent);
 const atualizador = window.PainelBoiGordo && window.PainelBoiGordo.criarAtualizador({
@@ -117,8 +117,12 @@ if (atualizador) {
 const fmt = v => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 let graficoBGI = null;
 
-function renderizarPainel(dados, fallback) {
-document.getElementById('estadoAtualizacao').textContent = (fallback ? 'fonte indisponível · ' : '') + 'fonte: ' + dados.fonte;
+function renderizarPainel(dados, fallback, defasado) {
+const estaDefasado = defasado == null && atualizador ? atualizador.defasado() : Boolean(defasado);
+document.getElementById('estadoAtualizacao').textContent =
+  (fallback ? 'fonte indisponível · ' : '') +
+  (estaDefasado ? 'dados defasados · ' : '') +
+  'fonte: ' + dados.fonte;
 
 document.getElementById('ts').textContent = dados.atualizadoEm;
 
@@ -168,7 +172,7 @@ graficoBGI = new Chart(document.getElementById('chartBGI'), {
 });
 }
 
-renderizarPainel(D, false);
+renderizarPainel(D, false, atualizador ? atualizador.defasado() : true);
 </script>
 </body>
 </html>

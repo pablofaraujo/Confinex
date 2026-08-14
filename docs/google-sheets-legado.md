@@ -10,6 +10,8 @@ compartilhado, renomeado ou alterado.
 
 - Dados operacionais confirmados: Supabase.
 - Simulação local e recuperação offline: `localStorage`.
+- Bases reutilizáveis de confinamento entre aparelhos: `confinex_bases` no
+  Supabase, com a migração aplicada em 12/08/2026.
 - Sheets/Apps Script: compatibilidade entre dispositivos e histórico antigo.
 - Código: GitHub; a pasta de código no Drive é somente um espelho antigo.
 
@@ -34,3 +36,9 @@ Uma migração só pode começar com autorização específica e precisa:
 
 Até esse gate ser cumprido, Sheets é formalmente **legado em uso**, não uma
 fonte operacional paralela a ser atualizada por agentes.
+
+O catálogo de bases é uma migração independente e menor: ele não move o estudo
+completo nem desativa o Apps Script. A primeira cópia das bases que já existem
+em um navegador continua exigindo o clique em **Sincronizar bases**. Em um
+computador novo, após entrar no ecossistema, essas bases são apenas lidas e
+mescladas ao cache local; o estudo aberto não é substituído.

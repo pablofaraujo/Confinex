@@ -48,14 +48,26 @@ somente leitura e está detalhado em
 com um cruzamento por registro entre exportação fiscal do Agronotas, ficha
 detalhada do IMA, extrato OFX e planilha de negócios. Ele aceita `.xlsx`, `.csv`
 ou `.json` nas fontes tabulares, lê o `.xlsx` sem executar macros e grava apenas
-um plano privado em JSON e Markdown.
+um plano privado em JSON e Markdown. `--agronotas` e `--ofx` podem ser
+repetidos: históricos e incrementos fiscais são deduplicados pelo documento, e
+extratos sobrepostos são deduplicados pelo identificador bancário anonimizado.
+
+Antes do primeiro uso, instale a dependência permanente das ferramentas:
+
+```bash
+python3 -m pip install -r requirements-tools.txt
+```
 
 ```bash
 python3 tools/conciliar_documentos_operacionais.py \
   --agronotas /caminho/privado/documentos.xlsx \
+  --agronotas /caminho/privado/documentos-incrementais.json \
   --aba-agronotas "Fiscal GTAs" \
-  --ima-pdf /caminho/privado/ficha-detalhada.pdf \
+  --agronotas-consultado-ate AAAA-MM-DD \
+  --ima-pdf /caminho/privado/ficha-historica.pdf \
+  --ima-pdf /caminho/privado/ficha-atual.pdf \
   --ofx /caminho/privado/extrato.ofx \
+  --ofx /caminho/privado/outra-conta-ou-periodo.ofx \
   --negocios /caminho/privado/negocios.xlsx \
   --aba-negocios "Negocios" \
   --data-referencia AAAA-MM-DD \
@@ -67,11 +79,27 @@ As regras permanentes são:
 
 - GTA igual na nota e no IMA é vínculo documental forte;
 - NF ou GTA igual ao negócio é candidato forte, ainda não confirmado;
+- códigos `CF-AA-NNN` e `NEG-AA-NNN` representam negócios; rótulos de fazenda,
+  parceria ou rateio permanecem contextos agregadores e não inflam a contagem;
 - valor bancário igual e único em até 90 dias é somente candidato provável;
+- NF sem GTA pode gerar candidato provável somente quando data e quantidade
+  inteira de cabeças coincidem com uma única movimentação IMA não disputada;
+  se duas NFs disputarem a mesma GTA, ambas permanecem ambíguas;
 - valor e data sem identificador documental nunca formam vínculo forte;
 - duas ou mais correspondências ficam ambíguas e intactas;
+- documento anterior ou posterior ao período coberto pela ficha IMA fica
+  classificado como histórico fora da cobertura, não como pendência;
+- fichas IMA complementares podem ser combinadas; movimentos repetidos no dia
+  de sobreposição são deduplicados e o saldo vem da ficha de corte mais recente;
+- linhas de GTA riscadas no PDF são excluídas como canceladas pela geometria do
+  documento, pois essa informação não existe no texto extraído;
 - documentos sem relação com gado são ignorados, mas contabilizados;
-- fonte desatualizada vira pendência explícita;
+- as palavras isoladas **boi** ou **gado** em insumos não caracterizam
+  movimentação animal; é preciso GTA, vínculo existente, bovino/bubalino,
+  categoria animal ou indicação de animais vivos;
+- a data do último documento é diferente da data até a qual o Agronotas foi
+  consultado; dias sem nota não geram falso atraso quando a consulta foi atual;
+- fonte não consultada até a referência vira pendência explícita;
 - não existe argumento `--executar`, chamada de rede ou escrita operacional.
 
 Números de GTA, NF, lançamentos e negócios permanecem somente nos relatórios em
@@ -207,7 +235,8 @@ para fazer o saldo fechar.
 
 ```bash
 python3 tools/analisar_ficha_ima.py \
-  --pdf /caminho/privado/ficha.pdf \
+  --pdf /caminho/privado/ficha-historica.pdf \
+  --pdf /caminho/privado/ficha-atual.pdf \
   --gtas /caminho/privado/gtas.json \
   --entradas /caminho/privado/entradas.json \
   --fiscal /caminho/privado/fiscal.json \
@@ -217,6 +246,8 @@ python3 tools/analisar_ficha_ima.py \
   --saida-md /caminho/privado/relatorio-ima.md
 ```
 
-O modo `--pdf` usa `pdftotext -layout` quando Poppler está disponível. Se não
-estiver, usa `pypdf` opcional em modo de preservação de layout; como última
-alternativa, o texto pode ser fornecido por `--texto-extraido`.
+O modo `--pdf` usa `pdftotext -layout` quando Poppler está disponível. A
+conferência gráfica de linhas canceladas exige `pypdf`, mesmo quando o texto é
+extraído pelo Poppler. Se Poppler não estiver disponível, o próprio `pypdf`
+preserva o layout; como última alternativa, um único texto pode ser fornecido
+por `--texto-extraido`, sem inferir cancelamentos que o texto não representa.

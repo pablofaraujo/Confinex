@@ -33,6 +33,8 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+      - name: Instalar dependências das ferramentas Python
+        run: python3 -m pip install -r requirements-tools.txt
       - name: Instalar dependências da auditoria
         run: npm ci
       - name: Instalar Chromium e WebKit

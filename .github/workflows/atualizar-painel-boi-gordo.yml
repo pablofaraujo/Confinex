@@ -8,9 +8,14 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: atualizar-painel-boi-gordo
+  cancel-in-progress: false
+
 jobs:
   atualizar:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -23,18 +28,20 @@ jobs:
         run: |
           set -u
           if [ -z "${PAINEL_BOI_GORDO_SOURCE_URL}" ]; then
-            echo "não testado: PAINEL_BOI_GORDO_SOURCE_URL não configurada"
-            echo "::warning::Painel preservado: falta configurar a fonte validada de mercado"
-            echo "### Painel não atualizado" >> "$GITHUB_STEP_SUMMARY"
+            echo "bloqueado: PAINEL_BOI_GORDO_SOURCE_URL não configurada"
+            echo "::error::Painel não atualizado: falta configurar a fonte validada de mercado"
+            echo "### Painel bloqueado" >> "$GITHUB_STEP_SUMMARY"
             echo "A agenda rodou, mas a fonte validada ainda não está configurada. O último dado válido foi preservado." >> "$GITHUB_STEP_SUMMARY"
-            echo "atualizado=false" >> "$GITHUB_OUTPUT"
-            exit 0
+            exit 1
           fi
           if python3 tools/atualizar_painel_boi_gordo.py; then
             echo "atualizado=true" >> "$GITHUB_OUTPUT"
           else
             echo "Fonte indisponível; último artefato válido preservado"
-            echo "atualizado=false" >> "$GITHUB_OUTPUT"
+            echo "::error::Painel não atualizado: a fonte configurada falhou ou devolveu dados inválidos"
+            echo "### Painel bloqueado" >> "$GITHUB_STEP_SUMMARY"
+            echo "A fonte configurada falhou ou devolveu dados inválidos. O último dado válido foi preservado." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
           fi
       - name: Publicar artefato atualizado
         if: steps.fonte.outputs.atualizado == 'true'

@@ -6,7 +6,13 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from tools.analisar_ficha_ima import extrair_texto_pdf, gerar_plano, ler_ficha
+from tools.analisar_ficha_ima import (
+    combinar_fichas,
+    detectar_gtas_canceladas_pdf,
+    extrair_texto_pdf,
+    gerar_plano,
+    ler_ficha,
+)
 
 
 TEXTO = """
@@ -51,6 +57,57 @@ class AnalisarFichaImaTest(unittest.TestCase):
     def test_rejeita_ficha_sem_periodo(self):
         with self.assertRaisesRegex(ValueError, "período"):
             ler_ficha("Total: 10", "hash")
+
+    def test_exclui_gta_cancelada_e_conserva_contagem(self):
+        ficha = ler_ficha(TEXTO, "hash", {"100002"})
+        self.assertEqual([item["gta"] for item in ficha["movimentos"]], ["100001", "100003"])
+        self.assertEqual(ficha["gtas_canceladas"], ["100002"])
+
+    def test_combina_periodos_e_deduplica_sobreposicao(self):
+        primeira = ler_ficha(TEXTO, "hash-a", {"100002"})
+        segunda = ler_ficha(TEXTO.replace("20/07/2026", "26/07/2026"), "hash-b", {"100002"})
+        segunda["saldo_rebanho"] = 240
+        combinada = combinar_fichas([primeira, segunda])
+        self.assertEqual(combinada["periodo_inicial"], "2026-07-20")
+        self.assertEqual(combinada["periodo_final"], "2026-07-26")
+        self.assertEqual(combinada["saldo_rebanho"], 240)
+        self.assertEqual(len(combinada["movimentos"]), 2)
+        self.assertEqual(combinada["movimentos_duplicados_ignorados"], 2)
+        self.assertEqual(combinada["lacunas_periodo"], [])
+
+    def test_combina_fichas_sem_esconder_lacuna_de_periodo(self):
+        primeira = ler_ficha(TEXTO, "hash-a")
+        segunda = ler_ficha(
+            TEXTO.replace("20/07/2026", "29/07/2026").replace("26/07/2026", "30/07/2026"),
+            "hash-b",
+        )
+        combinada = combinar_fichas([primeira, segunda])
+        self.assertEqual(combinada["lacunas_periodo"], [
+            {"inicio": "2026-07-27", "fim": "2026-07-28"}
+        ])
+
+    def test_cancelamento_em_uma_ficha_prevalece_sobre_periodo_sobreposto(self):
+        primeira = ler_ficha(TEXTO, "hash-a")
+        segunda = ler_ficha(TEXTO, "hash-b", {"100002"})
+        combinada = combinar_fichas([primeira, segunda])
+        self.assertEqual(
+            [item["gta"] for item in combinada["movimentos"]],
+            ["100001", "100003"],
+        )
+        self.assertEqual(combinada["gtas_canceladas"], ["100002"])
+
+    def test_detecta_risco_grafico_alinhado_ao_numero_da_gta(self):
+        class Pagina:
+            def extract_text(self, visitor_text=None, visitor_operand_before=None, **_kwargs):
+                visitor_text("100002", None, [1, 0, 0, 1, 68, 306.4], None, 7)
+                visitor_operand_before(b"m", [283, 309.8], None, None)
+                visitor_operand_before(b"l", [398, 309.8], None, None)
+                visitor_operand_before(b"S", [], None, None)
+                return ""
+
+        leitor = lambda _: SimpleNamespace(pages=[Pagina()])
+        with patch.dict(sys.modules, {"pypdf": SimpleNamespace(PdfReader=leitor)}):
+            self.assertEqual(detectar_gtas_canceladas_pdf(Path("ficha.pdf")), {"100002"})
 
     def test_extrai_pdf_com_pypdf_em_layout_quando_poppler_nao_existe(self):
         pagina = SimpleNamespace(extract_text=lambda **kwargs: (

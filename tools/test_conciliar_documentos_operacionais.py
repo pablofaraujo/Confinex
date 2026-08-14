@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from datetime import date
@@ -6,10 +7,13 @@ from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from tools.conciliar_documentos_operacionais import (
+    combinar_agronotas,
+    combinar_extratos,
     extrair_gtas,
     extrair_gtas_campo,
     gerar_plano,
     ler_agronotas,
+    ler_negocios,
 )
 
 
@@ -77,6 +81,59 @@ class ConciliarDocumentosOperacionaisTest(unittest.TestCase):
         self.assertNotIn("fitid_hash", candidato)
         self.assertFalse(candidato["confirmado"])
 
+    def test_data_e_cabecas_exatas_geram_apenas_candidato_provavel(self):
+        nota = {"linha": 2, "nf": "123", "gtas": [], "data": "2026-08-10",
+                "valor": None, "quantidade": Decimal("20.00"), "registro_id": "nota-a"}
+        plano = gerar_plano(
+            fonte_agronotas([nota]),
+            fonte_ima([{"gta": "654321", "data": "2026-08-10",
+                        "quantidade": 20, "sentido": "saida"}]),
+            fonte_banco([]), None, date(2026, 8, 11),
+        )
+        candidato = plano["vinculos_nf_gta"][0]
+        self.assertEqual(candidato["classificacao"], "provavel")
+        self.assertEqual(candidato["criterio"], "data_e_quantidade_exatas_sem_gta")
+        self.assertFalse(candidato["confirmado"])
+        self.assertIn("vinculos_nf_gta_provaveis_exigem_confirmacao", plano["pendencias"])
+
+    def test_duas_notas_disputando_mesma_gta_ficam_ambiguas(self):
+        notas = [
+            {"linha": i, "nf": str(120 + i), "gtas": [], "data": "2026-08-10",
+             "valor": None, "quantidade": Decimal("65.00"), "registro_id": f"nota-{i}"}
+            for i in (2, 3)
+        ]
+        plano = gerar_plano(
+            fonte_agronotas(notas),
+            fonte_ima([{"gta": "654321", "data": "2026-08-10",
+                        "quantidade": 65, "sentido": "saida"}]),
+            fonte_banco([]), None, date(2026, 8, 11),
+        )
+        self.assertEqual(plano["resumo"]["vinculos_nf_gta"], {"ambiguo": 2})
+        self.assertTrue(all(not item["confirmado"] for item in plano["vinculos_nf_gta"]))
+        self.assertIn("referencias_ambiguas_preservadas_sem_vinculo", plano["pendencias"])
+
+    def test_documento_anterior_ao_periodo_ima_nao_infla_pendencias(self):
+        notas = [
+            {"linha": 2, "nf": "100", "gtas": ["111111"],
+             "data": "2026-07-20", "valor": None, "quantidade": None},
+            {"linha": 3, "nf": "101", "gtas": [],
+             "data": "2026-08-10", "valor": None, "quantidade": None},
+        ]
+        plano = gerar_plano(
+            fonte_agronotas(notas), fonte_ima([]), fonte_banco([]), None,
+            date(2026, 8, 11),
+        )
+        self.assertEqual(plano["resumo"]["vinculos_nf_gta"], {
+            "fora_periodo_ima": 1,
+            "pendente": 1,
+        })
+        historico, pendente = plano["vinculos_nf_gta"]
+        self.assertEqual(historico["criterio"], "documento_fora_do_periodo_ima")
+        self.assertEqual(historico["data_nf"], "2026-07-20")
+        self.assertEqual(pendente["criterio"], "gta_ausente_na_nf")
+        self.assertIn("nfs_ou_gtas_sem_correspondencia_exigem_revisao",
+                      plano["pendencias"])
+
     def test_plano_id_e_deterministico(self):
         nota = {"linha": 2, "nf": "123", "gtas": [], "data": None,
                 "valor": None, "quantidade": None}
@@ -113,7 +170,9 @@ class ConciliarDocumentosOperacionaisTest(unittest.TestCase):
                     '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
                     f'<sheetData>{xml_linhas}</sheetData></worksheet>')
             resultado = ler_agronotas(caminho, "Notas")
-        self.assertEqual(len(resultado["registros"]), 1)
+            self.assertEqual(len(resultado["registros"]), 1)
+            self.assertEqual(resultado["registros"][0]["fonte_arquivo"], "notas.xlsx")
+            self.assertEqual(len(resultado["registros"][0]["registro_id"]), 12)
         self.assertEqual(resultado["registros"][0]["gtas"], ["654321"])
         self.assertEqual(resultado["registros"][0]["valor"], Decimal("1500.00"))
 
@@ -150,6 +209,105 @@ class ConciliarDocumentosOperacionaisTest(unittest.TestCase):
         self.assertEqual(resultado["ignorados_nao_pecuarios"], 1)
         self.assertEqual(resultado["registros"][0]["nf"], None)
         self.assertEqual(resultado["registros"][0]["gtas"], ["654321"])
+
+    def test_insumo_com_palavra_boi_ou_gado_nao_exige_gta(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            caminho = Path(pasta) / "documentos.json"
+            caminho.write_text(json.dumps([
+                {"numero": "100", "dataEmissao": "2026-08-10",
+                 "valorTotal": "100", "descricao": "suplemento para boi e gado"},
+                {"numero": "101", "dataEmissao": "2026-08-10",
+                 "valorTotal": "200", "descricao": "20 bovinos"},
+            ]), encoding="utf-8")
+            resultado = ler_agronotas(caminho)
+        self.assertEqual(resultado["ignorados_nao_pecuarios"], 1)
+        self.assertEqual(len(resultado["registros"]), 1)
+        self.assertEqual(resultado["registros"][0]["nf"], "101")
+
+    def test_combina_exportacoes_agronotas_sem_duplicar_documento(self):
+        item = {"linha": 2, "nf": "123", "gtas": ["654321"],
+                "data": "2026-08-10", "valor": Decimal("1200.00"),
+                "quantidade": Decimal("20.00")}
+        antiga = fonte_agronotas([item])
+        antiga["arquivo"] = "historico.xlsx"
+        nova = fonte_agronotas([{**item, "linha": 1}])
+        nova["arquivo"] = "atualizacao.json"
+        combinada = combinar_agronotas([antiga, nova])
+        self.assertEqual(len(combinada["registros"]), 1)
+        self.assertEqual(combinada["duplicados"], 1)
+        self.assertEqual(combinada["arquivos"], ["historico.xlsx", "atualizacao.json"])
+
+    def test_combina_extratos_e_remove_sobreposicao_por_fitid(self):
+        primeiro = fonte_banco([
+            {"fitid_hash": "id-a", "data": "2026-08-10", "valor": Decimal("-10")},
+        ])
+        segundo = fonte_banco([
+            {"fitid_hash": "id-a", "data": "2026-08-10", "valor": Decimal("-10")},
+            {"fitid_hash": "id-b", "data": "2026-08-11", "valor": Decimal("20")},
+        ])
+        segundo["arquivo"] = "outra-conta.ofx"
+        combinado = combinar_extratos([primeiro, segundo])
+        self.assertEqual(len(combinado["transacoes"]), 2)
+        self.assertEqual(combinado["duplicados_ignorados"], 1)
+        self.assertEqual(combinado["arquivos"], ["extrato.ofx", "outra-conta.ofx"])
+
+    def test_consulta_atual_sem_documento_no_dia_nao_gera_falso_atraso(self):
+        agronotas = fonte_agronotas([{
+            "linha": 2, "nf": "123", "gtas": [], "data": "2026-08-06",
+            "valor": None, "quantidade": None,
+        }])
+        agronotas["consultado_ate"] = "2026-08-12"
+        ima = fonte_ima([])
+        ima["periodo_final"] = "2026-08-12"
+        plano = gerar_plano(agronotas, ima, fonte_banco([
+            {"fitid_hash": "id-a", "data": "2026-08-12", "valor": Decimal("1")},
+        ]), None, date(2026, 8, 12))
+        self.assertNotIn("agronotas_nao_consultado_ate_data_de_referencia",
+                         plano["pendencias"])
+        self.assertEqual(plano["fontes"]["agronotas"]["data_final"], "2026-08-06")
+        self.assertEqual(plano["fontes"]["agronotas"]["consultado_ate"], "2026-08-12")
+
+    def test_le_json_da_api_com_campos_em_camel_case(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            caminho = Path(pasta) / "notas.json"
+            caminho.write_text(
+                '[{"numero":"900","dataEmissao":"2026-08-06",'
+                '"valorTotal":"1500.00","quantidade":"25",'
+                '"observacao":"GTA MG U 654321"}]', encoding="utf-8"
+            )
+            resultado = ler_agronotas(caminho)
+        self.assertEqual(resultado["registros"][0]["data"], "2026-08-06")
+        self.assertEqual(resultado["registros"][0]["valor"], Decimal("1500.00"))
+
+    def test_reconhece_codigos_de_negocio_das_planilhas_operacionais(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            caminho = Path(pasta) / "negocios.csv"
+            caminho.write_text(
+                "negocio_id;numero_gta;numero_nf\n"
+                "NEG-26-001;654321;900\n",
+                encoding="utf-8",
+            )
+            resultado = ler_negocios(caminho)
+        self.assertEqual(resultado["registros"][0]["codigo"], "NEG-26-001")
+        self.assertEqual(resultado["registros"][0]["gtas"], ["654321"])
+        self.assertEqual(resultado["registros"][0]["nfs"], ["900"])
+        self.assertEqual(resultado["codigos_unicos"], 1)
+        self.assertEqual(resultado["codigos_operacionais"], 1)
+        self.assertEqual(resultado["contextos_agregadores"], 0)
+
+    def test_contexto_agregador_nao_e_contado_como_negocio_operacional(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            caminho = Path(pasta) / "negocios.csv"
+            caminho.write_text(
+                "negocio_id;numero_gta\n"
+                "FAZENDA;654321\n"
+                "CF-26-009;654322\n",
+                encoding="utf-8",
+            )
+            resultado = ler_negocios(caminho)
+        self.assertEqual(resultado["codigos_unicos"], 2)
+        self.assertEqual(resultado["codigos_operacionais"], 1)
+        self.assertEqual(resultado["contextos_agregadores"], 1)
 
 
 if __name__ == "__main__":

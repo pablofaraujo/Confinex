@@ -81,6 +81,23 @@ class ClarezaInterfaceConfinexTests(unittest.TestCase):
         self.assertIn("if (!cloudReadyRef.current) return", self.fonte)
         self.assertIn("if (!url || !cloudReadyRef.current) return", self.fonte)
 
+    def test_bases_de_confinamento_sao_sincronizadas_entre_aparelhos(self):
+        for texto in (
+            'from "./js/confinex-bases-online.mjs"',
+            "listarBasesOnline",
+            "salvarBaseOnline",
+            "apagarBaseOnline",
+            "mesclarBasesConfinamento",
+            "Sincronizar bases",
+            "Entre no ecossistema neste aparelho",
+            'href: "./index.html"',
+            "Entrar pela Visão Geral",
+        ):
+            self.assertIn(texto, self.fonte)
+        self.assertIn("useEffect(() => {", self.fonte)
+        self.assertIn("await carregarBasesOnline({ mostrarStatus: true })", self.fonte)
+        self.assertIn("await salvarBaseNaNuvem(novo)", self.fonte)
+
     def test_resumo_prioriza_rentabilidade_bruta_e_mantem_liquido_complementar(self):
         for texto in (
             'children: "Lucro l\\xEDquido"',
@@ -143,6 +160,13 @@ class ClarezaInterfaceConfinexTests(unittest.TestCase):
         self.assertNotIn("<=240", pacote_movel)
         self.assertIn("60 e 150 dias", pacote_movel)
         self.assertIn("max:240", pacote_movel)  # O limite do cenário não foi alterado.
+
+    def test_bundles_nao_importam_fonte_externa_adicional(self):
+        pacote_movel = (ROOT / "confinex-app.mobile.js").read_text(encoding="utf-8")
+        for pacote in (self.fonte, pacote_movel):
+            self.assertNotIn("fonts.googleapis.com", pacote)
+            self.assertNotIn("fonts.gstatic.com", pacote)
+            self.assertIn("font-family:var(--font)", pacote)
 
     def test_comparativo_explica_limite_vp_e_revenda_equivalente(self):
         for texto in (

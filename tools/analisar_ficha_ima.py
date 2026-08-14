@@ -10,7 +10,7 @@ import json
 import re
 import shutil
 import subprocess
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -43,7 +43,56 @@ def extrair_texto_pdf(caminho: Path, destino: Path) -> str:
     return texto
 
 
-def ler_ficha(texto: str, sha256: str) -> dict[str, Any]:
+def detectar_gtas_canceladas_pdf(caminho: Path) -> set[str]:
+    """Detecta linhas de GTA riscadas no PDF, sem depender do texto extraído."""
+    try:
+        from pypdf import PdfReader
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "pypdf é necessário para conferir graficamente GTAs canceladas"
+        ) from exc
+
+    canceladas: set[str] = set()
+    for pagina in PdfReader(str(caminho)).pages:
+        textos: list[tuple[str, float, float]] = []
+        segmentos: list[tuple[float, float, float, float]] = []
+        caminho_atual: list[tuple[float, float]] = []
+
+        def visitar_texto(texto: str, _cm: Any, tm: Any, _fonte: Any, _tamanho: Any) -> None:
+            valor = " ".join(str(texto or "").split())
+            if re.fullmatch(r"\d{5,12}", valor):
+                textos.append((valor, float(tm[4]), float(tm[5])))
+
+        def visitar_operador(operador: bytes, argumentos: Any, _cm: Any, _tm: Any) -> None:
+            nonlocal caminho_atual
+            if operador == b"m":
+                caminho_atual = [(float(argumentos[0]), float(argumentos[1]))]
+            elif operador == b"l" and caminho_atual:
+                caminho_atual.append((float(argumentos[0]), float(argumentos[1])))
+            elif operador in (b"S", b"s"):
+                if len(caminho_atual) >= 2:
+                    x1, y1 = caminho_atual[0]
+                    x2, y2 = caminho_atual[-1]
+                    segmentos.append((x1, y1, x2, y2))
+                caminho_atual = []
+
+        pagina.extract_text(
+            visitor_text=visitar_texto,
+            visitor_operand_before=visitar_operador,
+        )
+        riscos = [
+            (x1, y1, x2, y2)
+            for x1, y1, x2, y2 in segmentos
+            if abs(y2 - y1) <= 2 and 70 <= abs(x2 - x1) <= 300
+            and max(x1, x2) >= 250
+        ]
+        for numero, x, y in textos:
+            if x <= 160 and any(abs(y - y1) <= 6 for _x1, y1, _x2, _y2 in riscos):
+                canceladas.add(numero)
+    return canceladas
+
+
+def ler_ficha(texto: str, sha256: str, gtas_canceladas: set[str] | None = None) -> dict[str, Any]:
     periodo = re.search(
         r"Período de\s+(\d{2}/\d{2}/\d{4})\s+a\s+(\d{2}/\d{2}/\d{4})",
         texto,
@@ -58,6 +107,7 @@ def ler_ficha(texto: str, sha256: str) -> dict[str, Any]:
         raise ValueError("seção de GTAs bovinas não encontrada")
     trecho = texto[inicio_bovinos:fim_bovinos if fim_bovinos >= 0 else None]
 
+    canceladas = {normalizar_numero(item) for item in (gtas_canceladas or set())}
     sentido = None
     movimentos = []
     for linha in trecho.splitlines():
@@ -73,7 +123,7 @@ def ler_ficha(texto: str, sha256: str) -> dict[str, Any]:
                 r"BOVINO\s+(\d+)\s+\w+\s+(\d{2}/\d{2}/\d{2}).*?\s(\d+)\s*$",
                 limpa,
             )
-            if encontrado:
+            if encontrado and encontrado.group(1) not in canceladas:
                 movimentos.append({
                     "gta": encontrado.group(1),
                     "data": datetime.strptime(encontrado.group(2), "%d/%m/%y").date().isoformat(),
@@ -89,6 +139,68 @@ def ler_ficha(texto: str, sha256: str) -> dict[str, Any]:
         "periodo_final": datetime.strptime(periodo.group(2), "%d/%m/%Y").date().isoformat(),
         "saldo_rebanho": int(total.group(1)),
         "movimentos": movimentos,
+        "gtas_canceladas": sorted(canceladas),
+    }
+
+
+def carregar_ficha_pdf(caminho: Path, destino_texto: Path) -> dict[str, Any]:
+    texto = extrair_texto_pdf(caminho, destino_texto)
+    canceladas = detectar_gtas_canceladas_pdf(caminho)
+    return ler_ficha(
+        texto,
+        hashlib.sha256(caminho.read_bytes()).hexdigest(),
+        canceladas,
+    )
+
+
+def combinar_fichas(fichas: list[dict[str, Any]]) -> dict[str, Any]:
+    if not fichas:
+        raise ValueError("nenhuma ficha IMA informada")
+    ordenadas = sorted(fichas, key=lambda item: item["periodo_inicial"])
+    canceladas = {
+        normalizar_numero(gta)
+        for ficha in ordenadas
+        for gta in ficha.get("gtas_canceladas", [])
+        if normalizar_numero(gta)
+    }
+    movimentos: list[dict[str, Any]] = []
+    vistos: set[tuple[Any, ...]] = set()
+    duplicados = 0
+    for ficha in ordenadas:
+        for item in ficha["movimentos"]:
+            if normalizar_numero(item.get("gta")) in canceladas:
+                continue
+            chave = (item["gta"], item["data"], item["quantidade"], item["sentido"])
+            if chave in vistos:
+                duplicados += 1
+                continue
+            vistos.add(chave)
+            movimentos.append(item)
+    mais_recente = max(
+        enumerate(ordenadas),
+        key=lambda par: (par[1]["periodo_final"], par[0]),
+    )[1]
+    lacunas = []
+    fim_coberto = date.fromisoformat(ordenadas[0]["periodo_final"])
+    for ficha in ordenadas[1:]:
+        inicio = date.fromisoformat(ficha["periodo_inicial"])
+        if inicio > fim_coberto + timedelta(days=1):
+            lacunas.append({
+                "inicio": (fim_coberto + timedelta(days=1)).isoformat(),
+                "fim": (inicio - timedelta(days=1)).isoformat(),
+            })
+        fim_coberto = max(fim_coberto, date.fromisoformat(ficha["periodo_final"]))
+    hashes = [item["sha256"] for item in ordenadas]
+    return {
+        "sha256": hashlib.sha256("|".join(hashes).encode()).hexdigest(),
+        "arquivos_sha256": hashes,
+        "periodo_inicial": min(item["periodo_inicial"] for item in ordenadas),
+        "periodo_final": max(item["periodo_final"] for item in ordenadas),
+        "saldo_rebanho": mais_recente["saldo_rebanho"],
+        "movimentos": movimentos,
+        "gtas_canceladas": sorted(canceladas),
+        "movimentos_duplicados_ignorados": duplicados,
+        "lacunas_periodo": lacunas,
     }
 
 
@@ -140,6 +252,8 @@ def gerar_plano(
             "animais_saida": animais_por_sentido["saida"],
             "animais_entrada": animais_por_sentido["entrada"],
             "saldo_movimentos": animais_por_sentido["entrada"] - animais_por_sentido["saida"],
+            "gtas_canceladas": len(ficha.get("gtas_canceladas", [])),
+            "movimentos_duplicados_ignorados": ficha.get("movimentos_duplicados_ignorados", 0),
         },
         "cruzamento": {
             "presentes_em_gtas": len(ids_ficha & conjuntos["gtas"]),
@@ -161,6 +275,8 @@ def gerar_plano(
     }
     if ficha["periodo_final"] != referencia.isoformat():
         plano["pendencias"].append("ficha_ima_nao_chega_a_data_de_referencia")
+    if ficha.get("lacunas_periodo"):
+        plano["pendencias"].append("fichas_ima_possuem_lacuna_de_periodo")
     if plano["cruzamento"]["sem_qualquer_vinculo"]:
         plano["pendencias"].append("gtas_ima_sem_vinculo_exigem_revisao")
     if saldo_ledger is None or int(saldo_ledger) != ficha["saldo_rebanho"]:
@@ -184,6 +300,8 @@ modo de leitura. Nenhuma escrita foi executada.
 - saldo informado pelo IMA: **{ficha['saldo_rebanho']} animais**;
 - {ficha['gtas_saida']} GTAs de saída, com {ficha['animais_saida']} animais;
 - {ficha['gtas_entrada']} GTAs de entrada, com {ficha['animais_entrada']} animais;
+- {ficha.get('gtas_canceladas', 0)} GTAs canceladas foram excluídas pela marcação gráfica;
+- {ficha.get('movimentos_duplicados_ignorados', 0)} movimentos sobrepostos foram deduplicados;
 - saldo líquido das movimentações do período: {ficha['saldo_movimentos']} animais;
 - {cruzamento['presentes_em_alguma_fonte']} das {ficha['gtas']} GTAs aparecem em alguma fonte central;
 - **{cruzamento['sem_qualquer_vinculo']} GTAs permanecem sem vínculo**;
@@ -207,7 +325,7 @@ def carregar_lista(caminho: Path) -> list[dict[str, Any]]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     origem = parser.add_mutually_exclusive_group(required=True)
-    origem.add_argument("--pdf", type=Path)
+    origem.add_argument("--pdf", type=Path, action="append")
     origem.add_argument("--texto-extraido", type=Path)
     parser.add_argument("--gtas", required=True, type=Path)
     parser.add_argument("--entradas", required=True, type=Path)
@@ -219,18 +337,21 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.pdf:
-        temporario = args.saida_json.with_suffix(".txt.tmp")
-        try:
-            texto = extrair_texto_pdf(args.pdf, temporario)
-        finally:
-            temporario.unlink(missing_ok=True)
-        sha256 = hashlib.sha256(args.pdf.read_bytes()).hexdigest()
+        fichas = []
+        for indice, caminho in enumerate(args.pdf, start=1):
+            temporario = args.saida_json.with_suffix(f".{indice}.txt.tmp")
+            try:
+                fichas.append(carregar_ficha_pdf(caminho, temporario))
+            finally:
+                temporario.unlink(missing_ok=True)
+        ficha = combinar_fichas(fichas)
     else:
         texto = args.texto_extraido.read_text(encoding="utf-8", errors="replace")
         sha256 = hashlib.sha256(texto.encode()).hexdigest()
+        ficha = ler_ficha(texto, sha256)
 
     plano = gerar_plano(
-        ler_ficha(texto, sha256),
+        ficha,
         carregar_lista(args.gtas),
         carregar_lista(args.entradas),
         carregar_lista(args.fiscal),

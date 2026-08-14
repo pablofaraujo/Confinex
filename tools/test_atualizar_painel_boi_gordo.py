@@ -8,6 +8,7 @@ from atualizar_painel_boi_gordo import atualizar, validar
 
 
 BASE = {"atualizadoEm": "2026-07-24 06:32", "fonte": "teste", "indicadores": [{}], "curvaBGI": [{}]}
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class AtualizadorPainelTest(unittest.TestCase):
@@ -27,7 +28,13 @@ class AtualizadorPainelTest(unittest.TestCase):
                     atualizar("https://fonte.invalid", destino)
             self.assertEqual(json.loads(destino.read_text(encoding="utf-8")), BASE)
 
+    def test_agendamento_nao_finge_atualizacao_sem_fonte(self):
+        workflow = (ROOT / ".github" / "workflows" / "atualizar-painel-boi-gordo.yml").read_text(encoding="utf-8")
+        self.assertIn("bloqueado: PAINEL_BOI_GORDO_SOURCE_URL não configurada", workflow)
+        self.assertIn("::error::Painel não atualizado", workflow)
+        self.assertNotIn("não testado: PAINEL_BOI_GORDO_SOURCE_URL", workflow)
+        self.assertIn("timeout-minutes: 5", workflow)
+
 
 if __name__ == "__main__":
     unittest.main()
-
