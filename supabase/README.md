@@ -26,6 +26,15 @@ há políticas de `insert`, `update` ou `delete`.
 
 O Google Sheets permanece como compatibilidade temporária. A estimativa original submetida é imutável; mudanças completas de premissas e resultado usam `revisar_estimativa_confinex`, enquanto mudanças rotineiras do prazo operacional usam `ajustar_prazo_confinex`. Ambas exigem motivo. Agentes e integrações externas não devem chamar `iniciar_negocio_confinex`: devem submeter para aprovação.
 
+## Consolidação privada — staging antes da promoção
+
+`migrations/202608130001_staging_consolidacao_privada.sql` cria somente a
+estrutura de entrada e revisão das planilhas, OFX, Telegram, IMA, AgroNota e
+Wey. A importação é idempotente por hash da fonte, chave de rastreio e
+`conta + FITID`. Candidatos confirmados continuam sem efeito operacional:
+qualquer promoção para compras, vendas, banco ou fluxo de caixa exige um fluxo
+separado, confirmação explícita e reconciliação antes/depois.
+
 Negócios cancelados continuam no banco para auditoria, mas as páginas operacionais os excluem das listas.
 
 ## Bases do simulador — migração aplicada
