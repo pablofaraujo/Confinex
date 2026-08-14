@@ -70,6 +70,14 @@ class VerificarWacliContinuoTest(unittest.TestCase):
         self.assertIn("sync --once", fonte)
         self.assertIn("sincronizar_wacli_com_retry.sh", unidade)
 
+    def test_retomada_espera_store_livre(self):
+        raiz = Path(__file__).parents[1]
+        fonte = (raiz / "tools/retomar_wacli_continuo.sh").read_text()
+        unidade = (raiz / "infra/systemd/wey-whatsapp-automation.service").read_text()
+        self.assertIn('d.get("lock_held")', fonte)
+        self.assertIn("systemctl reset-failed", fonte)
+        self.assertIn("retomar_wacli_continuo.sh", unidade)
+
 
 if __name__ == "__main__":
     unittest.main()

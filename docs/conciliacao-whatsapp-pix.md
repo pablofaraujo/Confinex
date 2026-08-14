@@ -74,6 +74,9 @@ grava um relatório privado com perguntas prontas. O timer simples
 pelo mesmo store.
 Falhas transitórias de abertura da conexão, inclusive respostas HTTP 502, têm
 até três tentativas espaçadas antes de a janela ser marcada como falha.
+A retomada aguarda explicitamente o bloqueio do store ser liberado antes de
+iniciar o processo contínuo, evitando concorrência residual no encerramento do
+backfill.
 
 Uma busca vazia não prova que a mensagem não existe. Antes de classificar um
 valor como ausente, confira `wacli history coverage` na conversa candidata. Se
