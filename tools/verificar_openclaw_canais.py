@@ -13,9 +13,11 @@ import argparse
 import concurrent.futures
 import json
 import os
+import socket
 import shutil
 import subprocess
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
@@ -127,6 +129,44 @@ def validar_canais(payload: Any) -> list[str]:
     return falhas
 
 
+def validar_confinex(ambiente: dict[str, str] | None = None) -> list[str]:
+    """Confirma DNS, TLS e uma leitura autenticada mínima no Supabase."""
+    env = ambiente or os.environ
+    base_url = str(env.get("CONFINEX_DB_URL") or "").rstrip("/")
+    chave = str(env.get("CONFINEX_DB_KEY") or "")
+    if not base_url or not chave:
+        return ["confinex_config_indisponivel"]
+    host = urllib.parse.urlparse(base_url).hostname
+    if not host:
+        return ["confinex_url_invalida"]
+    try:
+        socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
+    except socket.gaierror:
+        return ["confinex_dns_indisponivel"]
+
+    requisicao = urllib.request.Request(
+        f"{base_url}/rest/v1/operacoes?select=id&limit=1",
+        headers={
+            "apikey": chave,
+            "Authorization": f"Bearer {chave}",
+            "Accept": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(requisicao, timeout=20) as resposta:
+            if 200 <= resposta.status < 300:
+                return []
+            return [f"confinex_rest_http_{resposta.status}"]
+    except urllib.error.HTTPError as exc:
+        return [f"confinex_rest_http_{exc.code}"]
+    except urllib.error.URLError as exc:
+        if isinstance(exc.reason, socket.gaierror):
+            return ["confinex_dns_indisponivel"]
+        return ["confinex_rest_indisponivel"]
+    except (TimeoutError, OSError):
+        return ["confinex_rest_indisponivel"]
+
+
 def ids_grupos(payload: Any) -> set[str] | None:
     if isinstance(payload, list):
         itens = payload
@@ -169,6 +209,8 @@ def diagnosticar(args: argparse.Namespace) -> list[str]:
 
     if executar(["openclaw", "config", "validate"], timeout=60).codigo != 0:
         falhas.append("validacao_config_falhou")
+
+    falhas.extend(validar_confinex())
 
     agentes = json_comando(["openclaw", "agents", "list", "--bindings", "--json"])
     falhas.extend(validar_agentes(agentes))
@@ -232,7 +274,7 @@ def reparar(args: argparse.Namespace, falhas: list[str]) -> list[str]:
 
     gatilhos_gateway = (
         "gateway_", "telegram_", "whatsapp_openclaw_", "probe_canais_",
-        "diretorio_grupos_", "grupo_telegram_", "token_gateway_",
+        "diretorio_grupos_", "grupo_telegram_", "token_gateway_", "confinex_",
     )
     if any(falha.startswith(gatilhos_gateway) for falha in falhas):
         if reiniciar(args.gateway_service, usuario=True):

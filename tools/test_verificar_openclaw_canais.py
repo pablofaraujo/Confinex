@@ -9,6 +9,7 @@ from tools.verificar_openclaw_canais import (
     ids_grupos,
     validar_agentes,
     validar_canais,
+    validar_confinex,
 )
 
 
@@ -63,6 +64,38 @@ class VerificarOpenClawCanaisTest(unittest.TestCase):
         encontrados = ids_grupos([{"id": "grupo-a"}, {"id": "grupo-b"}])
         self.assertEqual(esperados, encontrados)
 
+    @patch("tools.verificar_openclaw_canais.urllib.request.urlopen")
+    @patch("tools.verificar_openclaw_canais.socket.getaddrinfo")
+    def test_valida_leitura_autenticada_minima_do_confinex(self, dns, abrir):
+        dns.return_value = [(None, None, None, None, None)]
+        resposta = Mock(status=200)
+        resposta.__enter__ = Mock(return_value=resposta)
+        resposta.__exit__ = Mock(return_value=False)
+        abrir.return_value = resposta
+        falhas = validar_confinex({
+            "CONFINEX_DB_URL": "https://projeto.supabase.co",
+            "CONFINEX_DB_KEY": "segredo-de-teste",
+        })
+        self.assertEqual([], falhas)
+        requisicao = abrir.call_args.args[0]
+        self.assertEqual(
+            requisicao.full_url,
+            "https://projeto.supabase.co/rest/v1/operacoes?select=id&limit=1",
+        )
+
+    @patch("tools.verificar_openclaw_canais.socket.getaddrinfo")
+    def test_detecta_dns_do_confinex_indisponivel(self, dns):
+        import socket
+
+        dns.side_effect = socket.gaierror("falha simulada")
+        self.assertEqual(
+            ["confinex_dns_indisponivel"],
+            validar_confinex({
+                "CONFINEX_DB_URL": "https://projeto.supabase.co",
+                "CONFINEX_DB_KEY": "segredo-de-teste",
+            }),
+        )
+
     def test_saida_e_unidades_nao_enviam_mensagem_a_grupos(self):
         raiz = Path(__file__).parents[1]
         fonte = (raiz / "tools/verificar_openclaw_canais.py").read_text()
@@ -72,6 +105,7 @@ class VerificarOpenClawCanaisTest(unittest.TestCase):
         self.assertIn("--reparar", unidade)
         self.assertIn("XDG_RUNTIME_DIR=/run/user/0", unidade)
         self.assertIn("DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/0/bus", unidade)
+        self.assertIn("validar_confinex", fonte)
 
 
 if __name__ == "__main__":

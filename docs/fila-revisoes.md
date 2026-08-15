@@ -41,6 +41,13 @@ Desde 23/07/2026, `compra_documento_ocr.py` usa primeiro o canal OpenClaw/OpenAI
 
 O runtime do Juan mantém o sandbox em `workspace-write`, mas não interrompe esse comando local com pedido de autorização. Alterar essa política sem repetir os testes do agente pode fazer Juan voltar a perguntar antes de ler o documento.
 
+No contexto Boi Balança, fêmeas usam a regra operacional permanente: dividir o
+peso total de balança por dois, descontar 20 kg por cabeça, dividir o peso
+líquido por 15 para obter arrobas e multiplicar pelo preço informado. O extrato
+de conferência mostra todas essas etapas e não pergunta novamente pelo desconto,
+salvo quando o sexo não puder ser confirmado ou houver uma exceção expressa na
+mensagem.
+
 ### Teste operacional validado na VPS
 
 Arquivos reais recebidos pelo Telegram, um em foto e outro em PDF de duas páginas, confirmaram o seguinte comportamento, com os dados comerciais sensíveis omitidos deste repositório público:
