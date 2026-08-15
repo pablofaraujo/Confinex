@@ -524,8 +524,8 @@ async function auditarPagamentoConfinamento(browser, viewport, resultados) {
         .locator('input:not([readonly])').first();
       await campo.fill(String(valor));
     };
-    await preencher('Qtd Cabeças', 1);
-    await preencher('Custo do dinheiro (% a.m.)', 2);
+    await preencher('Cabeças', 1);
+    await preencher('Custo dinheiro (% a.m.)', 2);
     await page.getByRole('button', { name: 'Diária', exact: true }).click();
     await preencher('Custo diária (R$/cab/dia)', 100);
     await preencher('Ciclo (dias)', 90);
@@ -602,7 +602,7 @@ async function auditarPagamentoConfinamento(browser, viewport, resultados) {
       JSON.stringify(contratoComCustoTexto),
     ));
 
-    await preencher('Custo do dinheiro (% a.m.)', 0);
+    await preencher('Custo dinheiro (% a.m.)', 0);
     await page.getByRole('button', { name: /CALCULAR E COMPARAR/ }).click();
     const contratoSemCustoTexto = await lerContrato();
     const contratoSemCusto = Object.fromEntries(
@@ -620,10 +620,10 @@ async function auditarPagamentoConfinamento(browser, viewport, resultados) {
       contratoSemCustoOk,
       JSON.stringify(contratoSemCustoTexto),
     ));
-    await preencher('Custo do dinheiro (% a.m.)', 2);
+    await preencher('Custo dinheiro (% a.m.)', 2);
     await page.getByRole('button', { name: /CALCULAR E COMPARAR/ }).click();
 
-    await preencher('Qtd Cabeças', 65);
+    await preencher('Cabeças', 65);
     await preencher('Custo diária (R$/cab/dia)', 10);
     await page.getByRole('button', { name: 'Comparar as duas', exact: true }).click();
     await page.getByRole('button', { name: /CALCULAR E COMPARAR/ }).click();

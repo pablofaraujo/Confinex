@@ -55,6 +55,7 @@ body.has-shell .shell-content .app{padding:0 0 100px}
 .logo{font-family:var(--font);font-size:28px;font-weight:700;color:var(--text);letter-spacing:-.02em;line-height:1.2}
 .logo-sub{font-family:var(--font);font-size:var(--fs-13);color:var(--muted);letter-spacing:0;text-transform:none;margin-top:4px;font-weight:400;line-height:1.35}
 .sec{min-width:0;max-width:100%;background:${T.card};border:1px solid ${T.border};border-top:3px solid #F2C500;border-radius:14px;padding:22px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.sec.compacta{padding:14px 18px}
 .sec-t{font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:${T.accent};margin-bottom:18px;display:flex;align-items:center;gap:10px}
 .sec-t::after{content:'';flex:1;height:1px;background:${T.border}}
 .sec-t.nm::after{display:none}
@@ -66,6 +67,10 @@ body.has-shell .shell-content .app{padding:0 0 100px}
 @media(max-width:680px){.hdr{flex-direction:column;gap:14px}.hdr>div:last-child{margin-left:0!important;width:100%;flex-wrap:wrap}}
 @media(max-width:520px){.g2,.g3,.g4{grid-template-columns:1fr}.g2>.fld,.g3>.fld,.g4>.fld{grid-column:auto!important}.app{padding-left:8px;padding-right:8px}.sec{padding:18px}.logo{font-size:24px}}
 .fld{display:flex;min-width:0;flex-direction:column;gap:5px}
+.fld.compacto{gap:3px}
+.fld.compacto input,.fld.compacto select{padding:7px 10px}
+.fld.compacto .hint{line-height:1.25;margin-top:1px}
+.fld.sexo .lbl{text-align:center}
 .lbl{font-size:10px;font-weight:600;color:${T.label};letter-spacing:.5px;text-transform:uppercase}
 input,select{min-width:0;max-width:100%;background:${T.surface};border:1px solid ${T.border};border-radius:8px;color:${T.text};font-family:'DM Mono',monospace;font-size:13px;padding:9px 12px;width:100%;outline:none;transition:border-color .15s;box-shadow:0 1px 2px rgba(0,0,0,.04)}
 input:focus,select:focus{border-color:${T.accent};box-shadow:0 0 0 3px ${T.accentDim}}
@@ -77,15 +82,43 @@ select option{background:white}
 .tb{background:${T.surface};border:1.5px solid ${T.border};border-radius:8px;color:${T.label};cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:500;padding:7px 13px;transition:all .15s;line-height:1.2}
 .tb.on{background:${T.accentDim};border-color:${T.accent};color:${T.accent};font-weight:700}
 .tb:hover:not(.on){border-color:#BDC3CC;color:${T.text}}
-.sc-bar{display:flex;align-items:stretch;border-bottom:1px solid ${T.border};overflow-x:auto;gap:2px;padding:0 22px}
-.sc-tab{background:transparent;border:none;border-bottom:2.5px solid transparent;color:${T.muted};cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;padding:10px 14px;transition:all .15s;white-space:nowrap;display:flex;align-items:center;gap:5px;margin-bottom:-1px}
+.painel-retratil{margin:0}
+.painel-retratil>.painel-retratil-resumo{display:flex;align-items:center;gap:10px;list-style:none;cursor:pointer;color:${T.accent};font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase}
+.painel-retratil>.painel-retratil-resumo::-webkit-details-marker{display:none}
+.painel-retratil>.painel-retratil-resumo::after{content:'+';margin-left:auto;font-size:18px;line-height:1;color:${T.muted}}
+.painel-retratil[open]>.painel-retratil-resumo::after{content:'−'}
+.painel-retratil-subtitulo{font-size:10px;font-weight:400;letter-spacing:0;text-transform:none;color:${T.muted}}
+.painel-retratil-corpo{padding-top:16px}
+.form-com-aside{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,270px);gap:18px;align-items:start}
+.form-principal{display:grid;grid-template-columns:minmax(180px,1.4fr) minmax(190px,1fr) minmax(90px,.55fr) minmax(120px,.7fr);gap:12px;align-items:start}
+.form-aside{display:grid;gap:8px;padding-left:16px;border-left:1px solid ${T.border}}
+.grid-campos-compactos{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:start}
+.grid-capim{display:grid;grid-template-columns:minmax(250px,1.35fr) minmax(190px,1fr) minmax(250px,1fr);gap:12px;align-items:start}
+.metricas-compactas{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.metrica-compacta{min-width:0;background:${T.bg};border:1px solid ${T.border};border-radius:8px;padding:8px 10px}
+.metrica-compacta .lbl{display:block;margin-bottom:2px}
+.metrica-compacta strong{display:block;color:${T.accent};font-family:'DM Mono',monospace;font-size:14px;white-space:nowrap}
+.metrica-compacta .hint{line-height:1.2}
+.mercado-topo{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:10px}
+.mercado-topo .sec-t{flex:1;margin:0}
+.mercado-topo .tb{flex:0 0 auto}
+.grid-cotacoes-bgi{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px}
+@media(max-width:900px){.form-com-aside{grid-template-columns:1fr}.form-aside{grid-template-columns:1fr 1fr;padding-left:0;padding-top:12px;border-left:0;border-top:1px solid ${T.border}}.form-principal,.grid-campos-compactos{grid-template-columns:repeat(2,minmax(0,1fr))}.grid-capim{grid-template-columns:1fr 1fr}.metricas-compactas{grid-column:1/-1}}
+@media(max-width:520px){.form-principal,.form-aside,.grid-campos-compactos,.grid-capim,.metricas-compactas{grid-template-columns:1fr}.mercado-topo{align-items:stretch;flex-direction:column}.mercado-topo .tb{width:100%}.sc-move{min-width:28px;min-height:28px}.painel-retratil-subtitulo{display:none}}
+.sc-bar{display:flex;align-items:stretch;border-bottom:1px solid ${T.border};overflow-x:auto;gap:2px;padding:0 16px}
+.sc-tab{background:transparent;border:none;border-bottom:2.5px solid transparent;color:${T.muted};cursor:grab;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;padding:8px;transition:all .15s;white-space:nowrap;display:flex;align-items:center;gap:4px;margin-bottom:-1px}
 .sc-tab.on{border-bottom-color:var(--c);color:var(--c)}
 .sc-tab:hover:not(.on){color:${T.label}}
+.sc-tab:active{cursor:grabbing}
+.sc-drag{color:${T.muted};font-size:12px;letter-spacing:-2px;padding-right:2px}
+.sc-move{background:none;border:none;color:inherit;cursor:pointer;font-size:12px;line-height:1;padding:3px;opacity:.45}
+.sc-move:hover,.sc-move:focus{opacity:1}
+.sc-move:disabled{opacity:.12;cursor:default}
 .sc-del{background:none;border:none;color:${T.red};cursor:pointer;font-size:14px;opacity:.35;padding:0 2px;transition:opacity .15s}
 .sc-del:hover{opacity:1}
 .sc-add{background:none;border:1.5px dashed ${T.border};border-radius:8px;color:${T.muted};cursor:pointer;font-size:18px;padding:2px 12px;transition:all .15s;align-self:center;margin-left:4px;margin-bottom:4px;line-height:1.5}
 .sc-add:hover{border-color:${T.accent};color:${T.accent}}
-.sc-body{padding:22px}
+.sc-body{padding:16px 18px 20px}
 .warn{background:#FEF9EC;border:1px solid #F0D58C;border-radius:8px;color:#92640A;font-size:11px;padding:9px 13px;margin-top:10px}
 .ck{display:flex;align-items:center;gap:9px;cursor:pointer;user-select:none}
 .ck input[type=checkbox]{width:15px;height:15px;accent-color:${T.accent};cursor:pointer;flex-shrink:0}
@@ -1286,10 +1319,17 @@ function loadSavedState() {
     return fallback;
   }
 }
-function F({ label, hint, children, span }) {
-  return /* @__PURE__ */ jsxs("div", { className: "fld", style: span ? { gridColumn: `span ${span}` } : {}, children: [
+function F({ label, hint, children, span, className = "" }) {
+  return /* @__PURE__ */ jsxs("div", { className: `fld ${className}`.trim(), style: span ? { gridColumn: `span ${span}` } : {}, children: [
     /* @__PURE__ */ jsx("label", { className: "lbl", children: label }),
     children,
+    hint && /* @__PURE__ */ jsx("div", { className: "hint", children: hint })
+  ] });
+}
+function MetricaCompacta({ label, value, hint }) {
+  return /* @__PURE__ */ jsxs("div", { className: "metrica-compacta", children: [
+    /* @__PURE__ */ jsx("span", { className: "lbl", children: label }),
+    /* @__PURE__ */ jsx("strong", { children: value }),
     hint && /* @__PURE__ */ jsx("div", { className: "hint", children: hint })
   ] });
 }
@@ -2205,6 +2245,7 @@ function Confinex() {
   const [statusBasesOnline, setStatusBasesOnline] = useState("Procurando bases online...");
   const [versoesSalvas, setVersoesSalvas] = useState(carregarVersoesNomeadas);
   const [versaoSelecionada, setVersaoSelecionada] = useState("");
+  const cenarioArrastadoRef = useRef(null);
   const contratosB3Estudo = [...new Set([...cenarios.map(contratoB3DoCenario).filter(Boolean), ...contratosB3DaEvolucao(cenarios)])].sort(compararContratosB3);
   useEffect(() => {
     try {
@@ -2582,6 +2623,22 @@ function Confinex() {
     setScAtivo(Math.min(scAtivo, novo.length - 1));
     setResultados([]);
   };
+  const moverCenario = (origem, destino) => {
+    if (origem === destino || origem < 0 || destino < 0 || origem >= cenarios.length || destino >= cenarios.length) return;
+    const idAtivo = cenarios[scAtivo]?.id;
+    const novaOrdem = [...cenarios];
+    const [movido] = novaOrdem.splice(origem, 1);
+    novaOrdem.splice(destino, 0, movido);
+    setCenarios(novaOrdem);
+    setScAtivo(Math.max(0, novaOrdem.findIndex((cenario) => cenario.id === idAtivo)));
+    setResultados((anteriores) => {
+      if (!Array.isArray(anteriores) || anteriores.length !== cenarios.length) return [];
+      const novos = [...anteriores];
+      const [resultadoMovido] = novos.splice(origem, 1);
+      novos.splice(destino, 0, resultadoMovido);
+      return novos;
+    });
+  };
   const updSc = (i, k, v) => {
     setCenarios((p) => p.map((s, j) => {
       if (j !== i) return s;
@@ -2885,8 +2942,12 @@ function Confinex() {
           /* @__PURE__ */ jsx("div", { className: "logo-sub", children: "Avaliação e comparativo de confinamento" })
         ] })
       ] }),
-      /* @__PURE__ */ jsxs("div", { className: "sec", style: { padding: "14px 18px" }, children: [
-        /* @__PURE__ */ jsx("div", { className: "sec-t", children: "Arquivo do estudo" }),
+      /* @__PURE__ */ jsx("div", { className: "sec compacta", children: /* @__PURE__ */ jsxs("details", { className: "painel-retratil", children: [
+        /* @__PURE__ */ jsxs("summary", { className: "painel-retratil-resumo", children: [
+          /* @__PURE__ */ jsx("span", { children: "Arquivo do estudo" }),
+          /* @__PURE__ */ jsx("span", { className: "painel-retratil-subtitulo", children: "Importar, copiar e versionar" })
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "painel-retratil-corpo", children: [
         /* @__PURE__ */ jsxs("div", { className: "g4", children: [
           /* @__PURE__ */ jsx(F, { label: "Importar arquivo", children: /* @__PURE__ */ jsxs("label", { className: "tb", style: { display: "block", width: "100%", padding: "10px 13px", textAlign: "center", boxSizing: "border-box", cursor: "pointer" }, children: [
             "Importar estudo",
@@ -2920,17 +2981,14 @@ function Confinex() {
           ] }),
           /* @__PURE__ */ jsx("div", { className: "hint", style: { marginTop: 8 }, children: statusSheets })
         ] })
-      ] }),
+        ] })
+      ] }) }),
       /* @__PURE__ */ jsxs("div", { className: "sec", children: [
         /* @__PURE__ */ jsx("div", { className: "sec-t", children: "01 \u2014 Dados do Lote (base comum a todos os cen\xE1rios)" }),
-        /* @__PURE__ */ jsxs("div", { className: "g2", children: [
-          /* @__PURE__ */ jsx(F, { label: "C\xF3digo do neg\xF3cio", hint: "Obrigat\xF3rio ao iniciar. Ex.: CF-26-012", children: /* @__PURE__ */ jsx("input", { value: lote.codigoNegocio || "", placeholder: "CF-26-012", onChange: (e) => updLote("codigoNegocio", e.target.value.toUpperCase()) }) }),
-          /* @__PURE__ */ jsx(F, { label: "Grupo Telegram de origem", hint: "Use somente o nome do grupo; o identificador t\xE9cnico \xE9 tratado automaticamente", children: /* @__PURE__ */ jsx("input", { value: lote.grupoOrigemNome || "", placeholder: "Confinamento", onChange: (e) => updLote("grupoOrigemNome", e.target.value) }) })
-        ] }),
-        /* @__PURE__ */ jsx("div", { className: "dvdr" }),
-        /* @__PURE__ */ jsxs("div", { className: "g4", children: [
+        /* @__PURE__ */ jsxs("div", { className: "form-com-aside", children: [
+          /* @__PURE__ */ jsxs("div", { className: "form-principal", children: [
           /* @__PURE__ */ jsx(F, { label: "Origem", children: /* @__PURE__ */ jsx("input", { value: lote.origemNome, onChange: (e) => updLote("origemNome", e.target.value) }) }),
-          /* @__PURE__ */ jsx(F, { label: "Sexo", children: /* @__PURE__ */ jsx(
+          /* @__PURE__ */ jsx(F, { label: "Sexo", className: "sexo", children: /* @__PURE__ */ jsx(
             Tg,
             {
               opts: [{ v: "macho", l: "Macho" }, { v: "femea", l: "F\xEAmea" }],
@@ -2944,21 +3002,26 @@ function Confinex() {
               }
             }
           ) }),
-          /* @__PURE__ */ jsx(F, { label: "Qtd Cabe\xE7as", children: /* @__PURE__ */ jsx("input", { type: "number", value: lote.qtd, onChange: (e) => updLote("qtd", e.target.value) }) }),
-          /* @__PURE__ */ jsx(F, { label: "Peso M\xE9dio (kg)", children: /* @__PURE__ */ jsx("input", { type: "number", value: lote.pesoMedio, onChange: (e) => updLote("pesoMedio", e.target.value) }) })
+          /* @__PURE__ */ jsx(F, { label: "Cabe\xE7as", className: "compacto", children: /* @__PURE__ */ jsx("input", { type: "number", value: lote.qtd, onChange: (e) => updLote("qtd", e.target.value) }) }),
+          /* @__PURE__ */ jsx(F, { label: "Peso m\xE9dio (kg)", className: "compacto", children: /* @__PURE__ */ jsx("input", { type: "number", value: lote.pesoMedio, onChange: (e) => updLote("pesoMedio", e.target.value) }) })
+          ] }),
+          /* @__PURE__ */ jsxs("aside", { className: "form-aside", "aria-label": "Identifica\xE7\xE3o do neg\xF3cio", children: [
+            /* @__PURE__ */ jsx(F, { label: "C\xF3digo do neg\xF3cio", className: "compacto", hint: "Ex.: CF-26-012", children: /* @__PURE__ */ jsx("input", { value: lote.codigoNegocio || "", placeholder: "CF-26-012", onChange: (e) => updLote("codigoNegocio", e.target.value.toUpperCase()) }) }),
+            /* @__PURE__ */ jsx(F, { label: "Grupo Telegram", className: "compacto", hint: "Nome do grupo de origem", children: /* @__PURE__ */ jsx("input", { value: lote.grupoOrigemNome || "", placeholder: "Confinamento", onChange: (e) => updLote("grupoOrigemNome", e.target.value) }) })
+          ] })
         ] }),
         /* @__PURE__ */ jsx("div", { className: "dvdr" }),
-        /* @__PURE__ */ jsxs("div", { className: "g4", children: [
-          /* @__PURE__ */ jsx(F, { label: "Pre\xE7o de Compra (R$/@)", children: /* @__PURE__ */ jsx("input", { type: "number", value: lote.precoCompra, onChange: (e) => updLote("precoCompra", e.target.value) }) }),
-          /* @__PURE__ */ jsx(F, { label: "Prazo pag. compra (dias)", hint: "0 = \xE0 vista. Afeta capital imobilizado e rentabilidade", children: /* @__PURE__ */ jsx("input", { type: "number", value: lote.prazoPagtoCompra, onChange: (e) => updLote("prazoPagtoCompra", e.target.value) }) }),
-          /* @__PURE__ */ jsx(F, { label: "Custo do dinheiro (% a.m.)", hint: "Taxa de oportunidade mensal \u2014 padr\xE3o 2,0%", children: /* @__PURE__ */ jsx("input", { type: "number", step: ".1", value: lote.custoDinheiro, onChange: (e) => updLote("custoDinheiro", e.target.value) }) }),
-          /* @__PURE__ */ jsx(F, { label: "Custo Baldeio (R$ total)", hint: "Valor total da opera\xE7\xE3o \u2014 rateado por cabe\xE7a internamente", children: /* @__PURE__ */ jsx("input", { type: "number", value: lote.baldeio, onChange: (e) => updLote("baldeio", e.target.value) }) }),
+        /* @__PURE__ */ jsxs("div", { className: "grid-campos-compactos", children: [
+          /* @__PURE__ */ jsx(F, { label: "Pre\xE7o de compra (R$/@)", className: "compacto", children: /* @__PURE__ */ jsx("input", { type: "number", value: lote.precoCompra, onChange: (e) => updLote("precoCompra", e.target.value) }) }),
+          /* @__PURE__ */ jsx(F, { label: "Prazo compra (dias)", className: "compacto", hint: "0 = \xE0 vista; afeta a rentabilidade", children: /* @__PURE__ */ jsx("input", { type: "number", value: lote.prazoPagtoCompra, onChange: (e) => updLote("prazoPagtoCompra", e.target.value) }) }),
+          /* @__PURE__ */ jsx(F, { label: "Custo dinheiro (% a.m.)", className: "compacto", hint: "Taxa de oportunidade; padr\xE3o 2,0%", children: /* @__PURE__ */ jsx("input", { type: "number", step: ".1", value: lote.custoDinheiro, onChange: (e) => updLote("custoDinheiro", e.target.value) }) }),
+          /* @__PURE__ */ jsx(F, { label: "Baldeio (R$ total)", className: "compacto", hint: "Total rateado por cabe\xE7a", children: /* @__PURE__ */ jsx("input", { type: "number", value: lote.baldeio, onChange: (e) => updLote("baldeio", e.target.value) }) }),
           lote.sexo === "femea" && /* @__PURE__ */ jsx(F, { label: "Desconto bezerro (f\xEAmeas)", children: /* @__PURE__ */ jsx(Ck, { checked: lote.descBezerro, onChange: (v) => updLote("descBezerro", v), label: "10 kg l\xEDquido de bezerro" }) }),
           lote.sexo === "femea" && lote.descBezerro && /* @__PURE__ */ jsx(F, { label: "Peso m\xEDn. desc. bezerro (kg)", children: /* @__PURE__ */ jsx("input", { type: "number", value: lote.limBezerro, onChange: (e) => updLote("limBezerro", e.target.value) }) })
         ] }),
         /* @__PURE__ */ jsx("div", { className: "dvdr" }),
         /* @__PURE__ */ jsx("div", { className: "sec-t nm", style: { marginBottom: 14 }, children: "Desconto de Capim na Compra" }),
-        /* @__PURE__ */ jsxs("div", { className: "g4", children: [
+        /* @__PURE__ */ jsxs("div", { className: "grid-capim", children: [
           /* @__PURE__ */ jsx(
             F,
             {
@@ -2995,8 +3058,10 @@ function Confinex() {
               )
             }
           ),
-          /* @__PURE__ */ jsx(F, { label: "Arrobas calculadas / cab", hint: "Resultado do desconto de capim aplicado", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: fAt(arrobasPrev) }) }),
-          /* @__PURE__ */ jsx(F, { label: "Custo compra / cab", hint: "Arrobas \xD7 pre\xE7o + baldeio rateado", children: /* @__PURE__ */ jsx("input", { readOnly: true, value: fR(arrobasPrev * (parseFloat(lote.precoCompra) || 0) + (parseFloat(lote.baldeio) || 0) / (parseFloat(lote.qtd) || 1)) }) })
+          /* @__PURE__ */ jsxs("div", { className: "metricas-compactas", children: [
+            /* @__PURE__ */ jsx(MetricaCompacta, { label: "Arrobas / cab", value: fAt(arrobasPrev), hint: "Com desconto de capim" }),
+            /* @__PURE__ */ jsx(MetricaCompacta, { label: "Custo / cab", value: fR(arrobasPrev * (parseFloat(lote.precoCompra) || 0) + (parseFloat(lote.baldeio) || 0) / (parseFloat(lote.qtd) || 1)), hint: "Compra + baldeio" })
+          ] })
         ] }),
         lote.modoCapim === "10kg" && /* @__PURE__ */ jsxs("div", { className: "warn", style: { marginTop: 10 }, children: [
           "10kg fixo: para peso \u2265 ",
@@ -3012,13 +3077,13 @@ function Confinex() {
           " (divisor). Abaixo do limite: peso/2/15."
         ] })
       ] }),
-      /* @__PURE__ */ jsxs("div", { className: "sec", children: [
-        /* @__PURE__ */ jsx("div", { className: "sec-t", children: "Mercado BGI \u2014 curva de referência" }),
-        /* @__PURE__ */ jsxs("div", { className: "g2", style: { marginBottom: 16 }, children: [
-          /* @__PURE__ */ jsx(F, { label: "Atualização automática", hint: "Atualiza de uma vez todos os vencimentos usados no estudo sem substituir valores manuais.", children: /* @__PURE__ */ jsx("button", { className: "tb on", style: { width: "100%", padding: "10px 13px" }, onClick: atualizarMercadoB3, children: "Atualizar curva BGI" }) }),
-          /* @__PURE__ */ jsx(F, { label: "Escolha do vencimento", hint: "O vencimento de cada cenário é escolhido na seção do próprio cenário.", children: /* @__PURE__ */ jsx("div", { className: "hint", style: { paddingTop: 10 }, children: "Uma cotação por contrato é compartilhada por todos os negócios." }) })
+      /* @__PURE__ */ jsxs("div", { className: "sec compacta", children: [
+        /* @__PURE__ */ jsxs("div", { className: "mercado-topo", children: [
+          /* @__PURE__ */ jsx("div", { className: "sec-t", children: "Mercado BGI \u2014 curva de referência" }),
+          /* @__PURE__ */ jsx("button", { className: "tb on", onClick: atualizarMercadoB3, children: "Atualizar curva BGI" })
         ] }),
-        /* @__PURE__ */ jsxs("div", { className: "g4", children: [
+        /* @__PURE__ */ jsx("div", { className: "hint", style: { marginBottom: 10 }, children: "A cotação de cada contrato é compartilhada; o vencimento é escolhido dentro do cenário." }),
+        /* @__PURE__ */ jsxs("div", { className: "grid-cotacoes-bgi", children: [
           contratosB3Estudo.map((contrato) => {
             const registro = lote.cotacoesB3?.[contrato];
             const manual = registro?.modo === "manual";
@@ -3033,13 +3098,32 @@ function Confinex() {
         lote.cotacoesB3AtualizadasEm && /* @__PURE__ */ jsx("div", { className: "hint", style: { marginTop: 4 }, children: `Última alteração conjunta: ${(/* @__PURE__ */ new Date(lote.cotacoesB3AtualizadasEm)).toLocaleString("pt-BR")}` })
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "sec", style: { padding: 0 }, children: [
-        /* @__PURE__ */ jsx("div", { style: { padding: "18px 22px 0" }, children: /* @__PURE__ */ jsx("div", { className: "sec-t", children: "02 \u2014 Cen\xE1rios (at\xE9 5)" }) }),
-        /* @__PURE__ */ jsxs("div", { className: "sc-bar", children: [
+        /* @__PURE__ */ jsx("div", { style: { padding: "14px 18px 0" }, children: /* @__PURE__ */ jsx("div", { className: "sec-t", style: { marginBottom: 10 }, children: "02 \u2014 Cen\xE1rios (at\xE9 5)" }) }),
+        /* @__PURE__ */ jsxs("div", { className: "sc-bar", role: "tablist", "aria-label": "Cen\xE1rios do estudo", children: [
           cenarios.map((sc, i) => /* @__PURE__ */ jsxs(
             "div",
             {
               className: `sc-tab ${scAtivo === i ? "on" : ""}`,
               style: { "--c": T.sc[i] },
+              draggable: true,
+              onDragStart: (e) => {
+                cenarioArrastadoRef.current = i;
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("text/plain", String(i));
+              },
+              onDragOver: (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+              },
+              onDrop: (e) => {
+                e.preventDefault();
+                const origem = cenarioArrastadoRef.current ?? parseInt(e.dataTransfer.getData("text/plain"), 10);
+                moverCenario(origem, i);
+                cenarioArrastadoRef.current = null;
+              },
+              onDragEnd: () => {
+                cenarioArrastadoRef.current = null;
+              },
               onClick: () => setScAtivo(i),
               onKeyDown: (e) => {
                 if (e.key === "Enter" || e.key === " ") {
@@ -3047,10 +3131,20 @@ function Confinex() {
                   setScAtivo(i);
                 }
               },
-              role: "button",
+              role: "tab",
+              "aria-selected": scAtivo === i,
               tabIndex: 0,
               children: [
+                /* @__PURE__ */ jsx("span", { className: "sc-drag", "aria-hidden": "true", children: "\u22EE\u22EE" }),
+                cenarios.length > 1 && /* @__PURE__ */ jsx("button", { className: "sc-move", disabled: i === 0, title: "Mover cen\xE1rio para a esquerda", "aria-label": `Mover ${sc.nome} para a esquerda`, onClick: (e) => {
+                  e.stopPropagation();
+                  moverCenario(i, i - 1);
+                }, children: "\u2190" }),
                 /* @__PURE__ */ jsx("span", { style: { maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis" }, children: sc.nome }),
+                cenarios.length > 1 && /* @__PURE__ */ jsx("button", { className: "sc-move", disabled: i === cenarios.length - 1, title: "Mover cen\xE1rio para a direita", "aria-label": `Mover ${sc.nome} para a direita`, onClick: (e) => {
+                  e.stopPropagation();
+                  moverCenario(i, i + 1);
+                }, children: "\u2192" }),
                 cenarios.length > 1 && /* @__PURE__ */ jsx("button", { className: "sc-del", onClick: (e) => {
                   e.stopPropagation();
                   delSc(i);

@@ -41,6 +41,49 @@ class ClarezaInterfaceConfinexTests(unittest.TestCase):
             self.assertIn(texto, self.fonte)
         self.assertNotIn("Salvar JSON", self.fonte)
 
+    def test_arquivo_do_estudo_inicia_recolhido(self):
+        inicio = self.fonte.index('className: "sec compacta", children: /* @__PURE__ */ jsxs("details", { className: "painel-retratil"')
+        fim = self.fonte.index('01 \\u2014 Dados do Lote', inicio)
+        trecho = self.fonte[inicio:fim]
+        self.assertIn("painel-retratil-resumo", trecho)
+        self.assertIn("painel-retratil-corpo", trecho)
+        self.assertNotIn("open: true", trecho)
+
+    def test_dados_do_lote_usam_layout_compacto(self):
+        for texto in (
+            'className: "form-com-aside"',
+            'className: "form-principal"',
+            'className: "form-aside"',
+            'label: "Cabe\\xE7as"',
+            'label: "Peso m\\xE9dio (kg)"',
+            'className: "grid-campos-compactos"',
+            'className: "metricas-compactas"',
+            'function MetricaCompacta(',
+        ):
+            self.assertIn(texto, self.fonte)
+        self.assertNotIn('label: "Qtd Cabe\\xE7as"', self.fonte)
+
+    def test_cenarios_podem_ser_reordenados_sem_perder_resultados(self):
+        for texto in (
+            "const moverCenario = (origem, destino) =>",
+            "const idAtivo = cenarios[scAtivo]?.id",
+            "const [resultadoMovido] = novos.splice(origem, 1)",
+            "draggable: true",
+            "onDragStart:",
+            "onDrop:",
+            'role: "tablist"',
+            'role: "tab"',
+            '"aria-selected": scAtivo === i',
+            "Mover cen\\xE1rio para a esquerda",
+            "Mover cen\\xE1rio para a direita",
+        ):
+            self.assertIn(texto, self.fonte)
+
+    def test_mercado_bgi_usa_resumo_compacto(self):
+        self.assertIn('className: "mercado-topo"', self.fonte)
+        self.assertIn('className: "grid-cotacoes-bgi"', self.fonte)
+        self.assertIn("Atualizar curva BGI", self.fonte)
+
     def test_sincronizacao_nao_expoe_configuracao_tecnica_na_tela(self):
         for texto in (
             "Cópia online e segurança",

@@ -70,6 +70,25 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--yellow-soft);bor
 .fld.campo-incompleto input,.fld.campo-incompleto select,.fld.campo-incompleto textarea{border-color:var(--red);background:var(--redbg)}
 .btn:disabled{opacity:.55;cursor:not-allowed}
 
+/* ---------- Formulários compactos e painéis retráteis ---------- */
+.painel-retratil{margin:0}
+.painel-retratil>.painel-retratil-resumo{display:flex;align-items:center;gap:10px;list-style:none;cursor:pointer;color:var(--navy);font-size:var(--fs-11);font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.painel-retratil>.painel-retratil-resumo::-webkit-details-marker{display:none}
+.painel-retratil>.painel-retratil-resumo::after{content:'+';margin-left:auto;font-size:var(--fs-20);line-height:1;color:var(--muted)}
+.painel-retratil[open]>.painel-retratil-resumo::after{content:'−'}
+.painel-retratil-subtitulo{font-size:var(--fs-11);font-weight:400;letter-spacing:0;text-transform:none;color:var(--muted)}
+.painel-retratil-corpo{padding-top:16px}
+.form-com-aside{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,270px);gap:18px;align-items:start}
+.form-principal{min-width:0}
+.form-aside{display:grid;gap:8px;padding-left:16px;border-left:1px solid var(--border)}
+.grid-campos-compactos{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:start}
+.fld.compacto{gap:3px}
+.fld.compacto input,.fld.compacto select{padding:7px 10px}
+.metrica-compacta{min-width:0;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);padding:8px 10px}
+.metrica-compacta strong{display:block;color:var(--navy);font-variant-numeric:tabular-nums}
+@media(max-width:900px){.form-com-aside{grid-template-columns:1fr}.form-aside{grid-template-columns:1fr 1fr;padding-left:0;padding-top:12px;border-left:0;border-top:1px solid var(--border)}.grid-campos-compactos{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.form-aside,.grid-campos-compactos{grid-template-columns:1fr}.painel-retratil-subtitulo{display:none}}
+
 /* ---------- Login ---------- */
 .login-box{max-width:360px;margin:80px auto;text-align:center}
 .login-box input{margin-bottom:10px}
