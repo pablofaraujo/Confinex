@@ -124,6 +124,12 @@ assert.ok(!htmlBgi.includes('const ab=expo.data.reduce'));
 assert.ok(!htmlBgi.includes('POS=pos.data'));
 
 const htmlConfinados = fs.readFileSync(path.join(__dirname, '..', 'confinados.html'), 'utf8');
+assert.ok(htmlConfinados.indexOf('<h2>Saldo atual por confinamento</h2>')
+  < htmlConfinados.indexOf('<h2>Lotes ativos em confinamento</h2>'));
+assert.ok(htmlConfinados.indexOf('<h2>Lotes ativos em confinamento</h2>')
+  < htmlConfinados.indexOf('<h2>Cobertura dos lotes ativos</h2>'));
+assert.ok(htmlConfinados.indexOf('<h2>Cobertura dos lotes ativos</h2>')
+  < htmlConfinados.indexOf('<h2>Posições abertas vinculadas aos confinados</h2>'));
 assert.ok(htmlConfinados.includes(
   "a.valor_liquido!=null&&a.esperado_calculado!=null?fmtR$(a.divergencia):'—'",
 ));
@@ -131,4 +137,4 @@ assert.ok(!htmlConfinados.includes(
   "a.valor_liquido!=null?fmtR$(a.divergencia):'—'",
 ));
 
-console.log('Confinados hedge e cabeçalho BGI: 37 verificações aprovadas.');
+console.log('Confinados hedge e cabeçalho BGI: 40 verificações aprovadas.');
