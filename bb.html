@@ -527,7 +527,7 @@ async function carregar(){
     db.from('operacoes').select('id,codigo,status,obs').eq('tipo_negocio','boi_balanca'),
     db.from('compras').select('*'),
     db.from('vendas').select('*'),
-    db.from('pendencias_documentos').select('id,tipo,status,operacao_id,created_at'),
+    db.from('pendencias_documentos').select('id,tipo,status,operacao_id,created_at').eq('status','aguardando_vendedor'),
     db.from('contatos').select('id,nome'),
     db.from('negocios_boi_balanca').select('*').eq('status','previsto').order('created_at',{ascending:false})
   ]);
@@ -543,7 +543,7 @@ async function carregar(){
   COMPRAS_LIST = cs;
   VENDAS_LIST = vs;
   OPERACOES_LIST = ops.data;
-  const ps = pend.data.filter(p=>bbIds.has(p.operacao_id) && !['validado','cancelado'].includes(p.status));
+  const ps = pend.data.filter(p=>bbIds.has(p.operacao_id));
   const ativos = ops.data.filter(o=>o.status!=='cancelada');
 
   PREVISOES = previsoes.data;
@@ -651,7 +651,7 @@ async function carregar(){
    ps.map(p=>{
      const o=ops.data.find(x=>x.id===p.operacao_id)||{};
      const dias=Math.round((Date.now()-new Date(p.created_at))/864e5);
-     return `<tr><td><b>${o.codigo||'—'}</b></td><td>${p.tipo==='gta'?'GTA':'NF entrada'}</td>
+     return `<tr><td><b>${o.codigo||'—'}</b></td><td>${String(p.tipo||'').toLowerCase()==='gta'?'GTA':'NF entrada'}</td>
       <td class="num">${dias}</td><td><span class="badge b-red">Aguardando</span></td></tr>`;
    }).join('') || '<tr><td colspan="4">Nenhuma pendência 🎉</td></tr>';
 }

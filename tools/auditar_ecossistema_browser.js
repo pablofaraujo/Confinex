@@ -1088,6 +1088,11 @@ function clientePendenciasEventosSimulado() {
       status: 'pendente',
       tipo_operacao: 'compra',
       created_at: isoComDias(-1),
+    }, {
+      resumo: 'Revisão concluída preservada no histórico',
+      status: 'realizado',
+      tipo_operacao: 'compra',
+      created_at: isoComDias(-8),
     }],
     pending_actions: [{
       resumo: 'Conferir divergência de peso 11111111-1111-4111-8111-111111111111',
@@ -1095,16 +1100,29 @@ function clientePendenciasEventosSimulado() {
       status: 'em_execucao',
       acao_tipo: 'revisar_pesagem',
       criado_em: isoComDias(-2),
+    }, {
+      resumo: 'Ação já concluída',
+      status: 'executado',
+      acao_tipo: 'revisar_pesagem',
+      criado_em: isoComDias(-7),
     }],
     pendencias_documentos: [{
       tipo: 'venda',
       entidade_codigo: 'compras_missing_fields',
-      status: 'aguardando_confirmacao',
+      status: 'aguardando_vendedor',
       criado_em: isoComDias(-3),
     }, {
       tipo: 'outro',
-      status: 'pendente',
+      status: 'aguardando_vendedor',
       criado_em: isoComDias(-4),
+    }, {
+      tipo: 'nf_entrada',
+      status: 'recebido',
+      criado_em: isoComDias(-5),
+    }, {
+      tipo: 'nf_entrada',
+      status: 'dispensado',
+      criado_em: isoComDias(-6),
     }],
   };
   const eventos = {
@@ -1166,7 +1184,11 @@ function clientePendenciasEventosSimulado() {
     from(nome) {
       const consulta = {
         select() {
-          return { limit: async () => resposta(nome) };
+          const cadeia = {
+            eq() { return cadeia; },
+            limit: async () => resposta(nome),
+          };
+          return cadeia;
         },
       };
       ['insert', 'update', 'upsert', 'delete'].forEach(operacao => {

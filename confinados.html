@@ -72,7 +72,7 @@ db.from('operacoes').select('id,codigo,status,sexo,modalidade,confinamentos(nome
 db.from('v_exposicao_hedge').select('*'),
 db.from('posicoes_hedge').select('id,termo,origem,contrato,direcao,contratos_qtd,preco_entrada,preco_saida,data_saida,status,resultado_realizado,categoria,negocio_rateio').or('status.in.(aberta,rolada),origem.eq.bgi-portfolio').order('status').order('contrato'),
 db.from('v_estoque_atual').select('*'),
-db.from('pendencias_documentos').select('id,tipo,status,cobrancas,created_at,operacoes(codigo),contatos(nome),compras(quantidade,data)').not('status','in','("validado","cancelado")'),
+db.from('pendencias_documentos').select('id,tipo,status,cobrancas,created_at,operacoes(codigo),contatos(nome),compras(quantidade,data)').eq('status','aguardando_vendedor'),
 db.from('acertos').select('*,operacoes(codigo),confinamentos(nome)').order('created_at'),
 db.from('fluxo_caixa').select('data,descricao,tipo,valor,realizado,categoria').order('data')
 ]);
@@ -88,7 +88,7 @@ const cab = estoque.data.reduce((s,e)=>s+Number(e.cabecas||0),0);
 const ativos = ops.data.filter(o=>['comprada','em_confinamento'].includes(o.status));
 const descob = expoConfinamento.reduce((s,e)=>s+Math.max(Number(e.cts_descobertos||0),0),0);
 const credit = expoConfinamento.reduce((s,e)=>s+Number(e.hedge_realizado_creditado||0),0);
-const pendAbertas = pend.data.filter(p=>p.status==='aguardando_vendedor');
+const pendAbertas = pend.data;
 const acAguard = acertos.data.filter(a=>['aguardando','divergente'].includes(a.status));
 const fluxoReal = fluxo.data.filter(f=>f.realizado);
 const saldoReal = fluxoReal.reduce((s,f)=>s+(f.tipo==='entrada'?1:-1)*Number(f.valor),0);
@@ -144,7 +144,7 @@ pend.data.sort((a,b)=>(a.operacoes?.codigo||'').localeCompare(b.operacoes?.codig
 const dias=Math.round((Date.now()-new Date(p.created_at))/864e5);
 const compData = p.compras?.data;
 return `<tr><td><b>${p.operacoes?.codigo||'—'}</b></td><td>${p.contatos?.nome||'<span class="badge b-amber">sem vendedor vinculado</span>'}</td>
-<td>${p.tipo==='gta'?'GTA':'NF entrada'}</td><td>${fmtD(compData)}</td><td class="num">${p.compras?.quantidade??'—'}</td>
+<td>${String(p.tipo||'').toLowerCase()==='gta'?'GTA':'NF entrada'}</td><td>${fmtD(compData)}</td><td class="num">${p.compras?.quantidade??'—'}</td>
 <td class="num">${dias}</td>
 <td>${p.status==='aguardando_vendedor'?'<span class="badge b-red">Aguardando</span>':'<span class="badge b-green">'+p.status+'</span>'}</td></tr>`;
 }).join('') || '<tr><td colspan="7">Nenhuma pendência 🎉</td></tr>';

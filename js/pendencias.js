@@ -40,15 +40,25 @@ async function carregar(){
   var respostas = await Promise.all([
     db.from('operation_drafts').select('*').limit(200),
     db.from('pending_actions').select('*').limit(200),
-    db.from('pendencias_documentos').select('*').limit(200)
+    db.from('pendencias_documentos').select('*').eq('status','aguardando_vendedor').limit(200)
   ]);
-  var fechados = new Set(['executado','rejeitado','cancelado','validado','dispensado']);
-  var abertos = function(lista){ return (lista || []).filter(function(item){ return !fechados.has(String(item.status || '').toLowerCase()); }); };
+  var fechadosRevisoes = new Set(['realizado','rejeitado','cancelado']);
+  var fechadosAcoes = new Set(['executado','rejeitado','cancelado','expirado']);
+  var abertos = function(lista, fechados){
+    return (lista || []).filter(function(item){
+      return !fechados.has(String(item.status || '').toLowerCase());
+    });
+  };
+  var documentosAbertos = function(lista){
+    return (lista || []).filter(function(item){
+      return String(item.status || '').toLowerCase() === 'aguardando_vendedor';
+    });
+  };
   var falhas = respostas.filter(function(resposta){ return resposta.error; });
   itens = CFAgroGestao.pendenciasLegiveis(
-    respostas[0].error ? [] : abertos(respostas[0].data),
-    respostas[1].error ? [] : abertos(respostas[1].data),
-    respostas[2].error ? [] : abertos(respostas[2].data)
+    respostas[0].error ? [] : abertos(respostas[0].data, fechadosRevisoes),
+    respostas[1].error ? [] : abertos(respostas[1].data, fechadosAcoes),
+    respostas[2].error ? [] : documentosAbertos(respostas[2].data)
   );
   if(falhas.length === respostas.length){
     el('subtitle').textContent = CFAgroGestao.erroLegivel(falhas[0].error);
