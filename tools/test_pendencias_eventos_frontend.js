@@ -57,8 +57,12 @@ for(const [pagina, html] of [['Confinados', confinadosHtml], ['Boi Balança', bb
     html.includes("String(p.tipo||'').toLowerCase()==='gta'"),
     `${pagina} deve reconhecer GTA sem depender de maiúsculas/minúsculas`
   );
+  assert.ok(
+    html.includes('Negócio encerrado · documento pendente'),
+    `${pagina} deve manter o alerta documental após o encerramento do negócio`
+  );
 }
 assert.ok(auditoriaBrowser.includes('linhasRestauradas === 4'));
 assert.ok(auditoriaBrowser.includes('linhasRestauradas === 3'));
 
-console.log('Pendências e Eventos: 36 verificações estáticas aprovadas.');
+console.log('Pendências e Eventos: 38 verificações estáticas aprovadas.');

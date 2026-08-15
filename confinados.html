@@ -72,7 +72,7 @@ db.from('operacoes').select('id,codigo,status,sexo,modalidade,confinamentos(nome
 db.from('v_exposicao_hedge').select('*'),
 db.from('posicoes_hedge').select('id,termo,origem,contrato,direcao,contratos_qtd,preco_entrada,preco_saida,data_saida,status,resultado_realizado,categoria,negocio_rateio').or('status.in.(aberta,rolada),origem.eq.bgi-portfolio').order('status').order('contrato'),
 db.from('v_estoque_atual').select('*'),
-db.from('pendencias_documentos').select('id,tipo,status,cobrancas,created_at,operacoes(codigo),contatos(nome),compras(quantidade,data)').eq('status','aguardando_vendedor'),
+db.from('pendencias_documentos').select('id,tipo,status,cobrancas,created_at,operacoes(codigo,status),contatos(nome),compras(quantidade,data)').eq('status','aguardando_vendedor'),
 db.from('acertos').select('*,operacoes(codigo),confinamentos(nome)').order('created_at'),
 db.from('fluxo_caixa').select('data,descricao,tipo,valor,realizado,categoria').order('data')
 ]);
@@ -143,10 +143,11 @@ document.getElementById('tbPend').innerHTML =
 pend.data.sort((a,b)=>(a.operacoes?.codigo||'').localeCompare(b.operacoes?.codigo||'')).map(p=>{
 const dias=Math.round((Date.now()-new Date(p.created_at))/864e5);
 const compData = p.compras?.data;
+const negocioEncerrado=['abatida','liquidada','encerrada','finalizada','concluida'].includes(String(p.operacoes?.status||'').toLowerCase());
 return `<tr><td><b>${p.operacoes?.codigo||'—'}</b></td><td>${p.contatos?.nome||'<span class="badge b-amber">sem vendedor vinculado</span>'}</td>
 <td>${String(p.tipo||'').toLowerCase()==='gta'?'GTA':'NF entrada'}</td><td>${fmtD(compData)}</td><td class="num">${p.compras?.quantidade??'—'}</td>
 <td class="num">${dias}</td>
-<td>${p.status==='aguardando_vendedor'?'<span class="badge b-red">Aguardando</span>':'<span class="badge b-green">'+p.status+'</span>'}</td></tr>`;
+<td>${negocioEncerrado?'<span class="badge b-amber">Negócio encerrado · documento pendente</span>':'<span class="badge b-red">Aguardando documento</span>'}</td></tr>`;
 }).join('') || '<tr><td colspan="7">Nenhuma pendência 🎉</td></tr>';
 
 // ---- Acertos
