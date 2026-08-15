@@ -117,6 +117,7 @@ As duas leituras são auxiliares e não mudam lucro, custos totais, caixa ou ran
 
 - `financeiro.html` é uma projeção somente leitura. Atualizar a página ou usar filtros nunca cria baixa, parcela, renegociação, lembrete persistente ou conciliação.
 - Em `fluxo_caixa`, entrada prevista com saldo representa conta a receber; saída prevista com saldo representa conta a pagar. Item realizado tem saldo zero. Pagamento parcial preserva `valor original`, `valor pago` e `saldo em aberto` separadamente.
+- Ressarcimento operacional (GTA, vacina, transporte ou outro adiantamento) só pode ser registrado depois que o valor estiver conciliado com comprovante ou fonte documental; não existe ressarcimento publicado como "a apurar".
 - A situação é derivada nesta ordem: realizado, parcial, atrasado e previsto. Assim, uma obrigação com pagamento parcial continua identificada como parcial; a data vencida ainda produz lembrete atrasado.
 - Dívida em aberto soma os saldos de empréstimos e promissórias. Quitado não deixa saldo; valor pago é a diferença entre original e saldo quando este estiver disponível.
 - Lembretes da tela são derivados de compromissos em aberto vencidos ou com vencimento nos próximos 30 dias. Eles não provam que Telegram ou e-mail foi enviado.

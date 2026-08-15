@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS public.ressarcimentos_operacionais (
   contato_id uuid REFERENCES public.contatos(id),
   tipo text NOT NULL CHECK (tipo IN ('gta', 'vacina', 'transporte', 'outro')),
   descricao text NOT NULL CHECK (btrim(descricao) <> ''),
-  valor numeric CHECK (valor IS NULL OR valor >= 0),
+  valor numeric NOT NULL CHECK (valor >= 0),
   valor_ressarcido numeric NOT NULL DEFAULT 0 CHECK (valor_ressarcido >= 0),
   data_pagamento date,
   status text NOT NULL DEFAULT 'a_ressarcir' CHECK (status IN ('a_ressarcir', 'parcialmente_ressarcido', 'ressarcido', 'descontado', 'dispensado')),
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS public.ressarcimentos_operacionais (
   obs text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  CHECK (valor IS NULL OR valor_ressarcido <= valor),
+  CHECK (valor_ressarcido <= valor),
   UNIQUE (operacao_id, contato_id, tipo, descricao)
 );
 

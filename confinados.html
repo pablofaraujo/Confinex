@@ -168,7 +168,7 @@ return `<tr><td><b>${p.operacoes?.codigo||'—'}</b></td><td>${p.contatos?.nome|
 // ---- Valores pagos a recuperar da contraparte
 document.getElementById('tbRessarcimentos').innerHTML =
 '<tr><th>Lote</th><th>Responsável</th><th>Tipo</th><th>Descrição</th><th>Pagamento</th><th class="num">Valor</th><th>Status</th></tr>'+
-(ressarcimentos.data||[]).sort((a,b)=>(a.operacoes?.codigo||'').localeCompare(b.operacoes?.codigo||'')).map(r=>`<tr><td><b>${r.operacoes?.codigo||'—'}</b></td><td>${r.contatos?.nome||'—'}</td><td>${r.tipo==='gta'?'GTA':r.tipo==='vacina'?'Vacina':r.tipo==='transporte'?'Transporte':'Outro'}</td><td class="wrap">${r.descricao}</td><td>${fmtD(r.data_pagamento)}</td><td class="num">${r.valor==null?'A apurar':fmtR$(r.valor)}</td><td><span class="badge b-amber">${r.status==='parcialmente_ressarcido'?'Parcial':'A ressarcir/descontar'}</span></td></tr>`).join('')
+(ressarcimentos.data||[]).sort((a,b)=>(a.operacoes?.codigo||'').localeCompare(b.operacoes?.codigo||'')).map(r=>`<tr><td><b>${r.operacoes?.codigo||'—'}</b></td><td>${r.contatos?.nome||'—'}</td><td>${r.tipo==='gta'?'GTA':r.tipo==='vacina'?'Vacina':r.tipo==='transporte'?'Transporte':'Outro'}</td><td class="wrap">${r.descricao}</td><td>${fmtD(r.data_pagamento)}</td><td class="num">${fmtR$(r.valor)}</td><td><span class="badge b-amber">${r.status==='parcialmente_ressarcido'?'Parcial':'A ressarcir/descontar'}</span></td></tr>`).join('')
 || '<tr><td colspan="7">Nenhum valor em aberto para ressarcimento.</td></tr>';
 
 // ---- Acertos

@@ -64,6 +64,7 @@ assert.ok(htmlResumo.includes('Posições abertas vinculadas aos confinados'));
 assert.ok(!htmlResumo.includes('Posições na B3 — hedge × especulação'));
 assert.ok(!htmlResumo.includes('Creditado (realizado)'));
 assert.ok(htmlResumo.includes("db.from('ressarcimentos_operacionais')"));
+assert.ok(!htmlResumo.includes("A apurar"));
 assert.ok(htmlGeral.includes('Machos / fêmeas confinados'));
 
-console.log('Resumo de confinados: 19 verificações aprovadas.');
+console.log('Resumo de confinados: 20 verificações aprovadas.');
