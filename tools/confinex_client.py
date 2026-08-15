@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
 import time
 import urllib.error
 import urllib.parse
@@ -19,6 +20,8 @@ ENV_PATH = Path("/root/.openclaw/gateway.systemd.env")
 TIMEOUT_MAX_SECONDS = 20
 TENTATIVAS_LEITURA_PADRAO = 3
 ESPERA_LEITURA_PADRAO = 0.4
+BRIDGE_CLIENT_PATH = Path("/root/juan-severino/handlers/confinex_db_bridge.py")
+BRIDGE_READY_PATH = Path("/root/.openclaw/workspace/.juan-confinex-jobs/.ready")
 
 READ_TABLES = {
     "acertos",
@@ -169,6 +172,9 @@ class ConfinexClient:
         timeout: int = TIMEOUT_MAX_SECONDS,
         tentativas_leitura: int = TENTATIVAS_LEITURA_PADRAO,
         espera_leitura: float = ESPERA_LEITURA_PADRAO,
+        bridge_path: Path | str = BRIDGE_CLIENT_PATH,
+        bridge_ready_path: Path | str = BRIDGE_READY_PATH,
+        usar_ponte: bool | None = None,
     ) -> None:
         values = {**_load_protected_env(), **os.environ, **(env or {})}
         self.url = (
@@ -188,6 +194,13 @@ class ConfinexClient:
         self.timeout = max(1, min(int(timeout), TIMEOUT_MAX_SECONDS))
         self.tentativas_leitura = max(1, min(int(tentativas_leitura), 5))
         self.espera_leitura = max(0.0, min(float(espera_leitura), 5.0))
+        self.bridge_path = Path(bridge_path)
+        self.bridge_ready_path = Path(bridge_ready_path)
+        self.usar_ponte = (
+            bool(usar_ponte)
+            if usar_ponte is not None
+            else self.bridge_path.is_file() and self.bridge_ready_path.is_file()
+        )
         if not self.url or not self.key:
             raise ConfinexError(
                 "credenciais protegidas do Supabase não estão disponíveis"
@@ -197,6 +210,80 @@ class ConfinexClient:
             "CONFINEX_DB_URL": self.url,
             "CONFINEX_DB_KEY": self.key,
         }
+
+    def _request_via_bridge(
+        self,
+        method: str,
+        table: str,
+        *,
+        params: dict[str, Any] | None,
+        payload: dict[str, Any] | None,
+    ) -> Any:
+        """Usa a ponte do host sem expor credenciais ao subprocesso do agente."""
+        query = urllib.parse.urlencode(params or {}, doseq=True)
+        route = table if not query else f"{table}?{query}"
+        if method == "GET":
+            command = ["get_read", route]
+        elif method == "POST" and table in WRITE_TABLES and payload is not None:
+            command = [
+                "post_review",
+                table,
+                json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
+            ]
+        elif method == "PATCH" and table in WRITE_TABLES and payload is not None and query:
+            command = [
+                "patch_review",
+                table,
+                query,
+                json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
+            ]
+        else:
+            raise ConfinexError(f"operação não permitida pela ponte: {method} {table}")
+
+        try:
+            completed = subprocess.run(
+                [
+                    str(self.bridge_path),
+                    "--timeout",
+                    str(min(60, self.timeout + 15)),
+                    *command,
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=min(65, self.timeout + 20),
+                env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")},
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise ConfinexConnectionError(
+                f"ponte indisponível em {method} {table}: {type(exc).__name__}"
+            ) from exc
+
+        output = completed.stdout.strip()
+        lines = output.splitlines()
+        status_line = lines[-1] if lines else ""
+        match = re.fullmatch(r"HTTP_STATUS:(\d{3})", status_line)
+        if completed.returncode != 0 and not match:
+            raise ConfinexConnectionError(
+                f"ponte falhou em {method} {table} sem resposta HTTP"
+            )
+        if not match:
+            raise ConfinexConnectionError(
+                f"ponte retornou formato inválido em {method} {table}"
+            )
+        status = int(match.group(1))
+        if not 200 <= status < 300:
+            raise ConfinexHTTPError(
+                f"Supabase {method} {table} falhou com HTTP {status}",
+                status=status,
+            )
+        text = "\n".join(lines[:-1]).strip()
+        if not text:
+            return []
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise ConfinexError(f"resposta invalida da ponte em {table}") from exc
 
     def _request(
         self,
@@ -210,6 +297,15 @@ class ConfinexClient:
         method = method.upper()
         if table not in READ_TABLES:
             raise ConfinexError(f"tabela não permitida: {table}")
+        if self.usar_ponte and (
+            method == "GET" or (method in {"POST", "PATCH"} and table in WRITE_TABLES)
+        ):
+            return self._request_via_bridge(
+                method,
+                table,
+                params=params,
+                payload=payload,
+            )
         query = urllib.parse.urlencode(params or {}, doseq=True)
         url = f"{self.url}/rest/v1/{table}"
         if query:

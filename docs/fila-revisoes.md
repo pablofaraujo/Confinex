@@ -16,6 +16,13 @@ Atualizado em 2026-07-23. Este documento é o roteiro operacional da versão atu
 
 Nenhuma compra é promovida automaticamente. Preparar, aprovar, simular e reconciliar auditorias não equivalem a gravar um lançamento.
 
+Na VPS, o sandbox do Juan não acessa o Supabase diretamente. O cliente envia
+leituras e escritas de `operation_drafts`, `pending_actions`, `eventos` e demais
+tabelas não operacionais permitidas à fila privada de `confinex_db_bridge.py`.
+O worker do host executa uma tentativa por escrita e até cinco tentativas por
+leitura. A ponte recusa `compras`, `vendas`, `abates` e `pesagens_caderno`; essas
+tabelas continuam exclusivas da promoção operacional confirmada.
+
 ## Foto ou PDF de compra no Juan
 
 Ao receber um documento de compra de gado, Juan segue esta ordem:
