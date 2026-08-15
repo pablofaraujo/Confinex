@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CFAgro — Confinamento</title>
+<title>CFAgro — Operação de confinamento</title>
 <link rel="icon" type="image/png" href="./confinex-logo.jpg">
 <link rel="apple-touch-icon" href="./confinex-logo.jpg">
 <link rel="stylesheet" href="./design/tokens.css?v=20260720-1">
@@ -11,6 +11,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="./js/cfagro-core.js"></script>
 <script src="./js/cfagro-shell.js?v=20260803-1" defer></script>
+<script src="./js/confinados-resumo.js?v=20260815-1"></script>
 </head>
 <body>
 
@@ -28,7 +29,7 @@
 <div class="topbar">
 <div class="ident">
 <div>
-<h1>Confinamento</h1>
+<h1>Operação de confinamento</h1>
 <div class="sub" id="subtitle"></div>
 </div>
 </div>
@@ -127,9 +128,14 @@ async function ajustarPrazo(id, codigo, prazoAtual){
 
 async function carregar(){
   document.getElementById('subtitle').textContent = 'Carregando...';
-  const [ops, entradas, custos, eventos, fechamentos, avaliacoes, consolidacoes, desvios, ajustesPrazo, interunidades] = await Promise.all([
-    db.from('operacoes').select('id,codigo,status,sexo,modalidade,contrato_confinamento,resultado_previsto,confinamentos(id,nome,municipio,uf,modalidades)').not('confinamento_id','is',null).not('status','in','(cancelada,cancelado)'),
+  const [ops, confinamentos, contatosConfinamentos, entradas, compras, abates, inventarios, custos, eventos, fechamentos, avaliacoes, consolidacoes, desvios, ajustesPrazo, interunidades] = await Promise.all([
+    db.from('operacoes').select('id,codigo,status,sexo,modalidade,tipo_negocio,confinamento_id,contrato_confinamento,resultado_previsto,confinamentos(id,nome,municipio,uf,modalidades)').eq('tipo_negocio','confinamento').not('status','in','(cancelada,cancelado)'),
+    db.from('confinamentos').select('id,nome,municipio,uf,modalidades').eq('ativo',true),
+    db.from('confinamento_contatos').select('confinamento_id,papel,principal,contatos(nome)').order('principal',{ascending:false}),
     db.from('entradas_confinamento').select('operacao_id,data_entrada,curral,cabecas,peso_embarque_kg,peso_chegada_kg,perda_transporte_pct,km_percorridos,gta,nf').order('data_entrada'),
+    db.from('compras').select('operacao_id,quantidade,data'),
+    db.from('abates').select('operacao_id,quantidade,data_abate'),
+    db.from('inventarios_confinamento').select('confinamento_id,data_referencia,cabecas_total,machos,femeas,fonte').order('data_referencia',{ascending:false}),
     db.from('custos_operacao').select('operacao_id,data,categoria,descricao,valor').order('categoria'),
     db.from('eventos_operacao').select('operacao_id,data,tipo,descricao').order('data',{ascending:false}).limit(30),
     db.from('fechamentos_operacao').select('operacao_id,previsto,realizado_bruto,realizado_liquido,hedge_creditado,desvio,explicacao'),
@@ -139,7 +145,7 @@ async function carregar(){
     db.from('confinex_ajustes_prazo').select('id,avaliacao_id,dias_anterior,dias_novo,data_saida_anterior,data_saida_nova,motivo,ajustado_em').order('ajustado_em',{ascending:false}),
     db.from('v_movimentacoes_interunidades').select('data_movimento,operacao_codigo,quantidade,peso_total_kg,preco_arroba,valor_total,estado').order('data_movimento',{ascending:false})
   ]);
-  const errs=[ops,entradas,custos,eventos,fechamentos,avaliacoes,consolidacoes,desvios].filter(r=>r.error);
+  const errs=[ops,confinamentos,contatosConfinamentos,entradas,compras,abates,inventarios,custos,eventos,fechamentos,avaliacoes,consolidacoes,desvios].filter(r=>r.error);
   if(errs.length){ document.getElementById('subtitle').textContent='Erro: '+errs[0].error.message; return; }
 
   document.getElementById('subtitle').textContent = 'Acompanhamento operacional dos lotes';
@@ -149,16 +155,19 @@ async function carregar(){
   entradas.data.forEach(e=>{
     (entradasPorOp[e.operacao_id] ||= []).push(e);
   });
+  const saldosAtivos = ConfinadosResumo.resumirLotes(ops.data,entradas.data,compras.data,abates.data);
+  const saldoPorOperacao = Object.fromEntries(saldosAtivos.map(l=>[l.operacao_id,l]));
+  const resumoConfinamentos = ConfinadosResumo.aplicarInventarios(ConfinadosResumo.agruparPorConfinamento(saldosAtivos),inventarios.data,confinamentos.data);
 
   // ---- KPIs
   const ativos = ops.data.filter(o=>['comprada','em_confinamento'].includes(o.status));
-  const cabAtivas = ativos.reduce((s,o)=>s + (entradasPorOp[o.id]||[]).reduce((s2,e)=>s2+Number(e.cabecas||0),0), 0);
-  const confinamentosAtivos = new Set(ativos.map(o=>o.confinamentos?.id).filter(Boolean)).size;
+  const cabAtivas = resumoConfinamentos.reduce((s,g)=>s+Number(g.cabecas||0),0);
+  const confinamentosAtivos = resumoConfinamentos.filter(g=>g.cabecas>0).length;
   const abatidos = ops.data.filter(o=>o.status==='abatida').length;
   const custoTotal = custos.data.reduce((s,c)=>s+Number(c.valor||0),0);
   document.getElementById('kpis').innerHTML = [
     ['Confinamentos ativos', fmtN(confinamentosAtivos), ativos.length+' lotes em aberto'],
-    ['Cabeças em confinamento', fmtN(cabAtivas), 'somando entradas dos lotes abertos'],
+    ['Cabeças em confinamento', fmtN(cabAtivas), 'entradas/compras menos abates registrados'],
     ['Lotes abatidos', fmtN(abatidos), 'de '+ops.data.length+' lotes no total'],
     ['Custos registrados', fmtR$(custoTotal), custos.data.length+' lançamentos (frete/trato/financeiro)'],
   ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="d">${k[2]}</div></div>`).join('');
@@ -220,23 +229,32 @@ async function carregar(){
 
   // ---- Confinamentos (parceiros)
   const porConfinamento = {};
+  const contatosPorConfinamento = {};
+  contatosConfinamentos.data.forEach(item=>(contatosPorConfinamento[item.confinamento_id] ||= []).push(item));
+  confinamentos.data.forEach(c=>{
+    const resumo=resumoConfinamentos.find(item=>item.id===c.id);
+    porConfinamento[c.id]={id:c.id,nome:c.nome,municipio:c.municipio,uf:c.uf,modalidades:c.modalidades||[],lotes:0,ativos:0,cabecas:resumo?.cabecas||0,machos:resumo?.machos||0,femeas:resumo?.femeas||0,nao_informado:resumo?.nao_informado||0};
+  });
   ops.data.forEach(o=>{
     const c = o.confinamentos;
     if(!c) return;
-    const g = (porConfinamento[c.id] ||= {nome:c.nome, municipio:c.municipio, uf:c.uf, modalidades:c.modalidades||[], lotes:0, ativos:0, cabecas:0});
+    const resumo = resumoConfinamentos.find(item=>item.id===c.id);
+    const g = porConfinamento[c.id] || (porConfinamento[c.id] = {id:c.id,nome:c.nome, municipio:c.municipio, uf:c.uf, modalidades:c.modalidades||[], lotes:0, ativos:0, cabecas:0,machos:0,femeas:0,nao_informado:0});
     g.lotes++;
     if(['comprada','em_confinamento'].includes(o.status)){
       g.ativos++;
-      g.cabecas += (entradasPorOp[o.id]||[]).reduce((s,e)=>s+Number(e.cabecas||0),0);
+      g.cabecas = resumo?.cabecas||0;
+      g.machos = resumo?.machos||0;
+      g.femeas = resumo?.femeas||0;
+      g.nao_informado = resumo?.nao_informado||0;
     }
   });
   document.getElementById('tbConf').innerHTML =
-    '<tr><th>Confinamento</th><th>Local</th><th>Modalidades</th><th class="num">Lotes (total)</th><th class="num">Lotes ativos</th><th class="num">Cabeças ativas</th></tr>'+
+    '<tr><th>Confinamento</th><th>Contatos</th><th>Local</th><th>Modalidades</th><th class="num">Lotes ativos</th><th class="num">Cabeças</th><th class="num">Machos</th><th class="num">Fêmeas</th><th class="num">Sem sexo</th></tr>'+
     Object.values(porConfinamento).sort((a,b)=>b.ativos-a.ativos || a.nome.localeCompare(b.nome)).map(c=>
-      `<tr><td><b>${c.nome}</b></td><td>${[c.municipio,c.uf].filter(Boolean).join('/')||'—'}</td>
-      <td>${c.modalidades.join(', ')||'—'}</td><td class="num">${fmtN(c.lotes)}</td>
-      <td class="num">${fmtN(c.ativos)}</td><td class="num">${fmtN(c.cabecas)}</td></tr>`
-    ).join('') || '<tr><td colspan="6">Nenhum confinamento cadastrado</td></tr>';
+      `<tr><td><b>${c.nome}</b></td><td class="wrap">${(contatosPorConfinamento[c.id]||[]).map(item=>`${esc(item.contatos?.nome||'—')} <span class="hint">(${esc(item.papel)})</span>`).join('<br>')||'—'}</td><td>${[c.municipio,c.uf].filter(Boolean).join('/')||'—'}</td>
+      <td>${c.modalidades.join(', ')||'—'}</td><td class="num">${fmtN(c.ativos)}</td><td class="num">${fmtN(c.cabecas)}</td><td class="num">${fmtN(c.machos)}</td><td class="num">${fmtN(c.femeas)}</td><td class="num">${fmtN(c.nao_informado)}</td></tr>`
+    ).join('') || '<tr><td colspan="9">Nenhum confinamento cadastrado</td></tr>';
 
   // ---- Lotes de confinamento
   document.getElementById('tbLotes').innerHTML =
@@ -244,7 +262,8 @@ async function carregar(){
     ops.data.sort((a,b)=>a.codigo.localeCompare(b.codigo)).map(o=>{
       const ent = entradasPorOp[o.id]||[];
       const currais = [...new Set(ent.map(e=>e.curral).filter(c=>c&&c!=='-'))].join(', ') || '—';
-      const cab = ent.reduce((s,e)=>s+Number(e.cabecas||0),0);
+      const saldo = saldoPorOperacao[o.id];
+      const cab = saldo ? saldo.cabecas_atuais : ent.reduce((s,e)=>s+Number(e.cabecas||0),0);
       const dataEnt = ent.length ? ent.map(e=>e.data_entrada).sort()[0] : null;
       const perdas = ent.map(e=>Number(e.perda_transporte_pct)).filter(v=>!isNaN(v));
       const perdaMedia = perdas.length ? perdas.reduce((a,b)=>a+b,0)/perdas.length : null;

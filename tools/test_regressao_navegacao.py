@@ -64,7 +64,7 @@ class RegressaoNavegacaoTests(unittest.TestCase):
     def test_shell_usa_rotulos_e_icones_humanos_aprovados(self):
         shell = (ROOT / "js" / "cfagro-shell.js").read_text(encoding="utf-8")
         self.assertIn("rotulo:'Visão Geral'", shell)
-        self.assertIn("rotulo:'Confinamento', icone:'curral'", shell)
+        self.assertIn("rotulo:'Operação confinamento', icone:'curral'", shell)
         self.assertIn("rotulo:'Fazenda Ametista', icone:'porteira'", shell)
         self.assertIn("rotulo:'Ricardo', icone:'pessoa'", shell)
         self.assertIn("rotulo:'Xande',   icone:'pessoa'", shell)

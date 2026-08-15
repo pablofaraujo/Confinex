@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CFAgro — Confinados</title>
+<title>CFAgro — Resumo dos confinados</title>
 <link rel="icon" type="image/png" href="./confinex-logo.jpg">
 <link rel="apple-touch-icon" href="./confinex-logo.jpg">
 <link rel="stylesheet" href="./design/tokens.css?v=20260720-1">
@@ -13,6 +13,7 @@
 <script src="./js/cfagro-core.js"></script>
 <script src="./js/cfagro-shell.js?v=20260803-1" defer></script>
 <script src="./js/confinados-hedge.js?v=20260801-1"></script>
+<script src="./js/confinados-resumo.js?v=20260815-1"></script>
 </head>
 <body>
 
@@ -30,25 +31,31 @@
 <div class="topbar">
 <div class="ident">
 <div>
-<h1>Confinados</h1>
-<div class="sub" id="subtitle">Acompanhamento dos lotes em confinamento</div>
+<h1>Resumo dos confinados</h1>
+<div class="sub" id="subtitle">Posição executiva dos lotes ativos em todos os confinamentos</div>
 </div>
 </div>
 </div>
 
 <div class="kpis" id="kpis"></div>
 
-<h2>Exposição BGI por lote (view ao vivo)</h2>
+<h2>Cobertura dos lotes ativos</h2>
 <div class="card scroll"><table id="tbExpo"></table></div>
 
-<h2>Posições na B3 — hedge × especulação</h2>
+<h2>Posições abertas vinculadas aos confinados</h2>
 <div class="card scroll"><table id="tbPos"></table></div>
 
-<h2>Estoque em confinamento (view ao vivo)</h2>
+<h2>Saldo atual por confinamento</h2>
+<div class="card scroll"><table id="tbResumoConf"></table></div>
+
+<h2>Lotes ativos em confinamento</h2>
 <div class="card scroll"><table id="tbEstoque"></table></div>
 
 <h2 id="pendencias">Pendências de documentos — quem deve GTA/NF</h2>
 <div class="card scroll"><table id="tbPend"></table></div>
+
+<h2>Valores a ressarcir ou descontar</h2>
+<div class="card scroll"><table id="tbRessarcimentos"></table></div>
 
 <h2>Acertos dos confinamentos</h2>
 <div class="card scroll"><table id="tbAcertos"></table></div>
@@ -67,35 +74,43 @@
 let chart;
 async function carregar(){
 document.getElementById('subtitle').textContent = 'Carregando...';
-const [ops, expo, posicoes, estoque, pend, acertos, fluxo] = await Promise.all([
-db.from('operacoes').select('id,codigo,status,sexo,modalidade,confinamentos(nome)'),
+const [ops, confinamentos, inventarios, expo, posicoes, entradas, compras, abates, pend, ressarcimentos, acertos, fluxo] = await Promise.all([
+db.from('operacoes').select('id,codigo,status,sexo,modalidade,tipo_negocio,confinamento_id,confinamentos(id,nome)'),
+db.from('confinamentos').select('id,nome').eq('ativo',true),
+db.from('inventarios_confinamento').select('confinamento_id,data_referencia,cabecas_total,machos,femeas,fonte').order('data_referencia',{ascending:false}),
 db.from('v_exposicao_hedge').select('*'),
-db.from('posicoes_hedge').select('id,termo,origem,contrato,direcao,contratos_qtd,preco_entrada,preco_saida,data_saida,status,resultado_realizado,categoria,negocio_rateio').or('status.in.(aberta,rolada),origem.eq.bgi-portfolio').order('status').order('contrato'),
-db.from('v_estoque_atual').select('*'),
-db.from('pendencias_documentos').select('id,tipo,status,cobrancas,created_at,operacoes(codigo,status),contatos(nome),compras(quantidade,data)').in('status',['aguardando_vendedor','revisao_necessaria']),
+db.from('posicoes_hedge').select('id,termo,origem,contrato,direcao,contratos_qtd,preco_entrada,status,categoria,negocio_rateio').in('status',['aberta','rolada']).order('contrato'),
+db.from('entradas_confinamento').select('operacao_id,cabecas,data_entrada,curral'),
+db.from('compras').select('operacao_id,quantidade,data'),
+db.from('abates').select('operacao_id,quantidade,data_abate'),
+db.from('pendencias_documentos').select('id,tipo,status,cobrancas,created_at,operacoes(id,codigo,status,tipo_negocio,confinamento_id),contatos(nome),compras(quantidade,data)').in('status',['aguardando_vendedor','revisao_necessaria']),
+db.from('ressarcimentos_operacionais').select('id,tipo,descricao,valor,valor_ressarcido,data_pagamento,status,operacoes(codigo,tipo_negocio),contatos(nome)').in('status',['a_ressarcir','parcialmente_ressarcido']),
 db.from('acertos').select('*,operacoes(codigo),confinamentos(nome)').order('created_at'),
 db.from('fluxo_caixa').select('data,descricao,tipo,valor,realizado,categoria').order('data')
 ]);
-const errs=[ops,expo,posicoes,estoque,pend,acertos,fluxo].filter(r=>r.error);
+const errs=[ops,confinamentos,inventarios,expo,posicoes,entradas,compras,abates,pend,ressarcimentos,acertos,fluxo].filter(r=>r.error);
 if(errs.length){ document.getElementById('subtitle').textContent='Erro: '+errs[0].error.message; return; }
 document.getElementById('subtitle').textContent = 'Acompanhamento dos lotes em confinamento';
 
 // ---- KPIs
-const posicoesVisiveis = ConfinadosHedge.deduplicarPosicoes(posicoes.data);
+const posicoesVisiveis = ConfinadosResumo.filtrarCoberturasAtivas(ConfinadosHedge.deduplicarPosicoes(posicoes.data),ops.data);
 const exposicaoEfetiva = ConfinadosHedge.reconciliarExposicao(expo.data, posicoesVisiveis);
-const expoConfinamento = exposicaoEfetiva.filter(e=>!String(e.codigo||'').toUpperCase().startsWith('BB-'));
-const cab = estoque.data.reduce((s,e)=>s+Number(e.cabecas||0),0);
-const ativos = ops.data.filter(o=>['comprada','em_confinamento'].includes(o.status));
+const expoConfinamento = ConfinadosResumo.filtrarExposicaoAtiva(exposicaoEfetiva,ops.data);
+const lotesAtivos = ConfinadosResumo.resumirLotes(ops.data,entradas.data,compras.data,abates.data);
+const confinamentosAtivos = ConfinadosResumo.aplicarInventarios(ConfinadosResumo.agruparPorConfinamento(lotesAtivos),inventarios.data,confinamentos.data);
+const cab = confinamentosAtivos.reduce((s,e)=>s+Number(e.cabecas||0),0);
+const ativos = lotesAtivos;
+const machos = confinamentosAtivos.reduce((s,e)=>s+e.machos,0);
+const femeas = confinamentosAtivos.reduce((s,e)=>s+e.femeas,0);
 const descob = expoConfinamento.reduce((s,e)=>s+Math.max(Number(e.cts_descobertos||0),0),0);
-const credit = expoConfinamento.reduce((s,e)=>s+Number(e.hedge_realizado_creditado||0),0);
-const pendAbertas = pend.data;
+const pendAbertas = ConfinadosResumo.filtrarPendenciasConfinamento(pend.data);
 const acAguard = acertos.data.filter(a=>['aguardando','divergente'].includes(a.status));
 const fluxoReal = fluxo.data.filter(f=>f.realizado);
 const saldoReal = fluxoReal.reduce((s,f)=>s+(f.tipo==='entrada'?1:-1)*Number(f.valor),0);
 document.getElementById('kpis').innerHTML = [
-['Cabeças no cocho', fmtN(cab), estoque.data.length+' currais · '+ativos.length+' lotes ativos'],
+['Cabeças confinadas', fmtN(cab), confinamentosAtivos.length+' confinamentos · '+ativos.length+' lotes ativos'],
+['Machos / fêmeas', fmtN(machos)+' / '+fmtN(femeas), 'composição dos lotes ativos'],
 ['Hedge descoberto', fmtN(descob,1)+' cts', '≈ '+fmtN(descob*330)+' @ expostas'],
-['Hedge já creditado', fmtR$(credit), 'lucro realizado nos lotes'],
 ['Pendências GTA/NF', pendAbertas.length, 'ausentes ou em revisão'],
 ['Acertos em aberto', acAguard.length, 'aguardando ou divergentes'],
 ['Caixa (a conciliar)', fmtR$(saldoReal), fluxoReal.length+' lançamentos realizados'],
@@ -103,44 +118,43 @@ document.getElementById('kpis').innerHTML = [
 
 // ---- Exposição
 document.getElementById('tbExpo').innerHTML =
-'<tr><th>Lote</th><th class="num">@ previstas</th><th class="num">Cts necessários</th><th class="num">Cts abertos</th><th class="num">Descoberto</th><th class="num">Creditado (realizado)</th><th>Status</th></tr>'+
+'<tr><th>Lote</th><th class="num">@ previstas</th><th class="num">Cts necessários</th><th class="num">Cts abertos</th><th class="num">Descoberto</th><th>Status</th></tr>'+
 expoConfinamento.sort((a,b)=>a.codigo.localeCompare(b.codigo)).map(e=>{
 const d=Number(e.cts_descobertos||0);
 return `<tr><td><b>${e.codigo}</b></td><td class="num">${fmtN(e.arrobas_previstas)}</td>
 <td class="num">${fmtN(e.cts_necessarios,2)}</td><td class="num">${fmtN(e.cts_abertos,2)}</td>
 <td class="num ${d>0.1?'neg':'pos'}">${fmtN(d,2)}</td>
-<td class="num ${cls(e.hedge_realizado_creditado)}">${fmtR$(e.hedge_realizado_creditado)}</td>
 <td>${d>0.1?'<span class="badge b-red">Descoberto</span>':'<span class="badge b-green">Coberto</span>'}</td></tr>`;
 }).join('');
 
-// ---- Posições B3 (hedge × especulação)
+// ---- Posições de hedge abertas e vinculadas aos lotes ativos
 document.getElementById('tbPos').innerHTML =
-'<tr><th>Contrato</th><th>Lado</th><th class="num">Cts</th><th class="num">Entrada</th><th class="num">Saída</th><th>Status</th><th class="num">Resultado líq.</th><th>Tipo</th><th>Negócio/Rateio</th></tr>'+
+'<tr><th>Contrato</th><th>Lado</th><th class="num">Cts</th><th class="num">Entrada</th><th>Status</th><th>Lote(s)</th></tr>'+
 posicoesVisiveis.map(p=>{
 const lado = p.direcao==='comprado'?'Comprado':p.direcao==='termo'?'Termo':'Vendido';
 return `<tr><td><b>${p.contrato}</b></td><td>${lado}</td>
 <td class="num">${fmtN(p.contratos_qtd,2)}</td><td class="num">${fmtN(p.preco_entrada,2)}</td>
-<td class="num">${p.preco_saida!=null?fmtN(p.preco_saida,2):'—'}</td>
-<td>${['aberta','rolada'].includes(p.status)?'<span class="badge b-amber">Aberta</span>':'<span class="badge b-green">Encerrada</span>'}</td>
-<td class="num ${cls(p.resultado_realizado)}">${fmtR$(p.resultado_realizado)}</td>
-<td>${p.categoria==='especulacao'?'<span class="badge b-red">Especulação</span>':'<span class="badge b-green">Hedge</span>'}</td>
-<td>${p.negocio_rateio&&p.negocio_rateio!=='ESPEC'?p.negocio_rateio:'—'}</td></tr>`;
+<td><span class="badge b-amber">Aberta</span></td><td>${p.negocio_rateio||'—'}</td></tr>`;
 }).join('')
-|| '<tr><td colspan="9">Nenhuma posição</td></tr>';
+|| '<tr><td colspan="6">Nenhuma cobertura aberta vinculada aos lotes ativos</td></tr>';
 
-// ---- Estoque
+// ---- Saldo por confinamento e sexo
+document.getElementById('tbResumoConf').innerHTML =
+'<tr><th>Confinamento</th><th class="num">Total</th><th class="num">Machos</th><th class="num">Fêmeas</th><th class="num">Sem sexo</th><th class="num">Lotes</th><th>Conferência</th></tr>'+
+confinamentosAtivos.sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR')).map(g=>{const origem=g.inventario_em?`Contagem ${fmtD(g.inventario_em)}${g.diferenca_ledger?' · diferença ledger '+(g.diferenca_ledger>0?'+':'')+fmtN(g.diferenca_ledger):''}`:g.lotes_sem_entrada?g.lotes_sem_entrada+' lote(s) sem entrada · usando compras':'Entradas registradas';return `<tr><td><b>${g.nome}</b></td><td class="num"><b>${fmtN(g.cabecas)}</b></td><td class="num">${fmtN(g.machos)}</td><td class="num">${fmtN(g.femeas)}</td><td class="num">${fmtN(g.nao_informado)}</td><td class="num">${fmtN(g.lotes)}</td><td><span class="badge ${g.diferenca_ledger?'b-amber':'b-green'}">${origem}</span></td></tr>`;}).join('');
+
+// ---- Lotes ativos
 document.getElementById('tbEstoque').innerHTML =
-'<tr><th>Lote</th><th>Confinamento</th><th>Curral</th><th class="num">Cabeças</th><th>Desde</th><th class="num">Dias</th></tr>'+
-estoque.data.sort((a,b)=>a.codigo.localeCompare(b.codigo)).map(e=>{
+ '<tr><th>Lote</th><th>Confinamento</th><th>Sexo</th><th>Curral(is)</th><th class="num">Entrada/compra</th><th class="num">Abatidas</th><th class="num">Saldo</th><th>Desde</th><th>Fonte</th></tr>'+
+lotesAtivos.sort((a,b)=>a.codigo.localeCompare(b.codigo)).map(e=>{
 const dias = e.desde?Math.round((Date.now()-new Date(e.desde))/864e5):null;
-return `<tr><td><b>${e.codigo}</b></td><td>${e.confinamento||'—'}</td><td>${e.curral||'—'}</td>
-<td class="num">${fmtN(e.cabecas)}</td><td>${fmtD(e.desde)}</td><td class="num">${dias??'—'}</td></tr>`;
+return `<tr><td><b>${e.codigo}</b></td><td>${e.confinamento||'—'}</td><td>${e.sexo==='machos'?'Machos':e.sexo==='femeas'?'Fêmeas':'Não informado'}</td><td>${e.currais.join(', ')||'—'}</td><td class="num">${fmtN(e.cabecas_base)}</td><td class="num">${fmtN(e.cabecas_abatidas)}</td><td class="num"><b>${fmtN(e.cabecas_atuais)}</b></td><td>${fmtD(e.desde)}${dias!=null?' · '+dias+' dias':''}</td><td>${e.fonte_quantidade==='entradas'?'Entrada registrada':e.fonte_quantidade==='compras'?'<span class="badge b-amber">Compra · entrada pendente</span>':'<span class="badge b-red">Quantidade ausente</span>'}</td></tr>`;
 }).join('');
 
 // ---- Pendências
 document.getElementById('tbPend').innerHTML =
 '<tr><th>Lote</th><th>Vendedor</th><th>Documento</th><th>Compra</th><th class="num">Cab</th><th class="num">Dias em aberto</th><th>Status</th></tr>'+
-pend.data.sort((a,b)=>(a.operacoes?.codigo||'').localeCompare(b.operacoes?.codigo||'')).map(p=>{
+pendAbertas.sort((a,b)=>(a.operacoes?.codigo||'').localeCompare(b.operacoes?.codigo||'')).map(p=>{
 const dias=Math.round((Date.now()-new Date(p.created_at))/864e5);
 const compData = p.compras?.data;
 const negocioEncerrado=['abatida','liquidada','encerrada','finalizada','concluida'].includes(String(p.operacoes?.status||'').toLowerCase());
@@ -150,6 +164,12 @@ return `<tr><td><b>${p.operacoes?.codigo||'—'}</b></td><td>${p.contatos?.nome|
 <td class="num">${dias}</td>
 <td>${exigeRevisao?'<span class="badge b-amber">Revisar vínculo documental</span>':negocioEncerrado?'<span class="badge b-amber">Negócio encerrado · documento pendente</span>':'<span class="badge b-red">Aguardando documento</span>'}</td></tr>`;
 }).join('') || '<tr><td colspan="7">Nenhuma pendência 🎉</td></tr>';
+
+// ---- Valores pagos a recuperar da contraparte
+document.getElementById('tbRessarcimentos').innerHTML =
+'<tr><th>Lote</th><th>Responsável</th><th>Tipo</th><th>Descrição</th><th>Pagamento</th><th class="num">Valor</th><th>Status</th></tr>'+
+(ressarcimentos.data||[]).sort((a,b)=>(a.operacoes?.codigo||'').localeCompare(b.operacoes?.codigo||'')).map(r=>`<tr><td><b>${r.operacoes?.codigo||'—'}</b></td><td>${r.contatos?.nome||'—'}</td><td>${r.tipo==='gta'?'GTA':r.tipo==='vacina'?'Vacina':r.tipo==='transporte'?'Transporte':'Outro'}</td><td class="wrap">${r.descricao}</td><td>${fmtD(r.data_pagamento)}</td><td class="num">${r.valor==null?'A apurar':fmtR$(r.valor)}</td><td><span class="badge b-amber">${r.status==='parcialmente_ressarcido'?'Parcial':'A ressarcir/descontar'}</span></td></tr>`).join('')
+|| '<tr><td colspan="7">Nenhum valor em aberto para ressarcimento.</td></tr>';
 
 // ---- Acertos
 document.getElementById('tbAcertos').innerHTML =

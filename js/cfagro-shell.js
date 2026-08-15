@@ -15,10 +15,10 @@ var BASE = LOCAL ? new URL('./', location.href).href : BASE_PRODUCAO;
 
 var NAV = [
   { href:'./',              rotulo:'Visão Geral',  icone:'grid' },
-  { href:'./confinados.html', rotulo:'Confinados', icone:'shield' },
+  { href:'./confinados.html', rotulo:'Resumo confinados', icone:'shield' },
   { sec:'Operações' },
   { href:'./confinex.html', rotulo:'Confinex',     icone:'calculator' },
-  { href:'./confinamento.html', rotulo:'Confinamento', icone:'curral' },
+  { href:'./confinamento.html', rotulo:'Operação confinamento', icone:'curral' },
   { href:'./fazenda-ametista.html', rotulo:'Fazenda Ametista', icone:'porteira' },
   // O portfólio é um app CFAgro separado, mas navega na mesma janela. Somente
   // ferramentas de terceiros usam ext:true e abrem outra aba.

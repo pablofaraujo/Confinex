@@ -11,6 +11,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="./js/cfagro-core.js?v=20260719-3"></script>
 <script src="./js/cfagro-shell.js?v=20260803-1" defer></script>
+<script src="./js/confinados-resumo.js?v=20260815-1"></script>
 </head>
 <body>
 <div id="login" class="login-box card">
@@ -64,44 +65,53 @@ async function carregar(){
   try{
     const resultados=await Promise.all([
       consultaComTimeout('Fazenda Ametista',db.from('fazenda_ametista').select('*')),
-      consultaComTimeout('Operações de confinamento',db.from('operacoes').select('id,codigo,status,confinamentos(id,nome)').not('confinamento_id','is',null)),
-      consultaComTimeout('Entradas de confinamento',db.from('entradas_confinamento').select('operacao_id,cabecas')),
-      consultaComTimeout('Exposição de hedge',db.from('v_exposicao_hedge').select('codigo,arrobas_previstas,cts_descobertos')),
+      consultaComTimeout('Operações de confinamento',db.from('operacoes').select('id,codigo,status,sexo,tipo_negocio,confinamento_id,confinamentos(id,nome)').eq('tipo_negocio','confinamento')),
+      consultaComTimeout('Entradas de confinamento',db.from('entradas_confinamento').select('operacao_id,cabecas,data_entrada,curral')),
+      consultaComTimeout('Compras de confinamento',db.from('compras').select('operacao_id,quantidade,data')),
+      consultaComTimeout('Abates de confinamento',db.from('abates').select('operacao_id,quantidade,data_abate')),
+      consultaComTimeout('Confinamentos',db.from('confinamentos').select('id,nome').eq('ativo',true)),
+      consultaComTimeout('Inventários de confinamento',db.from('inventarios_confinamento').select('confinamento_id,data_referencia,cabecas_total,machos,femeas,fonte').order('data_referencia',{ascending:false})),
+      consultaComTimeout('Exposição de hedge',db.from('v_exposicao_hedge').select('operacao_id,codigo,arrobas_previstas,cts_descobertos')),
       consultaComTimeout('Parceria Ricardo',db.from('parceria_ricardo').select('cabecas,status'))
     ]);
-    const [fazenda,confOps,confEntradas,exposicao,ricardo]=resultados;
-    const falhas=resultados.filter(r=>r.error),entradasPorOp={},expoPorCodigo={};
-    (confEntradas.data||[]).forEach(e=>entradasPorOp[e.operacao_id]=(entradasPorOp[e.operacao_id]||0)+Number(e.cabecas||0));
-    (exposicao.data||[]).forEach(e=>expoPorCodigo[e.codigo]=e);
+    const [fazenda,confOps,confEntradas,confCompras,confAbates,confinamentos,inventarios,exposicao,ricardo]=resultados;
+    const falhas=resultados.filter(r=>r.error),expoPorCodigo={};
+    const lotesConfinados=ConfinadosResumo.resumirLotes(confOps.data,confEntradas.data,confCompras.data,confAbates.data);
+    const resumoConfinamentos=ConfinadosResumo.aplicarInventarios(ConfinadosResumo.agruparPorConfinamento(lotesConfinados),inventarios.data,confinamentos.data);
+    ConfinadosResumo.filtrarExposicaoAtiva(exposicao.data,confOps.data).forEach(e=>expoPorCodigo[e.codigo]=e);
     const cabFazenda=(fazenda.data||[]).reduce((s,l)=>s+(l.tipo==='entrada'?1:-1)*Number(l.cabecas||0),0);
     const confAtivas=(confOps.data||[]).filter(o=>['comprada','em_confinamento'].includes(o.status));
-    const cabConfinamento=confAtivas.reduce((s,o)=>s+(entradasPorOp[o.id]||0),0);
+    const cabConfinamento=resumoConfinamentos.reduce((s,g)=>s+Number(g.cabecas||0),0);
+    const machosConfinados=resumoConfinamentos.reduce((s,g)=>s+g.machos,0);
+    const femeasConfinadas=resumoConfinamentos.reduce((s,g)=>s+g.femeas,0);
+    const sexoPendente=resumoConfinamentos.reduce((s,g)=>s+g.nao_informado,0);
     const cabRicardo=(ricardo.data||[]).filter(r=>r.status==='engorda').reduce((s,r)=>s+Number(r.cabecas||0),0);
     const cabTotal=cabFazenda+cabConfinamento+cabRicardo;
     kpis.innerHTML=[
       ['Total cabeças',fmtN(cabTotal),'Confinados + Ametista + Ricardo'],
       ['Total cabeças confinadas',fmtN(cabConfinamento),confAtivas.length+' lotes ativos'],
+      ['Machos / fêmeas confinados',fmtN(machosConfinados)+' / '+fmtN(femeasConfinadas),sexoPendente?fmtN(sexoPendente)+' sem sexo informado':'composição dos lotes ativos'],
       ['Total cabeças Fazenda Ametista',fmtN(cabFazenda),'rebanho próprio'],
       ['Total cabeças Parceria Ricardo',fmtN(cabRicardo),'bois em engorda']
     ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="d">${k[2]}</div></div>`).join('');
 
     const grupos={};
-    confAtivas.forEach(o=>{
-      const nome=o.confinamentos?.nome||'Confinamento sem nome';
-      const g=grupos[nome]||(grupos[nome]={nome,cabecas:0,arrobas:0,descobertas:0,lotes:0});
-      const ex=expoPorCodigo[o.codigo]||{};
-      g.cabecas+=entradasPorOp[o.id]||0;
+    resumoConfinamentos.forEach(resumo=>grupos[resumo.nome]={...resumo,arrobas:0,descobertas:0});
+    lotesConfinados.forEach(lote=>{
+      const g=grupos[lote.confinamento];
+      const ex=expoPorCodigo[lote.codigo]||{};
       g.arrobas+=Number(ex.arrobas_previstas||0);
       g.descobertas+=Math.max(0,Number(ex.cts_descobertos||0))*330;
-      g.lotes++;
     });
     const confEl=document.getElementById('confinamentosResumo');
     const lista=Object.values(grupos).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
     confEl.innerHTML=lista.length?lista.map(g=>{
       const descobertas=Math.min(g.descobertas,g.arrobas||g.descobertas);
       const pct=g.arrobas?Math.min(100,descobertas/g.arrobas*100):0;
-      const cobertura=g.arrobas?`${fmtN(descobertas,0)} arrobas descobertas das ${fmtN(g.arrobas,0)} arrobas totais previstas (${fmtN(pct,0)}%)`:'Previsão de arrobas ainda não cadastrada';
-      return `<a class="eco-row" href="./confinamento.html"><div class="eco-row-top"><span><b>${esc(g.nome)}</b> · ${fmtN(g.cabecas)} cab</span><span>${g.lotes} ${g.lotes===1?'lote':'lotes'}</span></div><div class="eco-detail">${cobertura}</div><div class="eco-progress" aria-label="${fmtN(pct,0)}% descoberto"><span style="width:${pct.toFixed(1)}%"></span></div></a>`;
+      const cobertura=g.arrobas?`${fmtN(descobertas,0)} arrobas descobertas das ${fmtN(g.arrobas,0)} arrobas previstas (${fmtN(pct,0)}%)`:'Previsão de arrobas ainda não cadastrada';
+      const composicao=`${fmtN(g.machos)} machos · ${fmtN(g.femeas)} fêmeas${g.nao_informado?' · '+fmtN(g.nao_informado)+' sem sexo':''}`;
+      const conferencia=g.inventario_em?` · contagem de ${fmtD(g.inventario_em)}${g.diferenca_ledger?' · diferença do ledger: '+(g.diferenca_ledger>0?'+':'')+fmtN(g.diferenca_ledger):''}`:'';
+      return `<a class="eco-row" href="./confinados.html"><div class="eco-row-top"><span><b>${esc(g.nome)}</b> · ${fmtN(g.cabecas)} cab</span><span>${g.lotes} ${g.lotes===1?'lote':'lotes'}</span></div><div class="eco-detail">${composicao} · ${cobertura}${conferencia}</div><div class="eco-progress" aria-label="${fmtN(pct,0)}% descoberto"><span style="width:${pct.toFixed(1)}%"></span></div></a>`;
     }).join(''):'<div class="eco-empty">Nenhum confinamento ativo.</div>';
 
     const temSexo=(fazenda.data||[]).some(l=>l.sexo);
