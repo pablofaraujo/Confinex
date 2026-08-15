@@ -120,7 +120,7 @@ class CabecalhosUiTest(unittest.TestCase):
                 self.assertEqual(leitor.h1, 1)
                 self.assertEqual(leitor.subtitulos, 1)
                 self.assertEqual(leitor.imagens, 0)
-                self.assertIn("design/components.css?v=20260804-1", fonte)
+                self.assertIn("design/components.css?v=20260815-1", fonte)
 
     def test_design_system_define_o_mesmo_contrato_da_visao_geral(self) -> None:
         css = (ROOT / "design/components.css").read_text(encoding="utf-8")
@@ -135,6 +135,22 @@ class CabecalhosUiTest(unittest.TestCase):
             css,
         )
         self.assertIn(".topbar h1{font-size:24px}", css)
+
+    def test_shell_e_tabelas_nao_expandem_o_documento_no_celular(self) -> None:
+        css = (ROOT / "design/components.css").read_text(encoding="utf-8")
+        self.assertIn(
+            ".scroll{width:100%;max-width:100%;min-width:0;overflow-x:auto}",
+            css,
+        )
+        self.assertIn(
+            "body.has-shell{grid-template-columns:minmax(0,1fr);",
+            css,
+        )
+        self.assertIn(
+            ".shell-side{position:sticky;top:60px;z-index:900;width:100%;"
+            "max-width:100%;min-width:0;",
+            css,
+        )
 
     def test_confinex_react_repete_o_mesmo_contrato_nos_dois_pacotes(self) -> None:
         contrato_titulo = (

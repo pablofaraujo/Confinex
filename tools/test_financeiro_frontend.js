@@ -21,7 +21,7 @@ assert.ok(js.includes('As demais áreas continuam disponíveis.'));
 assert.ok(!/\bgrupo_(?:id|origem_id)\b/.test(js), 'não exibir ID técnico de grupo');
 assert.ok(html.includes('cfagro-gestao.js?v=20260814-1'));
 assert.ok(html.includes('financeiro.js?v=20260803-1'));
-assert.ok(html.includes('components.css?v=20260804-1'));
+assert.ok(html.includes('components.css?v=20260815-1'));
 assert.ok(html.includes('class="kpis kpis-dinheiro"'));
 assert.ok(componentes.includes('.kpis.kpis-dinheiro'));
 assert.ok(componentes.includes('minmax(min(220px,100%),1fr)'));

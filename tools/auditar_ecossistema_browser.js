@@ -1531,6 +1531,75 @@ async function auditarEventos(browser, viewport, resultados) {
   }
 }
 
+async function auditarConfinadosResponsivo(browser, viewport, resultados) {
+  const context = await browser.newContext({
+    viewport: { width: viewport.largura, height: viewport.altura },
+  });
+  const page = await context.newPage();
+  try {
+    await page.goto(new URL('confinados.html', baseUrl).href, {
+      waitUntil: 'load',
+      timeout: 30000,
+    });
+    await page.waitForFunction(() => document.body.classList.contains('has-shell'));
+    const estado = await page.evaluate(async () => {
+      document.getElementById('login').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      document.getElementById('tbRessarcimentos').innerHTML = `
+        <thead><tr><th>Lote</th><th>Confinamento</th><th>Responsável</th>
+        <th>Motivo detalhado</th><th class="num">Valor</th><th>Situação</th></tr></thead>
+        <tbody><tr><td>CF-26-011</td><td>Confinamento de referência</td>
+        <td>Contato operacional completo</td><td>GTA, vacina e transporte a ressarcir</td>
+        <td class="num">R$ 12.345,67</td><td><span class="badge b-amber">Aguardando acerto</span></td></tr></tbody>`;
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      const raiz = document.documentElement;
+      const card = document.getElementById('tbRessarcimentos').closest('.scroll');
+      const shell = document.querySelector('.shell-side');
+      const titulos = Array.from(document.querySelectorAll('#app > h2'))
+        .map(elemento => elemento.textContent.trim());
+      return {
+        cliente: raiz.clientWidth,
+        documento: raiz.scrollWidth,
+        cardCliente: card.clientWidth,
+        cardConteudo: card.scrollWidth,
+        cardDireita: Math.round(card.getBoundingClientRect().right),
+        overflowCard: getComputedStyle(card).overflowX,
+        shellCliente: shell.clientWidth,
+        shellConteudo: shell.scrollWidth,
+        titulos: titulos.slice(0, 2),
+      };
+    });
+    const aprovado = estado.documento <= estado.cliente &&
+      estado.cardConteudo > estado.cardCliente &&
+      estado.cardDireita <= estado.cliente &&
+      ['auto', 'scroll'].includes(estado.overflowCard) &&
+      estado.shellConteudo > estado.shellCliente &&
+      JSON.stringify(estado.titulos) === JSON.stringify([
+        'Saldo atual por confinamento',
+        'Lotes ativos em confinamento',
+      ]);
+    resultados.push(item(
+      `browser:${viewport.nome}:confinados:tabelas-contidas`,
+      'Resumo confinados responsivo com dados largos',
+      `tabela e navegação maiores que a tela em ${viewport.nome}`,
+      'card e menu rolam internamente sem ampliar o documento',
+      aprovado,
+      JSON.stringify(estado),
+    ));
+  } catch (erro) {
+    resultados.push(item(
+      `browser:${viewport.nome}:confinados:tabelas-contidas`,
+      'Resumo confinados responsivo com dados largos',
+      `tabela e navegação maiores que a tela em ${viewport.nome}`,
+      'o cenário automatizado termina',
+      false,
+      erro.stack || erro.message,
+    ));
+  } finally {
+    await context.close();
+  }
+}
+
 async function auditarAtualizacaoPainelBoiGordo(browser, viewport, resultados) {
   const context = await browser.newContext({
     viewport: { width: viewport.largura, height: viewport.altura },
@@ -1619,6 +1688,7 @@ async function auditarAtualizacaoPainelBoiGordo(browser, viewport, resultados) {
         await auditarMenu(browser, viewport, resultados);
         if (viewport.nome === 'celular') {
           await auditarSafari14Confinex(browser, viewport, resultados);
+          await auditarConfinadosResponsivo(browser, viewport, resultados);
         }
         await auditarPagamentoConfinamento(browser, viewport, resultados);
         await auditarBasesOnlineConfinex(browser, viewport, resultados);

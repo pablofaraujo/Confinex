@@ -13,7 +13,7 @@ h1{font-size:28px;font-weight:700;letter-spacing:-.02em}
 h1 span{font-weight:400;color:var(--muted);font-size:var(--fs-17)}
 h2{font-size:var(--fs-13);font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.08em;margin:28px 0 12px}
 .sub{color:var(--muted);font-size:var(--fs-13);margin-top:4px}
-.scroll{overflow-x:auto}
+.scroll{width:100%;max-width:100%;min-width:0;overflow-x:auto}
 #app{display:none}
 
 /* ---------- Topbar ---------- */
@@ -25,7 +25,7 @@ h2{font-size:var(--fs-13);font-weight:700;color:var(--navy);text-transform:upper
 .logo-img{border-radius:50%;object-fit:cover;flex-shrink:0}
 
 /* ---------- Cards e KPIs ---------- */
-.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r-md);padding:16px;box-shadow:var(--shadow-1)}
+.card{min-width:0;max-width:100%;background:var(--card);border:1px solid var(--border);border-radius:var(--r-md);padding:16px;box-shadow:var(--shadow-1)}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:16px}
 .kpi{background:var(--card);border:1px solid var(--border);border-top:4px solid var(--yellow);border-radius:var(--r-sm);padding:14px 16px;box-shadow:var(--shadow-1)}
 .kpi .l{font-size:var(--fs-11);color:var(--muted);text-transform:uppercase}
@@ -208,7 +208,7 @@ td.c-media{background:var(--amberbg)}
 td.c-baixa{background:var(--redbg)}
 
 /* ---------- Shell de navegação (sidebar fixa — js/cfagro-shell.js) ---------- */
-body.has-shell{display:grid;grid-template-columns:240px minmax(0,1fr);grid-template-rows:68px minmax(0,1fr);grid-template-areas:"top top" "side content";max-width:none;padding:0;margin:0;min-height:100vh}
+body.has-shell{display:grid;grid-template-columns:240px minmax(0,1fr);grid-template-rows:68px minmax(0,1fr);grid-template-areas:"top top" "side content";max-width:none;min-width:0;padding:0;margin:0;min-height:100vh}
 .shell-top{grid-area:top;position:sticky;top:0;z-index:1000;height:68px;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 24px;box-shadow:0 1px 0 rgba(255,255,255,.08)}
 .shell-brand{display:flex;align-items:center;gap:12px;color:#fff;text-decoration:none;font-size:22px;font-weight:700;letter-spacing:.04em}
 .shell-brand img{width:46px;height:46px;border-radius:50%;object-fit:cover;background:var(--yellow)}
@@ -227,15 +227,16 @@ body.has-shell{display:grid;grid-template-columns:240px minmax(0,1fr);grid-templ
 .shell-link.ativa{background:var(--yellow-soft);color:var(--navy);font-weight:700;box-shadow:inset 4px 0 0 var(--yellow)}
 .shell-link.ativa .shell-icon-wrap{color:var(--navy)}
 .shell-link .ext{margin-left:auto;color:var(--muted);font-size:var(--fs-11)}
-.shell-content{grid-area:content;min-width:0;width:100%;max-width:1440px;margin:0 auto;padding:26px 30px}
+.shell-content,.shell-content>#app{min-width:0;max-width:100%}
+.shell-content{grid-area:content;width:100%;max-width:1440px;margin:0 auto;padding:26px 30px}
 body.has-shell[data-w=md] .shell-content{max-width:1100px}
 body.has-shell .voltar-central{display:none}
 body.has-shell .shell-content .topbar .logo-img{display:none}
 @media(max-width:900px){
-  body.has-shell{grid-template-columns:1fr;grid-template-rows:60px auto minmax(0,1fr);grid-template-areas:"top" "side" "content"}
+  body.has-shell{grid-template-columns:minmax(0,1fr);grid-template-rows:60px auto minmax(0,1fr);grid-template-areas:"top" "side" "content"}
   .shell-top{height:60px;padding:0 14px}
   .shell-brand{font-size:18px}.shell-brand img{width:40px;height:40px}.shell-context{display:none}.shell-actions{margin-left:auto}.shell-action{padding:6px 9px}
-  .shell-side{position:sticky;top:60px;z-index:900;height:auto;max-width:100vw;flex-direction:row;flex-wrap:nowrap;align-items:center;gap:4px;border-right:none;border-bottom:1px solid var(--border);padding:8px 10px;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
+  .shell-side{position:sticky;top:60px;z-index:900;width:100%;max-width:100%;min-width:0;height:auto;flex-direction:row;flex-wrap:nowrap;align-items:center;gap:4px;border-right:none;border-bottom:1px solid var(--border);padding:8px 10px;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
   .shell-sec{display:none}
   .shell-sep{width:1px;height:24px;flex:0 0 1px;margin:0 3px}
   .shell-link{flex:0 0 auto;white-space:nowrap}
