@@ -127,7 +127,9 @@ As duas leituras são auxiliares e não mudam lucro, custos totais, caixa ou ran
 
 ## Pendências e eventos
 
-- Pendências agrega `operation_drafts`, `pending_actions` e `pendencias_documentos` em modo somente leitura. Ela indica o que exige atenção e a próxima etapa, mas conferência e promoção operacional continuam exclusivamente em Revisões.
+- Pendências agrega `operation_drafts`, `pending_actions` e `pendencias_documentos` em modo somente leitura. Ela também cruza os negócios de confinamento não cancelados com as avaliações Confinex não canceladas. Todo negócio precisa ter ao menos uma estimativa identificada, com premissas e resultado salvos; enquanto não tiver, aparece como **Planejamento de rentabilidade não registrado** tanto em Pendências quanto em Operações → Confinamento.
+- A existência isolada de `operacoes.resultado_previsto`, de uma avaliação vazia ou cancelada não encerra a pendência. Negócio abatido ou encerrado também não é dispensado automaticamente: o comparativo planejado × executado exige uma base Confinex preservada. Uma reconstrução posterior deve ser identificada e revisada, nunca apresentada silenciosamente como estimativa original.
+- Pendências indica o que exige atenção e a próxima etapa, mas conferência e promoção operacional continuam exclusivamente em Revisões. O planejamento abre o Confinex e não cria nem altera registros por conta própria.
 - Uma fonte de Pendências indisponível não oculta itens válidos das demais. Falha total produz mensagem genérica; detalhes internos da API nunca são apresentados.
 - Eventos é histórico, não fila operacional. Os filtros por situação, tipo, período e texto atuam localmente e não alteram registros.
 - Resumo e contexto priorizam campos humanos explícitos e, depois, dados legíveis de estruturas aninhadas ou códigos operacionais. JSON bruto, UUID, ID técnico de grupo e referência `telegram:<id>` são descartados, nunca usados como substituto.

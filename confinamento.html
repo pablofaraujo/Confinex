@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="./design/components.css?v=20260804-1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="./js/cfagro-core.js"></script>
+<script src="./js/cfagro-gestao.js?v=20260815-2"></script>
 <script src="./js/cfagro-shell.js?v=20260803-1" defer></script>
 <script src="./js/confinados-resumo.js?v=20260815-1"></script>
 </head>
@@ -36,6 +37,9 @@
 </div>
 
 <div class="kpis" id="kpis"></div>
+
+<h2>Planejamento de rentabilidade pendente</h2>
+<div class="card scroll"><table id="tbPlanejamento"></table></div>
 
 <h2>Avaliações aguardando aprovação</h2>
 <div class="card scroll"><table id="tbAprovacoes"></table></div>
@@ -139,7 +143,7 @@ async function carregar(){
     db.from('custos_operacao').select('operacao_id,data,categoria,descricao,valor').order('categoria'),
     db.from('eventos_operacao').select('operacao_id,data,tipo,descricao').order('data',{ascending:false}).limit(30),
     db.from('fechamentos_operacao').select('operacao_id,previsto,realizado_bruto,realizado_liquido,hedge_creditado,desvio,explicacao'),
-    db.from('confinex_avaliacoes').select('id,codigo,nome,status,grupo_origem_nome,estimativa_versao_atual,criado_em,confinex_estimativas(versao,tipo,premissas,resultado)').neq('status','cancelado'),
+    db.from('confinex_avaliacoes').select('id,operacao_id,codigo,nome,status,grupo_origem_nome,estimativa_versao_atual,criado_em,confinex_estimativas(id,versao,tipo,premissas,resultado)').neq('status','cancelado'),
     db.from('confinex_consolidacoes').select('id,avaliacao_id,estimativa_versao,comentario_geral,consolidado_em'),
     db.from('confinex_desvios').select('id,consolidacao_id,indicador,natureza,estimado,realizado,desvio,desvio_percentual,classificacao,comentario_automatico,comentario_manual,material').order('indicador'),
     db.from('confinex_ajustes_prazo').select('id,avaliacao_id,dias_anterior,dias_novo,data_saida_anterior,data_saida_nova,motivo,ajustado_em').order('ajustado_em',{ascending:false}),
@@ -171,6 +175,12 @@ async function carregar(){
     ['Lotes abatidos', fmtN(abatidos), 'de '+ops.data.length+' lotes no total'],
     ['Custos registrados', fmtR$(custoTotal), custos.data.length+' lançamentos (frete/trato/financeiro)'],
   ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="d">${k[2]}</div></div>`).join('');
+
+  // ---- Todo negócio de confinamento precisa de estimativa salva no Confinex.
+  const planejamentosPendentes = CFAgroGestao.planejamentosRentabilidadePendentes(ops.data, avaliacoes.data||[]);
+  document.getElementById('tbPlanejamento').innerHTML =
+    '<tr><th>Negócio</th><th>Pendência</th><th>Situação</th><th>Próxima etapa</th></tr>'+
+    (planejamentosPendentes.map(item=>`<tr><td><b>${esc(item.contexto)}</b></td><td class="wrap">${esc(item.resumo)}</td><td><span class="badge b-amber">${esc(item.status)}</span></td><td><a class="btn mini sec" href="${item.destino.href}">${esc(item.acao)}</a></td></tr>`).join('') || '<tr><td colspan="4">Todos os negócios de confinamento têm planejamento de rentabilidade salvo.</td></tr>');
 
   // ---- Avaliações aguardando aprovação
   const pendentes = (avaliacoes.data||[]).filter(a=>a.status==='rascunho').map(a=>{
