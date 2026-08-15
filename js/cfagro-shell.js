@@ -38,6 +38,7 @@ var NAV = [
   { href:'./parceria-ricardo.html',rotulo:'Ricardo', icone:'pessoa' },
   { href:'./parceria-xande.html',  rotulo:'Xande',   icone:'pessoa' },
   { sec:'Gestão' },
+  { href:'./crm.html',      rotulo:'CRM de Gado',   icone:'pessoa' },
   { href:'./pendencias.html',rotulo:'Pendências',    icone:'checklist' },
   { href:'./revisoes.html', rotulo:'Revisões',      icone:'edit' },
   { href:'./eventos.html',  rotulo:'Eventos',       icone:'calendar' },

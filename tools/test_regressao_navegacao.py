@@ -44,7 +44,7 @@ class RegressaoNavegacaoTests(unittest.TestCase):
         for pagina in paginas_ativas:
             fonte = pagina.read_text(encoding="utf-8")
             self.assertIn(
-                "cfagro-shell.js?v=20260803-1",
+                "cfagro-shell.js?v=20260815-1",
                 fonte,
                 msg=f"{pagina.name} ainda pode carregar um menu antigo do cache",
             )
@@ -96,6 +96,7 @@ class RegressaoNavegacaoTests(unittest.TestCase):
             "revisoes.html",
             "ocr-pesagem.html",
             "painel-boi-gordo.html",
+            "crm.html",
         )
         for nome in paginas_sem_acoes_duplicadas:
             pagina = (ROOT / nome).read_text(encoding="utf-8")

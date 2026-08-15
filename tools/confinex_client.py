@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -16,10 +17,13 @@ from typing import Any
 
 ENV_PATH = Path("/root/.openclaw/gateway.systemd.env")
 TIMEOUT_MAX_SECONDS = 20
+TENTATIVAS_LEITURA_PADRAO = 3
+ESPERA_LEITURA_PADRAO = 0.4
 
 READ_TABLES = {
     "abates",
     "compras",
+    "crm_followups",
     "confinex_avaliacoes",
     "confinex_consolidacoes",
     "confinex_desvios",
@@ -29,10 +33,13 @@ READ_TABLES = {
     "contexto_handoff",
     "contextos_canais",
     "eventos",
+    "interacoes_crm",
     "gtas",
     "memorias_agentes",
     "operacoes",
     "operation_drafts",
+    "negociacoes_gado",
+    "ofertas_gado",
     "pendencias_documentos",
     "pending_actions",
     "pesagens_caderno",
@@ -43,9 +50,13 @@ WRITE_TABLES = {
     "contexto_handoff",
     "contextos_canais",
     "eventos",
+    "interacoes_crm",
     "memorias_agentes",
     "operation_drafts",
+    "negociacoes_gado",
+    "ofertas_gado",
     "pending_actions",
+    "crm_followups",
 }
 
 OPERATIONAL_WRITE_TABLES = {
@@ -153,6 +164,8 @@ class ConfinexClient:
         url: str | None = None,
         key: str | None = None,
         timeout: int = TIMEOUT_MAX_SECONDS,
+        tentativas_leitura: int = TENTATIVAS_LEITURA_PADRAO,
+        espera_leitura: float = ESPERA_LEITURA_PADRAO,
     ) -> None:
         values = {**_load_protected_env(), **os.environ, **(env or {})}
         self.url = (
@@ -170,6 +183,8 @@ class ConfinexClient:
             or ""
         )
         self.timeout = max(1, min(int(timeout), TIMEOUT_MAX_SECONDS))
+        self.tentativas_leitura = max(1, min(int(tentativas_leitura), 5))
+        self.espera_leitura = max(0.0, min(float(espera_leitura), 5.0))
         if not self.url or not self.key:
             raise ConfinexError(
                 "credenciais protegidas do Supabase não estão disponíveis"
@@ -205,22 +220,30 @@ class ConfinexClient:
         if prefer:
             headers["Prefer"] = prefer
         req = urllib.request.Request(url, data=body, headers=headers, method=method)
-        try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-                text = resp.read().decode("utf-8")
-        except urllib.error.HTTPError as exc:
-            raise ConfinexHTTPError(
-                f"Supabase {method} {table} falhou com HTTP {exc.code}",
-                status=exc.code,
-            ) from exc
-        except urllib.error.URLError as exc:
-            raise ConfinexConnectionError(
-                f"falha de rede em {method} {table}: {type(exc.reason).__name__}"
-            ) from exc
-        except (TimeoutError, OSError) as exc:
-            raise ConfinexConnectionError(
-                f"falha de rede em {method} {table}: {type(exc).__name__}"
-            ) from exc
+        tentativas = self.tentativas_leitura if method == "GET" else 1
+        for tentativa in range(1, tentativas + 1):
+            try:
+                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                    text = resp.read().decode("utf-8")
+                break
+            except urllib.error.HTTPError as exc:
+                # Erros HTTP são respostas definitivas. Repeti-los pode mascarar
+                # autorização, contrato de API ou indisponibilidade persistente.
+                raise ConfinexHTTPError(
+                    f"Supabase {method} {table} falhou com HTTP {exc.code}",
+                    status=exc.code,
+                ) from exc
+            except urllib.error.URLError as exc:
+                erro = exc
+                detalhe = type(exc.reason).__name__
+            except (TimeoutError, OSError) as exc:
+                erro = exc
+                detalhe = type(exc).__name__
+            if tentativa >= tentativas:
+                raise ConfinexConnectionError(
+                    f"falha de rede em {method} {table} após {tentativas} tentativa(s): {detalhe}"
+                ) from erro
+            time.sleep(self.espera_leitura * tentativa)
         if not text:
             return []
         try:

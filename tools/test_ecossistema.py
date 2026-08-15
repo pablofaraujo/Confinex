@@ -26,10 +26,14 @@ TOOLS = ROOT / "tools"
 TABLES_AUDITADAS = (
     "abates",
     "compras",
+    "crm_followups",
     "contexto_handoff",
     "eventos",
+    "interacoes_crm",
     "memorias_agentes",
     "operation_drafts",
+    "negociacoes_gado",
+    "ofertas_gado",
     "pending_actions",
     "pesagens_caderno",
     "vendas",
@@ -141,6 +145,7 @@ def validar_local() -> None:
     executar(["node", "--check", "js/financeiro.js"])
     executar(["node", "--check", "js/pendencias.js"])
     executar(["node", "--check", "js/eventos.js"])
+    executar(["node", "--check", "js/crm.js"])
     executar(["node", "--check", "js/confinados-hedge.js"])
     executar(["node", "--check", "js/confinex-pagamento-confinamento.mjs"])
     executar(["node", "--check", "js/confinex-resultado-financeiro.mjs"])
