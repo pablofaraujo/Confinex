@@ -7,6 +7,6 @@
     "auditar:browser": "node tools/auditar_ecossistema_browser.js"
   },
   "devDependencies": {
-    "playwright": "1.61.1"
+    "playwright": "1.62.1"
   }
 }

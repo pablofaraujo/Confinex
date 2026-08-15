@@ -26,7 +26,7 @@ e telas de mercado podem informar a data da fonte quando isso muda a decisão.
 ```html
 <link rel="stylesheet" href="./design/tokens.css">
 <link rel="stylesheet" href="./design/components.css">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.min.js"></script>
 <script src="./js/cfagro-core.js"></script>
 <script src="./js/cfagro-shell.js" defer></script>
 ```
@@ -58,7 +58,7 @@ Larguras: padrão 1280px; `<body data-w="md">` = 1100px; `<body data-w="sm">` = 
 
 | Componente | Classes | Uso |
 |---|---|---|
-| Card | `.card` (+ `.scroll` p/ tabela larga) | container padrão |
+| Card | `.card` (+ `.scroll` p/ tabela larga) | container padrão; `.scroll` limita a largura ao conteúdo e mantém a rolagem dentro do card |
 | KPI | `.kpis > .kpi > .l/.v/.d` | indicadores no topo |
 | KPI monetário longo | `.kpis.kpis-dinheiro > .kpi` | valores em reais que precisam de cartões mais largos e quebra de segurança |
 | Tabela | `table/th/td`, `.num`, `.pos/.neg`, `td.wrap` | dados operacionais |
@@ -115,6 +115,11 @@ e o resumo de parcerias usa o aperto de mãos. As ações globais “Atualizar�
 - O brinco CFAgro aparece somente no cabeçalho global do shell. As áreas não
   repetem logo, nome do responsável ou marca dentro do próprio cabeçalho.
 - Ações próprias da tela permanecem em `.topbar > .acoes`, alinhadas ao topo.
+
+No celular, o grid do shell usa coluna `minmax(0, 1fr)` e todos os contêineres
+de conteúdo têm `min-width: 0`. Tabelas largas devem permanecer dentro de
+`.scroll`; a rolagem horizontal pertence ao card ou à faixa de navegação, nunca
+ao documento inteiro.
 
 - Título da aba: `CFAgro — {Módulo}`.
 - Toda página-satélite tem `.voltar-central` apontando para `./`.
