@@ -9,6 +9,7 @@ const pendenciasJs = fs.readFileSync(path.join(raiz, 'js/pendencias.js'), 'utf8'
 const eventosHtml = fs.readFileSync(path.join(raiz, 'eventos.html'), 'utf8');
 const eventosJs = fs.readFileSync(path.join(raiz, 'js/eventos.js'), 'utf8');
 const confinadosHtml = fs.readFileSync(path.join(raiz, 'confinados.html'), 'utf8');
+const confinamentoHtml = fs.readFileSync(path.join(raiz, 'confinamento.html'), 'utf8');
 const bbHtml = fs.readFileSync(path.join(raiz, 'bb.html'), 'utf8');
 const auditoriaBrowser = fs.readFileSync(path.join(raiz, 'tools/auditar_ecossistema_browser.js'), 'utf8');
 
@@ -18,7 +19,15 @@ for(const id of ['listaPendencias','filtroOrigem','filtroTexto','erroFontes']){
 for(const tabela of ['operation_drafts','pending_actions','pendencias_documentos']){
   assert.ok(pendenciasJs.includes(`db.from('${tabela}').select('*')`), `consulta ausente: ${tabela}`);
 }
+for(const tabela of ['operacoes','confinex_avaliacoes']){
+  assert.ok(pendenciasJs.includes(`db.from('${tabela}').select(`), `consulta ausente: ${tabela}`);
+}
 assert.ok(pendenciasHtml.includes('Próxima etapa'));
+assert.ok(pendenciasHtml.includes('<option>Planejamento</option>'));
+assert.ok(pendenciasJs.includes('planejamentosRentabilidadePendentes'));
+assert.ok(confinamentoHtml.includes('id="tbPlanejamento"'));
+assert.ok(confinamentoHtml.includes('Planejamento de rentabilidade pendente'));
+assert.ok(confinamentoHtml.includes('planejamentosRentabilidadePendentes(ops.data, avaliacoes.data||[])'));
 assert.ok(pendenciasJs.includes('Os demais itens continuam disponíveis.'));
 assert.ok(pendenciasJs.includes("href=\"'+esc(item.destino.href)"));
 assert.ok(!/\.(insert|update|delete|upsert|rpc)\s*\(/.test(pendenciasJs));
@@ -32,10 +41,10 @@ assert.ok(eventosHtml.includes('Origem'));
 assert.ok(eventosJs.includes("href=\"'+esc(item.origem.href)"));
 assert.ok(!/\.(insert|update|delete|upsert|rpc)\s*\(/.test(eventosJs));
 
-for(const html of [pendenciasHtml,eventosHtml]){
-  assert.ok(html.includes('cfagro-gestao.js?v=20260814-1'));
-}
-assert.ok(pendenciasHtml.includes('pendencias.js?v=20260814-1'));
+assert.ok(pendenciasHtml.includes('cfagro-gestao.js?v=20260815-2'));
+assert.ok(eventosHtml.includes('cfagro-gestao.js?v=20260814-1'));
+assert.ok(confinamentoHtml.includes('cfagro-gestao.js?v=20260815-2'));
+assert.ok(pendenciasHtml.includes('pendencias.js?v=20260815-2'));
 assert.ok(eventosHtml.includes('eventos.js?v=20260803-1'));
 assert.ok(pendenciasJs.includes("new Set(['realizado','rejeitado','cancelado'])"));
 assert.ok(pendenciasJs.includes("new Set(['executado','rejeitado','cancelado','expirado'])"));
@@ -66,7 +75,7 @@ for(const [pagina, html] of [['Confinados', confinadosHtml], ['Boi Balança', bb
     `${pagina} deve distinguir revisão documental de documento ausente`
   );
 }
-assert.ok(auditoriaBrowser.includes('linhasRestauradas === 5'));
-assert.ok(auditoriaBrowser.includes('estado.linhas === 4'));
+assert.ok(auditoriaBrowser.includes('linhasRestauradas === 6'));
+assert.ok(auditoriaBrowser.includes('estado.linhas === 5'));
 
-console.log('Pendências e Eventos: 40 verificações estáticas aprovadas.');
+console.log('Pendências e Eventos: 48 verificações estáticas aprovadas.');

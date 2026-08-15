@@ -63,6 +63,36 @@ const documentoEmRevisao = gestao.pendenciasLegiveis([], [], [{
 assert.strictEqual(documentoEmRevisao.resumo, 'Revisar documento: Gta');
 assert.strictEqual(documentoEmRevisao.status, 'Revisão necessária');
 
+// Todo negócio de confinamento precisa de uma estimativa Confinex válida e salva.
+const operacoesPlanejamento = [
+  {id:'op-1',codigo:'CF-26-001',tipo_negocio:'confinamento',status:'em_confinamento'},
+  {id:'op-2',codigo:'CF-26-002',tipo_negocio:'confinamento',status:'abatida'},
+  {id:'op-3',codigo:'CF-26-003',tipo_negocio:'confinamento',status:'comprada',resultado_previsto:{lucro:100}},
+  {id:'op-4',codigo:'CF-26-004',tipo_negocio:'confinamento',status:'cancelada'},
+  {id:'op-5',codigo:'BB-26-001',tipo_negocio:'boi_balanca',status:'comprada'},
+  {id:'op-6',codigo:'CF-26-006',tipo_negocio:'confinamento',status:'em_confinamento'}
+];
+const avaliacoesPlanejamento = [
+  {operacao_id:'op-1',codigo:'OUTRO',status:'iniciado',confinex_estimativas:[{id:'est-1',versao:1,premissas:{cabecas:100},resultado:{lucro:10}}]},
+  {codigo:' cf-26-002 ',status:'consolidado',confinex_estimativas:[{versao:1,premissas:{cabecas:80},resultado:{lucro:8}}]},
+  {operacao_id:'op-3',codigo:'CF-26-003',status:'iniciado',confinex_estimativas:[]},
+  {operacao_id:'op-3',codigo:'CF-26-003',status:'cancelado',confinex_estimativas:[{versao:1,premissas:{cabecas:70},resultado:{lucro:7}}]},
+  {operacao_id:'op-6',codigo:'CF-26-006',status:'rascunho',confinex_estimativas:[]},
+  {operacao_id:'op-6',codigo:'CF-26-006',status:'iniciado',confinex_estimativas:[{versao:2,premissas:{cabecas:60},resultado:{lucro:6}}]}
+];
+const planejamentoPendente = gestao.planejamentosRentabilidadePendentes(operacoesPlanejamento, avaliacoesPlanejamento);
+assert.strictEqual(planejamentoPendente.length, 1);
+assert.deepStrictEqual(planejamentoPendente[0], {
+  origem:'Planejamento',
+  resumo:'Planejamento de rentabilidade não registrado',
+  contexto:'CF-26-003',
+  status:'Pendente',
+  data:null,
+  destino:{rotulo:'Confinex',href:'./confinex.html'},
+  acao:'Planejar'
+});
+assert.deepStrictEqual(gestao.planejamentosRentabilidadePendentes([], []), []);
+
 // Eventos legados usam código/contexto humano, nunca UUID ou ID de grupo.
 const eventosHumanos = gestao.eventosLegiveis([{
   tipo:'promocao_operacional_preparada',
@@ -177,4 +207,4 @@ const mensagem = gestao.erroLegivel(new Error('relation public.segredo does not 
 assert.strictEqual(mensagem, 'Não foi possível carregar os dados. Tente atualizar a página.');
 assert.ok(!mensagem.includes('public.segredo'));
 
-console.log('test_gestao_frontend: 49 verificações aprovadas');
+console.log('test_gestao_frontend: 52 verificações aprovadas');

@@ -218,6 +218,53 @@ function pendenciasLegiveis(rascunhos, acoes, documentos){
   return linhas.sort(function(a,b){ return String(b.data || '').localeCompare(String(a.data || '')); });
 }
 
+function codigoNormalizado(valor){
+  return texto(valor).toUpperCase();
+}
+
+function estimativaConfinexValida(estimativa){
+  if(!estimativa || typeof estimativa !== 'object' || Array.isArray(estimativa)) return false;
+  var identificada = texto(estimativa.id) || numero(estimativa.versao) > 0;
+  return Boolean(
+    identificada &&
+    Object.keys(objeto(estimativa.premissas)).length &&
+    Object.keys(objeto(estimativa.resultado)).length
+  );
+}
+
+function planejamentosRentabilidadePendentes(operacoes, avaliacoes){
+  var avaliacoesAtivas = (avaliacoes || []).filter(function(avaliacao){
+    return texto(avaliacao && avaliacao.status).toLowerCase() !== 'cancelado';
+  });
+  return (operacoes || []).filter(function(operacao){
+    var status = texto(operacao && operacao.status).toLowerCase();
+    var tipo = texto(operacao && operacao.tipo_negocio).toLowerCase();
+    return tipo === 'confinamento' && !['cancelada','cancelado'].includes(status);
+  }).filter(function(operacao){
+    var codigo = codigoNormalizado(operacao.codigo);
+    var planejamentoValido = avaliacoesAtivas.some(function(item){
+      var corresponde = Boolean(
+        (texto(item.operacao_id) && texto(item.operacao_id) === texto(operacao.id)) ||
+        (codigo && codigoNormalizado(item.codigo) === codigo)
+      );
+      return corresponde && (item.confinex_estimativas || []).some(estimativaConfinexValida);
+    });
+    return !planejamentoValido;
+  }).map(function(operacao){
+    return {
+      origem:'Planejamento',
+      resumo:'Planejamento de rentabilidade não registrado',
+      contexto:referenciaHumana(operacao.codigo, 'Negócio de confinamento'),
+      status:'Pendente',
+      data:dataItem(operacao),
+      destino:{rotulo:'Confinex', href:'./confinex.html'},
+      acao:'Planejar'
+    };
+  }).sort(function(a,b){
+    return String(a.contexto || '').localeCompare(String(b.contexto || ''), 'pt-BR');
+  });
+}
+
 function eventosLegiveis(eventos){
   return (eventos || []).map(function(item){
     return {
@@ -404,6 +451,7 @@ return {
   lembretesFinanceiros:lembretesFinanceiros,
   obrigacoesFinanceiras:obrigacoesFinanceiras,
   pendenciasLegiveis:pendenciasLegiveis,
+  planejamentosRentabilidadePendentes:planejamentosRentabilidadePendentes,
   resumoFinanceiro:resumoFinanceiro,
   resumoFinanceiroAmpliado:resumoFinanceiroAmpliado,
   transacoesFinanceiras:transacoesFinanceiras,

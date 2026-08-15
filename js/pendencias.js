@@ -24,13 +24,14 @@ function render(){
     return '<tr><td>'+esc(item.origem)+'</td><td class="wrap">'+esc(item.resumo)+'</td><td class="wrap">'+esc(item.contexto)+'</td><td><span class="badge '+classeStatus(item.status)+'">'+esc(item.status)+'</span></td><td>'+CFAgro.fmtDT(item.data)+'</td><td>'+linkDestino(item)+'</td></tr>';
   }).join('') || '<tr><td colspan="6" class="wrap">Nenhuma pendência corresponde aos filtros.</td></tr>';
 
-  var contagem = {Revisões:0,Ações:0,Documentos:0};
+  var contagem = {Revisões:0,Ações:0,Documentos:0,Planejamento:0};
   itens.forEach(function(item){ contagem[item.origem] = (contagem[item.origem] || 0) + 1; });
   el('kpis').innerHTML = [
     ['Total',itens.length],
     ['Revisões',contagem.Revisões],
     ['Ações',contagem.Ações],
-    ['Documentos',contagem.Documentos]
+    ['Documentos',contagem.Documentos],
+    ['Planejamento',contagem.Planejamento]
   ].map(function(k){ return '<div class="kpi"><div class="l">'+k[0]+'</div><div class="v">'+k[1]+'</div></div>'; }).join('');
 }
 
@@ -40,7 +41,9 @@ async function carregar(){
   var respostas = await Promise.all([
     db.from('operation_drafts').select('*').limit(200),
     db.from('pending_actions').select('*').limit(200),
-    db.from('pendencias_documentos').select('*').in('status',['aguardando_vendedor','revisao_necessaria']).limit(200)
+    db.from('pendencias_documentos').select('*').in('status',['aguardando_vendedor','revisao_necessaria']).limit(200),
+    db.from('operacoes').select('id,codigo,status,tipo_negocio').limit(500),
+    db.from('confinex_avaliacoes').select('id,operacao_id,codigo,status,confinex_estimativas(id,versao,premissas,resultado)').limit(500)
   ]);
   var fechadosRevisoes = new Set(['realizado','rejeitado','cancelado']);
   var fechadosAcoes = new Set(['executado','rejeitado','cancelado','expirado']);
@@ -55,11 +58,17 @@ async function carregar(){
     });
   };
   var falhas = respostas.filter(function(resposta){ return resposta.error; });
-  itens = CFAgroGestao.pendenciasLegiveis(
+  var pendenciasOperacionais = CFAgroGestao.pendenciasLegiveis(
     respostas[0].error ? [] : abertos(respostas[0].data, fechadosRevisoes),
     respostas[1].error ? [] : abertos(respostas[1].data, fechadosAcoes),
     respostas[2].error ? [] : documentosAbertos(respostas[2].data)
   );
+  var planejamentos = respostas[3].error || respostas[4].error ? [] :
+    CFAgroGestao.planejamentosRentabilidadePendentes(respostas[3].data, respostas[4].data);
+  itens = pendenciasOperacionais.concat(planejamentos).sort(function(a,b){
+    return String(b.data || '').localeCompare(String(a.data || '')) ||
+      String(a.contexto || '').localeCompare(String(b.contexto || ''), 'pt-BR');
+  });
   if(falhas.length === respostas.length){
     el('subtitle').textContent = CFAgroGestao.erroLegivel(falhas[0].error);
   }else{
