@@ -5,9 +5,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tools.orquestrar_conciliacao_whatsapp import (
+    buscar_evidencias,
     cobertura_suficiente,
     descobrir_candidatos,
     executar_backfills,
+    jid_whatsapp,
     normalizar,
     pontuar_chat,
     pergunta_pendente,
@@ -32,6 +34,39 @@ class OrquestrarConciliacaoWhatsappTest(unittest.TestCase):
             pontuar_chat("Manuel Cazassa", tokens),
             pontuar_chat("Joao Manoel Rialma", tokens),
         )
+
+    def test_normaliza_whatsapp_para_jid_sem_aceitar_valor_invalido(self):
+        self.assertEqual(jid_whatsapp("+55 (17) 99999-1111"), "5517999991111@s.whatsapp.net")
+        self.assertIsNone(jid_whatsapp("123"))
+
+    @patch("tools.orquestrar_conciliacao_whatsapp.listar_chats", return_value=[])
+    def test_contato_com_whatsapp_vira_candidato_direto(self, _listar):
+        candidatos = descobrir_candidatos({
+            "negocio": "CSAP - 141 cabeças",
+            "contatos": [{"nome": "Vinicius Peron", "whatsapp": "+5517999991111"}],
+        }, Path("/wacli"), Path("/store"))
+        self.assertEqual(candidatos[0]["jid"], "5517999991111@s.whatsapp.net")
+        self.assertEqual(candidatos[0]["origem"], "contato_supabase")
+
+    @patch("tools.orquestrar_conciliacao_whatsapp.listar_mensagens_chat")
+    def test_localiza_pdf_de_acerto_sem_enviar_mensagem(self, listar):
+        listar.return_value = [{
+            "ChatJID": "5517999991111@s.whatsapp.net",
+            "MsgID": "msg-1",
+            "Timestamp": "2026-08-12T10:59:55Z",
+            "FromMe": False,
+            "Text": "Sent document",
+            "MediaType": "document",
+            "Filename": "Acerto 141 cabecas - Abate 07.08.pdf",
+        }]
+        evidencias = buscar_evidencias({
+            "data": "07/08/2026",
+            "tipo": "acerto_confinamento",
+            "termos_busca": ["141", "acerto", "abate"],
+        }, [{"jid": "5517999991111@s.whatsapp.net", "name": "Contato CSAP"}], Path("/wacli"), Path("/store"))
+        self.assertEqual(evidencias[0]["mensagem_id"], "msg-1")
+        self.assertTrue(evidencias[0]["documento_candidato"])
+        self.assertGreaterEqual(evidencias[0]["pontuacao"], 60)
 
     @patch("tools.orquestrar_conciliacao_whatsapp.listar_chats")
     def test_descobre_chat_por_nome_sem_aceitar_grupo(self, listar):
