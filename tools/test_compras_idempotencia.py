@@ -2,6 +2,7 @@ import re
 import sys
 import threading
 import unittest
+import urllib.error
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest import mock
@@ -192,6 +193,75 @@ class ComprasIdempotenciaTests(unittest.TestCase):
                     self.payload,
                     idempotency_key="origem:mensagem-1",
                 )
+
+    def test_select_retries_transient_transport_failure(self):
+        client = ConfinexClient(
+            url="https://example.invalid",
+            key="test-only",
+            tentativas_leitura=3,
+            espera_leitura=0,
+        )
+        response = mock.MagicMock()
+        response.__enter__.return_value.read.return_value = b'[{"id":"ok"}]'
+        with mock.patch(
+            "confinex_client.urllib.request.urlopen",
+            side_effect=[TimeoutError("transiente"), response],
+        ) as request:
+            rows = client.select("compras", select="id")
+        self.assertEqual(rows, [{"id": "ok"}])
+        self.assertEqual(request.call_count, 2)
+
+    def test_select_stops_after_configured_attempts(self):
+        client = ConfinexClient(
+            url="https://example.invalid",
+            key="test-only",
+            tentativas_leitura=3,
+            espera_leitura=0,
+        )
+        with mock.patch(
+            "confinex_client.urllib.request.urlopen",
+            side_effect=TimeoutError("persistente"),
+        ) as request:
+            with self.assertRaisesRegex(ConfinexConnectionError, "após 3 tentativa"):
+                client.select("compras", select="id")
+        self.assertEqual(request.call_count, 3)
+
+    def test_http_error_is_not_retried_on_select(self):
+        client = ConfinexClient(
+            url="https://example.invalid",
+            key="test-only",
+            tentativas_leitura=3,
+            espera_leitura=0,
+        )
+        error = urllib.error.HTTPError(
+            "https://example.invalid",
+            503,
+            "indisponível",
+            {},
+            None,
+        )
+        with mock.patch(
+            "confinex_client.urllib.request.urlopen",
+            side_effect=error,
+        ) as request:
+            with self.assertRaises(ConfinexHTTPError):
+                client.select("compras", select="id")
+        self.assertEqual(request.call_count, 1)
+
+    def test_post_never_retries_transport_failure(self):
+        client = ConfinexClient(
+            url="https://example.invalid",
+            key="test-only",
+            tentativas_leitura=3,
+            espera_leitura=0,
+        )
+        with mock.patch(
+            "confinex_client.urllib.request.urlopen",
+            side_effect=TimeoutError("resultado incerto"),
+        ) as request:
+            with self.assertRaises(ConfinexConnectionError):
+                client.insert("pending_actions", {"tipo": "teste"})
+        self.assertEqual(request.call_count, 1)
 
     def test_vps_environment_names_are_supported(self):
         client = ConfinexClient(

@@ -85,6 +85,11 @@ Larguras: padrão 1280px; `<body data-w="md">` = 1100px; `<body data-w="sm">` = 
 | Voltar | `.voltar-central` | botão flutuante ⌂ (oculto quando o shell está ativo) |
 | Shell | `.shell-top .shell-brand .shell-side .shell-sec .shell-sep .shell-link(.ativa) .shell-content` | cabeçalho azul-marinho + sidebar fixa; montados pelo cfagro-shell.js |
 
+O módulo **CRM de Gado** reutiliza exclusivamente KPIs, cards, tabelas, badges,
+campos, `simgrid` e `grid2`. Ofertas incompletas usam badge de atenção e mantêm
+os campos ausentes escritos na tabela; o cadastro informa no rodapé que não
+gera efeito operacional.
+
 ### Ícones do shell
 
 Os itens do menu usam SVGs lineares locais, sem emojis, CDN ou fonte externa.

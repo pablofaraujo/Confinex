@@ -27,6 +27,7 @@ PAGINAS = (
     "pendencias.html",
     "revisoes.html",
     "eventos.html",
+    "crm.html",
     "ops.html",
 )
 

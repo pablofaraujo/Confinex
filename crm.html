@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CFAgro — CRM de Gado</title>
+<link rel="icon" type="image/png" href="./confinex-logo.jpg">
+<link rel="stylesheet" href="./design/tokens.css?v=20260720-1">
+<link rel="stylesheet" href="./design/components.css?v=20260804-1">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="./js/cfagro-core.js?v=20260720-1"></script>
+<script src="./js/crm.js?v=20260815-1" defer></script>
+<script src="./js/cfagro-shell.js?v=20260815-1" defer></script>
+</head>
+<body>
+<div id="login" class="login-box card">
+  <img class="logo-img" src="./confinex-logo.jpg" alt="Logo Confinex" width="72" height="72">
+  <h1>CRM de Gado</h1>
+  <div class="sub">Acesso protegido às ofertas e negociações</div>
+  <input type="email" id="email" placeholder="seu email" autocomplete="username">
+  <input type="password" id="senha" placeholder="senha" autocomplete="current-password">
+  <button class="btn" id="entrarBtn">Entrar</button>
+  <div class="err" id="loginErr"></div>
+</div>
+
+<div id="app">
+  <div class="topbar"><div class="ident"><div>
+    <h1>CRM de Gado</h1>
+    <div class="sub" id="subtitle">Ofertas, negociações e contatos em um único histórico.</div>
+  </div></div></div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <h2>Registrar oferta recebida</h2>
+  <form class="card" id="formOferta">
+    <div class="simgrid">
+      <div class="fld"><label for="fornecedor">Fornecedor ou contato</label><select id="fornecedor" required><option value="">Selecione</option></select></div>
+      <div class="fld"><label for="sexo">Sexo</label><select id="sexo"><option value="nao_informado">Não informado</option><option value="macho">Macho</option><option value="femea">Fêmea</option><option value="misto">Misto</option></select></div>
+      <div class="fld"><label for="quantidade">Cabeças</label><input id="quantidade" type="number" min="1" inputmode="numeric"></div>
+      <div class="fld"><label for="pesoMedio">Peso estimado (kg)</label><input id="pesoMedio" type="number" min="1" step="0.01" inputmode="decimal"></div>
+      <div class="fld"><label for="preco">Preço (R$/@)</label><input id="preco" type="number" min="0.01" step="0.01" inputmode="decimal"></div>
+      <div class="fld"><label for="municipio">Município</label><input id="municipio" autocomplete="address-level2"></div>
+      <div class="fld"><label for="uf">UF</label><input id="uf" maxlength="2" autocomplete="address-level1"></div>
+      <div class="fld"><label for="categoria">Categoria</label><input id="categoria"></div>
+    </div>
+    <div class="fld"><label for="observacoes">Observações</label><textarea id="observacoes" rows="2" placeholder="Origem e detalhes úteis da oferta"></textarea></div>
+    <button class="btn" type="submit" id="salvarOferta">Salvar no CRM</button>
+    <div class="msg" id="formMsg" role="status"></div>
+    <div class="err" id="formErr" role="alert"></div>
+  </form>
+
+  <h2>Ofertas em aberto</h2>
+  <div class="card scroll"><table><thead><tr><th>Recebida</th><th>Contato</th><th>Sexo</th><th class="num">Cab.</th><th class="num">Peso</th><th class="num">Preço</th><th>Local</th><th>Status</th><th>Falta confirmar</th></tr></thead><tbody id="listaOfertas"></tbody></table></div>
+
+  <h2>Funil de negociações</h2>
+  <div class="card scroll"><table><thead><tr><th>Início</th><th>Contato</th><th>Status</th><th class="num">Cab.</th><th class="num">Preço</th><th>Próxima ação</th></tr></thead><tbody id="listaNegociacoes"></tbody></table></div>
+
+  <div class="grid2">
+    <section><h2>Contatos do negócio</h2><div class="card scroll"><table><thead><tr><th>Nome</th><th>Papéis</th><th>Local</th></tr></thead><tbody id="listaContatos"></tbody></table></div></section>
+    <section><h2>Próximas ações</h2><div class="card scroll"><table><thead><tr><th>Quando</th><th>Contato</th><th>Descrição</th></tr></thead><tbody id="listaFollowups"></tbody></table></div></section>
+  </div>
+  <div class="foot">CRM informativo · salvar uma oferta não cria compra, venda ou operação.</div>
+</div>
+</body>
+</html>
