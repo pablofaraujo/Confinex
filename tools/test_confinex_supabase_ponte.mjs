@@ -12,7 +12,7 @@ assert.match(html, /__CONFINEX_CARREGAR_APP/);
 assert.match(html, /recarga=/);
 assert.doesNotMatch(html, /<script defer src="\.\/confinex-app\.mobile\.js/);
 assert.match(fonte, /__CONFINEX_APP_INICIADO/);
-assert.match(fonte, /role: "button",\s+tabIndex: 0/);
+assert.match(fonte, /role: "tab",\s+"aria-selected": scAtivo === i,\s+tabIndex: 0/);
 assert.doesNotMatch(html, /<\/script>\\n\s*<script/);
 assert.match(html, /id="root"/);
 assert.match(html, /__CONFINEX_BUILD/);
