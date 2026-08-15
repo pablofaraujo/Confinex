@@ -2,6 +2,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from tools.verificar_openclaw_canais import (
@@ -10,6 +11,7 @@ from tools.verificar_openclaw_canais import (
     validar_agentes,
     validar_canais,
     validar_confinex,
+    reparar,
 )
 
 
@@ -109,6 +111,28 @@ class VerificarOpenClawCanaisTest(unittest.TestCase):
         self.assertIn("confinex_bridge_inativa", fonte)
         self.assertIn("juan-confinex-db-bridge.service", fonte)
         self.assertIn("confinex_bridge_reiniciada", fonte)
+
+    @patch("tools.verificar_openclaw_canais.reiniciar", return_value=True)
+    def test_repara_ponte_sem_reiniciar_gateway(self, reiniciar):
+        args = SimpleNamespace(
+            confinex_bridge_service="juan-confinex-db-bridge.service",
+            gateway_service="openclaw-gateway.service",
+        )
+        acoes = reparar(args, ["confinex_bridge_inativa"])
+        self.assertEqual(acoes, ["confinex_bridge_reiniciada"])
+        reiniciar.assert_called_once_with(
+            "juan-confinex-db-bridge.service", usuario=True
+        )
+
+    @patch("tools.verificar_openclaw_canais.reiniciar", return_value=True)
+    def test_repara_dns_no_resolvedor_do_host(self, reiniciar):
+        args = SimpleNamespace(
+            dns_service="systemd-resolved.service",
+            gateway_service="openclaw-gateway.service",
+        )
+        acoes = reparar(args, ["confinex_dns_indisponivel"])
+        self.assertEqual(acoes, ["dns_resolver_reiniciado"])
+        reiniciar.assert_called_once_with("systemd-resolved.service")
 
 
 if __name__ == "__main__":

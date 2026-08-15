@@ -272,6 +272,8 @@ def reparar(args: argparse.Namespace, falhas: list[str]) -> list[str]:
         args.confinex_bridge_service, usuario=True
     ):
         acoes.append("confinex_bridge_reiniciada")
+    if "confinex_dns_indisponivel" in falhas and reiniciar(args.dns_service):
+        acoes.append("dns_resolver_reiniciado")
     if "chrome_openclaw_inativo" in falhas and reiniciar(args.chrome_service):
         acoes.append("chrome_reiniciado")
     if "wacli_continuo_inativo" in falhas:
@@ -280,7 +282,7 @@ def reparar(args: argparse.Namespace, falhas: list[str]) -> list[str]:
 
     gatilhos_gateway = (
         "gateway_", "telegram_", "whatsapp_openclaw_", "probe_canais_",
-        "diretorio_grupos_", "grupo_telegram_", "token_gateway_", "confinex_",
+        "diretorio_grupos_", "grupo_telegram_", "token_gateway_",
     )
     if any(falha.startswith(gatilhos_gateway) for falha in falhas):
         if reiniciar(args.gateway_service, usuario=True):
@@ -329,6 +331,7 @@ def main() -> int:
         "--confinex-bridge-service",
         default="juan-confinex-db-bridge.service",
     )
+    parser.add_argument("--dns-service", default="systemd-resolved.service")
     parser.add_argument("--chrome-service", default="openclaw-chrome.service")
     parser.add_argument("--wacli-service", default="wey-whatsapp-live-sync.service")
     parser.add_argument("--wacli-health-service", default="wey-whatsapp-live-health.service")
