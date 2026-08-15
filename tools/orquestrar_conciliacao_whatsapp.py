@@ -13,7 +13,7 @@ import os
 import re
 import subprocess
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timedelta
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
@@ -107,29 +107,154 @@ def pontuar_chat(nome_chat: str, tokens: list[str]) -> int:
     return pontos
 
 
+def jid_whatsapp(valor: Any) -> str | None:
+    digitos = re.sub(r"\D", "", str(valor or ""))
+    if not 10 <= len(digitos) <= 15:
+        return None
+    return f"{digitos}@s.whatsapp.net"
+
+
+def referencias_duvida(duvida: dict[str, Any]) -> list[dict[str, Any]]:
+    referencias = []
+    for contato in duvida.get("contatos") or []:
+        if isinstance(contato, str):
+            referencias.append({"nome": contato})
+        elif isinstance(contato, dict) and contato.get("nome"):
+            referencias.append(contato)
+    if duvida.get("negocio"):
+        referencias.append({"nome": str(duvida["negocio"])})
+    return referencias
+
+
 def descobrir_candidatos(
     duvida: dict[str, Any],
     binario: Path,
     store: Path,
 ) -> list[dict[str, Any]]:
-    tokens = tokens_negocio(str(duvida.get("negocio") or ""))
     vistos: dict[str, dict[str, Any]] = {}
-    consultas = []
-    for token in tokens[:3]:
-        consultas.append(token)
-        consultas.extend(ALIASES_TOKEN.get(token, []))
-    for consulta in consultas:
-        for chat in listar_chats(binario, store, consulta):
-            jid = str(chat.get("jid") or "")
-            if not jid or not jid.endswith("@s.whatsapp.net"):
-                continue
-            pontos = pontuar_chat(str(chat.get("name") or ""), tokens)
-            if pontos < 20:
-                continue
-            atual = vistos.get(jid)
-            if atual is None or pontos > atual["pontuacao"]:
-                vistos[jid] = {**chat, "pontuacao": pontos}
+    for referencia in referencias_duvida(duvida):
+        nome_referencia = str(referencia.get("nome") or "")
+        jid_direto = jid_whatsapp(referencia.get("whatsapp"))
+        if jid_direto:
+            vistos[jid_direto] = {
+                "jid": jid_direto,
+                "name": nome_referencia,
+                "pontuacao": 100,
+                "origem": "contato_supabase",
+            }
+        tokens = tokens_negocio(nome_referencia)
+        consultas = []
+        for token in tokens[:3]:
+            consultas.append(token)
+            consultas.extend(ALIASES_TOKEN.get(token, []))
+        for consulta in consultas:
+            for chat in listar_chats(binario, store, consulta):
+                jid = str(chat.get("jid") or "")
+                if not jid or not jid.endswith("@s.whatsapp.net"):
+                    continue
+                pontos = pontuar_chat(str(chat.get("name") or ""), tokens)
+                if pontos < 20:
+                    continue
+                atual = vistos.get(jid)
+                if atual is None or pontos > atual["pontuacao"]:
+                    vistos[jid] = {
+                        **chat,
+                        "pontuacao": pontos,
+                        "origem": "busca_por_nome",
+                    }
     return sorted(vistos.values(), key=lambda item: (-item["pontuacao"], str(item.get("name") or "")))[:4]
+
+
+def listar_mensagens_chat(
+    binario: Path,
+    store: Path,
+    jid: str,
+    *,
+    depois: str | None,
+    limite: int = 300,
+) -> list[dict[str, Any]]:
+    comando = comando_base(binario, store) + [
+        "messages", "list", "--chat", jid, "--limit", str(limite),
+    ]
+    if depois:
+        comando.extend(["--after", depois])
+    resposta = executar_json(comando)
+    mensagens = (resposta.get("data") or {}).get("messages") or []
+    return [item for item in mensagens if isinstance(item, dict)]
+
+
+def inicio_busca_evidencia(duvida: dict[str, Any]) -> str | None:
+    valor = data_negocio(duvida)
+    if not valor:
+        return None
+    return (valor - timedelta(days=30)).strftime("%Y-%m-%d")
+
+
+def texto_mensagem(item: dict[str, Any]) -> str:
+    partes = [
+        item.get("Text"), item.get("text"), item.get("DisplayText"),
+        item.get("display_text"), item.get("MediaCaption"),
+        item.get("media_caption"), item.get("Filename"), item.get("filename"),
+    ]
+    return " ".join(str(parte) for parte in partes if parte).strip()
+
+
+def termos_evidencia(duvida: dict[str, Any]) -> list[str]:
+    termos = [str(item) for item in duvida.get("termos_busca") or [] if item]
+    if not termos:
+        termos.extend(tokens_negocio(str(duvida.get("negocio") or ""))[:3])
+        termos.extend(re.findall(r"\b\d{2,}\b", str(duvida.get("negocio") or "")))
+    if duvida.get("tipo") == "acerto_confinamento":
+        termos.extend(["acerto", "relatorio", "romaneio", "abate"])
+    return list(dict.fromkeys(termo for termo in termos if normalizar(termo)))[:12]
+
+
+def buscar_evidencias(
+    duvida: dict[str, Any],
+    candidatos: list[dict[str, Any]],
+    binario: Path,
+    store: Path,
+) -> list[dict[str, Any]]:
+    termos = [(termo, normalizar(termo)) for termo in termos_evidencia(duvida)]
+    vistos: set[tuple[str, str]] = set()
+    evidencias = []
+    for candidato in candidatos:
+        jid = str(candidato["jid"])
+        try:
+            mensagens = listar_mensagens_chat(
+                binario, store, jid, depois=inicio_busca_evidencia(duvida),
+            )
+        except (RuntimeError, subprocess.SubprocessError, json.JSONDecodeError):
+            continue
+        for mensagem in mensagens:
+            texto = texto_mensagem(mensagem)
+            normalizado = normalizar(texto)
+            correspondencias = [original for original, termo in termos if termo in normalizado]
+            if not correspondencias:
+                continue
+            mensagem_id = str(mensagem.get("MsgID") or mensagem.get("msg_id") or "")
+            chave = (jid, mensagem_id or str(mensagem.get("Timestamp") or texto[:80]))
+            if chave in vistos:
+                continue
+            vistos.add(chave)
+            media = str(mensagem.get("MediaType") or mensagem.get("media_type") or "")
+            evidencias.append({
+                "jid": jid,
+                "conversa": candidato.get("name") or "conversa sem nome",
+                "mensagem_id": mensagem_id,
+                "timestamp": mensagem.get("Timestamp") or mensagem.get("timestamp"),
+                "from_me": bool(mensagem.get("FromMe") or mensagem.get("from_me")),
+                "termos": correspondencias,
+                "texto_resumo": texto[:280],
+                "media_type": media,
+                "arquivo": mensagem.get("Filename") or mensagem.get("filename"),
+                "documento_candidato": media == "document",
+                "pontuacao": len(correspondencias) * 20 + (20 if media == "document" else 0),
+            })
+    return sorted(
+        evidencias,
+        key=lambda item: (-int(item["pontuacao"]), str(item.get("timestamp") or "")),
+    )[:20]
 
 
 def cobertura_suficiente(cobertura: dict[str, Any] | None, limite: datetime | None) -> bool:
@@ -165,6 +290,7 @@ def montar_plano(
                 "cobertura": cobertura,
                 "precisa_backfill": not cobertura_suficiente(cobertura, data_negocio(duvida)),
             })
+        evidencias = buscar_evidencias(duvida, candidatos, binario, store)
         plano.append({
             "codigo": duvida.get("codigo"),
             "negocio": duvida.get("negocio"),
@@ -174,6 +300,7 @@ def montar_plano(
             "campos_faltantes": duvida.get("campos_faltantes") or "",
             "divergencias": duvida.get("divergencias") or "",
             "candidatos": candidatos,
+            "evidencias": evidencias,
         })
     return plano
 
@@ -313,7 +440,9 @@ def main() -> None:
         "codigo": item["codigo"],
         "negocio": item["negocio"],
         "motivo": (
-            "cobertura_incompleta"
+            "evidencia_candidata_localizada"
+            if item.get("evidencias")
+            else "cobertura_incompleta"
             if any(c["precisa_backfill"] for c in item["candidatos"])
             else "evidencia_nao_localizada_com_cobertura"
             if item["candidatos"]
@@ -321,6 +450,7 @@ def main() -> None:
         ),
         "pergunta_pronta": pergunta_pendente(item),
         "candidatos": item["candidatos"],
+        "evidencias": item.get("evidencias") or [],
     } for item in plano]
     saida = {
         "gerado_em": datetime.now().astimezone().isoformat(),
@@ -333,6 +463,7 @@ def main() -> None:
             "escritas_supabase": 0,
             "registros_operacionais_alterados": 0,
             "promocoes_executadas": 0,
+            "documentos_operacionais_gravados": 0,
         },
     }
     args.saida_orquestracao.parent.mkdir(parents=True, exist_ok=True)

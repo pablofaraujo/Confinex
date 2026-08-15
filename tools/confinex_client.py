@@ -21,6 +21,7 @@ TENTATIVAS_LEITURA_PADRAO = 3
 ESPERA_LEITURA_PADRAO = 0.4
 
 READ_TABLES = {
+    "acertos",
     "abates",
     "compras",
     "crm_followups",
@@ -30,6 +31,8 @@ READ_TABLES = {
     "confinex_estimativas",
     "confinex_testes",
     "contatos",
+    "confinamento_contatos",
+    "confinamentos",
     "contexto_handoff",
     "contextos_canais",
     "eventos",
