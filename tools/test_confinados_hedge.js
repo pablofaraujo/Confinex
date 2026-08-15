@@ -123,4 +123,12 @@ assert.ok(htmlBgi.includes("filter(o=>!ehLoteBoiBalanca(o.codigo))"));
 assert.ok(!htmlBgi.includes('const ab=expo.data.reduce'));
 assert.ok(!htmlBgi.includes('POS=pos.data'));
 
-console.log('Confinados hedge e cabeçalho BGI: 35 verificações aprovadas.');
+const htmlConfinados = fs.readFileSync(path.join(__dirname, '..', 'confinados.html'), 'utf8');
+assert.ok(htmlConfinados.includes(
+  "a.valor_liquido!=null&&a.esperado_calculado!=null?fmtR$(a.divergencia):'—'",
+));
+assert.ok(!htmlConfinados.includes(
+  "a.valor_liquido!=null?fmtR$(a.divergencia):'—'",
+));
+
+console.log('Confinados hedge e cabeçalho BGI: 37 verificações aprovadas.');

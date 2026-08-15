@@ -177,7 +177,7 @@ document.getElementById('tbAcertos').innerHTML =
 acertos.data.sort((a,b)=>(a.operacoes?.codigo||'').localeCompare(b.operacoes?.codigo||'')).map(a=>`
 <tr><td><b>${a.operacoes?.codigo||'—'}</b></td><td>${a.confinamentos?.nome||'—'}</td>
 <td class="num">${fmtR$(a.esperado_calculado)}</td><td class="num">${fmtR$(a.valor_recebido)}</td>
-<td class="num ${cls(a.divergencia)}">${a.valor_liquido!=null?fmtR$(a.divergencia):'—'}</td>
+<td class="num ${cls(a.divergencia)}">${a.valor_liquido!=null&&a.esperado_calculado!=null?fmtR$(a.divergencia):'—'}</td>
 <td>${a.status==='aguardando'?'<span class="badge b-amber">Aguardando</span>':a.status==='divergente'?'<span class="badge b-red">Divergente</span>':'<span class="badge b-green">'+a.status+'</span>'}</td></tr>`).join('');
 
 // ---- Fluxo
