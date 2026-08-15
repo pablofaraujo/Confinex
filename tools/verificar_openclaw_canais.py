@@ -192,6 +192,8 @@ def diagnosticar(args: argparse.Namespace) -> list[str]:
         falhas.append("gateway_servico_inativo")
     if not unidade_ativa(args.ocr_service, usuario=True):
         falhas.append("ocr_worker_inativo")
+    if not unidade_ativa(args.confinex_bridge_service, usuario=True):
+        falhas.append("confinex_bridge_inativa")
     if not unidade_ativa(args.chrome_service):
         falhas.append("chrome_openclaw_inativo")
     if not unidade_ativa(args.wacli_service):
@@ -266,6 +268,10 @@ def reparar(args: argparse.Namespace, falhas: list[str]) -> list[str]:
 
     if "ocr_worker_inativo" in falhas and reiniciar(args.ocr_service, usuario=True):
         acoes.append("ocr_worker_reiniciado")
+    if "confinex_bridge_inativa" in falhas and reiniciar(
+        args.confinex_bridge_service, usuario=True
+    ):
+        acoes.append("confinex_bridge_reiniciada")
     if "chrome_openclaw_inativo" in falhas and reiniciar(args.chrome_service):
         acoes.append("chrome_reiniciado")
     if "wacli_continuo_inativo" in falhas:
@@ -319,6 +325,10 @@ def main() -> int:
     parser.add_argument("--config", type=Path, default=Path("/root/.openclaw/openclaw.json"))
     parser.add_argument("--gateway-service", default="openclaw-gateway.service")
     parser.add_argument("--ocr-service", default="juan-compra-ocr-worker.service")
+    parser.add_argument(
+        "--confinex-bridge-service",
+        default="juan-confinex-db-bridge.service",
+    )
     parser.add_argument("--chrome-service", default="openclaw-chrome.service")
     parser.add_argument("--wacli-service", default="wey-whatsapp-live-sync.service")
     parser.add_argument("--wacli-health-service", default="wey-whatsapp-live-health.service")

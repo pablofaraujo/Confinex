@@ -106,6 +106,9 @@ class VerificarOpenClawCanaisTest(unittest.TestCase):
         self.assertIn("XDG_RUNTIME_DIR=/run/user/0", unidade)
         self.assertIn("DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/0/bus", unidade)
         self.assertIn("validar_confinex", fonte)
+        self.assertIn("confinex_bridge_inativa", fonte)
+        self.assertIn("juan-confinex-db-bridge.service", fonte)
+        self.assertIn("confinex_bridge_reiniciada", fonte)
 
 
 if __name__ == "__main__":
