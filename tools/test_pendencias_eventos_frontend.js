@@ -33,25 +33,25 @@ assert.ok(eventosJs.includes("href=\"'+esc(item.origem.href)"));
 assert.ok(!/\.(insert|update|delete|upsert|rpc)\s*\(/.test(eventosJs));
 
 for(const html of [pendenciasHtml,eventosHtml]){
-  assert.ok(html.includes('cfagro-gestao.js?v=20260724-6'));
+  assert.ok(html.includes('cfagro-gestao.js?v=20260814-1'));
 }
 assert.ok(pendenciasHtml.includes('pendencias.js?v=20260814-1'));
 assert.ok(eventosHtml.includes('eventos.js?v=20260803-1'));
 assert.ok(pendenciasJs.includes("new Set(['realizado','rejeitado','cancelado'])"));
 assert.ok(pendenciasJs.includes("new Set(['executado','rejeitado','cancelado','expirado'])"));
-assert.ok(pendenciasJs.includes("=== 'aguardando_vendedor'"));
+assert.ok(pendenciasJs.includes("new Set(['aguardando_vendedor','revisao_necessaria'])"));
 for(const estadoFechado of ['recebido','dispensado']){
   const registros = [
     {status: estadoFechado, tipo: 'nf_entrada'},
     {status: 'aguardando_vendedor', tipo: 'gta'}
   ];
-  const ativos = registros.filter(item => String(item.status || '').toLowerCase() === 'aguardando_vendedor');
+  const ativos = registros.filter(item => new Set(['aguardando_vendedor','revisao_necessaria']).has(String(item.status || '').toLowerCase()));
   assert.deepStrictEqual(ativos.map(item => item.tipo), ['gta'], `documento ${estadoFechado} não pode aparecer como pendência`);
 }
 for(const [pagina, html] of [['Confinados', confinadosHtml], ['Boi Balança', bbHtml]]){
   assert.ok(
-    html.includes(".eq('status','aguardando_vendedor')"),
-    `${pagina} deve consultar somente pendências documentais ativas`
+    html.includes(".in('status',['aguardando_vendedor','revisao_necessaria'])"),
+    `${pagina} deve consultar documentos ausentes ou em revisão`
   );
   assert.ok(
     html.includes("String(p.tipo||'').toLowerCase()==='gta'"),
@@ -61,8 +61,12 @@ for(const [pagina, html] of [['Confinados', confinadosHtml], ['Boi Balança', bb
     html.includes('Negócio encerrado · documento pendente'),
     `${pagina} deve manter o alerta documental após o encerramento do negócio`
   );
+  assert.ok(
+    html.includes('Revisar vínculo documental'),
+    `${pagina} deve distinguir revisão documental de documento ausente`
+  );
 }
-assert.ok(auditoriaBrowser.includes('linhasRestauradas === 4'));
-assert.ok(auditoriaBrowser.includes('linhasRestauradas === 3'));
+assert.ok(auditoriaBrowser.includes('linhasRestauradas === 5'));
+assert.ok(auditoriaBrowser.includes('estado.linhas === 4'));
 
-console.log('Pendências e Eventos: 38 verificações estáticas aprovadas.');
+console.log('Pendências e Eventos: 40 verificações estáticas aprovadas.');

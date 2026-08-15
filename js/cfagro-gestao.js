@@ -29,6 +29,7 @@ var STATUS = {
   quitada:'Quitada',
   quitado:'Quitado',
   renegociado:'Renegociado',
+  revisao_necessaria:'Revisão necessária',
   realizado:'Realizado',
   recebido:'Recebido',
   registrado:'Registrado',
@@ -164,7 +165,7 @@ function resumoItem(item, tipo){
     item.acao_tipo && statusHumano(item.acao_tipo),
     'Ação aguardando conferência'
   );
-  if(tipo === 'documento') return 'Documento: ' +
+  if(tipo === 'documento') return (texto(item.status).toLowerCase() === 'revisao_necessaria' ? 'Revisar documento: ' : 'Documento: ') +
     (item.tipo ? statusHumano(item.tipo) : 'tipo não informado');
   return referenciaHumana(
     item.observacao, item.resumo, item.descricao, dados.observacao,

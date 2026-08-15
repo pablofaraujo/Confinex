@@ -57,6 +57,11 @@ const documentoComCodigo = gestao.pendenciasLegiveis([], [], [{
 }])[0];
 assert.strictEqual(documentoComCodigo.contexto, 'BB-26-041');
 assert.deepStrictEqual(documentoComCodigo.destino, {rotulo:'Boi Balança',href:'./bb.html'});
+const documentoEmRevisao = gestao.pendenciasLegiveis([], [], [{
+  tipo:'gta', status:'revisao_necessaria', operacoes:{codigo:'BB-26-042'}
+}])[0];
+assert.strictEqual(documentoEmRevisao.resumo, 'Revisar documento: Gta');
+assert.strictEqual(documentoEmRevisao.status, 'Revisão necessária');
 
 // Eventos legados usam código/contexto humano, nunca UUID ou ID de grupo.
 const eventosHumanos = gestao.eventosLegiveis([{
@@ -172,5 +177,4 @@ const mensagem = gestao.erroLegivel(new Error('relation public.segredo does not 
 assert.strictEqual(mensagem, 'Não foi possível carregar os dados. Tente atualizar a página.');
 assert.ok(!mensagem.includes('public.segredo'));
 
-console.log('test_gestao_frontend: 47 verificações aprovadas');
-
+console.log('test_gestao_frontend: 49 verificações aprovadas');

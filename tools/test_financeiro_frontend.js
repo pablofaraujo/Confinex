@@ -19,7 +19,7 @@ assert.ok(html.includes('nenhuma movimentação, baixa, parcela, renegociação 
 assert.ok(html.includes('Preparado, mas não ativado'));
 assert.ok(js.includes('As demais áreas continuam disponíveis.'));
 assert.ok(!/\bgrupo_(?:id|origem_id)\b/.test(js), 'não exibir ID técnico de grupo');
-assert.ok(html.includes('cfagro-gestao.js?v=20260723-3'));
+assert.ok(html.includes('cfagro-gestao.js?v=20260814-1'));
 assert.ok(html.includes('financeiro.js?v=20260803-1'));
 assert.ok(html.includes('components.css?v=20260804-1'));
 assert.ok(html.includes('class="kpis kpis-dinheiro"'));

@@ -72,7 +72,7 @@ db.from('operacoes').select('id,codigo,status,sexo,modalidade,confinamentos(nome
 db.from('v_exposicao_hedge').select('*'),
 db.from('posicoes_hedge').select('id,termo,origem,contrato,direcao,contratos_qtd,preco_entrada,preco_saida,data_saida,status,resultado_realizado,categoria,negocio_rateio').or('status.in.(aberta,rolada),origem.eq.bgi-portfolio').order('status').order('contrato'),
 db.from('v_estoque_atual').select('*'),
-db.from('pendencias_documentos').select('id,tipo,status,cobrancas,created_at,operacoes(codigo,status),contatos(nome),compras(quantidade,data)').eq('status','aguardando_vendedor'),
+db.from('pendencias_documentos').select('id,tipo,status,cobrancas,created_at,operacoes(codigo,status),contatos(nome),compras(quantidade,data)').in('status',['aguardando_vendedor','revisao_necessaria']),
 db.from('acertos').select('*,operacoes(codigo),confinamentos(nome)').order('created_at'),
 db.from('fluxo_caixa').select('data,descricao,tipo,valor,realizado,categoria').order('data')
 ]);
@@ -96,7 +96,7 @@ document.getElementById('kpis').innerHTML = [
 ['Cabeças no cocho', fmtN(cab), estoque.data.length+' currais · '+ativos.length+' lotes ativos'],
 ['Hedge descoberto', fmtN(descob,1)+' cts', '≈ '+fmtN(descob*330)+' @ expostas'],
 ['Hedge já creditado', fmtR$(credit), 'lucro realizado nos lotes'],
-['Pendências GTA/NF', pendAbertas.length, 'aguardando vendedor'],
+['Pendências GTA/NF', pendAbertas.length, 'ausentes ou em revisão'],
 ['Acertos em aberto', acAguard.length, 'aguardando ou divergentes'],
 ['Caixa (a conciliar)', fmtR$(saldoReal), fluxoReal.length+' lançamentos realizados'],
 ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="d">${k[2]}</div></div>`).join('');
@@ -144,10 +144,11 @@ pend.data.sort((a,b)=>(a.operacoes?.codigo||'').localeCompare(b.operacoes?.codig
 const dias=Math.round((Date.now()-new Date(p.created_at))/864e5);
 const compData = p.compras?.data;
 const negocioEncerrado=['abatida','liquidada','encerrada','finalizada','concluida'].includes(String(p.operacoes?.status||'').toLowerCase());
+const exigeRevisao=String(p.status||'').toLowerCase()==='revisao_necessaria';
 return `<tr><td><b>${p.operacoes?.codigo||'—'}</b></td><td>${p.contatos?.nome||'<span class="badge b-amber">sem vendedor vinculado</span>'}</td>
 <td>${String(p.tipo||'').toLowerCase()==='gta'?'GTA':'NF entrada'}</td><td>${fmtD(compData)}</td><td class="num">${p.compras?.quantidade??'—'}</td>
 <td class="num">${dias}</td>
-<td>${negocioEncerrado?'<span class="badge b-amber">Negócio encerrado · documento pendente</span>':'<span class="badge b-red">Aguardando documento</span>'}</td></tr>`;
+<td>${exigeRevisao?'<span class="badge b-amber">Revisar vínculo documental</span>':negocioEncerrado?'<span class="badge b-amber">Negócio encerrado · documento pendente</span>':'<span class="badge b-red">Aguardando documento</span>'}</td></tr>`;
 }).join('') || '<tr><td colspan="7">Nenhuma pendência 🎉</td></tr>';
 
 // ---- Acertos

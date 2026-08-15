@@ -40,7 +40,7 @@ async function carregar(){
   var respostas = await Promise.all([
     db.from('operation_drafts').select('*').limit(200),
     db.from('pending_actions').select('*').limit(200),
-    db.from('pendencias_documentos').select('*').eq('status','aguardando_vendedor').limit(200)
+    db.from('pendencias_documentos').select('*').in('status',['aguardando_vendedor','revisao_necessaria']).limit(200)
   ]);
   var fechadosRevisoes = new Set(['realizado','rejeitado','cancelado']);
   var fechadosAcoes = new Set(['executado','rejeitado','cancelado','expirado']);
@@ -51,7 +51,7 @@ async function carregar(){
   };
   var documentosAbertos = function(lista){
     return (lista || []).filter(function(item){
-      return String(item.status || '').toLowerCase() === 'aguardando_vendedor';
+      return new Set(['aguardando_vendedor','revisao_necessaria']).has(String(item.status || '').toLowerCase());
     });
   };
   var falhas = respostas.filter(function(resposta){ return resposta.error; });

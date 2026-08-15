@@ -1116,6 +1116,11 @@ function clientePendenciasEventosSimulado() {
       status: 'aguardando_vendedor',
       criado_em: isoComDias(-4),
     }, {
+      tipo: 'gta',
+      status: 'revisao_necessaria',
+      operacoes: { codigo: 'BB-REVISÃO' },
+      criado_em: isoComDias(-4),
+    }, {
       tipo: 'nf_entrada',
       status: 'recebido',
       criado_em: isoComDias(-5),
@@ -1186,6 +1191,7 @@ function clientePendenciasEventosSimulado() {
         select() {
           const cadeia = {
             eq() { return cadeia; },
+            in() { return cadeia; },
             limit: async () => resposta(nome),
           };
           return cadeia;
@@ -1266,10 +1272,12 @@ async function auditarPendencias(browser, viewport, resultados) {
       'Pendências agregadas em linguagem humana',
       `três origens em ${viewport.nome}`,
       'cada item tem resumo, contexto humano e próxima etapa',
-      estado.linhas === 4 && estado.links === 4 &&
+      estado.linhas === 5 && estado.links === 5 &&
         estado.texto.includes('Lote Primavera') &&
         estado.texto.includes('Pesagem Fazenda Norte') &&
         estado.texto.includes('Compras com campos faltantes') &&
+        estado.texto.includes('Revisar documento: Gta') &&
+        estado.texto.includes('Revisão necessária') &&
         estado.texto.includes('Documento operacional') && semTecnico,
       `linhas=${estado.linhas} links=${estado.links} sem conteúdo técnico=${semTecnico}`,
     ));
@@ -1283,7 +1291,7 @@ async function auditarPendencias(browser, viewport, resultados) {
       'Filtros de Pendências',
       `origem e busca em ${viewport.nome}`,
       'origem reduz a lista e busca sem resultado mostra estado vazio',
-      porOrigem === 2 && vazioFiltrado.includes('Nenhuma pendência corresponde aos filtros'),
+      porOrigem === 3 && vazioFiltrado.includes('Nenhuma pendência corresponde aos filtros'),
       `linhas por origem=${porOrigem}; vazio=${vazioFiltrado}`,
     ));
     await page.locator('#filtroTexto').fill(' ');
@@ -1311,7 +1319,7 @@ async function auditarPendencias(browser, viewport, resultados) {
       'Evidência visual de Pendências',
       `dados positivos em ${viewport.nome}`,
       'captura integral é gerada depois de restaurar todas as linhas',
-      linhasRestauradas === 4 && fs.existsSync(captura) && fs.statSync(captura).size > 0,
+      linhasRestauradas === 5 && fs.existsSync(captura) && fs.statSync(captura).size > 0,
       `${captura}; linhas restauradas=${linhasRestauradas}`,
     ));
   } catch (erro) {
@@ -1341,7 +1349,7 @@ async function auditarPendencias(browser, viewport, resultados) {
       const aprovado = modo === 'vazio'
         ? estado.texto.includes('Nenhuma pendência corresponde aos filtros')
         : modo === 'falha-parcial'
-          ? estado.linhas === 3 && estado.aviso.includes('1 fonte') &&
+          ? estado.linhas === 4 && estado.aviso.includes('1 fonte') &&
             estado.texto.includes('Compra aguardando conferência')
           : estado.subtitulo.includes('Não foi possível carregar os dados') &&
             !estado.texto.includes('public.segredo');
