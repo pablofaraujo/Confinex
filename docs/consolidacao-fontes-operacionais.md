@@ -5,6 +5,25 @@ leitura de Supabase, mensagens do Juan, planilha de NFs/GTAs e extrato bancário
 O resultado é um plano de conferência; ele não possui caminho de execução e não
 faz chamadas de rede.
 
+## Monitor fiscal proativo do AgroNota
+
+O Juan consulta diariamente as NF-e emitidas e recebidas no AgroNota, baixa
+somente os XMLs ainda não conhecidos e usa a chave de acesso para impedir
+duplicidade. Em documento pecuário, lê o número da GTA nas informações
+complementares antes de procurar o negócio correspondente. Uma correspondência
+continua sendo evidência para revisão: nunca cria compra, venda, abate ou
+movimentação financeira diretamente.
+
+Quando a NF e a GTA já estão disponíveis, a pendência apresentada deve conter
+somente o que realmente falta. O extrato bancário ou comprovante permanece como
+pendência porque o Juan não acessa a conta bancária; essa etapa começa apenas
+quando Pablo envia o arquivo ao Telegram. Mais de uma GTA, ausência de vínculo
+inequívoco ou divergência de data, quantidade ou valor mantém o item em revisão.
+
+O agendamento deve registrar execução, falhas e quantidade de documentos sem
+incluir chaves, nomes ou valores nos logs. Reexecuções são idempotentes e não
+promovem nenhuma informação para as tabelas operacionais.
+
 O cruzamento cobre:
 
 - contagens e datas de corte das fontes;

@@ -42,6 +42,10 @@ não se sobrepõem.
 - **Supabase:** os estados de eventos pertencem ao contrato vigente; a
   reconciliação cria somente `operation_drafts`; nenhuma compra operacional
   nasce sem o executor e a confirmação exata.
+- **AgroNota proativo:** o parser reconhece GTA em formatos diferentes sem
+  confundir datas, e o monitor opera em dry-run por padrão. Os testes exigem
+  IDs determinísticos, ordem compatível com a chave estrangeira, atualização
+  apenas de revisão aberta e allowlist que exclui todas as tabelas operacionais.
 - **Memória e contexto:** `memorias_agentes` guarda apenas regras, decisões ou
   preferências reutilizáveis; `contexto_handoff` serve apenas à continuidade
   temporária. Nenhuma das duas substitui rascunhos, pendências ou eventos.
