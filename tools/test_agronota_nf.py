@@ -3,10 +3,10 @@ import unittest
 from agronota_nf import analisar_xml_nfe, campos_pendentes_documento, extrair_gtas_texto
 
 
-def xml_nfe(informacao: str, produto: str = "30 BOVINOS") -> bytes:
+def xml_nfe(informacao: str, produto: str = "30 BOVINOS", natureza: str = "") -> bytes:
     return f'''<?xml version="1.0"?>
     <nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
-      <NFe><infNFe Id="NFe{'1' * 44}">
+      <NFe><infNFe Id="NFe{'1' * 44}"><ide><natOp>{natureza}</natOp></ide>
         <det><prod><xProd>{produto}</xProd></prod><infAdProd>{informacao}</infAdProd></det>
         <infAdic><infCpl>{informacao}</infCpl></infAdic>
       </infNFe></NFe>
@@ -41,6 +41,16 @@ class AgronotaNfTests(unittest.TestCase):
 
     def test_aceita_uf_e_texto_entre_rotulo_e_numero(self):
         self.assertEqual(extrair_gtas_texto("GTA/MG número: 123456"), ["123456"])
+
+    def test_identifica_natureza_de_venda_sem_confundir_transferencia(self):
+        self.assertTrue(analisar_xml_nfe(xml_nfe("GTA 123456", natureza="Venda de gado"))["eh_nota_venda"])
+        self.assertFalse(analisar_xml_nfe(xml_nfe("GTA 123456", natureza="Transferência"))["eh_nota_venda"])
+
+    def test_nota_de_venda_nao_procura_negocio_anterior(self):
+        self.assertEqual(
+            campos_pendentes_documento(tem_gta=True, operacao_vinculada=False, novo_negocio=True),
+            ["extrato bancário ou comprovante"],
+        )
 
     def test_lista_apenas_pendencias_reais(self):
         self.assertEqual(

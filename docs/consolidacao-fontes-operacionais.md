@@ -14,6 +14,12 @@ complementares antes de procurar o negócio correspondente. Uma correspondência
 continua sendo evidência para revisão: nunca cria compra, venda, abate ou
 movimentação financeira diretamente.
 
+Uma NF-e pecuária cuja natureza da operação é **venda** inicia sempre um novo
+negócio em revisão. Ela não procura nem exige um negócio anterior: NF, GTA,
+data, quantidade e valor disponíveis formam o candidato, e somente os campos
+ausentes continuam pendentes. A regra cria evidência e rascunho, nunca a venda
+ou a compra operacional.
+
 Quando a NF e a GTA já estão disponíveis, a pendência apresentada deve conter
 somente o que realmente falta. O extrato bancário ou comprovante permanece como
 pendência porque o Juan não acessa a conta bancária; essa etapa começa apenas

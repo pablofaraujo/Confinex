@@ -94,6 +94,21 @@ class MonitorAgronotaTests(unittest.TestCase):
         self.assertNotIn("número da GTA", draft_patch["campos_pendentes"])
         self.assertEqual(draft_patch["dados_extraidos"]["gta"], "123456")
 
+    def test_nota_de_venda_abre_novo_negocio_sem_exigir_vinculo_anterior(self):
+        cliente = ClienteFalso([self._nota()])
+        with tempfile.TemporaryDirectory() as pasta:
+            Path(pasta, f"{'1' * 44}-procNfe.xml").write_bytes(
+                xml_nfe("GTA 123456", natureza="Venda de animais")
+            )
+            plano = planejar(cliente, Path(pasta), "x")
+        draft = next(p for t, p in plano["criacoes"] if t == "operation_drafts")
+        action = next(p for t, p in plano["criacoes"] if t == "pending_actions")
+        self.assertEqual(draft["tipo_operacao"], "novo_negocio_por_nota_fiscal")
+        self.assertTrue(draft["dados_extraidos"]["novo_negocio"])
+        self.assertEqual(draft["campos_pendentes"], ["extrato bancário ou comprovante"])
+        self.assertEqual(action["acao_tipo"], "revisar_novo_negocio_fiscal")
+        self.assertFalse(action["payload"]["promovido_para_operacional"])
+
 
 if __name__ == "__main__":
     unittest.main()

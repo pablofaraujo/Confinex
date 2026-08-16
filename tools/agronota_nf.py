@@ -8,6 +8,7 @@ XML já obtido em metadados sanitizáveis usados pelo pipeline do Juan.
 from __future__ import annotations
 
 import re
+import unicodedata
 import xml.etree.ElementTree as ET
 from typing import Any
 
@@ -35,6 +36,10 @@ def _textos(raiz: ET.Element, nome: str) -> list[str]:
     ]
 
 
+def _normalizar_texto(valor: str) -> str:
+    return unicodedata.normalize("NFKD", valor).encode("ascii", "ignore").decode().upper()
+
+
 def normalizar_gta(valor: str) -> str | None:
     """Conserva somente dígitos e rejeita datas/fragmentos curtos."""
     if re.fullmatch(r"\s*\d{1,2}/\d{1,2}/\d{4}\s*", valor or ""):
@@ -60,6 +65,7 @@ def analisar_xml_nfe(xml: bytes | str) -> dict[str, Any]:
     campos_adicionais = ("infCpl", "infAdFisco", "xPed", "infAdProd")
     textos_adicionais = [texto for campo in campos_adicionais for texto in _textos(raiz, campo)]
     descricoes = _textos(raiz, "xProd")
+    naturezas = _textos(raiz, "natOp")
     gtas: list[str] = []
     for texto in textos_adicionais:
         for gta in extrair_gtas_texto(texto):
@@ -73,15 +79,18 @@ def analisar_xml_nfe(xml: bytes | str) -> dict[str, Any]:
         # quando a descrição comercial não usa palavras como "bovino".
         "relacionada_a_gado": bool(gtas) or bool(GADO_RE.search(" | ".join(descricoes + textos_adicionais))),
         "tem_informacao_adicional": bool(textos_adicionais),
+        "eh_nota_venda": any(re.search(r"\bVENDA\b", _normalizar_texto(item)) for item in naturezas),
     }
 
 
-def campos_pendentes_documento(*, tem_gta: bool, operacao_vinculada: bool) -> list[str]:
-    """Pendências humanas para uma NF de compra; banco sempre chega por anexo."""
+def campos_pendentes_documento(
+    *, tem_gta: bool, operacao_vinculada: bool, novo_negocio: bool = False
+) -> list[str]:
+    """Pendências humanas; nota de venda é origem de negócio, não vínculo antigo."""
     campos: list[str] = []
     if not tem_gta:
         campos.append("número da GTA")
-    if not operacao_vinculada:
+    if not novo_negocio and not operacao_vinculada:
         campos.append("negócio correspondente")
     campos.append("extrato bancário ou comprovante")
     return campos

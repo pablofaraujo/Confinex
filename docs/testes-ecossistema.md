@@ -46,6 +46,8 @@ não se sobrepõem.
   confundir datas, e o monitor opera em dry-run por padrão. Os testes exigem
   IDs determinísticos, ordem compatível com a chave estrangeira, atualização
   apenas de revisão aberta e allowlist que exclui todas as tabelas operacionais.
+  Uma `natOp` de venda deve iniciar novo negócio e não pode cobrar vínculo com
+  operação anterior.
 - **Memória e contexto:** `memorias_agentes` guarda apenas regras, decisões ou
   preferências reutilizáveis; `contexto_handoff` serve apenas à continuidade
   temporária. Nenhuma das duas substitui rascunhos, pendências ou eventos.
