@@ -1,6 +1,6 @@
 import unittest
 
-from test_juan_vps import auditar_chamadas_midia
+from test_juan_vps import auditar_chamadas_midia, validar_contrato_roteador
 
 
 def chamada(nome, argumentos):
@@ -8,6 +8,22 @@ def chamada(nome, argumentos):
 
 
 class JuanVpsTrajectoryContractTest(unittest.TestCase):
+    def test_contrato_extrato_pdf_e_vinculo_bidirecional(self):
+        source = "\n".join(
+            (
+                "def parse_pdf_bank_statement(): pass",
+                'x = {"classe": "extrato_bancario", "importado": False}',
+                'x = {"resultado": {"operation_draft_id": draft["id"]}}',
+                'x = {"duplicado": True}',
+                'raise Error("a mesma origem já existe com classificação diferente")',
+            )
+        )
+        validar_contrato_roteador(source)
+
+    def test_contrato_rejeita_roteador_sem_extrato_bancario(self):
+        with self.assertRaisesRegex(RuntimeError, "parse_pdf_bank_statement"):
+            validar_contrato_roteador("def route(): pass")
+
     def test_duas_tentativas_usam_roteador(self):
         referencia = "media://inbound/anexo.pdf"
         calls = [

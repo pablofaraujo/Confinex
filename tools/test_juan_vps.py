@@ -164,6 +164,23 @@ def validar_prompt() -> None:
         raise RuntimeError("instrução efetiva não bloqueia gravação automática")
 
 
+def validar_contrato_roteador(source: str | None = None) -> None:
+    """Impede regressão de extrato PDF para compra e de vínculos incompletos."""
+    source = source or (HANDLERS / "arquivo_grupo_router.py").read_text(
+        encoding="utf-8"
+    )
+    for required in (
+        "def parse_pdf_bank_statement",
+        '"classe": "extrato_bancario"',
+        '"importado": False',
+        '"resultado": {"operation_draft_id": draft["id"]}',
+        '"duplicado": True',
+        "a mesma origem já existe com classificação diferente",
+    ):
+        if required not in source:
+            raise RuntimeError(f"contrato do roteador não contém {required}")
+
+
 def validar_arquivo(path_text: str, legenda: str, grupo_id: str) -> dict[str, Any]:
     path = Path(path_text)
     if not path.is_file():
@@ -528,6 +545,7 @@ def main() -> int:
         run(["openclaw", "config", "validate"])
         validar_indice_sessoes()
         validar_pre_processamento_anthropic()
+        validar_contrato_roteador()
         for service in (
             "openclaw-gateway.service",
             "juan-compra-ocr-worker.service",

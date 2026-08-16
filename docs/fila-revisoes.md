@@ -44,6 +44,14 @@ Ao receber um documento de compra de gado, Juan segue esta ordem:
 
 Reconhecer, extrair, confirmar ou calcular nunca autoriza escrita em `compras`, `operation_drafts` ou qualquer outra tabela. O rascunho depende de aceite explícito posterior e continua sujeito à revisão visual e à promoção controlada.
 
+PDF de extrato bancário é uma classe separada de compra. O roteador usa texto
+determinístico do próprio PDF para reconhecê-lo antes do OCR visual; o item de
+revisão registra que nenhuma transação foi importada ou conciliada e nunca pode
+ser promovido como compra. Ao criar qualquer par vindo de arquivo,
+`operation_drafts.pending_action_id` e `pending_actions.resultado.operation_draft_id`
+devem apontar um para o outro. Reprocessar a mesma mensagem devolve o mesmo par;
+uma classificação diferente para a mesma origem é bloqueada para revisão.
+
 Desde 23/07/2026, `compra_documento_ocr.py` usa primeiro o canal OpenClaw/OpenAI já autenticado por OAuth (`openclaw infer image describe`) para ler foto/PDF de compra. Como o sandbox do Juan não possui rede externa, o pedido passa por uma fila privada na pasta de trabalho e é atendido por um trabalhador local supervisionado. PDFs têm até oito páginas processadas em paralelo; resultados são armazenados por assinatura do conteúdo para evitar releitura do mesmo anexo. O fallback local com Tesseract permanece para indisponibilidade do trabalhador ou do canal visual. O fluxo extrai compra, vendedor, cabeças, preço por arroba, peso total ou médio, desconto de barriga, data e pagamento quando legíveis; calcula peso total, arrobas e valor quando houver dados suficientes; e marca claramente quando precisou do fallback.
 
 O runtime do Juan mantém o sandbox em `workspace-write`, mas não interrompe esse comando local com pedido de autorização. Alterar essa política sem repetir os testes do agente pode fazer Juan voltar a perguntar antes de ler o documento.
