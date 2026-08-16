@@ -167,6 +167,40 @@ def validar_confinex(ambiente: dict[str, str] | None = None) -> list[str]:
         return ["confinex_rest_indisponivel"]
 
 
+def validar_monitor_agronota(
+    *,
+    cron: str,
+    log: Path,
+    arquivos: tuple[Path, ...],
+    agora: float | None = None,
+    idade_maxima_segundos: int = 11 * 60 * 60,
+) -> list[str]:
+    """Prova que a busca fiscal proativa está instalada e executando.
+
+    O heartbeat não chama a API do AgroNota a cada cinco minutos. Ele fiscaliza
+    o agendamento das consultas controladas e a atualização do último log.
+    """
+    falhas: list[str] = []
+    if any(not arquivo.is_file() for arquivo in arquivos):
+        falhas.append("agronota_monitor_ausente")
+    linhas_ativas = [
+        linha.strip() for linha in cron.splitlines()
+        if linha.strip() and not linha.lstrip().startswith("#")
+    ]
+    linhas_agronota = [linha for linha in linhas_ativas if "agronota_pipeline" in linha]
+    if not any("30 4 * * *" in linha for linha in linhas_agronota):
+        falhas.append("agronota_varredura_diaria_ausente")
+    if not any("15 11,15,19 * * *" in linha for linha in linhas_agronota):
+        falhas.append("agronota_incremental_ausente")
+    try:
+        idade = (time.time() if agora is None else agora) - log.stat().st_mtime
+        if idade < 0 or idade > idade_maxima_segundos:
+            falhas.append("agronota_monitor_atrasado")
+    except OSError:
+        falhas.append("agronota_log_ausente")
+    return sorted(set(falhas))
+
+
 def ids_grupos(payload: Any) -> set[str] | None:
     if isinstance(payload, list):
         itens = payload
@@ -213,6 +247,17 @@ def diagnosticar(args: argparse.Namespace) -> list[str]:
         falhas.append("validacao_config_falhou")
 
     falhas.extend(validar_confinex())
+
+    cron = executar(["crontab", "-l"], timeout=20)
+    if cron.codigo != 0:
+        falhas.append("agronota_agendamento_indisponivel")
+    else:
+        falhas.extend(validar_monitor_agronota(
+            cron=cron.stdout,
+            log=args.agronota_log,
+            arquivos=tuple(args.agronota_arquivos),
+            idade_maxima_segundos=args.agronota_idade_maxima,
+        ))
 
     agentes = json_comando(["openclaw", "agents", "list", "--bindings", "--json"])
     falhas.extend(validar_agentes(agentes))
@@ -335,6 +380,19 @@ def main() -> int:
     parser.add_argument("--chrome-service", default="openclaw-chrome.service")
     parser.add_argument("--wacli-service", default="wey-whatsapp-live-sync.service")
     parser.add_argument("--wacli-health-service", default="wey-whatsapp-live-health.service")
+    parser.add_argument(
+        "--agronota-log", type=Path,
+        default=Path("/var/log/cfagro/agronota_pipeline.log"),
+    )
+    parser.add_argument(
+        "--agronota-arquivos", type=Path, nargs="+",
+        default=[
+            Path("/root/ponte/tools/agronota_nf.py"),
+            Path("/root/ponte/tools/monitorar_agronota.py"),
+            Path("/root/.openclaw/workspace/skills/agronota/bin/download_new_nfs.py"),
+        ],
+    )
+    parser.add_argument("--agronota-idade-maxima", type=int, default=11 * 60 * 60)
     parser.add_argument("--backup-dir", type=Path,
                         default=Path("/root/.openclaw/state/heartbeat-backups"))
     parser.add_argument("--alert-state", type=Path,

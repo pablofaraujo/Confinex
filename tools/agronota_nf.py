@@ -66,11 +66,14 @@ def analisar_xml_nfe(xml: bytes | str) -> dict[str, Any]:
     textos_adicionais = [texto for campo in campos_adicionais for texto in _textos(raiz, campo)]
     descricoes = _textos(raiz, "xProd")
     naturezas = _textos(raiz, "natOp")
+    finalidades = _textos(raiz, "finNFe")
+    referencias_nfe = [item for item in _textos(raiz, "refNFe") if re.fullmatch(r"\d{44}", item)]
     gtas: list[str] = []
     for texto in textos_adicionais:
         for gta in extrair_gtas_texto(texto):
             if gta not in gtas:
                 gtas.append(gta)
+    natureza_normalizada = " | ".join(_normalizar_texto(item) for item in naturezas)
     return {
         "gtas": gtas,
         "gta": gtas[0] if len(gtas) == 1 else None,
@@ -79,18 +82,32 @@ def analisar_xml_nfe(xml: bytes | str) -> dict[str, Any]:
         # quando a descrição comercial não usa palavras como "bovino".
         "relacionada_a_gado": bool(gtas) or bool(GADO_RE.search(" | ".join(descricoes + textos_adicionais))),
         "tem_informacao_adicional": bool(textos_adicionais),
-        "eh_nota_venda": any(re.search(r"\bVENDA\b", _normalizar_texto(item)) for item in naturezas),
+        "eh_nota_venda": bool(re.search(r"\bVENDA\b", natureza_normalizada)),
+        "eh_complemento": "2" in finalidades or "COMPLEMENT" in natureza_normalizada or bool(referencias_nfe),
+        "referencias_nfe": referencias_nfe,
     }
 
 
 def campos_pendentes_documento(
-    *, tem_gta: bool, operacao_vinculada: bool, novo_negocio: bool = False
+    *, tem_gta: bool, operacao_vinculada: bool
 ) -> list[str]:
-    """Pendências humanas; nota de venda é origem de negócio, não vínculo antigo."""
+    """Pendências humanas de indexação da NF ao negócio correto."""
     campos: list[str] = []
     if not tem_gta:
         campos.append("número da GTA")
-    if not novo_negocio and not operacao_vinculada:
-        campos.append("negócio correspondente")
+    if not operacao_vinculada:
+        campos.append("relação com o negócio")
     campos.append("extrato bancário ou comprovante")
     return campos
+
+
+def documento_deve_ser_indexado(
+    analise: dict[str, Any], *, fonte: str | None = None, eh_venda_gado_pablo: bool = False
+) -> bool:
+    """Inclui documento pecuário e toda NF de venda emitida pelo negócio."""
+    emitida = str(fonte or "").endswith("_emitida")
+    return bool(
+        analise.get("relacionada_a_gado")
+        or eh_venda_gado_pablo
+        or (emitida and analise.get("eh_nota_venda"))
+    )

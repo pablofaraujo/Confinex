@@ -11,11 +11,48 @@ from tools.verificar_openclaw_canais import (
     validar_agentes,
     validar_canais,
     validar_confinex,
+    validar_monitor_agronota,
     reparar,
 )
 
 
 class VerificarOpenClawCanaisTest(unittest.TestCase):
+    def test_heartbeat_fiscal_valida_agendamento_arquivos_e_frescor(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            raiz = Path(pasta)
+            arquivos = (raiz / "parser.py", raiz / "monitor.py", raiz / "download.py")
+            for arquivo in arquivos:
+                arquivo.write_text("# teste\n")
+            log = raiz / "agronota.log"
+            log.write_text("ok\n")
+            cron = (
+                "30 4 * * * /root/bin/agronota_pipeline.sh >> /var/log/agronota_pipeline.log\n"
+                "15 11,15,19 * * * /root/bin/agronota_pipeline.sh >> /var/log/agronota_pipeline.log\n"
+            )
+            agora = log.stat().st_mtime + 60
+            self.assertEqual([], validar_monitor_agronota(
+                cron=cron, log=log, arquivos=arquivos, agora=agora,
+            ))
+
+    def test_heartbeat_fiscal_detecta_monitor_atrasado_e_agendamento_incompleto(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            raiz = Path(pasta)
+            arquivo = raiz / "parser.py"
+            arquivo.write_text("# teste\n")
+            log = raiz / "agronota.log"
+            log.write_text("antigo\n")
+            falhas = validar_monitor_agronota(
+                cron="30 4 * * * /root/bin/agronota_pipeline.sh\n",
+                log=log,
+                arquivos=(arquivo, raiz / "ausente.py"),
+                agora=log.stat().st_mtime + 12 * 60 * 60,
+            )
+            self.assertEqual(falhas, [
+                "agronota_incremental_ausente",
+                "agronota_monitor_atrasado",
+                "agronota_monitor_ausente",
+            ])
+
     def test_valida_todas_as_contas_e_whatsapp(self):
         payload = {
             "eventLoop": {"degraded": False},

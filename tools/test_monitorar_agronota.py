@@ -2,14 +2,16 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from monitorar_agronota import executar, planejar
+from monitorar_agronota import TABELAS_ESCRITA, TABELAS_LEITURA, executar, planejar
 from test_agronota_nf import xml_nfe
 
 
 class ClienteFalso:
-    def __init__(self, notas, existentes=None):
+    def __init__(self, notas, existentes=None, operacoes_gta=None, operacoes_referencias=None):
         self.notas = notas
         self.existentes = dict(existentes or {})
+        self._operacoes_gta = set(operacoes_gta or [])
+        self._operacoes_referencias = set(operacoes_referencias or [])
         self.escritas = []
 
     def listar_notas(self, _desde):
@@ -20,6 +22,12 @@ class ClienteFalso:
 
     def obter(self, tabela, identificador):
         return self.existentes.get((tabela, identificador))
+
+    def operacoes_por_gta(self, _gta):
+        return set(self._operacoes_gta)
+
+    def operacoes_por_referencias(self, _referencias, _nota_fiscal_id=None):
+        return set(self._operacoes_referencias)
 
     def atualizar_nota(self, identificador, payload):
         self.escritas.append(("PATCH", "notas_fiscais_xml_raw", identificador, payload))
@@ -36,6 +44,10 @@ class MonitorAgronotaTests(unittest.TestCase):
         return {"id": "nf-1", "chave_acesso": "1" * 44, "numero": "10", "data": "2026-08-14",
                 "valor": 100.0, "qtd_total_itens": 30, "descricao_itens": "BOVINOS",
                 "operacao_id": "op-1", "gta": None, "alerta_gta_ausente": False}
+
+    def test_fontes_de_vinculo_sao_somente_leitura(self):
+        self.assertTrue({"gtas", "entradas_confinamento"}.issubset(TABELAS_LEITURA))
+        self.assertTrue({"gtas", "entradas_confinamento", "compras", "vendas", "abates"}.isdisjoint(TABELAS_ESCRITA))
 
     def test_dry_run_nao_escreve_e_prepara_apenas_revisao(self):
         cliente = ClienteFalso([self._nota()])
@@ -94,8 +106,8 @@ class MonitorAgronotaTests(unittest.TestCase):
         self.assertNotIn("número da GTA", draft_patch["campos_pendentes"])
         self.assertEqual(draft_patch["dados_extraidos"]["gta"], "123456")
 
-    def test_nota_de_venda_abre_novo_negocio_sem_exigir_vinculo_anterior(self):
-        cliente = ClienteFalso([self._nota()])
+    def test_nota_de_venda_cria_indexacao_sem_assumir_novo_negocio(self):
+        cliente = ClienteFalso([{**self._nota(), "operacao_id": None}])
         with tempfile.TemporaryDirectory() as pasta:
             Path(pasta, f"{'1' * 44}-procNfe.xml").write_bytes(
                 xml_nfe("GTA 123456", natureza="Venda de animais")
@@ -103,11 +115,51 @@ class MonitorAgronotaTests(unittest.TestCase):
             plano = planejar(cliente, Path(pasta), "x")
         draft = next(p for t, p in plano["criacoes"] if t == "operation_drafts")
         action = next(p for t, p in plano["criacoes"] if t == "pending_actions")
-        self.assertEqual(draft["tipo_operacao"], "novo_negocio_por_nota_fiscal")
-        self.assertTrue(draft["dados_extraidos"]["novo_negocio"])
-        self.assertEqual(draft["campos_pendentes"], ["extrato bancário ou comprovante"])
-        self.assertEqual(action["acao_tipo"], "revisar_novo_negocio_fiscal")
+        self.assertEqual(draft["tipo_operacao"], "indexacao_nota_fiscal_negocio")
+        self.assertEqual(draft["dados_extraidos"]["relacao_negocio"], "relacao_com_negocio_a_conferir")
+        self.assertTrue(draft["dados_extraidos"]["pode_ser_novo_negocio"])
+        self.assertEqual(draft["campos_pendentes"], ["relação com o negócio", "extrato bancário ou comprovante"])
+        self.assertEqual(action["acao_tipo"], "revisar_indexacao_nota_fiscal")
         self.assertFalse(action["payload"]["promovido_para_operacional"])
+
+    def test_gta_exata_indexa_documento_no_negocio_existente(self):
+        nota = {**self._nota(), "operacao_id": None}
+        cliente = ClienteFalso([nota], operacoes_gta={"op-exata"})
+        with tempfile.TemporaryDirectory() as pasta:
+            Path(pasta, f"{'1' * 44}-procNfe.xml").write_bytes(
+                xml_nfe("GTA 123456", natureza="Venda de animais")
+            )
+            plano = planejar(cliente, Path(pasta), "x")
+        draft = next(p for t, p in plano["criacoes"] if t == "operation_drafts")
+        self.assertEqual(draft["dados_extraidos"]["operacao_id"], "op-exata")
+        self.assertEqual(draft["dados_extraidos"]["relacao_negocio"], "documento_de_negocio_existente")
+        self.assertNotIn("relação com o negócio", draft["campos_pendentes"])
+        self.assertEqual(plano["alteracoes_notas"][0][1]["operacao_id"], "op-exata")
+
+    def test_multiplos_vinculos_preservam_ambiguidade(self):
+        nota = {**self._nota(), "operacao_id": None}
+        cliente = ClienteFalso([nota], operacoes_gta={"op-1", "op-2"})
+        with tempfile.TemporaryDirectory() as pasta:
+            Path(pasta, f"{'1' * 44}-procNfe.xml").write_bytes(xml_nfe("GTA 123456"))
+            plano = planejar(cliente, Path(pasta), "x")
+        draft = next(p for t, p in plano["criacoes"] if t == "operation_drafts")
+        self.assertIsNone(draft["dados_extraidos"]["operacao_id"])
+        self.assertTrue(draft["dados_extraidos"]["vinculo_ambiguo"])
+        self.assertIn("relação com o negócio", draft["campos_pendentes"])
+        self.assertFalse(any("operacao_id" in patch for _, patch in plano["alteracoes_notas"]))
+
+    def test_referencia_da_nf_indexa_complemento_no_negocio(self):
+        nota = {**self._nota(), "operacao_id": None, "eh_complemento": True}
+        cliente = ClienteFalso([nota], operacoes_referencias={"op-referenciada"})
+        with tempfile.TemporaryDirectory() as pasta:
+            xml = xml_nfe("GTA 123456", natureza="Complemento de venda").replace(
+                b"</infNFe>", b"<NFref><refNFe>" + b"2" * 44 + b"</refNFe></NFref></infNFe>"
+            )
+            Path(pasta, f"{'1' * 44}-procNfe.xml").write_bytes(xml)
+            plano = planejar(cliente, Path(pasta), "x")
+        draft = next(p for t, p in plano["criacoes"] if t == "operation_drafts")
+        self.assertEqual(draft["dados_extraidos"]["relacao_negocio"], "complemento_de_negocio_existente")
+        self.assertEqual(draft["dados_extraidos"]["operacao_id"], "op-referenciada")
 
 
 if __name__ == "__main__":

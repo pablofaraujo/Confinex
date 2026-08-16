@@ -136,6 +136,20 @@ As regras permanentes são:
 - fonte não consultada até a referência vira pendência explícita;
 - não existe argumento `--executar`, chamada de rede ou escrita operacional.
 
+## Indexação proativa das notas fiscais
+
+Toda NF de venda emitida deve ser indexada para localizar o negócio ao qual
+pertence. A emissão, sozinha, não comprova que exista um negócio novo. A revisão
+deve distinguir documento de negócio existente, complemento documental,
+complemento de animais, possível negócio novo e relação ambígua. GTA ou chave de
+NF referenciada com uma única correspondência permitem sugerir o vínculo; duas
+ou mais correspondências permanecem intactas para conferência.
+
+Na VPS, o AgroNota é consultado em horários controlados e o heartbeat verifica
+se a busca diária, as buscas incrementais, os executores e o log recente estão
+saudáveis. A indexação pode atualizar somente staging fiscal, rascunhos,
+pendências e eventos. Ela nunca cria ou altera compra, venda, abate ou pesagem.
+
 Números de GTA, NF, lançamentos e negócios permanecem somente nos relatórios em
 `docs/privado/`, que não são versionados. O repositório público guarda apenas o
 código, testes e regras sanitizadas.

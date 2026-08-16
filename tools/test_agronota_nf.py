@@ -1,6 +1,11 @@
 import unittest
 
-from agronota_nf import analisar_xml_nfe, campos_pendentes_documento, extrair_gtas_texto
+from agronota_nf import (
+    analisar_xml_nfe,
+    campos_pendentes_documento,
+    documento_deve_ser_indexado,
+    extrair_gtas_texto,
+)
 
 
 def xml_nfe(informacao: str, produto: str = "30 BOVINOS", natureza: str = "") -> bytes:
@@ -46,11 +51,25 @@ class AgronotaNfTests(unittest.TestCase):
         self.assertTrue(analisar_xml_nfe(xml_nfe("GTA 123456", natureza="Venda de gado"))["eh_nota_venda"])
         self.assertFalse(analisar_xml_nfe(xml_nfe("GTA 123456", natureza="Transferência"))["eh_nota_venda"])
 
-    def test_nota_de_venda_nao_procura_negocio_anterior(self):
+    def test_nota_de_venda_sem_vinculo_exige_classificacao(self):
         self.assertEqual(
-            campos_pendentes_documento(tem_gta=True, operacao_vinculada=False, novo_negocio=True),
-            ["extrato bancário ou comprovante"],
+            campos_pendentes_documento(tem_gta=True, operacao_vinculada=False),
+            ["relação com o negócio", "extrato bancário ou comprovante"],
         )
+
+    def test_identifica_complemento_por_finalidade_e_referencia(self):
+        xml = xml_nfe("GTA 123456", natureza="Complemento de venda").replace(
+            b"</ide>", b"<finNFe>2</finNFe></ide>"
+        ).replace(b"</infNFe>", b"<NFref><refNFe>" + b"2" * 44 + b"</refNFe></NFref></infNFe>")
+        resultado = analisar_xml_nfe(xml)
+        self.assertTrue(resultado["eh_complemento"])
+        self.assertEqual(resultado["referencias_nfe"], ["2" * 44])
+
+    def test_toda_nota_de_venda_emitida_e_indexada(self):
+        analise = analisar_xml_nfe(xml_nfe("sem GTA", produto="SERVIÇO", natureza="Venda"))
+        self.assertFalse(analise["relacionada_a_gado"])
+        self.assertTrue(documento_deve_ser_indexado(analise, fonte="nfe_xml_auto_emitida"))
+        self.assertFalse(documento_deve_ser_indexado(analise, fonte="nfe_xml_auto_recebida"))
 
     def test_lista_apenas_pendencias_reais(self):
         self.assertEqual(
@@ -59,7 +78,7 @@ class AgronotaNfTests(unittest.TestCase):
         )
         self.assertEqual(
             campos_pendentes_documento(tem_gta=False, operacao_vinculada=False),
-            ["número da GTA", "negócio correspondente", "extrato bancário ou comprovante"],
+            ["número da GTA", "relação com o negócio", "extrato bancário ou comprovante"],
         )
 
 

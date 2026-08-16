@@ -19,12 +19,13 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from agronota_nf import analisar_xml_nfe, campos_pendentes_documento
+from agronota_nf import analisar_xml_nfe, campos_pendentes_documento, documento_deve_ser_indexado
 
 
 CONFIRMACAO = "PROCESSAR NFS AGRONOTA PARA REVISAO"
 NAMESPACE = uuid.UUID("a1a23770-061f-4ff9-9e69-40d1d16b7e7c")
-TABELAS_PERMITIDAS = {"notas_fiscais_xml_raw", "operation_drafts", "pending_actions", "eventos"}
+TABELAS_ESCRITA = {"notas_fiscais_xml_raw", "operation_drafts", "pending_actions", "eventos"}
+TABELAS_LEITURA = TABELAS_ESCRITA | {"gtas", "entradas_confinamento"}
 
 
 def id_deterministico(tipo: str, chave: str) -> str:
@@ -42,7 +43,8 @@ class ClienteSupabase:
 
     def _chamar(self, metodo: str, caminho: str, payload: Any = None, prefer: str | None = None):
         tabela = caminho.split("?", 1)[0]
-        if tabela not in TABELAS_PERMITIDAS:
+        permitidas = TABELAS_LEITURA if metodo == "GET" else TABELAS_ESCRITA
+        if tabela not in permitidas:
             raise ValueError(f"tabela não permitida: {tabela}")
         headers = dict(self.headers)
         if prefer:
@@ -55,12 +57,33 @@ class ClienteSupabase:
 
     def listar_notas(self, desde: str) -> list[dict[str, Any]]:
         query = urllib.parse.urlencode({
-            "select": "id,chave_acesso,numero,data,valor,qtd_total_itens,descricao_itens,operacao_id,gta,alerta_gta_ausente,criado_em",
+            "select": "id,chave_acesso,numero,data,valor,qtd_total_itens,descricao_itens,operacao_id,gta,alerta_gta_ausente,eh_complemento,eh_venda_gado_pablo,nf_referenciada,nota_fiscal_id,fonte,criado_em",
             "criado_em": "gte." + desde,
             "order": "criado_em.asc",
             "limit": "500",
         })
         return self._chamar("GET", "notas_fiscais_xml_raw?" + query) or []
+
+    def operacoes_por_gta(self, gta: str) -> set[str]:
+        operacoes: set[str] = set()
+        for tabela, coluna in (("gtas", "numero"), ("entradas_confinamento", "gta")):
+            query = urllib.parse.urlencode({"select": "operacao_id", coluna: "eq." + gta, "limit": "50"})
+            for item in self._chamar("GET", tabela + "?" + query) or []:
+                if item.get("operacao_id"):
+                    operacoes.add(item["operacao_id"])
+        return operacoes
+
+    def operacoes_por_referencias(self, referencias: list[str], nota_fiscal_id: str | None = None) -> set[str]:
+        operacoes: set[str] = set()
+        filtros: list[tuple[str, str]] = [("chave_acesso", item) for item in referencias]
+        if nota_fiscal_id:
+            filtros.append(("id", nota_fiscal_id))
+        for coluna, valor in filtros:
+            query = urllib.parse.urlencode({"select": "operacao_id", coluna: "eq." + valor, "limit": "10"})
+            for item in self._chamar("GET", "notas_fiscais_xml_raw?" + query) or []:
+                if item.get("operacao_id"):
+                    operacoes.add(item["operacao_id"])
+        return operacoes
 
     def existe(self, tabela: str, identificador: str) -> bool:
         return self.obter(tabela, identificador) is not None
@@ -88,11 +111,16 @@ def montar_registros(nota: dict[str, Any], analise: dict[str, Any]) -> dict[str,
     action_id = id_deterministico("action", chave)
     event_id = id_deterministico("event", chave)
     fonte = referencia_fonte(chave)
-    novo_negocio = bool(analise.get("eh_nota_venda"))
     pendentes = campos_pendentes_documento(
         tem_gta=bool(analise.get("gta")), operacao_vinculada=bool(nota.get("operacao_id")),
-        novo_negocio=novo_negocio,
     )
+    complemento = bool(analise.get("eh_complemento") or nota.get("eh_complemento"))
+    if nota.get("operacao_id"):
+        relacao = "complemento_de_negocio_existente" if complemento else "documento_de_negocio_existente"
+    elif complemento:
+        relacao = "complemento_pendente_de_vinculo"
+    else:
+        relacao = "relacao_com_negocio_a_conferir"
     dados = {
         "tipo_documento": "NF-e pecuária",
         "numero_nf": nota.get("numero"),
@@ -102,21 +130,29 @@ def montar_registros(nota: dict[str, Any], analise: dict[str, Any]) -> dict[str,
         "gta": analise.get("gta"),
         "operacao_id": nota.get("operacao_id"),
         "fonte_referencia": fonte,
-        "novo_negocio": novo_negocio,
-        "natureza_documento": "venda" if novo_negocio else "a_conferir",
+        "natureza_documento": "venda" if analise.get("eh_nota_venda") else "a_conferir",
+        "relacao_negocio": relacao,
+        "pode_ser_novo_negocio": relacao == "relacao_com_negocio_a_conferir",
+        "eh_complemento": complemento,
+        "vinculo_ambiguo": bool(analise.get("vinculo_ambiguo")),
+        "opcoes_relacao": [
+            "documento de negócio existente",
+            "complemento documental",
+            "complemento de animais de negócio existente",
+            "possível negócio novo",
+        ],
         "promovido_para_operacional": False,
     }
     contexto = "Documentos fiscais"
     draft = {
         "id": draft_id, "agente": "juan", "status": "em_revisao",
-        "tipo_operacao": "novo_negocio_por_nota_fiscal" if novo_negocio else "documento_fiscal",
-        "entidade_final_tipo": "revisao" if novo_negocio else "revisao_documental",
-        "confianca": 0.95 if novo_negocio and analise.get("gta") else (
-            0.95 if analise.get("gta") and nota.get("operacao_id") else 0.8
-        ),
+        "tipo_operacao": "indexacao_nota_fiscal_negocio",
+        "entidade_final_tipo": "revisao_documental",
+        "confianca": 0.95 if analise.get("gta") and nota.get("operacao_id") else 0.8,
         "dados_extraidos": dados, "campos_pendentes": pendentes,
         "inferencias": {"gta_lida_do_xml": bool(analise.get("gta")),
-                        "nota_de_venda_inicia_novo_negocio": novo_negocio,
+                        "nota_fiscal_deve_ser_relacionada_a_negocio": True,
+                        "classificacao_relacao": relacao,
                         "exige_confirmacao": True},
         "pending_action_id": action_id, "origem_canal": "agronotas",
         "origem_conversa_id": fonte, "origem_mensagem_id": fonte,
@@ -125,12 +161,9 @@ def montar_registros(nota: dict[str, Any], analise: dict[str, Any]) -> dict[str,
     }
     action = {
         "id": action_id, "agente": "juan", "usuario_solicitante": "sistema",
-        "canal": "agronotas", "acao_tipo": (
-            "revisar_novo_negocio_fiscal" if novo_negocio else "revisar_documento_fiscal"
-        ),
+        "canal": "agronotas", "acao_tipo": "revisar_indexacao_nota_fiscal",
         "entidade_tipo": "operation_draft", "entidade_id": draft_id,
-        "resumo": ("Conferir novo negócio identificado pela NF-e"
-                   if novo_negocio else "Conferir NF-e, GTA e vínculo com o negócio"),
+        "resumo": "Classificar a relação da NF-e com o negócio correto",
         "payload": {"operation_draft_id": draft_id, "dados_extraidos": dados,
                     "campos_pendentes": pendentes, "promovido_para_operacional": False},
         "resultado": {"operation_draft_id": draft_id}, "status": "aguardando_confirmacao",
@@ -139,9 +172,7 @@ def montar_registros(nota: dict[str, Any], analise: dict[str, Any]) -> dict[str,
         "contexto_nome": contexto, "escopo": "documentos_fiscais",
     }
     event = {
-        "id": event_id, "tipo": (
-            "novo_negocio_detectado_por_nota_fiscal" if novo_negocio else "documento_fiscal_detectado"
-        ), "agente": "juan",
+        "id": event_id, "tipo": "nota_fiscal_indexada_para_revisao", "agente": "juan",
         "usuario": "sistema", "entidade_tipo": "operation_draft", "entidade_id": draft_id,
         "origem": "agronotas_monitor_fiscal", "origem_canal": "agronotas",
         "origem_conversa_id": fonte, "origem_mensagem_id": fonte,
@@ -149,10 +180,9 @@ def montar_registros(nota: dict[str, Any], analise: dict[str, Any]) -> dict[str,
         "escopo": "documentos_fiscais", "status": "pendente",
         "fonte_ref": fonte, "confianca": draft["confianca"],
         "dados": {"operation_draft_id": draft_id, "pending_action_id": action_id,
-                  "gta_identificada": bool(analise.get("gta")), "novo_negocio": novo_negocio,
+                  "gta_identificada": bool(analise.get("gta")), "relacao_negocio": relacao,
                   "promovido_para_operacional": False},
-        "observacao": ("Nota de venda detectada como novo negócio e encaminhada somente para revisão."
-                       if novo_negocio else "Documento detectado automaticamente e encaminhado somente para revisão."),
+        "observacao": "Nota fiscal indexada para relacionar ao negócio correto, sem promoção operacional.",
     }
     return {"operation_drafts": draft, "pending_actions": action, "eventos": event}
 
@@ -172,7 +202,10 @@ def planejar(cliente: ClienteSupabase, xml_store: Path, desde: str) -> dict[str,
         except Exception:
             faltam_xml += 1
             continue
-        if not analise["relacionada_a_gado"]:
+        if not documento_deve_ser_indexado(
+            analise, fonte=nota.get("fonte"),
+            eh_venda_gado_pablo=bool(nota.get("eh_venda_gado_pablo")),
+        ):
             ignoradas += 1
             continue
         patch: dict[str, Any] = {}
@@ -185,7 +218,30 @@ def planejar(cliente: ClienteSupabase, xml_store: Path, desde: str) -> dict[str,
             alteracoes_nota.append((nota["id"], patch))
         if analise.get("gta_ambigua"):
             ambiguas += 1
-        registros = montar_registros(nota, analise)
+        operacoes_candidatas: set[str] = set()
+        if nota.get("operacao_id"):
+            operacoes_candidatas.add(nota["operacao_id"])
+        if analise.get("gta"):
+            operacoes_candidatas.update(cliente.operacoes_por_gta(analise["gta"]))
+        referencias = list(analise.get("referencias_nfe") or [])
+        if nota.get("nf_referenciada") and re.fullmatch(r"\d{44}", str(nota["nf_referenciada"])):
+            referencias.append(str(nota["nf_referenciada"]))
+        operacoes_candidatas.update(cliente.operacoes_por_referencias(
+            referencias, nota.get("nota_fiscal_id")
+        ))
+        nota_processada = dict(nota)
+        if not nota.get("operacao_id") and len(operacoes_candidatas) == 1:
+            nota_processada["operacao_id"] = next(iter(operacoes_candidatas))
+            patch["operacao_id"] = nota_processada["operacao_id"]
+            if not any(item_id == nota["id"] for item_id, _ in alteracoes_nota):
+                alteracoes_nota.append((nota["id"], patch))
+            else:
+                for indice, (item_id, existente) in enumerate(alteracoes_nota):
+                    if item_id == nota["id"]:
+                        alteracoes_nota[indice] = (item_id, {**existente, **patch})
+                        break
+        analise["vinculo_ambiguo"] = len(operacoes_candidatas) > 1
+        registros = montar_registros(nota_processada, analise)
         for tabela, payload in registros.items():
             atual = cliente.obter(tabela, payload["id"])
             if atual is None:
@@ -201,13 +257,16 @@ def planejar(cliente: ClienteSupabase, xml_store: Path, desde: str) -> dict[str,
                 patch_existente = {campo: payload[campo] for campo in campos if atual.get(campo) != payload.get(campo)}
                 if patch_existente:
                     atualizacoes.append((tabela, payload["id"], patch_existente))
-            elif tabela == "eventos" and analise.get("eh_nota_venda") and not (atual.get("dados") or {}).get("novo_negocio"):
-                evento_negocio = dict(payload)
-                evento_negocio["id"] = id_deterministico("event-negocio", nota["chave_acesso"])
-                evento_negocio["tipo"] = "nota_de_venda_classificada_como_novo_negocio"
-                evento_negocio["observacao"] = "Regra de negócio aplicada à revisão aberta; nenhuma operação foi promovida."
-                if not cliente.existe("eventos", evento_negocio["id"]):
-                    criacoes.append(("eventos", evento_negocio))
+            elif tabela == "eventos" and (
+                (atual.get("dados") or {}).get("novo_negocio") is True
+                or cliente.existe("eventos", id_deterministico("event-negocio", nota["chave_acesso"]))
+            ):
+                evento_correcao = dict(payload)
+                evento_correcao["id"] = id_deterministico("event-correcao-relacao", nota["chave_acesso"])
+                evento_correcao["tipo"] = "classificacao_de_nota_fiscal_corrigida"
+                evento_correcao["observacao"] = "Classificação automática como novo negócio foi removida; relação voltou para conferência."
+                if not cliente.existe("eventos", evento_correcao["id"]):
+                    criacoes.append(("eventos", evento_correcao))
             elif tabela == "eventos" and analise.get("gta") and not (atual.get("dados") or {}).get("gta_identificada"):
                 evento_gta = dict(payload)
                 evento_gta["id"] = id_deterministico("event-gta", nota["chave_acesso"])

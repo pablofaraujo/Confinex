@@ -46,8 +46,13 @@ não se sobrepõem.
   confundir datas, e o monitor opera em dry-run por padrão. Os testes exigem
   IDs determinísticos, ordem compatível com a chave estrangeira, atualização
   apenas de revisão aberta e allowlist que exclui todas as tabelas operacionais.
-  Uma `natOp` de venda deve iniciar novo negócio e não pode cobrar vínculo com
-  operação anterior.
+  Toda NF de venda emitida deve ser indexada, mas não pode ser classificada
+  automaticamente como negócio novo. GTA ou referência fiscal exata podem
+  sugerir um único negócio existente; candidatos múltiplos preservam a
+  ambiguidade. Complementos e documentos de negócio existente continuam
+  separados de possíveis negócios novos. O heartbeat também valida o
+  agendamento fiscal e a atualização recente do log, sem consultar a API em
+  intervalos de cinco minutos.
 - **Memória e contexto:** `memorias_agentes` guarda apenas regras, decisões ou
   preferências reutilizáveis; `contexto_handoff` serve apenas à continuidade
   temporária. Nenhuma das duas substitui rascunhos, pendências ou eventos.
