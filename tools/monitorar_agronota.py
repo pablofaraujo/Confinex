@@ -132,6 +132,20 @@ def montar_registros(nota: dict[str, Any], analise: dict[str, Any]) -> dict[str,
         if fonte_nota.endswith("_recebida")
         else analise.get("destinatario_nome")
     )
+    origem_documento = (
+        "Recebida pelo AgroNota"
+        if fonte_nota.endswith("_recebida")
+        else "Emitida pelo AgroNota" if fonte_nota.endswith("_emitida") else "AgroNota"
+    )
+    descricao_itens = nota.get("descricao_itens") or " | ".join(
+        analise.get("descricoes_produtos") or []
+    )
+    situacoes = {
+        "documento_de_negocio_existente": "Documento relacionado a um negócio existente.",
+        "complemento_de_negocio_existente": "Complemento relacionado a um negócio existente.",
+        "complemento_pendente_de_vinculo": "Complemento fiscal ainda sem negócio confirmado.",
+        "relacao_com_negocio_a_conferir": "NF-e encontrada sem negócio confirmado.",
+    }
     dados = {
         "tipo_documento": "NF-e pecuária",
         "numero_nf": nota.get("numero"),
@@ -141,6 +155,11 @@ def montar_registros(nota: dict[str, Any], analise: dict[str, Any]) -> dict[str,
         "quantidade": nota.get("qtd_total_itens"),
         "gta": analise.get("gta"),
         "contraparte": contraparte,
+        "emitente_nome": analise.get("emitente_nome"),
+        "destinatario_nome": analise.get("destinatario_nome"),
+        "natureza_operacao": analise.get("natureza_operacao"),
+        "descricao_itens": descricao_itens,
+        "fonte_documento": origem_documento,
         "documento": f"NF-e {nota.get('numero')}" if nota.get("numero") else "NF-e",
         "operacao_id": nota.get("operacao_id"),
         "fonte_referencia": fonte,
@@ -149,6 +168,21 @@ def montar_registros(nota: dict[str, Any], analise: dict[str, Any]) -> dict[str,
         "pode_ser_novo_negocio": relacao == "relacao_com_negocio_a_conferir",
         "eh_complemento": complemento,
         "vinculo_ambiguo": bool(analise.get("vinculo_ambiguo")),
+        "situacao": situacoes.get(relacao, "Relação documental ainda precisa ser conferida."),
+        "divergencia": (
+            "Mais de um negócio possível foi encontrado; mantenha sem vínculo até conferir."
+            if analise.get("vinculo_ambiguo") else ""
+        ),
+        "acao_recomendada": (
+            "Confirme se a NF-e pertence a um negócio existente, complementa documentos "
+            "ou animais, ou representa um negócio novo."
+        ),
+        "evidencia": " · ".join(filter(None, (
+            f"NF-e {nota.get('numero')}" if nota.get("numero") else None,
+            f"GTA {analise.get('gta')}" if analise.get("gta") else None,
+            f"{nota.get('qtd_total_itens')} cabeças" if nota.get("qtd_total_itens") is not None else None,
+            str(descricao_itens) if descricao_itens else None,
+        ))),
         "opcoes_relacao": [
             "documento de negócio existente",
             "complemento documental",

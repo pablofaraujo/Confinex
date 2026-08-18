@@ -23,6 +23,12 @@ fonte da data humana. Dados já presentes no vínculo superior do rascunho são
 herdados pela revisão, sem obrigar a pessoa a redigitar canal, mensagem, agente
 ou situação da confirmação.
 
+A revisão fiscal começa por uma ficha de pistas: emitente, destinatário,
+natureza da operação, descrição dos animais, origem emitida/recebida, número,
+data, valor, cabeças, GTA e relação sugerida. Os mesmos dados permanecem
+editáveis logo abaixo. A ficha serve para localizar e confirmar o negócio; ela
+não transforma a NF em compra, venda ou movimentação da Fazenda.
+
 Na VPS, o sandbox do Juan não acessa o Supabase diretamente. O cliente envia
 leituras e escritas de `operation_drafts`, `pending_actions`, `eventos` e demais
 tabelas não operacionais permitidas à fila privada de `confinex_db_bridge.py`.

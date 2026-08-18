@@ -12,7 +12,7 @@ const inlineScripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script
   .map(match => match[1].trim())
   .filter(Boolean);
 assert.equal(inlineScripts.length, 0, 'revisoes.html nao deve manter script inline');
-assert.match(html, /<script src="\.\/revisoes\.js\?v=20260818-1"><\/script>/);
+assert.match(html, /<script src="\.\/revisoes\.js\?v=20260818-2"><\/script>/);
 
 const context = {
   CFAgro: {authInit() {}},
@@ -22,7 +22,7 @@ const context = {
   console,
 };
 vm.createContext(context);
-new vm.Script(`${js}\nglobalThis.__revisoes={buildPromocaoPreview,promotionValidationState,promotionInputElement,aplicarEstadoPromocao,businessFieldIndex,businessTargetPath,promotionMissingLinks,irParaCampoObrigatorio,validarNegocioOperacional,planoDecisao,montarEventoDecisao,montarAtualizacaoRascunho,registrarEvento,promotionHistoryData,promotionHistoryHtml,statusPrincipal,dadosItem,labelStatus,painelFila,itemMatchesStatus,camposObrigatoriosFaltantes,filtrosRapidosHtml,contextosResumoHtml,contextoDe,grupoNome,dadosComGrupoNome,contextoPersistivel,incluirContextoSeDisponivel,inferPromotionTarget,prioridadeItem,compararPrioridade,orientacaoCampoFaltante,orientacoesCamposHtml};`, {filename: 'revisoes.js'}).runInContext(context);
+new vm.Script(`${js}\nglobalThis.__revisoes={buildPromocaoPreview,promotionValidationState,promotionInputElement,aplicarEstadoPromocao,businessFieldIndex,businessTargetPath,promotionMissingLinks,irParaCampoObrigatorio,validarNegocioOperacional,planoDecisao,montarEventoDecisao,montarAtualizacaoRascunho,registrarEvento,promotionHistoryData,promotionHistoryHtml,statusPrincipal,dadosItem,labelStatus,painelFila,itemMatchesStatus,camposObrigatoriosFaltantes,filtrosRapidosHtml,contextosResumoHtml,contextoDe,grupoNome,dadosComGrupoNome,contextoPersistivel,incluirContextoSeDisponivel,inferPromotionTarget,prioridadeItem,compararPrioridade,orientacaoCampoFaltante,orientacoesCamposHtml,pistasDocumentoFiscal,documentoFiscalResumoHtml,renderBusinessSections};`, {filename: 'revisoes.js'}).runInContext(context);
 
 const api = context.__revisoes;
 
@@ -36,6 +36,23 @@ const compraCompleta = api.buildPromocaoPreview({operacao_id:'op-1',data_compra:
 assert.equal(api.promotionValidationState('compras', compraCompleta).blocked, false);
 const compraFiscal = api.buildPromocaoPreview({operacao_id:'op-1',data_emissao:'2026-08-06',quantidade:13,valor_total:35050}, 'compras');
 assert.equal(compraFiscal.data, '2026-08-06', 'data de emissão da NF deve preencher a data revisável');
+const pistasFiscais = api.pistasDocumentoFiscal({
+  numero_nf:'52737291', data_emissao:'2026-08-06', valor_total:35050,
+  quantidade:13, emitente_nome:'Fornecedor Teste', destinatario_nome:'CFAgro',
+  gta:'879309', relacao_negocio:'relacao_com_negocio_a_conferir',
+  descricao_itens:'13 novilhas', fonte_documento:'Recebida pelo AgroNota',
+});
+assert.deepEqual([...pistasFiscais.map(([rotulo])=>rotulo)], ['NF-e','Data de emissão','Valor da NF','Cabeças','Emitente','Destinatário','GTA','Relação sugerida','Descrição na NF','Origem']);
+const resumoFiscal = api.documentoFiscalResumoHtml(Object.fromEntries([
+  ['numero_nf','52737291'],['data_emissao','2026-08-06'],['valor_total',35050],
+  ['quantidade',13],['emitente_nome','Fornecedor Teste'],['destinatario_nome','CFAgro'],
+  ['gta','879309'],['descricao_itens','13 novilhas'],
+]));
+assert.match(resumoFiscal, /Pistas do documento para sua conferência/);
+assert.match(resumoFiscal, /Valor da NF/);
+assert.match(resumoFiscal, /Fornecedor Teste/);
+assert.match(api.renderBusinessSections({numero_nf:'1'}), /Informações escritas na NF/);
+assert.doesNotMatch(api.renderBusinessSections({}), /Informações escritas na NF/);
 
 const vendaSemRecebimento = api.buildPromocaoPreview({data_abate:'2026-07-22',cabecas:18,peso_liquido_kg:5228.785,valor_bruto:115033.27}, 'vendas');
 const estadoVenda = api.promotionValidationState('vendas', vendaSemRecebimento);

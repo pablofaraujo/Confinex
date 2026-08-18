@@ -96,6 +96,8 @@ def analisar_xml_nfe(xml: bytes | str) -> dict[str, Any]:
         "eh_nota_venda": bool(re.search(r"\bVENDA\b", natureza_normalizada)),
         "eh_complemento": "2" in finalidades or "COMPLEMENT" in natureza_normalizada or bool(referencias_nfe),
         "referencias_nfe": referencias_nfe,
+        "natureza_operacao": " | ".join(naturezas) or None,
+        "descricoes_produtos": descricoes,
         "emitente_nome": _texto_no_bloco(raiz, "emit", "xNome"),
         "destinatario_nome": _texto_no_bloco(raiz, "dest", "xNome"),
     }

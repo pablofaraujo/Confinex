@@ -76,11 +76,18 @@ class MonitorAgronotaTests(unittest.TestCase):
         self.assertEqual(dados["data"], "2026-08-14")
         self.assertEqual(dados["data_emissao"], "2026-08-14")
         self.assertEqual(dados["contraparte"], "Fornecedor Teste")
+        self.assertEqual(dados["emitente_nome"], "Fornecedor Teste")
+        self.assertEqual(dados["destinatario_nome"], "Comprador Teste")
+        self.assertEqual(dados["descricao_itens"], "BOVINOS")
+        self.assertEqual(dados["fonte_documento"], "Recebida pelo AgroNota")
         self.assertEqual(dados["documento"], "NF-e 10")
         self.assertEqual(dados["gta"], "123456")
         self.assertEqual(dados["origem_canal"], "agronotas")
         self.assertEqual(dados["agente"], "juan")
         self.assertEqual(dados["status_confirmacao"], "em_revisao")
+        self.assertEqual(dados["situacao"], "Documento relacionado a um negócio existente.")
+        self.assertIn("Confirme se a NF-e", dados["acao_recomendada"])
+        self.assertIn("NF-e 10", dados["evidencia"])
 
     def test_filtro_exato_resgata_nota_fora_da_janela(self):
         nota_alvo = self._nota()

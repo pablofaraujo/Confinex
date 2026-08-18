@@ -139,7 +139,7 @@ def validar_local() -> None:
     scripts = scripts_inline(html)
     if scripts:
         raise FalhaValidacao("revisoes.html não deve manter script inline")
-    if './revisoes.js?v=20260818-1' not in html:
+    if './revisoes.js?v=20260818-2' not in html:
         raise FalhaValidacao("revisoes.html deve carregar revisoes.js versionado")
     executar(["node", "--check", "revisoes.js"])
     executar(["node", "--check", "js/cfagro-gestao.js"])

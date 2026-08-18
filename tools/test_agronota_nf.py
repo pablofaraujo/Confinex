@@ -27,6 +27,7 @@ class AgronotaNfTests(unittest.TestCase):
         self.assertFalse(resultado["gta_ambigua"])
         self.assertEqual(resultado["emitente_nome"], "Fornecedor Teste")
         self.assertEqual(resultado["destinatario_nome"], "Comprador Teste")
+        self.assertEqual(resultado["descricoes_produtos"], ["30 BOVINOS"])
 
     def test_deduplica_mesma_gta_em_campos_distintos(self):
         resultado = analisar_xml_nfe(xml_nfe("GTA: 123456-7"))
@@ -51,7 +52,9 @@ class AgronotaNfTests(unittest.TestCase):
         self.assertEqual(extrair_gtas_texto("GTA/MG número: 123456"), ["123456"])
 
     def test_identifica_natureza_de_venda_sem_confundir_transferencia(self):
-        self.assertTrue(analisar_xml_nfe(xml_nfe("GTA 123456", natureza="Venda de gado"))["eh_nota_venda"])
+        venda = analisar_xml_nfe(xml_nfe("GTA 123456", natureza="Venda de gado"))
+        self.assertTrue(venda["eh_nota_venda"])
+        self.assertEqual(venda["natureza_operacao"], "Venda de gado")
         self.assertFalse(analisar_xml_nfe(xml_nfe("GTA 123456", natureza="Transferência"))["eh_nota_venda"])
 
     def test_nota_de_venda_sem_vinculo_exige_classificacao(self):
