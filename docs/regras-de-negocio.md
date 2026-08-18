@@ -112,6 +112,8 @@ As duas leituras são auxiliares e não mudam lucro, custos totais, caixa ou ran
 - Arrobas a 50% de rendimento são `peso_total_kg ÷ 30`. Em rendimento diferente, usar `peso_total_kg × rendimento_pct ÷ 100 ÷ 15`.
 - Uma compra agregada entra uma única vez no custo e na quantidade da operação. Seus componentes explicam origem e intermediação, mas não são somados novamente.
 - Participantes são declarados por operação. O sistema não herda vendedor, corretor, proprietário ou parceiro de outro negócio por semelhança.
+- Inventário físico é uma fotografia por data, local e categoria; não é entrada nem saída. Grupos mistos são separados em itens por categoria, o peso total é `cabeças × peso médio` e sexo ausente permanece não informado.
+- O saldo do ledger e a última contagem física são apresentados separadamente. Uma divergência entre ambos exige conciliação explícita e nunca é corrigida pela criação automática de movimentações.
 
 ## Agenda financeira e dívidas
 

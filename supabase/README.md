@@ -61,3 +61,19 @@ grants mínimos. As tabelas-base mantiveram contagens e assinaturas idênticas.
 `anon` não possui acesso; `authenticated` tem somente leitura; `service_role`
 tem `SELECT/INSERT/UPDATE` nas tabelas e somente `SELECT` nas views, sem
 `DELETE` ou `TRUNCATE`. Nenhum negócio foi carregado nessa etapa.
+
+## Inventários físicos da Fazenda — migração aplicada
+
+`migrations/202608180001_inventarios_fazenda.sql` adiciona uma tabela de
+retratos físicos por data, local e categoria, além de uma visão resumida. O
+inventário não gera movimentação, compra, venda nem negócio: ele permanece
+separado do saldo calculado pelo histórico e serve para conferência.
+
+A carga é feita por `tools/registrar_inventario_fazenda.py`, em dry-run por
+padrão, com chave idempotente determinística e confirmação vinculada ao plano.
+O `service_role` pode consultar, inserir e corrigir o retrato, mas não apagar;
+`authenticated` possui apenas leitura e `anon` permanece bloqueado.
+
+A estrutura foi aplicada em 18/08/2026, após autorização explícita. A execução
+da migração retornou sucesso sem linhas e a tabela e a visão foram confirmadas
+vazias antes da primeira carga autorizada.

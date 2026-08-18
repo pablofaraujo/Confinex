@@ -38,6 +38,9 @@
 
   <div class="kpis" id="kpis"></div>
 
+  <h2>Último inventário físico</h2>
+  <div class="card scroll"><table id="tbInventario"></table></div>
+
   <h2>Registrar lançamento</h2>
   <div class="card">
     <div class="grid g6">
@@ -69,6 +72,8 @@ const MOTIVOS = {
   saida:   ['Venda','Envio para confinamento (cocho)','Envio para parceria Ricardo','Envio para parceria Xande','Morte/perda','Outro']
 };
 let LANC=[];
+let INVENTARIO=[];
+let INVENTARIO_RESUMO=[];
 
 function atualizarMotivos(){
   const tipo=document.getElementById('lTipo').value;
@@ -82,9 +87,54 @@ async function carregar(){
   const {data,error}=await db.from('fazenda_ametista').select('*').order('data',{ascending:true}).order('created_at',{ascending:true});
   if(error){ document.getElementById('subtitle').textContent='Erro: '+error.message; return; }
   LANC=data||[];
+  await carregarInventario();
   document.getElementById('subtitle').textContent='Controle do rebanho próprio';
   renderKpis(); renderTabela();
   carregarInterunidades();
+}
+
+async function carregarInventario(){
+  const tabela=document.getElementById('tbInventario');
+  const {data:resumos,error:erroResumo}=await db.from('v_inventarios_fazenda_resumo')
+    .select('unidade_codigo,data_referencia,cabecas_total,peso_total_kg,peso_medio_kg,itens')
+    .eq('unidade_codigo','fazenda_ametista')
+    .order('data_referencia',{ascending:false})
+    .limit(1);
+  if(erroResumo){
+    INVENTARIO=[]; INVENTARIO_RESUMO=[];
+    tabela.innerHTML='<tr><td><span class="badge b-amber">Inventário indisponível</span> A estrutura ainda não está publicada.</td></tr>';
+    return;
+  }
+  INVENTARIO_RESUMO=resumos||[];
+  if(!INVENTARIO_RESUMO.length){
+    INVENTARIO=[];
+    tabela.innerHTML='<tr><td>Nenhum inventário físico registrado.</td></tr>';
+    return;
+  }
+  const referencia=INVENTARIO_RESUMO[0].data_referencia;
+  const {data:itens,error:erroItens}=await db.from('inventarios_fazenda')
+    .select('data_referencia,local_nome,categoria,sexo,cabecas,peso_medio_kg,peso_total_kg')
+    .eq('unidade_codigo','fazenda_ametista')
+    .eq('data_referencia',referencia)
+    .order('local_nome')
+    .order('categoria');
+  if(erroItens){
+    INVENTARIO=[];
+    tabela.innerHTML='<tr><td><span class="badge b-amber">Inventário indisponível</span> Não foi possível carregar os itens.</td></tr>';
+    return;
+  }
+  INVENTARIO=itens||[];
+  renderInventario();
+}
+
+function nomeSexo(sexo){
+  return sexo==='macho'?'Macho':sexo==='femea'?'Fêmea':sexo==='misto'?'Misto':'Não informado';
+}
+
+function renderInventario(){
+  document.getElementById('tbInventario').innerHTML=
+    '<tr><th>Data</th><th>Local</th><th>Categoria</th><th>Sexo</th><th class="num">Cabeças</th><th class="num">Peso médio</th><th class="num">Peso estimado</th></tr>'+
+    (INVENTARIO.map(item=>`<tr><td>${fmtD(item.data_referencia)}</td><td><b>${esc(item.local_nome)}</b></td><td>${esc(item.categoria)}</td><td>${nomeSexo(item.sexo)}</td><td class="num">${fmtN(item.cabecas)}</td><td class="num">${fmtN(item.peso_medio_kg)} kg</td><td class="num">${fmtN(item.peso_total_kg)} kg</td></tr>`).join('') || '<tr><td colspan="7">Nenhum inventário físico registrado.</td></tr>');
 }
 
 async function carregarInterunidades(){
@@ -109,8 +159,11 @@ function renderKpis(){
   const entr30=recentes.filter(l=>l.tipo==='entrada').reduce((s,l)=>s+Number(l.cabecas||0),0);
   const sai30=recentes.filter(l=>l.tipo==='saida').reduce((s,l)=>s+Number(l.cabecas||0),0);
   const ultimo=LANC[LANC.length-1];
+  const inventario=INVENTARIO_RESUMO[0];
   document.getElementById('kpis').innerHTML=[
-    ['Estoque atual', fmtN(saldoAtual()), 'cabeças na Ametista hoje'],
+    ['Estoque físico', inventario?fmtN(inventario.cabecas_total):'—', inventario?'contagem de '+fmtD(inventario.data_referencia):'sem inventário'],
+    ['Peso estimado', inventario?fmtN(inventario.peso_total_kg)+' kg':'—', inventario?'média de '+fmtN(inventario.peso_medio_kg)+' kg/cab':'sem inventário'],
+    ['Saldo pelo histórico', fmtN(saldoAtual()), 'entradas menos saídas registradas'],
     ['Entradas (30d)', fmtN(entr30), 'cabeças'],
     ['Saídas (30d)', fmtN(sai30), 'cabeças'],
     ['Último lançamento', ultimo?fmtD(ultimo.data):'—', ultimo?(ultimo.tipo==='entrada'?'+':'−')+ultimo.cabecas+' · '+(ultimo.motivo||''):'nenhum ainda'],
