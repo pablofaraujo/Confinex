@@ -12,7 +12,7 @@ const inlineScripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script
   .map(match => match[1].trim())
   .filter(Boolean);
 assert.equal(inlineScripts.length, 0, 'revisoes.html nao deve manter script inline');
-assert.match(html, /<script src="\.\/revisoes\.js\?v=20260803-1"><\/script>/);
+assert.match(html, /<script src="\.\/revisoes\.js\?v=20260818-1"><\/script>/);
 
 const context = {
   CFAgro: {authInit() {}},
@@ -34,6 +34,8 @@ assert.match(estadoCompraIncompleta.aviso, /Negócio selecionado, Data, Cabeças
 
 const compraCompleta = api.buildPromocaoPreview({operacao_id:'op-1',data_compra:'2026-07-22',quantidade:18,valor_total:115033.27}, 'compras');
 assert.equal(api.promotionValidationState('compras', compraCompleta).blocked, false);
+const compraFiscal = api.buildPromocaoPreview({operacao_id:'op-1',data_emissao:'2026-08-06',quantidade:13,valor_total:35050}, 'compras');
+assert.equal(compraFiscal.data, '2026-08-06', 'data de emissão da NF deve preencher a data revisável');
 
 const vendaSemRecebimento = api.buildPromocaoPreview({data_abate:'2026-07-22',cabecas:18,peso_liquido_kg:5228.785,valor_bruto:115033.27}, 'vendas');
 const estadoVenda = api.promotionValidationState('vendas', vendaSemRecebimento);
@@ -264,6 +266,15 @@ const contextoSeparado = api.dadosComGrupoNome(
 );
 assert.equal(contextoSeparado.contexto_nome, 'Grupo Operacional');
 assert.equal(contextoSeparado.origem_conversa_id, '-9999999999', 'ID técnico deve ser preservado sem aparecer como nome');
+const contextoFiscal = api.dadosComGrupoNome(
+  {status:'em_revisao',agente:'juan',contexto_nome:'Documentos fiscais',origem_canal:'agronotas',origem_conversa_id:'fonte-tecnica',origem_mensagem_id:'nfe-10',escopo:'documentos_fiscais'},
+  {status:'aguardando_confirmacao',canal:'agronotas'},
+  {data_emissao:'2026-08-06'},
+);
+assert.equal(contextoFiscal.origem_canal, 'agronotas');
+assert.equal(contextoFiscal.origem_mensagem_id, 'nfe-10');
+assert.equal(contextoFiscal.agente, 'juan');
+assert.equal(contextoFiscal.status_confirmacao, 'em_revisao');
 assert.equal(api.contextoDe({draft:{contexto_nome:'Grupo Operacional',dados_extraidos:contextoSeparado},action:null}), 'Grupo Operacional');
 assert.doesNotMatch(
   api.contextoDe({draft:{contexto_canonico:'telegram:grupo:-9999999999',origem_conversa_id:'-9999999999',dados_extraidos:{}},action:null}),

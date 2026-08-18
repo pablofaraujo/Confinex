@@ -16,6 +16,13 @@ Atualizado em 2026-07-23. Este documento é o roteiro operacional da versão atu
 
 Nenhuma compra é promovida automaticamente. Preparar, aprovar, simular e reconciliar auditorias não equivalem a gravar um lançamento.
 
+Rascunhos vindos do monitor fiscal preservam no conteúdo revisável a data de
+emissão, número da NF-e, GTA identificada, quantidade, valor, contraparte e os
+sete campos do contexto de origem. A tela também aceita `data_emissao` como
+fonte da data humana. Dados já presentes no vínculo superior do rascunho são
+herdados pela revisão, sem obrigar a pessoa a redigitar canal, mensagem, agente
+ou situação da confirmação.
+
 Na VPS, o sandbox do Juan não acessa o Supabase diretamente. O cliente envia
 leituras e escritas de `operation_drafts`, `pending_actions`, `eventos` e demais
 tabelas não operacionais permitidas à fila privada de `confinex_db_bridge.py`.

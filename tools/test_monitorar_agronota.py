@@ -51,7 +51,8 @@ class MonitorAgronotaTests(unittest.TestCase):
     def _nota(self):
         return {"id": "nf-1", "chave_acesso": "1" * 44, "numero": "10", "data": "2026-08-14",
                 "valor": 100.0, "qtd_total_itens": 30, "descricao_itens": "BOVINOS",
-                "operacao_id": "op-1", "gta": None, "alerta_gta_ausente": False}
+                "operacao_id": "op-1", "gta": None, "alerta_gta_ausente": False,
+                "fonte": "nfe_xml_auto_recebida"}
 
     def test_fontes_de_vinculo_sao_somente_leitura(self):
         self.assertTrue({"gtas", "entradas_confinamento"}.issubset(TABELAS_LEITURA))
@@ -71,6 +72,15 @@ class MonitorAgronotaTests(unittest.TestCase):
         draft = next(p for t, p in plano["criacoes"] if t == "operation_drafts")
         self.assertEqual(draft["campos_pendentes"], ["extrato bancário ou comprovante"])
         self.assertIsInstance(draft["confianca"], float)
+        dados = draft["dados_extraidos"]
+        self.assertEqual(dados["data"], "2026-08-14")
+        self.assertEqual(dados["data_emissao"], "2026-08-14")
+        self.assertEqual(dados["contraparte"], "Fornecedor Teste")
+        self.assertEqual(dados["documento"], "NF-e 10")
+        self.assertEqual(dados["gta"], "123456")
+        self.assertEqual(dados["origem_canal"], "agronotas")
+        self.assertEqual(dados["agente"], "juan")
+        self.assertEqual(dados["status_confirmacao"], "em_revisao")
 
     def test_filtro_exato_resgata_nota_fora_da_janela(self):
         nota_alvo = self._nota()

@@ -36,6 +36,17 @@ def _textos(raiz: ET.Element, nome: str) -> list[str]:
     ]
 
 
+def _texto_no_bloco(raiz: ET.Element, bloco: str, campo: str) -> str | None:
+    """Lê um campo dentro de emit/dest sem misturar as duas partes da NF-e."""
+    for elemento in raiz.iter():
+        if _nome_tag(elemento) != bloco:
+            continue
+        for filho in elemento.iter():
+            if _nome_tag(filho) == campo and (filho.text or "").strip():
+                return (filho.text or "").strip()
+    return None
+
+
 def _normalizar_texto(valor: str) -> str:
     return unicodedata.normalize("NFKD", valor).encode("ascii", "ignore").decode().upper()
 
@@ -85,6 +96,8 @@ def analisar_xml_nfe(xml: bytes | str) -> dict[str, Any]:
         "eh_nota_venda": bool(re.search(r"\bVENDA\b", natureza_normalizada)),
         "eh_complemento": "2" in finalidades or "COMPLEMENT" in natureza_normalizada or bool(referencias_nfe),
         "referencias_nfe": referencias_nfe,
+        "emitente_nome": _texto_no_bloco(raiz, "emit", "xNome"),
+        "destinatario_nome": _texto_no_bloco(raiz, "dest", "xNome"),
     }
 
 

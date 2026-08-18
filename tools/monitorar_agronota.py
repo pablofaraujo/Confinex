@@ -125,13 +125,23 @@ def montar_registros(nota: dict[str, Any], analise: dict[str, Any]) -> dict[str,
         relacao = "complemento_pendente_de_vinculo"
     else:
         relacao = "relacao_com_negocio_a_conferir"
+    contexto = "Documentos fiscais"
+    fonte_nota = str(nota.get("fonte") or "")
+    contraparte = (
+        analise.get("emitente_nome")
+        if fonte_nota.endswith("_recebida")
+        else analise.get("destinatario_nome")
+    )
     dados = {
         "tipo_documento": "NF-e pecuária",
         "numero_nf": nota.get("numero"),
         "data_emissao": nota.get("data"),
+        "data": nota.get("data"),
         "valor_total": nota.get("valor"),
         "quantidade": nota.get("qtd_total_itens"),
         "gta": analise.get("gta"),
+        "contraparte": contraparte,
+        "documento": f"NF-e {nota.get('numero')}" if nota.get("numero") else "NF-e",
         "operacao_id": nota.get("operacao_id"),
         "fonte_referencia": fonte,
         "natureza_documento": "venda" if analise.get("eh_nota_venda") else "a_conferir",
@@ -146,8 +156,16 @@ def montar_registros(nota: dict[str, Any], analise: dict[str, Any]) -> dict[str,
             "possível negócio novo",
         ],
         "promovido_para_operacional": False,
+        "contexto_nome": contexto,
+        "contexto_operacional": contexto,
+        "grupo_telegram": contexto,
+        "origem_canal": "agronotas",
+        "origem_conversa_id": fonte,
+        "origem_mensagem_id": fonte,
+        "agente": "juan",
+        "escopo": "documentos_fiscais",
+        "status_confirmacao": "em_revisao",
     }
-    contexto = "Documentos fiscais"
     draft = {
         "id": draft_id, "agente": "juan", "status": "em_revisao",
         "tipo_operacao": "indexacao_nota_fiscal_negocio",
