@@ -2,7 +2,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from monitorar_agronota import TABELAS_ESCRITA, TABELAS_LEITURA, executar, planejar
+from monitorar_agronota import (
+    TABELAS_ESCRITA,
+    TABELAS_LEITURA,
+    ClienteSupabase,
+    executar,
+    planejar,
+)
 from test_agronota_nf import xml_nfe
 
 
@@ -14,7 +20,9 @@ class ClienteFalso:
         self._operacoes_referencias = set(operacoes_referencias or [])
         self.escritas = []
 
-    def listar_notas(self, _desde):
+    def listar_notas(self, _desde, numero_nota=None):
+        if numero_nota:
+            return [nota for nota in self.notas if str(nota.get("numero")) == numero_nota]
         return self.notas
 
     def existe(self, tabela, identificador):
@@ -63,6 +71,34 @@ class MonitorAgronotaTests(unittest.TestCase):
         draft = next(p for t, p in plano["criacoes"] if t == "operation_drafts")
         self.assertEqual(draft["campos_pendentes"], ["extrato bancário ou comprovante"])
         self.assertIsInstance(draft["confianca"], float)
+
+    def test_filtro_exato_resgata_nota_fora_da_janela(self):
+        nota_alvo = self._nota()
+        outra = {**nota_alvo, "id": "nf-2", "chave_acesso": "2" * 44, "numero": "11"}
+        cliente = ClienteFalso([outra, nota_alvo])
+        with tempfile.TemporaryDirectory() as pasta:
+            Path(pasta, f"{'1' * 44}-procNfe.xml").write_bytes(xml_nfe("GTA 123456"))
+            plano = planejar(cliente, Path(pasta), "data-fora-da-janela", numero_nota="10")
+        self.assertEqual(plano["resumo"]["operation_drafts"], 1)
+        self.assertEqual(plano["resumo"]["filtro_numero_nota"], "10")
+        draft = next(p for t, p in plano["criacoes"] if t == "operation_drafts")
+        self.assertEqual(draft["dados_extraidos"]["numero_nf"], "10")
+
+    def test_cliente_filtra_numero_sem_restringir_criado_em(self):
+        cliente = ClienteSupabase("https://teste.invalid", "chave")
+        caminhos = []
+        cliente._chamar = lambda _metodo, caminho, *_args: caminhos.append(caminho) or []
+        cliente.listar_notas("2026-08-17T00:00:00Z", numero_nota="52737291")
+        self.assertEqual(len(caminhos), 1)
+        self.assertIn("numero=eq.52737291", caminhos[0])
+        self.assertNotIn("criado_em=gte", caminhos[0])
+
+    def test_pipeline_diario_reconcilia_toda_janela_baixada(self):
+        fonte = Path("tools/agronota_pipeline.sh").read_text(encoding="utf-8")
+        self.assertIn(
+            'RECON_SINCE_DAYS="${RECONCILE_SINCE_DAYS:-$LOOKBACK_DAYS}"', fonte
+        )
+        self.assertIn('--since-days "$RECON_SINCE_DAYS"', fonte)
 
     def test_execucao_idempotente_nao_ressuscita_registro_existente(self):
         nota = self._nota()

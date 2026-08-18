@@ -55,13 +55,17 @@ class ClienteSupabase:
             bruto = resposta.read()
             return json.loads(bruto) if bruto else None
 
-    def listar_notas(self, desde: str) -> list[dict[str, Any]]:
-        query = urllib.parse.urlencode({
+    def listar_notas(self, desde: str, numero_nota: str | None = None) -> list[dict[str, Any]]:
+        filtros = {
             "select": "id,chave_acesso,numero,data,valor,qtd_total_itens,descricao_itens,operacao_id,gta,alerta_gta_ausente,eh_complemento,eh_venda_gado_pablo,nf_referenciada,nota_fiscal_id,fonte,criado_em",
-            "criado_em": "gte." + desde,
             "order": "criado_em.asc",
             "limit": "500",
-        })
+        }
+        if numero_nota:
+            filtros["numero"] = "eq." + numero_nota
+        else:
+            filtros["criado_em"] = "gte." + desde
+        query = urllib.parse.urlencode(filtros)
         return self._chamar("GET", "notas_fiscais_xml_raw?" + query) or []
 
     def operacoes_por_gta(self, gta: str) -> set[str]:
@@ -187,12 +191,17 @@ def montar_registros(nota: dict[str, Any], analise: dict[str, Any]) -> dict[str,
     return {"operation_drafts": draft, "pending_actions": action, "eventos": event}
 
 
-def planejar(cliente: ClienteSupabase, xml_store: Path, desde: str) -> dict[str, Any]:
+def planejar(
+    cliente: ClienteSupabase,
+    xml_store: Path,
+    desde: str,
+    numero_nota: str | None = None,
+) -> dict[str, Any]:
     alteracoes_nota: list[tuple[str, dict[str, Any]]] = []
     atualizacoes: list[tuple[str, str, dict[str, Any]]] = []
     criacoes: list[tuple[str, dict[str, Any]]] = []
     faltam_xml = ambiguas = ignoradas = 0
-    for nota in cliente.listar_notas(desde):
+    for nota in cliente.listar_notas(desde, numero_nota=numero_nota):
         caminho = xml_store / f"{nota.get('chave_acesso')}-procNfe.xml"
         if not caminho.exists():
             faltam_xml += 1
@@ -290,6 +299,7 @@ def planejar(cliente: ClienteSupabase, xml_store: Path, desde: str) -> dict[str,
             "gtas_ambiguas": ambiguas, "xml_ausente_ou_invalido": faltam_xml,
             "documentos_nao_pecuarios_ignorados": ignoradas,
             "tabelas_operacionais_alteradas": 0,
+            "filtro_numero_nota": numero_nota,
         },
     }
 
@@ -317,15 +327,20 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--xml-store", type=Path, required=True)
     parser.add_argument("--since-days", type=int, default=2)
+    parser.add_argument("--numero-nota")
     parser.add_argument("--executar", action="store_true")
     parser.add_argument("--confirmacao")
     args = parser.parse_args()
+    if args.since_days < 1 or args.since_days > 365:
+        raise SystemExit("--since-days deve ficar entre 1 e 365")
+    if args.numero_nota and not re.fullmatch(r"\d{1,20}", args.numero_nota):
+        raise SystemExit("--numero-nota deve conter somente dígitos")
     if args.executar and args.confirmacao != CONFIRMACAO:
         raise SystemExit("Confirmação inválida")
     url, chave = credenciais()
     cliente = ClienteSupabase(url, chave)
     desde = (datetime.now(timezone.utc) - timedelta(days=args.since_days)).isoformat().replace("+00:00", "Z")
-    plano = planejar(cliente, args.xml_store, desde)
+    plano = planejar(cliente, args.xml_store, desde, numero_nota=args.numero_nota)
     if args.executar:
         executar(cliente, plano)
     saida = {"plano_id": plano["plano_id"], **plano["resumo"],
