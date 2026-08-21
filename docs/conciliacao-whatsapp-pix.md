@@ -1,10 +1,12 @@
 # Conciliação privada de negócios pelo WhatsApp
 
 `tools/conciliar_whatsapp_pix.py` pesquisa os históricos locais do Wey e,
-quando configurado, o cache histórico local do `wacli`, pelo valor do PIX. Ele
+quando configurado, o cache histórico local do `wacli`, pela referência humana
+do negócio de bolsa (`B3-AA-NNN`) e pelo valor do PIX. Ele
 produz candidatos de evidência para as dúvidas da consolidação.
-O valor é a primeira chave de investigação porque o comprovante costuma ser
-enviado no WhatsApp junto do valor escrito.
+A referência B3 é a chave mais forte quando aparece na conversa com a mesa. Na
+ausência dela, o valor continua sendo a primeira chave de investigação porque
+o comprovante costuma ser enviado no WhatsApp junto do valor escrito.
 
 A ferramenta aceita formatos brasileiros e variantes sem separador de milhar,
 deduplica mensagens copiadas entre sessões e backups, considera nome e data
@@ -37,6 +39,7 @@ Formato mínimo de entrada:
     {
       "codigo": "NEG-AA-NNN",
       "negocio": "Nome ou referência humana",
+      "referencia_bolsa": "B3-AA-NNN",
       "valores": ["123.456,78"],
       "data": "31/12/2026"
     }
