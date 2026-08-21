@@ -30,6 +30,8 @@ Não há gravação em compras, vendas, abates, pesagens ou fluxo financeiro.
 
 ## Situação desta entrega
 
-A migração está **preparada e não aplicada**. O Portfólio é compatível com o
-banco anterior: ele só envia `referencia_bolsa` quando o campo já foi recebido
-do Supabase. Até a migração ser aplicada, a prévia exibe **A atribuir**.
+A migração foi aplicada em **21/08/2026**. A validação confirmou referências
+preenchidas, distintas e dentro do padrão, além do índice único, do gatilho e
+do contador protegido por RLS. Compras, vendas, abates e pesagens permaneceram
+inalterados. O preenchimento do legado acionou os gatilhos preexistentes de
+`updated_at` e auditoria de `posicoes_hedge`, preservando o histórico da mudança.
