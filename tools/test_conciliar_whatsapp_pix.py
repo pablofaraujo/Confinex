@@ -9,6 +9,8 @@ from tools.conciliar_whatsapp_pix import (
     gerar_plano,
     ler_mensagens_wacli,
     ler_mensagens,
+    normalizar_referencia_b3,
+    regex_referencia_b3,
     regex_valor,
     variantes_valor,
 )
@@ -22,6 +24,11 @@ class ConciliarWhatsappPixTest(unittest.TestCase):
         self.assertIn("82.361,00", variantes_valor(8_236_100))
         self.assertRegex("PIX R$ 82.361,00 enviado", regex_valor(8_236_100))
         self.assertNotRegex("telefone 5533823610012", regex_valor(8_236_100))
+
+    def test_normaliza_referencia_humana_de_bolsa(self):
+        self.assertEqual(normalizar_referencia_b3("b3 26 7"), "B3-26-007")
+        self.assertRegex("Fechamos B3-26-007 com a mesa", regex_referencia_b3("B3-26-007"))
+        self.assertNotRegex("B3-27-007", regex_referencia_b3("B3-26-007"))
 
     def criar_sessao(self, pasta: Path, sessao: str, mensagens: list[dict]):
         caminho = pasta / f"{sessao}.jsonl"
@@ -73,6 +80,27 @@ class ConciliarWhatsappPixTest(unittest.TestCase):
             })
             plano = gerar_plano([{"codigo": "NEG-X", "negocio": "", "valores": [35050]}], mensagens)
             self.assertEqual(plano["resultados"][0]["status"], "ambiguo")
+
+    def test_referencia_b3_identifica_a_conversa_mesmo_sem_valor(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pasta = Path(tmp)
+            sessao = "55555555-5555-5555-5555-555555555555"
+            self.criar_sessao(pasta, sessao, [{
+                "text": "Mesa confirmou o fechamento da B3-26-014.",
+            }])
+            mensagens = ler_mensagens(pasta, {
+                sessao: "agent:wey:whatsapp:direct:+5533999994444",
+            })
+            plano = gerar_plano([{
+                "codigo": "hedge",
+                "referencia_bolsa": "B3-26-014",
+                "valores": [],
+            }], mensagens)
+            resultado = plano["resultados"][0]
+            self.assertEqual(resultado["status"], "encontrado_unico")
+            self.assertEqual(resultado["referencia_bolsa"], "B3-26-014")
+            self.assertEqual(resultado["candidatos"][0]["referencia_bolsa"], "B3-26-014")
+            self.assertGreaterEqual(resultado["candidatos"][0]["pontuacao"], 200)
 
     def test_ignora_assistente_e_outros_canais(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -140,6 +168,26 @@ class ConciliarWhatsappPixTest(unittest.TestCase):
             self.assertNotIn("send", comando)
         for chamada in executar.call_args_list:
             self.assertEqual(chamada.kwargs["env"]["WACLI_READONLY"], "1")
+
+    @patch("tools.conciliar_whatsapp_pix.subprocess.run")
+    def test_pesquisa_referencia_b3_no_cache_wey_sem_valor(self, executar):
+        executar.return_value.stdout = json.dumps({
+            "success": True,
+            "data": {"messages": []},
+            "error": None,
+        })
+
+        ler_mensagens_wacli(
+            Path("/usr/local/bin/wacli"),
+            Path("/privado/wacli"),
+            [],
+            ["B3-26-014"],
+        )
+
+        comando = executar.call_args.args[0]
+        self.assertIn("B3-26-014", comando)
+        self.assertIn("--read-only", comando)
+        self.assertNotIn("send", comando)
 
 
 if __name__ == "__main__":

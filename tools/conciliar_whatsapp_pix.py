@@ -24,6 +24,7 @@ from typing import Any, Iterable
 UUID_INICIO = re.compile(r"^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})", re.I)
 PALAVRAS_PAGAMENTO = re.compile(r"\b(?:pix|comprovante|paguei|pago|pagamento|transfer[eê]ncia)\b", re.I)
 PALAVRAS_TOKEN = re.compile(r"[a-zà-ÿ0-9]+", re.I)
+REFERENCIA_B3 = re.compile(r"(?<![A-Z0-9])B3\s*[-–—_/]?\s*(\d{2})\s*[-–—_/]?\s*(\d{1,6})(?!\d)", re.I)
 ARQUIVOS_IGNORADOS = (".trajectory.jsonl", ".trajectory-path.json", ".codex-app-server.json")
 
 
@@ -94,6 +95,24 @@ def variantes_valor(valor_centavos: int) -> list[str]:
 def regex_valor(valor_centavos: int) -> re.Pattern[str]:
     alternativas = "|".join(re.escape(item) for item in variantes_valor(valor_centavos))
     return re.compile(rf"(?<!\d)(?:R\$\s*)?(?:{alternativas})(?!\d)", re.I)
+
+
+def normalizar_referencia_b3(valor: Any) -> str | None:
+    achado = REFERENCIA_B3.search(str(valor or ""))
+    if not achado:
+        return None
+    return f"B3-{achado.group(1)}-{int(achado.group(2)):03d}"
+
+
+def regex_referencia_b3(referencia: str) -> re.Pattern[str]:
+    normalizada = normalizar_referencia_b3(referencia)
+    if not normalizada:
+        raise ValueError("Referência B3 inválida.")
+    _, ano, numero = normalizada.split("-")
+    return re.compile(
+        rf"(?<![A-Z0-9])B3\s*[-–—_/]?\s*{ano}\s*[-–—_/]?\s*0*{int(numero)}(?!\d)",
+        re.I,
+    )
 
 
 def texto_conteudo(conteudo: Any) -> str:
@@ -299,17 +318,16 @@ def ler_mensagens_wacli(
     binario: Path,
     store: Path,
     valores: Iterable[int],
+    referencias: Iterable[str] = (),
 ) -> list[Mensagem]:
     mensagens: list[Mensagem] = []
     vistos: set[tuple[str, str]] = set()
-    consultas = sorted(
-        {
+    consultas = sorted({
             variante
             for valor in valores
             for variante in variantes_valor(valor)
             if len(re.sub(r"\D", "", variante)) >= 4
-        }
-    )
+        } | {referencia for referencia in referencias if normalizar_referencia_b3(referencia)})
     for consulta in consultas:
         for item in executar_busca_wacli(binario, store, consulta):
             conversa_jid = str(campo(item, "ChatJID", "chat_jid") or "")
@@ -389,12 +407,16 @@ def analisar_duvida(duvida: dict[str, Any], mensagens: list[Mensagem]) -> dict[s
     valores = sorted({item for item in (centavos(v) for v in valores_brutos) if item})
     codigo = str(duvida.get("codigo") or "sem-codigo")
     negocio = str(duvida.get("negocio") or "")
-    if not valores:
+    referencia_bolsa = normalizar_referencia_b3(
+        duvida.get("referencia_bolsa") or duvida.get("referencia_b3")
+    )
+    if not valores and not referencia_bolsa:
         return {
             "codigo": codigo,
             "negocio": negocio,
-            "status": "sem_valor_para_busca",
+            "status": "sem_chave_para_busca",
             "valores": [],
+            "referencia_bolsa": None,
             "candidatos": [],
         }
 
@@ -402,13 +424,23 @@ def analisar_duvida(duvida: dict[str, Any], mensagens: list[Mensagem]) -> dict[s
     nome_tokens = tokens_nome(negocio)
     candidatos: list[dict[str, Any]] = []
     for mensagem in mensagens:
+        achado_referencia = regex_referencia_b3(referencia_bolsa).search(mensagem.texto) if referencia_bolsa else None
+        achado_valor = None
+        valor_encontrado = None
         for valor in valores:
-            achado = regex_valor(valor).search(mensagem.texto)
-            if not achado:
-                continue
+            achado_valor = regex_valor(valor).search(mensagem.texto)
+            if achado_valor:
+                valor_encontrado = valor
+                break
+        if not achado_referencia and not achado_valor:
+            continue
+        achado = achado_referencia or achado_valor
+        if achado:
             texto_minusculo = mensagem.texto.lower()
             tokens_encontrados = sorted(token for token in nome_tokens if token in texto_minusculo)
-            pontuacao = 100
+            pontuacao = 200 if achado_referencia else 100
+            if achado_referencia and achado_valor:
+                pontuacao += 40
             if PALAVRAS_PAGAMENTO.search(mensagem.texto):
                 pontuacao += 20
             pontuacao += min(len(tokens_encontrados), 2) * 15
@@ -422,7 +454,8 @@ def analisar_duvida(duvida: dict[str, Any], mensagens: list[Mensagem]) -> dict[s
                     pontuacao += 5
             candidatos.append(
                 {
-                    "valor": formatar_brl(valor),
+                    "valor": formatar_brl(valor_encontrado) if valor_encontrado else None,
+                    "referencia_bolsa": referencia_bolsa if achado_referencia else None,
                     "conversa": mensagem.conversa,
                     "remetente": mensagem.remetente,
                     "timestamp": mensagem.timestamp,
@@ -451,6 +484,7 @@ def analisar_duvida(duvida: dict[str, Any], mensagens: list[Mensagem]) -> dict[s
         "negocio": negocio,
         "status": status,
         "valores": [formatar_brl(item) for item in valores],
+        "referencia_bolsa": referencia_bolsa,
         "candidatos": candidatos[:20],
     }
 
@@ -462,7 +496,7 @@ def gerar_plano(duvidas: list[dict[str, Any]], mensagens: list[Mensagem]) -> dic
         contagens[item["status"]] = contagens.get(item["status"], 0) + 1
     return {
         "modo": "somente_leitura",
-        "regra_primaria": "buscar primeiro pelo valor do PIX",
+        "regra_primaria": "buscar primeiro pela referência B3 e depois pelo valor do PIX",
         "mensagens_whatsapp_indexadas": len(mensagens),
         "duvidas_analisadas": len(resultados),
         "contagens": contagens,
@@ -485,13 +519,13 @@ def relatorio_markdown(plano: dict[str, Any]) -> str:
         f"- Mensagens indexadas: {plano['mensagens_whatsapp_indexadas']}",
         f"- Dúvidas analisadas: {plano['duvidas_analisadas']}",
         "",
-        "| Código | Negócio | Situação | Valores | Candidatos |",
-        "|---|---|---|---|---:|",
+        "| Código | Referência B3 | Negócio | Situação | Valores | Candidatos |",
+        "|---|---|---|---|---|---:|",
     ]
     for item in plano["resultados"]:
         valores = ", ".join(item["valores"]) or "—"
         linhas.append(
-            f"| {item['codigo']} | {item['negocio']} | {item['status']} | {valores} | {len(item['candidatos'])} |"
+            f"| {item['codigo']} | {item.get('referencia_bolsa') or '—'} | {item['negocio']} | {item['status']} | {valores} | {len(item['candidatos'])} |"
         )
     linhas.extend(["", "## Evidências", ""])
     for item in plano["resultados"]:
@@ -503,7 +537,7 @@ def relatorio_markdown(plano: dict[str, Any]) -> str:
         for candidato in item["candidatos"][:5]:
             remetente = candidato.get("remetente") or candidato["conversa"]
             linhas.append(
-                f"- {candidato['valor']} · {candidato['timestamp'] or 'sem horário'} · "
+                f"- {candidato.get('referencia_bolsa') or candidato.get('valor') or 'evidência'} · {candidato['timestamp'] or 'sem horário'} · "
                 f"{remetente} · confiança {candidato['pontuacao']} · mensagem `{candidato['mensagem_id']}`"
             )
             linhas.append(f"  - {candidato['excerto']}")
@@ -541,7 +575,20 @@ def main() -> int:
             for valor in (centavos(item) for item in (duvida.get("valores") or []))
             if valor
         }
-        mensagens.extend(ler_mensagens_wacli(args.wacli_bin, args.wacli_store, valores))
+        referencias = {
+            referencia
+            for duvida in duvidas
+            for referencia in [normalizar_referencia_b3(
+                duvida.get("referencia_bolsa") or duvida.get("referencia_b3")
+            )]
+            if referencia
+        }
+        mensagens.extend(ler_mensagens_wacli(
+            args.wacli_bin,
+            args.wacli_store,
+            valores,
+            referencias,
+        ))
         mensagens = list({(item.sessao_id, item.id): item for item in mensagens}.values())
     plano = gerar_plano(duvidas, mensagens)
     args.saida_json.write_text(json.dumps(plano, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
