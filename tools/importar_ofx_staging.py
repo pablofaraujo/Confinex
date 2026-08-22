@@ -11,21 +11,34 @@ import re
 import urllib.error
 import urllib.request
 import uuid
-from datetime import date
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
 try:
-    from analisar_extrato_ofx import campo_ofx, data_ofx
     from exportar_snapshot_consolidacao import LeitorSupabase
 except ModuleNotFoundError:
-    from tools.analisar_extrato_ofx import campo_ofx, data_ofx
     from tools.exportar_snapshot_consolidacao import LeitorSupabase
 
 
 NAMESPACE = uuid.UUID("93a6d927-d28d-4ed7-8c10-905554ce02eb")
 TABELAS_ESCRITA = {"fontes_importacao", "transacoes_banco_staging"}
+
+
+def campo_ofx(bloco: str, nome: str) -> str:
+    encontrado = re.search(rf"<{nome}>([^<\r\n]+)", bloco, re.I)
+    return encontrado.group(1).strip() if encontrado else ""
+
+
+def data_ofx(valor: str) -> str | None:
+    digitos = re.sub(r"\D", "", valor or "")
+    if len(digitos) < 8:
+        return None
+    try:
+        return datetime.strptime(digitos[:8], "%Y%m%d").date().isoformat()
+    except ValueError:
+        return None
 
 
 def ler_ofx(caminho: Path) -> dict[str, Any]:
