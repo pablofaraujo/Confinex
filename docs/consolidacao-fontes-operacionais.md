@@ -177,6 +177,14 @@ fila de Revisões:
   e um evento. Ele escreve somente em `operation_drafts`, `pending_actions` e
   `eventos`, exige limite e confirmação vinculada ao `plano_id` e nunca possui
   acesso de escrita a tabelas operacionais.
+- `tools/propor_conciliacoes_staging.py` compara o banco em staging com
+  candidatos e fluxo de caixa sem alterar nenhum deles. Valor exato, data e
+  texto podem produzir proposta forte; valor exato e data em alvo único geram
+  proposta provável; uma referência textual distintiva e única pode produzir
+  somente proposta possível de pagamento parcial. Sobreposição entre extratos,
+  múltiplos alvos e transação já presente no banco operacional permanecem sem
+  vínculo. A execução escreve exclusivamente em `conciliacoes_candidatas`, com
+  estado pendente, IDs determinísticos, limite e confirmação pelo `plano_id`.
 
 O fluxo recomendado é sempre: snapshot sanitizado, dry-run, execução com
 limite, novo snapshot e segundo dry-run. A execução é aceita somente quando as
@@ -190,6 +198,7 @@ Exemplo sem escrita:
 python3 tools/auditar_staging_consolidacao.py
 python3 tools/materializar_revisoes_staging.py
 python3 tools/importar_ofx_staging.py /caminho/privado/extrato.ofx
+python3 tools/propor_conciliacoes_staging.py
 ```
 
 O arquivo OFX é privado e não pode ser copiado para a VPS, anexado a relatório
