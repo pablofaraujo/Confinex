@@ -60,6 +60,7 @@ class ImportarOfxStagingTest(unittest.TestCase):
 
     def test_fonte_nao_repete_escrita(self):
         fonte = Path(__file__).with_name("importar_ofx_staging.py").read_text()
+        self.assertNotIn("analisar_extrato_ofx", fonte)
         self.assertNotIn("while tentativa", fonte)
         self.assertNotIn("method=\"PATCH\"", fonte)
         self.assertNotIn("method=\"DELETE\"", fonte)
