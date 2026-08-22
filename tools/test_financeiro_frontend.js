@@ -8,19 +8,20 @@ const html = fs.readFileSync(path.join(raiz, 'financeiro.html'), 'utf8');
 const js = fs.readFileSync(path.join(raiz, 'js/financeiro.js'), 'utf8');
 const componentes = fs.readFileSync(path.join(raiz, 'design/components.css'), 'utf8');
 
-for(const id of ['kpis','obrigacoes','lembretes','dividas','transacoes','filtroSituacao','filtroTexto','filtroBanco','erroBanco']){
+for(const id of ['kpis','obrigacoes','lembretes','dividas','transacoes','conciliacoesPendentes','filtroSituacao','filtroTexto','filtroBanco','erroBanco','erroConciliacoes']){
   assert.ok(html.includes(`id="${id}"`), `financeiro.html sem #${id}`);
 }
-for(const tabela of ['fluxo_caixa','emprestimos','promissorias','transacoes_banco']){
+for(const tabela of ['fluxo_caixa','emprestimos','promissorias','transacoes_banco','conciliacoes_candidatas','transacoes_banco_staging','negocios_candidatos']){
   assert.ok(js.includes(`db.from('${tabela}').select('*')`), `consulta ausente: ${tabela}`);
 }
 assert.ok(!/\.(insert|update|delete|upsert|rpc)\s*\(/.test(js), 'Financeiro deve permanecer somente leitura');
-assert.ok(html.includes('nenhuma movimentação, baixa, parcela, renegociação ou conciliação é criada'));
+assert.ok(html.includes('nenhuma sugestão confirma vínculo'));
+assert.ok(html.includes('Nenhum pagamento, negócio ou lançamento foi relacionado automaticamente'));
 assert.ok(html.includes('Preparado, mas não ativado'));
 assert.ok(js.includes('As demais áreas continuam disponíveis.'));
 assert.ok(!/\bgrupo_(?:id|origem_id)\b/.test(js), 'não exibir ID técnico de grupo');
-assert.ok(html.includes('cfagro-gestao.js?v=20260814-1'));
-assert.ok(html.includes('financeiro.js?v=20260803-1'));
+assert.ok(html.includes('cfagro-gestao.js?v=20260822-1'));
+assert.ok(html.includes('financeiro.js?v=20260822-1'));
 assert.ok(html.includes('components.css?v=20260815-1'));
 assert.ok(html.includes('class="kpis kpis-dinheiro"'));
 assert.ok(componentes.includes('.kpis.kpis-dinheiro'));

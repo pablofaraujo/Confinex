@@ -4,10 +4,14 @@ var fluxoBruto = [];
 var emprestimosBrutos = [];
 var promissoriasBrutas = [];
 var transacoesBrutas = [];
+var conciliacoesBrutas = [];
+var transacoesStagingBrutas = [];
+var candidatosBrutos = [];
 var obrigacoes = [];
 var dividas = [];
 var transacoes = [];
 var lembretes = [];
+var conciliacoesPendentes = [];
 var el = function(id){ return document.getElementById(id); };
 var esc = function(v){ return CFAgro.esc(v); };
 
@@ -31,10 +35,24 @@ function renderKpis(){
     ['Realizado', CFAgro.fmtR$2(r.realizado), 'Entradas menos saídas realizadas'],
     ['Vencido', CFAgro.fmtR$2(r.vencido), 'Obrigações vencidas e não realizadas'],
     ['Próximos 30 dias', CFAgro.fmtR$2(r.proximos30), 'Obrigações a vencer'],
-    ['Dívida em aberto', CFAgro.fmtR$2(r.dividaAberta), 'Empréstimos e promissórias']
+    ['Dívida em aberto', CFAgro.fmtR$2(r.dividaAberta), 'Empréstimos e promissórias'],
+    ['A conferir', conciliacoesPendentes.length, 'Sugestões bancárias sem vínculo confirmado']
   ].map(function(k){
     return '<div class="kpi"><div class="l">'+k[0]+'</div><div class="v">'+k[1]+'</div><div class="d">'+k[2]+'</div></div>';
   }).join('');
+}
+
+function renderConciliacoesPendentes(){
+  el('conciliacoesPendentes').innerHTML = conciliacoesPendentes.map(function(item){
+    return '<tr>'+
+      '<td>'+CFAgro.fmtD(item.data)+'</td>'+
+      '<td class="wrap"><strong>'+esc(item.descricao)+'</strong><br><span class="muted">'+esc(item.justificativa)+'</span></td>'+
+      '<td class="wrap"><strong>'+esc(item.negocio)+'</strong><br><span class="muted">'+esc(item.contraparte)+' · '+esc(item.contexto)+'</span></td>'+
+      '<td>'+badge(item.classificacao)+'</td>'+
+      '<td class="num">'+CFAgro.fmtR$2(item.valor)+'</td>'+
+      '<td><span class="badge b-amber">'+esc(item.status)+'</span></td>'+
+    '</tr>';
+  }).join('') || '<tr><td colspan="6" class="wrap">Nenhuma sugestão bancária aguarda conferência.</td></tr>';
 }
 
 function bateFiltroObrigacao(item, filtro){
@@ -110,12 +128,16 @@ function renderTudo(){
   obrigacoes = CFAgroGestao.obrigacoesFinanceiras(fluxoBruto, hoje);
   dividas = CFAgroGestao.dividasFinanceiras(emprestimosBrutos, promissoriasBrutas, hoje);
   transacoes = CFAgroGestao.transacoesFinanceiras(transacoesBrutas);
+  conciliacoesPendentes = CFAgroGestao.conciliacoesBancariasPendentes(
+    conciliacoesBrutas, transacoesStagingBrutas, candidatosBrutos, fluxoBruto
+  );
   lembretes = CFAgroGestao.lembretesFinanceiros(obrigacoes, dividas);
   renderKpis();
   renderObrigacoes();
   renderDividas();
   renderLembretes();
   renderTransacoes();
+  renderConciliacoesPendentes();
 }
 
 async function carregar(){
@@ -125,7 +147,10 @@ async function carregar(){
     db.from('fluxo_caixa').select('*').limit(500),
     db.from('emprestimos').select('*').limit(200),
     db.from('promissorias').select('*').limit(200),
-    db.from('transacoes_banco').select('*').limit(500)
+    db.from('transacoes_banco').select('*').limit(500),
+    db.from('conciliacoes_candidatas').select('*').eq('estado','pendente').limit(200),
+    db.from('transacoes_banco_staging').select('*').limit(500),
+    db.from('negocios_candidatos').select('*').limit(500)
   ]);
   var falhasPrincipais = respostas.slice(0,3).filter(function(r){ return r.error; });
   if(falhasPrincipais.length){
@@ -141,6 +166,16 @@ async function carregar(){
     el('erroBanco').textContent = 'A conciliação bancária não pôde ser carregada. As demais áreas continuam disponíveis.';
   }else{
     transacoesBrutas = respostas[3].data || [];
+  }
+  var falhasConciliacao = respostas.slice(4,7).filter(function(r){ return r.error; });
+  if(falhasConciliacao.length){
+    conciliacoesBrutas = []; transacoesStagingBrutas = []; candidatosBrutos = [];
+    el('erroConciliacoes').textContent = 'As sugestões de conciliação não puderam ser carregadas. Os demais dados continuam disponíveis.';
+  }else{
+    conciliacoesBrutas = respostas[4].data || [];
+    transacoesStagingBrutas = respostas[5].data || [];
+    candidatosBrutos = respostas[6].data || [];
+    el('erroConciliacoes').textContent = '';
   }
   renderTudo();
   if(!falhasPrincipais.length){

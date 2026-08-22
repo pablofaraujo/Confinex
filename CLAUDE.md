@@ -40,7 +40,7 @@ Leia conforme a tarefa:
 | `bgi.html` | BGI — exposição e gestão operacional de hedge por lote. O item separado **Portfolio B3** abre o app de portfólio na mesma janela; não há botão duplicado dentro do BGI. |
 | `ocr-pesagem.html` | OCR Pesagem — leitura de tickets de balança (tema escuro próprio, ainda fora do DS) |
 | `painel-boi-gordo.html` | Painel Boi Gordo — arroba CEPEA/B3, bezerro, relação de troca, curva futura BGI, manchetes e contexto de mercado (dados estáticos no DS, sem Supabase; atualizados por automação — ver Armadilhas) |
-| `financeiro.html` | Financeiro — consulta somente leitura de fluxo previsto/realizado, contas a pagar/receber, dívidas, promissórias, vencimentos, saldos parciais, renegociações e transações bancárias; não quita, concilia nem cria registros |
+| `financeiro.html` | Financeiro — consulta somente leitura de fluxo previsto/realizado, contas a pagar/receber, dívidas, promissórias, vencimentos, saldos parciais, renegociações, transações bancárias e propostas pendentes de conciliação com justificativa humana; não confirma vínculo, quita, concilia nem cria registros |
 | `pendencias.html` | Pendências — visão agregada somente leitura de rascunhos, ações, documentos e negócios de confinamento sem estimativa Confinex válida, com próxima etapa e tolerância à falha isolada de uma fonte; não substitui Revisões |
 | `eventos.html` | Eventos — histórico operacional legível, filtrável por situação, tipo, período e texto, com ligação humana à origem; não expõe JSON nem IDs técnicos |
 | `crm.html` + `js/crm.js` | CRM de Gado — contatos, ofertas abertas e incompletas, funil de negociações e próximas ações. Salvar oferta não cria compra, venda ou operação e não envia mensagem |
