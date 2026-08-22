@@ -14,11 +14,13 @@ complementares antes de procurar o negócio correspondente. Uma correspondência
 continua sendo evidência para revisão: nunca cria compra, venda, abate ou
 movimentação financeira diretamente.
 
-Uma NF-e pecuária cuja natureza da operação é **venda** inicia sempre um novo
-negócio em revisão. Ela não procura nem exige um negócio anterior: NF, GTA,
-data, quantidade e valor disponíveis formam o candidato, e somente os campos
-ausentes continuam pendentes. A regra cria evidência e rascunho, nunca a venda
-ou a compra operacional.
+Uma NF-e pecuária cuja natureza da operação é **venda** precisa ser relacionada
+a algum negócio, mas isso não significa que o negócio seja novo. Ela pode ser
+documento de um negócio existente, complemento documental, complemento de
+animais ou evidência de um possível negócio novo. NF, GTA, data, quantidade e
+valor disponíveis orientam a conferência; ambiguidades e campos ausentes
+continuam pendentes. A regra cria evidência e rascunho, nunca venda, compra ou
+outra operação definitiva.
 
 Quando a NF e a GTA já estão disponíveis, a pendência apresentada deve conter
 somente o que realmente falta. O extrato bancário ou comprovante permanece como
@@ -153,6 +155,45 @@ pendências e eventos. Ela nunca cria ou altera compra, venda, abate ou pesagem.
 Números de GTA, NF, lançamentos e negócios permanecem somente nos relatórios em
 `docs/privado/`, que não são versionados. O repositório público guarda apenas o
 código, testes e regras sanitizadas.
+
+## Staging auditável e passagem para Revisões
+
+As ferramentas abaixo formam o caminho permanente entre fontes privadas e a
+fila de Revisões:
+
+- `tools/exportar_snapshot_consolidacao.py` lê somente uma lista fechada de
+  tabelas, pagina os resultados e grava um snapshot privado com permissão
+  restrita. A saída no terminal contém apenas contagens e assinaturas;
+- `tools/auditar_staging_consolidacao.py` compara staging, fila e tabelas
+  operacionais em memória. O relatório é sanitizado, preserva duplicidades e
+  ambiguidades e nunca possui modo de escrita;
+- `tools/importar_ofx_staging.py` recebe um OFX enviado por Pablo, deduplica por
+  conta e FITID e pode escrever somente em `fontes_importacao` e
+  `transacoes_banco_staging`. O padrão é dry-run e a execução exige a frase
+  exibida pelo próprio plano;
+- `tools/materializar_revisoes_staging.py` seleciona apenas candidatos de alta
+  prioridade, completos, sem vínculo operacional e sem duplicidade aparente.
+  Para cada candidato cria IDs determinísticos para um rascunho, uma pendência
+  e um evento. Ele escreve somente em `operation_drafts`, `pending_actions` e
+  `eventos`, exige limite e confirmação vinculada ao `plano_id` e nunca possui
+  acesso de escrita a tabelas operacionais.
+
+O fluxo recomendado é sempre: snapshot sanitizado, dry-run, execução com
+limite, novo snapshot e segundo dry-run. A execução é aceita somente quando as
+assinaturas de `operacoes`, `compras`, `vendas`, `abates` e
+`pesagens_caderno` permanecem idênticas. Reexecutar o materializador deve
+produzir zero novas revisões.
+
+Exemplo sem escrita:
+
+```bash
+python3 tools/auditar_staging_consolidacao.py
+python3 tools/materializar_revisoes_staging.py
+python3 tools/importar_ofx_staging.py /caminho/privado/extrato.ofx
+```
+
+O arquivo OFX é privado e não pode ser copiado para a VPS, anexado a relatório
+público ou versionado sem autorização específica para aquele arquivo.
 
 ## Histórico exportado do Telegram
 
