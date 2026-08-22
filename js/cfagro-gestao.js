@@ -423,6 +423,7 @@ function conciliacoesBancariasPendentes(conciliacoes, transacoesStaging, candida
     var alvo = candidato || fluxo || {};
     var classificacao = statusHumano(item.classificacao || 'possivel');
     return {
+      idInterno:item.id || null,
       data:banco.data || null,
       descricao:referenciaHumana(banco.memo, banco.descricao, 'Movimentação bancária'),
       valor:Math.abs(primeiroNumero(item.valor_alocado, banco.valor)),

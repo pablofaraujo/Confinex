@@ -43,7 +43,7 @@ function renderKpis(){
 }
 
 function renderConciliacoesPendentes(){
-  el('conciliacoesPendentes').innerHTML = conciliacoesPendentes.map(function(item){
+  el('conciliacoesPendentes').innerHTML = conciliacoesPendentes.map(function(item, indice){
     return '<tr>'+
       '<td>'+CFAgro.fmtD(item.data)+'</td>'+
       '<td class="wrap"><strong>'+esc(item.descricao)+'</strong><br><span class="muted">'+esc(item.justificativa)+'</span></td>'+
@@ -51,8 +51,47 @@ function renderConciliacoesPendentes(){
       '<td>'+badge(item.classificacao)+'</td>'+
       '<td class="num">'+CFAgro.fmtR$2(item.valor)+'</td>'+
       '<td><span class="badge b-amber">'+esc(item.status)+'</span></td>'+
+      '<td class="wrap"><div class="fld compacto"><label for="motivoConciliacao'+indice+'">Motivo da decisão</label><input id="motivoConciliacao'+indice+'" data-motivo-conciliacao="'+indice+'" placeholder="Ex.: valor e fornecedor conferidos"></div><div class="pill-row"><button type="button" class="btn mini" data-decisao-conciliacao="confirmar" data-indice-conciliacao="'+indice+'">Confirmar relação</button><button type="button" class="btn sec mini warn" data-decisao-conciliacao="rejeitar" data-indice-conciliacao="'+indice+'">Rejeitar sugestão</button></div></td>'+
     '</tr>';
-  }).join('') || '<tr><td colspan="6" class="wrap">Nenhuma sugestão bancária aguarda conferência.</td></tr>';
+  }).join('') || '<tr><td colspan="7" class="wrap">Nenhuma sugestão bancária aguarda conferência.</td></tr>';
+}
+
+function mensagemDecisao(texto, erro){
+  el('mensagemConciliacoes').textContent = erro ? '' : texto;
+  el('erroConciliacoes').textContent = erro ? texto : '';
+}
+
+async function decidirConciliacao(indice, decisao){
+  var item = conciliacoesPendentes[indice];
+  var campo = document.querySelector('[data-motivo-conciliacao="'+indice+'"]');
+  var motivo = String(campo && campo.value || '').trim();
+  if(!item || !item.idInterno){
+    mensagemDecisao('A sugestão precisa ser recarregada antes da decisão.', true);
+    return;
+  }
+  if(!motivo){
+    mensagemDecisao('Informe o motivo antes de confirmar ou rejeitar.', true);
+    if(campo) campo.focus();
+    return;
+  }
+  var rotulo = decisao === 'confirmar' ? 'confirmar esta relação' : 'rejeitar esta sugestão';
+  if(!confirm('Deseja '+rotulo+'?\n\nNenhum lançamento, pagamento ou negócio operacional será alterado.')) return;
+  var botoes = document.querySelectorAll('[data-indice-conciliacao="'+indice+'"]');
+  botoes.forEach(function(botao){ botao.disabled = true; });
+  mensagemDecisao('', false);
+  try{
+    var resposta = await db.rpc('decidir_conciliacao_candidata', {
+      p_conciliacao_id:item.idInterno,
+      p_decisao:decisao,
+      p_motivo:motivo
+    });
+    if(resposta.error) throw resposta.error;
+    await carregar();
+    mensagemDecisao(resposta.data && resposta.data.mensagem || 'Decisão registrada com segurança.', false);
+  }catch(erro){
+    mensagemDecisao(CFAgroGestao.erroLegivel(erro), true);
+    botoes.forEach(function(botao){ botao.disabled = false; });
+  }
 }
 
 function bateFiltroObrigacao(item, filtro){
@@ -140,9 +179,16 @@ function renderTudo(){
   renderConciliacoesPendentes();
 }
 
+el('conciliacoesPendentes').addEventListener('click', function(evento){
+  var botao = evento.target.closest('[data-decisao-conciliacao]');
+  if(!botao) return;
+  decidirConciliacao(Number(botao.dataset.indiceConciliacao), botao.dataset.decisaoConciliacao);
+});
+
 async function carregar(){
   el('subtitle').textContent = 'Carregando dados financeiros…';
   el('erroBanco').textContent = '';
+  el('mensagemConciliacoes').textContent = '';
   var respostas = await Promise.all([
     db.from('fluxo_caixa').select('*').limit(500),
     db.from('emprestimos').select('*').limit(200),

@@ -186,6 +186,32 @@ fila de Revisões:
   vínculo. A execução escreve exclusivamente em `conciliacoes_candidatas`, com
   estado pendente, IDs determinísticos, limite e confirmação pelo `plano_id`.
 
+## Decisão humana da sugestão bancária
+
+A migração aditiva
+`supabase/migrations/202608220001_decisoes_conciliacao_financeira.sql` criou
+em 22/08/2026 a RPC `decidir_conciliacao_candidata`. A aplicação não alterou
+linhas: os snapshots anterior e posterior das 20 tabelas auditadas tiveram
+contagens e assinaturas idênticas. A verificação confirmou execução somente
+para `authenticated`, bloqueio de `anon`, `SECURITY DEFINER` e
+`search_path=public`.
+
+Confirmar significa apenas que a relação sugerida foi conferida. Rejeitar
+significa somente retirar aquela sugestão da fila. Nas duas decisões:
+
+- o motivo é obrigatório;
+- a linha é bloqueada durante a transação para evitar decisões concorrentes;
+- repetir a mesma decisão não cria outro histórico;
+- uma decisão oposta posterior é recusada;
+- somente `conciliacoes_candidatas`, `decisoes_consolidacao` e `eventos` podem
+  receber escrita;
+- `fluxo_caixa`, `transacoes_banco`, `operacoes`, `compras`, `vendas`, `abates`
+  e `pesagens_caderno` permanecem intocados.
+
+Essa confirmação não quita pagamento, não relaciona a transação ao livro
+financeiro e não promove negócio. Qualquer incorporação futura continua sendo
+uma etapa separada, com autorização e auditoria próprias.
+
 O fluxo recomendado é sempre: snapshot sanitizado, dry-run, execução com
 limite, novo snapshot e segundo dry-run. A execução é aceita somente quando as
 assinaturas de `operacoes`, `compras`, `vendas`, `abates` e

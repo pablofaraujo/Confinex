@@ -892,12 +892,25 @@ function clienteFinanceiroSimulado() {
       });
       return consulta;
     },
-    rpc() {
-      window.__mutacoesFinanceiro = (window.__mutacoesFinanceiro || 0) + 1;
-      throw new Error('mutação inesperada: rpc');
+    async rpc(nome, parametros) {
+      if (nome !== 'decidir_conciliacao_candidata') {
+        window.__mutacoesFinanceiro = (window.__mutacoesFinanceiro || 0) + 1;
+        throw new Error(`rpc inesperada: ${nome}`);
+      }
+      window.__decisoesFinanceiro = (window.__decisoesFinanceiro || 0) + 1;
+      window.__ultimaDecisaoFinanceiro = parametros;
+      return {
+        data: {
+          estado: parametros.p_decisao === 'confirmar' ? 'confirmada' : 'rejeitada',
+          alterado: true,
+          mensagem: 'Decisão simulada com segurança.',
+        },
+        error: null,
+      };
     },
   };
   window.__mutacoesFinanceiro = 0;
+  window.__decisoesFinanceiro = 0;
   window.supabase = { createClient: () => cliente };
 }
 
@@ -1013,11 +1026,60 @@ async function auditarFinanceiro(browser, viewport, resultados) {
     ));
     resultados.push(item(
       `browser:${viewport.nome}:financeiro:sem-escrita`,
-      'Financeiro somente leitura',
+      'Financeiro sem escrita operacional',
       `carga e filtro em ${viewport.nome}`,
-      'nenhuma mutação é chamada',
+      'nenhuma tabela é alterada durante carga e filtros',
       estado.mutacoes === 0,
       `mutações=${estado.mutacoes}`,
+    ));
+    await page.locator('[data-decisao-conciliacao="confirmar"]').click();
+    const motivoObrigatorio = await page.locator('#erroConciliacoes').innerText();
+    const semRpc = await page.evaluate(() => window.__decisoesFinanceiro === 0);
+    resultados.push(item(
+      `browser:${viewport.nome}:financeiro:motivo-obrigatorio`,
+      'Motivo obrigatório na conciliação',
+      `tentativa sem motivo em ${viewport.nome}`,
+      'a decisão é bloqueada antes da RPC',
+      motivoObrigatorio.includes('Informe o motivo') && semRpc,
+      `mensagem=${motivoObrigatorio}; sem RPC=${semRpc}`,
+    ));
+    await page.locator('[data-motivo-conciliacao="0"]').fill('Valor e origem conferidos no cenário automatizado');
+    page.once('dialog', dialog => dialog.accept());
+    await page.locator('[data-decisao-conciliacao="confirmar"]').click();
+    await page.waitForFunction(() => window.__decisoesFinanceiro === 1);
+    const decisaoRegistrada = await page.evaluate(() => ({
+      chamadas: window.__decisoesFinanceiro,
+      decisao: window.__ultimaDecisaoFinanceiro && window.__ultimaDecisaoFinanceiro.p_decisao,
+      motivo: window.__ultimaDecisaoFinanceiro && window.__ultimaDecisaoFinanceiro.p_motivo,
+      mutacoes: window.__mutacoesFinanceiro,
+    }));
+    resultados.push(item(
+      `browser:${viewport.nome}:financeiro:decisao-controlada`,
+      'Decisão controlada da conciliação',
+      `confirmação simulada em ${viewport.nome}`,
+      'somente a RPC permitida recebe decisão e motivo; nenhuma escrita direta ocorre',
+      decisaoRegistrada.chamadas === 1 && decisaoRegistrada.decisao === 'confirmar' &&
+        decisaoRegistrada.motivo.includes('origem conferidos') && decisaoRegistrada.mutacoes === 0,
+      `RPCs=${decisaoRegistrada.chamadas}; decisão=${decisaoRegistrada.decisao}; mutações diretas=${decisaoRegistrada.mutacoes}`,
+    ));
+    await page.locator('[data-motivo-conciliacao="0"]').fill('Sugestão incompatível no cenário automatizado');
+    page.once('dialog', dialog => dialog.accept());
+    await page.locator('[data-decisao-conciliacao="rejeitar"]').click();
+    await page.waitForFunction(() => window.__decisoesFinanceiro === 2);
+    const rejeicaoRegistrada = await page.evaluate(() => ({
+      chamadas: window.__decisoesFinanceiro,
+      decisao: window.__ultimaDecisaoFinanceiro && window.__ultimaDecisaoFinanceiro.p_decisao,
+      motivo: window.__ultimaDecisaoFinanceiro && window.__ultimaDecisaoFinanceiro.p_motivo,
+      mutacoes: window.__mutacoesFinanceiro,
+    }));
+    resultados.push(item(
+      `browser:${viewport.nome}:financeiro:rejeicao-controlada`,
+      'Rejeição controlada da conciliação',
+      `rejeição simulada em ${viewport.nome}`,
+      'a mesma RPC recebe rejeição com motivo; nenhuma escrita direta ocorre',
+      rejeicaoRegistrada.chamadas === 2 && rejeicaoRegistrada.decisao === 'rejeitar' &&
+        rejeicaoRegistrada.motivo.includes('incompatível') && rejeicaoRegistrada.mutacoes === 0,
+      `RPCs=${rejeicaoRegistrada.chamadas}; decisão=${rejeicaoRegistrada.decisao}; mutações diretas=${rejeicaoRegistrada.mutacoes}`,
     ));
     resultados.push(item(
       `browser:${viewport.nome}:financeiro:console-rede`,

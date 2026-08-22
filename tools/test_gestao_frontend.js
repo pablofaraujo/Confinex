@@ -157,6 +157,7 @@ const sugestoesBanco = gestao.conciliacoesBancariasPendentes([{
   id:'n1',codigo_fonte:'NEG-26-900',nome:'Fornecedor teste',contexto:'Compras Fazenda'
 }], []);
 assert.deepStrictEqual(sugestoesBanco[0], {
+  idInterno:'c1',
   data:'2026-08-14', descricao:'Pagamento recebido', valor:400,
   negocio:'NEG-26-900', contraparte:'Fornecedor teste', contexto:'Compras Fazenda',
   classificacao:'Possivel',
@@ -164,6 +165,7 @@ assert.deepStrictEqual(sugestoesBanco[0], {
   status:'Aguardando conferência'
 });
 assert.ok(!JSON.stringify(sugestoesBanco).includes('transacao_staging_id'));
+assert.ok(!JSON.stringify(sugestoesBanco).includes('negocio_candidato_id'));
 assert.deepStrictEqual(gestao.conciliacoesBancariasPendentes([], [], [], []), []);
 
 // Vazio: cada projeção retorna um estado determinístico e renderizável.
