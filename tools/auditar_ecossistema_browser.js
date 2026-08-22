@@ -828,6 +828,33 @@ function clienteFinanceiroSimulado() {
           valor: 500,
         },
       ],
+      conciliacoes_candidatas: [
+        {
+          id: 'conciliacao-fixture',
+          transacao_staging_id: 'transacao-fixture',
+          negocio_candidato_id: 'negocio-fixture',
+          estado: 'pendente',
+          classificacao: 'possivel',
+          valor_alocado: 400,
+          justificativa: 'Referência textual única; confirmar pagamento parcial.',
+        },
+      ],
+      transacoes_banco_staging: [
+        {
+          id: 'transacao-fixture',
+          data: isoComDias(-2),
+          memo: 'Pagamento identificado no extrato',
+          valor: -400,
+        },
+      ],
+      negocios_candidatos: [
+        {
+          id: 'negocio-fixture',
+          codigo_fonte: 'NEG-TESTE',
+          nome: 'Fornecedor de teste',
+          contexto: 'Compras Fazenda',
+        },
+      ],
     };
   }
   function resposta(nome) {
@@ -848,11 +875,13 @@ function clienteFinanceiroSimulado() {
       signOut: async () => ({ error: null }),
     },
     from(nome) {
+      const selecao = {
+        eq() { return selecao; },
+        limit: async () => resposta(nome),
+      };
       const consulta = {
         select() {
-          return {
-            limit: async () => resposta(nome),
-          };
+          return selecao;
         },
       };
       ['insert', 'update', 'upsert', 'delete'].forEach(operacao => {
@@ -922,6 +951,7 @@ async function auditarFinanceiro(browser, viewport, resultados) {
       dividas: document.querySelectorAll('#dividas tr').length,
       lembretes: document.querySelectorAll('#lembretes tr').length,
       transacoes: document.querySelectorAll('#transacoes tr').length,
+      conciliacoes: document.querySelectorAll('#conciliacoesPendentes tr').length,
       texto: document.getElementById('app').innerText,
       largura: document.documentElement.scrollWidth,
       mutacoes: window.__mutacoesFinanceiro,
@@ -933,9 +963,9 @@ async function auditarFinanceiro(browser, viewport, resultados) {
       'Financeiro previsto e realizado',
       `dados positivos em ${viewport.nome}`,
       'KPIs, obrigações, dívidas, lembretes e conciliação são apresentados',
-      estado.kpis === 6 && estado.obrigacoes === 3 && estado.dividas === 2 &&
-        estado.lembretes >= 3 && estado.transacoes === 1,
-      `kpis=${estado.kpis} obrigações=${estado.obrigacoes} dívidas=${estado.dividas} lembretes=${estado.lembretes} transações=${estado.transacoes}`,
+      estado.kpis === 7 && estado.obrigacoes === 3 && estado.dividas === 2 &&
+        estado.lembretes >= 3 && estado.transacoes === 1 && estado.conciliacoes === 1,
+      `kpis=${estado.kpis} obrigações=${estado.obrigacoes} dívidas=${estado.dividas} lembretes=${estado.lembretes} transações=${estado.transacoes} sugestões=${estado.conciliacoes}`,
     ));
     resultados.push(item(
       `browser:${viewport.nome}:financeiro:parcial-renegociacao`,
@@ -943,7 +973,7 @@ async function auditarFinanceiro(browser, viewport, resultados) {
       `compromissos em ${viewport.nome}`,
       'saldo pago, saldo aberto, parcela e renegociação ficam legíveis',
       estado.texto.includes('Parcial') && estado.texto.includes('Renegociada') &&
-        estado.texto.includes('3/12'),
+        estado.texto.includes('3/12') && estado.texto.includes('Aguardando conferência'),
       'marcadores legíveis verificados no conteúdo renderizado',
     ));
     resultados.push(item(
@@ -1036,7 +1066,8 @@ async function auditarFinanceiro(browser, viewport, resultados) {
       const esperado = modo === 'vazio'
         ? estado.texto.includes('Nenhuma obrigação') &&
           estado.texto.includes('Nenhuma dívida') &&
-          estado.texto.includes('Nenhuma transação')
+          estado.texto.includes('Nenhuma transação') &&
+          estado.texto.includes('Nenhuma sugestão bancária')
         : modo === 'falha-banco'
           ? estado.erroBanco.includes('não pôde ser carregada') &&
             estado.texto.includes('Diária do confinamento')
