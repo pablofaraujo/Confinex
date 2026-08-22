@@ -410,6 +410,35 @@ function transacoesFinanceiras(transacoes){
   }).sort(function(a,b){ return String(b.data || '').localeCompare(String(a.data || '')); });
 }
 
+function conciliacoesBancariasPendentes(conciliacoes, transacoesStaging, candidatos, fluxos){
+  var bancoPorId = new Map((transacoesStaging || []).map(function(item){ return [String(item.id),item]; }));
+  var candidatoPorId = new Map((candidatos || []).map(function(item){ return [String(item.id),item]; }));
+  var fluxoPorId = new Map((fluxos || []).map(function(item){ return [String(item.id),item]; }));
+  return (conciliacoes || []).filter(function(item){
+    return String(item.estado || '').toLowerCase() === 'pendente';
+  }).map(function(item){
+    var banco = bancoPorId.get(String(item.transacao_staging_id)) || {};
+    var candidato = candidatoPorId.get(String(item.negocio_candidato_id)) || null;
+    var fluxo = fluxoPorId.get(String(item.fluxo_caixa_id)) || null;
+    var alvo = candidato || fluxo || {};
+    var classificacao = statusHumano(item.classificacao || 'possivel');
+    return {
+      data:banco.data || null,
+      descricao:referenciaHumana(banco.memo, banco.descricao, 'Movimentação bancária'),
+      valor:Math.abs(primeiroNumero(item.valor_alocado, banco.valor)),
+      negocio:referenciaHumana(candidato && candidato.codigo_fonte, fluxo && fluxo.negocio, 'Ainda não relacionado'),
+      contraparte:referenciaHumana(candidato && candidato.nome, fluxo && fluxo.descricao, 'A conferir'),
+      contexto:referenciaHumana(candidato && candidato.contexto, fluxo && fluxo.categoria, 'Financeiro'),
+      classificacao:classificacao,
+      justificativa:referenciaHumana(item.justificativa, 'Conferir a sugestão antes de relacionar.'),
+      status:'Aguardando conferência'
+    };
+  }).sort(function(a,b){
+    return String(b.data || '').localeCompare(String(a.data || '')) ||
+      String(a.negocio || '').localeCompare(String(b.negocio || ''), 'pt-BR');
+  });
+}
+
 function lembretesFinanceiros(obrigacoes, dividas){
   return (obrigacoes || []).concat(dividas || []).filter(function(item){
     return item.saldo > 0 && item.diasAteVencimento !== null && item.diasAteVencimento <= 30;
@@ -445,6 +474,7 @@ function erroLegivel(erro){
 
 return {
   contextoHumano:contextoHumano,
+  conciliacoesBancariasPendentes:conciliacoesBancariasPendentes,
   dividasFinanceiras:dividasFinanceiras,
   erroLegivel:erroLegivel,
   eventosLegiveis:eventosLegiveis,

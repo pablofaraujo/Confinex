@@ -9,8 +9,8 @@
 <link rel="stylesheet" href="./design/components.css?v=20260815-1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.min.js"></script>
 <script src="./js/cfagro-core.js"></script>
-<script src="./js/cfagro-gestao.js?v=20260814-1"></script>
-<script src="./js/financeiro.js?v=20260803-1" defer></script>
+<script src="./js/cfagro-gestao.js?v=20260822-1"></script>
+<script src="./js/financeiro.js?v=20260822-1" defer></script>
 <script src="./js/cfagro-shell.js?v=20260815-1" defer></script>
 </head>
 <body data-w="md">
@@ -49,6 +49,11 @@
   <div class="card scroll"><table><thead><tr><th>Origem</th><th>Referência</th><th>Próximo vencimento</th><th>Parcelas</th><th class="num">Taxa</th><th class="num">Original</th><th class="num">Pago</th><th class="num">Saldo</th><th>Situação</th></tr></thead><tbody id="dividas"></tbody></table></div>
 
   <h2>Conciliação bancária</h2>
+  <div class="aviso">Sugestões abaixo são apenas pistas para conferência. Nenhum pagamento, negócio ou lançamento foi relacionado automaticamente.</div>
+  <div class="err" id="erroConciliacoes"></div>
+  <div class="card scroll"><table><thead><tr><th>Data</th><th>Movimentação</th><th>Negócio sugerido</th><th>Força da sugestão</th><th class="num">Valor</th><th>Situação</th></tr></thead><tbody id="conciliacoesPendentes"></tbody></table></div>
+
+  <h2>Movimentações já registradas</h2>
   <div class="card">
     <div class="simgrid"><div class="fld"><label for="filtroBanco">Buscar transação</label><input id="filtroBanco" type="search" placeholder="descrição, categoria, negócio ou lote"></div></div>
     <div class="err" id="erroBanco"></div>
@@ -61,7 +66,7 @@
     <p class="muted"><strong>Preparado, mas não ativado:</strong> histórico estruturado de pagamentos parciais, parcelas, renegociações e lembretes persistentes. A migração está versionada para homologação e não foi aplicada ao Supabase.</p>
   </div>
 
-  <div class="foot">Consulta somente leitura · nenhuma movimentação, baixa, parcela, renegociação ou conciliação é criada nesta tela.</div>
+  <div class="foot">Consulta somente leitura · nenhuma sugestão confirma vínculo, movimentação, baixa, parcela, renegociação ou conciliação.</div>
 </div>
 </body>
 </html>

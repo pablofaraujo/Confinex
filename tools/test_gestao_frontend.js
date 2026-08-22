@@ -149,6 +149,23 @@ assert.deepStrictEqual(
 );
 assert.ok(!JSON.stringify(transacao).includes('22222222-2222-2222-2222-222222222222'));
 
+const sugestoesBanco = gestao.conciliacoesBancariasPendentes([{
+  id:'c1', transacao_staging_id:'t1', negocio_candidato_id:'n1', estado:'pendente',
+  classificacao:'possivel', valor_alocado:400,
+  justificativa:'Referência textual única; confirmar pagamento parcial.'
+}], [{id:'t1',data:'2026-08-14',memo:'Pagamento recebido',valor:-400}], [{
+  id:'n1',codigo_fonte:'NEG-26-900',nome:'Fornecedor teste',contexto:'Compras Fazenda'
+}], []);
+assert.deepStrictEqual(sugestoesBanco[0], {
+  data:'2026-08-14', descricao:'Pagamento recebido', valor:400,
+  negocio:'NEG-26-900', contraparte:'Fornecedor teste', contexto:'Compras Fazenda',
+  classificacao:'Possivel',
+  justificativa:'Referência textual única; confirmar pagamento parcial.',
+  status:'Aguardando conferência'
+});
+assert.ok(!JSON.stringify(sugestoesBanco).includes('transacao_staging_id'));
+assert.deepStrictEqual(gestao.conciliacoesBancariasPendentes([], [], [], []), []);
+
 // Vazio: cada projeção retorna um estado determinístico e renderizável.
 assert.deepStrictEqual(gestao.pendenciasLegiveis([], [], []), []);
 assert.deepStrictEqual(gestao.eventosLegiveis([]), []);
