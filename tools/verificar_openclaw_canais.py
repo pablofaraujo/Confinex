@@ -16,10 +16,12 @@ import os
 import socket
 import shutil
 import subprocess
+import tempfile
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -27,6 +29,7 @@ from typing import Any
 
 AGENTES_OBRIGATORIOS = {"juan": 1, "ceci": 1, "wey": 1, "zeus": 0}
 CONTAS_TELEGRAM = ("default", "ceci")
+STATUS_MODELO_OK = {"ok"}
 
 
 @dataclass
@@ -61,6 +64,231 @@ def json_comando(comando: list[str], *, timeout: int = 60,
         return json.loads(resultado.stdout)
     except json.JSONDecodeError:
         return None
+
+
+def gravar_json_atomico(caminho: Path, payload: dict[str, Any]) -> None:
+    caminho.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    temporario = caminho.with_suffix(f"{caminho.suffix}.{os.getpid()}.tmp")
+    temporario.write_text(
+        json.dumps(payload, ensure_ascii=False, sort_keys=True),
+        encoding="utf-8",
+    )
+    os.chmod(temporario, 0o600)
+    os.replace(temporario, caminho)
+
+
+def contrato_modelo(valor: Any) -> tuple[str, tuple[str, ...]]:
+    if isinstance(valor, str):
+        return valor, ()
+    if not isinstance(valor, dict):
+        return "", ()
+    primario = str(valor.get("primary") or "")
+    fallbacks = tuple(
+        str(item) for item in (valor.get("fallbacks") or []) if item
+    )
+    return primario, fallbacks
+
+
+def configuracoes_modelos(configuracao: dict[str, Any]) -> list[dict[str, Any]]:
+    agentes = (configuracao.get("agents") or {})
+    padrao = contrato_modelo((agentes.get("defaults") or {}).get("model"))
+    vistos: set[tuple[str, tuple[str, ...]]] = set()
+    configuracoes = []
+    for item in agentes.get("list") or []:
+        if not isinstance(item, dict) or not item.get("id"):
+            continue
+        modelo = contrato_modelo(item.get("model"))
+        if not modelo[0]:
+            modelo = padrao
+        if not modelo[0] or modelo in vistos:
+            continue
+        vistos.add(modelo)
+        configuracoes.append({
+            "agente": str(item["id"]),
+            "primario": modelo[0],
+            "fallbacks": list(modelo[1]),
+        })
+    return configuracoes
+
+
+def validar_probe_modelos(
+    payload: Any,
+    *,
+    primario: str,
+    fallbacks: list[str],
+) -> list[str]:
+    if not isinstance(payload, dict):
+        return ["probe_modelos_falhou"]
+    resultados = ((((payload.get("auth") or {}).get("probes") or {})
+                   .get("results")) or [])
+    por_modelo: dict[str, list[str]] = {}
+    for item in resultados:
+        if not isinstance(item, dict) or not item.get("model"):
+            continue
+        por_modelo.setdefault(str(item["model"]), []).append(
+            str(item.get("status") or "desconhecido")
+        )
+
+    falhas = []
+    if not any(status in STATUS_MODELO_OK for status in por_modelo.get(primario, [])):
+        falhas.append(f"modelo_primario_indisponivel:{primario}")
+    for modelo in fallbacks:
+        if not any(status in STATUS_MODELO_OK for status in por_modelo.get(modelo, [])):
+            falhas.append(f"modelo_fallback_indisponivel:{modelo}")
+    return falhas
+
+
+def validar_modelos(
+    configuracao: dict[str, Any],
+    *,
+    ambiente: dict[str, str],
+    cache: Path,
+    intervalo: int,
+    forcar: bool = False,
+) -> list[str]:
+    agora = int(time.time())
+    if not forcar:
+        try:
+            anterior = json.loads(cache.read_text(encoding="utf-8"))
+            if agora - int(anterior.get("timestamp") or 0) < intervalo:
+                return sorted(set(str(item) for item in anterior.get("falhas") or []))
+        except (OSError, ValueError, json.JSONDecodeError):
+            pass
+
+    configuracoes = configuracoes_modelos(configuracao)
+    resultados: list[dict[str, Any]] = []
+    falhas = []
+    for item in configuracoes:
+        payload = json_comando([
+            "openclaw", "models", "--agent", item["agente"], "status",
+            "--probe", "--json", "--probe-concurrency", "2",
+            "--probe-max-tokens", "1", "--probe-timeout", "15000",
+        ], timeout=60, ambiente=ambiente)
+        if not isinstance(payload, dict):
+            falhas.append(f"probe_modelos_falhou:{item['agente']}")
+            continue
+        itens = ((((payload.get("auth") or {}).get("probes") or {})
+                 .get("results")) or [])
+        resultados.extend(item for item in itens if isinstance(item, dict))
+
+    consolidado = {"auth": {"probes": {"results": resultados}}}
+    primarios = sorted({item["primario"] for item in configuracoes})
+    fallbacks = sorted({
+        modelo
+        for item in configuracoes
+        for modelo in item["fallbacks"]
+        if modelo not in primarios
+    })
+    for modelo in primarios:
+        falhas.extend(validar_probe_modelos(
+            consolidado, primario=modelo, fallbacks=[],
+        ))
+    if primarios:
+        falhas.extend(
+            falha for falha in validar_probe_modelos(
+                consolidado, primario=primarios[0], fallbacks=fallbacks,
+            )
+            if falha.startswith("modelo_fallback_indisponivel:")
+        )
+    falhas = sorted(set(falhas))
+    gravar_json_atomico(cache, {"timestamp": agora, "falhas": falhas})
+    return falhas
+
+
+def criar_xlsx_minimo(caminho: Path) -> None:
+    arquivos = {
+        "[Content_Types].xml": """<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</Types>""",
+        "_rels/.rels": """<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>""",
+        "xl/workbook.xml": """<?xml version="1.0" encoding="UTF-8"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<sheets><sheet name="Heartbeat" sheetId="1" r:id="rId1"/></sheets></workbook>""",
+        "xl/_rels/workbook.xml.rels": """<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+</Relationships>""",
+        "xl/worksheets/sheet1.xml": """<?xml version="1.0" encoding="UTF-8"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Teste</t></is></c></row></sheetData></worksheet>""",
+    }
+    with zipfile.ZipFile(caminho, "w", compression=zipfile.ZIP_DEFLATED) as pacote:
+        for nome, conteudo in arquivos.items():
+            pacote.writestr(nome, conteudo)
+
+
+def validar_roteador_xlsx(roteador: Path) -> list[str]:
+    if not roteador.is_file():
+        return ["roteador_arquivo_ausente"]
+    with tempfile.TemporaryDirectory(prefix="openclaw-heartbeat-") as pasta:
+        caminho = Path(pasta) / "heartbeat.xlsx"
+        criar_xlsx_minimo(caminho)
+        resultado = executar([
+            "python3", str(roteador), str(caminho),
+            "--grupo-id", "1", "--mensagem-id", "heartbeat-xlsx",
+            "--dry-run", "--no-ocr",
+        ], timeout=30)
+    if resultado.codigo != 0:
+        return ["roteador_xlsx_indisponivel"]
+    try:
+        payload = json.loads(resultado.stdout)
+        routed = payload.get("routed") or {}
+        if (
+            payload.get("dry_run") is True
+            and routed.get("classe") == "planilha_xlsx"
+            and (routed.get("dados") or {}).get("importado") is False
+        ):
+            return []
+    except json.JSONDecodeError:
+        pass
+    return ["roteador_xlsx_indisponivel"]
+
+
+def validar_indice_sessoes(payload: Any, agente: str) -> list[str]:
+    """Detecta referencias de sessao cujo arquivo ja nao existe.
+
+    O ``cleanup --dry-run --fix-missing`` nao aplica retencao nem remove
+    arquivos. Mantemos a falha por agente para que o reparo posterior seja
+    estritamente localizado.
+    """
+    if not isinstance(payload, dict):
+        return [f"probe_indice_sessoes_falhou:{agente}"]
+    try:
+        ausentes = int(payload.get("missing") or 0)
+    except (TypeError, ValueError):
+        return [f"probe_indice_sessoes_falhou:{agente}"]
+    if ausentes > 0:
+        return [f"indice_sessoes_inconsistente:{agente}"]
+    return []
+
+
+def reparar_indice_sessoes(agente: str) -> bool:
+    """Remove somente referencias ausentes, nunca sessoes ou artefatos validos."""
+    comando_base = [
+        "openclaw", "sessions", "cleanup", "--agent", agente,
+        "--fix-missing", "--json",
+    ]
+    previa = json_comando(comando_base[:-1] + ["--dry-run", "--json"], timeout=120)
+    if not isinstance(previa, dict) or int(previa.get("missing") or 0) <= 0:
+        return False
+    if any(previa.get(campo) for campo in ("dmScopeRetired", "pruned", "capped")):
+        return False
+    artefatos = previa.get("unreferencedArtifacts") or {}
+    if artefatos.get("removedFiles"):
+        return False
+    aplicado = json_comando(comando_base, timeout=120)
+    if not isinstance(aplicado, dict):
+        return False
+    conferencia = json_comando(
+        comando_base[:-1] + ["--dry-run", "--json"], timeout=120,
+    )
+    return isinstance(conferencia, dict) and int(conferencia.get("missing") or 0) == 0
 
 
 def unidade_ativa(unidade: str, *, usuario: bool = False) -> bool:
@@ -247,6 +475,7 @@ def diagnosticar(args: argparse.Namespace) -> list[str]:
         falhas.append("validacao_config_falhou")
 
     falhas.extend(validar_confinex())
+    falhas.extend(validar_roteador_xlsx(args.arquivo_router))
 
     cron = executar(["crontab", "-l"], timeout=20)
     if cron.codigo != 0:
@@ -261,12 +490,25 @@ def diagnosticar(args: argparse.Namespace) -> list[str]:
 
     agentes = json_comando(["openclaw", "agents", "list", "--bindings", "--json"])
     falhas.extend(validar_agentes(agentes))
+    for agente in AGENTES_OBRIGATORIOS:
+        indice = json_comando([
+            "openclaw", "sessions", "cleanup", "--agent", agente,
+            "--dry-run", "--fix-missing", "--json",
+        ], timeout=120)
+        falhas.extend(validar_indice_sessoes(indice, agente))
 
     token = resolver_token_gateway(configuracao)
     if not token:
         return falhas + ["token_gateway_indisponivel"]
     ambiente = dict(os.environ)
     ambiente["OPENCLAW_GATEWAY_TOKEN"] = token
+    falhas.extend(validar_modelos(
+        configuracao,
+        ambiente=ambiente,
+        cache=args.modelo_probe_cache,
+        intervalo=args.modelo_probe_intervalo,
+        forcar=args.forcar_probe_modelos,
+    ))
 
     canais = json_comando(
         ["openclaw", "channels", "status", "--probe", "--json"],
@@ -325,6 +567,11 @@ def reparar(args: argparse.Namespace, falhas: list[str]) -> list[str]:
         if executar(["systemctl", "start", args.wacli_health_service], timeout=90).codigo == 0:
             acoes.append("wacli_reparado")
 
+    for agente in AGENTES_OBRIGATORIOS:
+        if f"indice_sessoes_inconsistente:{agente}" in falhas:
+            if reparar_indice_sessoes(agente):
+                acoes.append(f"indice_sessoes_reparado:{agente}")
+
     gatilhos_gateway = (
         "gateway_", "telegram_", "whatsapp_openclaw_", "probe_canais_",
         "diretorio_grupos_", "grupo_telegram_", "token_gateway_",
@@ -380,6 +627,16 @@ def main() -> int:
     parser.add_argument("--chrome-service", default="openclaw-chrome.service")
     parser.add_argument("--wacli-service", default="wey-whatsapp-live-sync.service")
     parser.add_argument("--wacli-health-service", default="wey-whatsapp-live-health.service")
+    parser.add_argument(
+        "--arquivo-router", type=Path,
+        default=Path("/root/juan-severino/handlers/arquivo_grupo_router.py"),
+    )
+    parser.add_argument(
+        "--modelo-probe-cache", type=Path,
+        default=Path("/root/.openclaw/state/model-probe-heartbeat.json"),
+    )
+    parser.add_argument("--modelo-probe-intervalo", type=int, default=30 * 60)
+    parser.add_argument("--forcar-probe-modelos", action="store_true")
     parser.add_argument(
         "--agronota-log", type=Path,
         default=Path("/var/log/cfagro/agronota_pipeline.log"),

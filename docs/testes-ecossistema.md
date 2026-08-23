@@ -148,3 +148,13 @@ também informa:
 Uma falha é bloqueante: corrija a causa e rode novamente a bateria completa.
 Não contorne falha de contrato removendo a asserção sem confirmar a regra
 operacional correspondente.
+
+O heartbeat permanente acrescenta dois gates leves. Uma planilha XLSX mínima
+passa pelo roteador em `--dry-run`, e cada configuração distinta de modelos
+recebe um probe oficial limitado a um token a cada trinta minutos. O cache
+contém somente horário e códigos de falha. Depois de corrigir uma credencial,
+use `--forcar-probe-modelos` para ignorar o cache e obter nova prova imediata.
+Em cada execução, ele também roda a prévia do índice de sessões dos quatro
+agentes. Se houver referência para arquivo ausente, o autorreparo aplica apenas
+`--fix-missing` e confirma nova prévia com zero ausências; qualquer sinal de
+poda, limite ou remoção de artefato válido bloqueia o reparo automático.
