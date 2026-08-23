@@ -6,17 +6,191 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from tools.verificar_openclaw_canais import (
+    configuracoes_modelos,
+    criar_xlsx_minimo,
     grupos_configurados,
     ids_grupos,
     validar_agentes,
     validar_canais,
     validar_confinex,
+    validar_modelos,
     validar_monitor_agronota,
+    validar_probe_modelos,
+    validar_indice_sessoes,
+    validar_roteador_xlsx,
+    reparar_indice_sessoes,
     reparar,
 )
 
 
 class VerificarOpenClawCanaisTest(unittest.TestCase):
+    def test_deduplica_configuracoes_de_modelos_por_contrato(self):
+        config = {"agents": {
+            "defaults": {"model": {
+                "primary": "openai/gpt-5.5",
+                "fallbacks": ["anthropic/claude-sonnet-4-6"],
+            }},
+            "list": [
+                {"id": "juan"},
+                {"id": "ceci"},
+                {"id": "wey", "model": {
+                    "primary": "openai/gpt-5.4",
+                    "fallbacks": ["anthropic/claude-sonnet-4-6"],
+                }},
+                {"id": "zeus", "model": {
+                    "primary": "openai/gpt-5.4",
+                    "fallbacks": ["anthropic/claude-sonnet-4-6"],
+                }},
+            ],
+        }}
+        self.assertEqual(configuracoes_modelos(config), [
+            {
+                "agente": "juan",
+                "primario": "openai/gpt-5.5",
+                "fallbacks": ["anthropic/claude-sonnet-4-6"],
+            },
+            {
+                "agente": "wey",
+                "primario": "openai/gpt-5.4",
+                "fallbacks": ["anthropic/claude-sonnet-4-6"],
+            },
+        ])
+
+    def test_probe_detecta_primario_e_fallback_indisponiveis(self):
+        payload = {"auth": {"probes": {"results": [
+            {"model": "openai/gpt-5.5", "status": "ok"},
+            {"model": "anthropic/claude-sonnet-4-6", "status": "auth"},
+        ]}}}
+        self.assertEqual(validar_probe_modelos(
+            payload,
+            primario="openai/gpt-5.5",
+            fallbacks=["anthropic/claude-sonnet-4-6"],
+        ), ["modelo_fallback_indisponivel:anthropic/claude-sonnet-4-6"])
+        self.assertIn(
+            "modelo_primario_indisponivel:openai/gpt-5.4",
+            validar_probe_modelos(
+                payload,
+                primario="openai/gpt-5.4",
+                fallbacks=[],
+            ),
+        )
+
+    @patch("tools.verificar_openclaw_canais.json_comando")
+    def test_probe_modelos_usa_cache_sanitizado(self, comando):
+        comando.return_value = {"auth": {"probes": {"results": [
+            {"model": "openai/gpt-5.5", "status": "ok"},
+            {"model": "anthropic/claude-sonnet-4-6", "status": "auth"},
+        ]}}}
+        config = {"agents": {"defaults": {"model": {
+            "primary": "openai/gpt-5.5",
+            "fallbacks": ["anthropic/claude-sonnet-4-6"],
+        }}, "list": [{"id": "juan"}]}}
+        with tempfile.TemporaryDirectory() as pasta:
+            cache = Path(pasta) / "probe.json"
+            primeira = validar_modelos(
+                config, ambiente={}, cache=cache, intervalo=1800, forcar=True,
+            )
+            segunda = validar_modelos(
+                config, ambiente={}, cache=cache, intervalo=1800,
+            )
+            conteudo = json.loads(cache.read_text())
+        self.assertEqual(primeira, segunda)
+        self.assertEqual(comando.call_count, 1)
+        self.assertEqual(set(conteudo), {"timestamp", "falhas"})
+        self.assertNotIn("auth", conteudo)
+
+    @patch("tools.verificar_openclaw_canais.json_comando")
+    def test_modelo_compartilhado_entre_primario_e_fallback_nao_falha(self, comando):
+        comando.side_effect = [
+            {"auth": {"probes": {"results": [
+                {"model": "openai/gpt-5.5", "status": "ok"},
+            ]}}},
+            {"auth": {"probes": {"results": [
+                {"model": "openai/gpt-5.4", "status": "ok"},
+            ]}}},
+        ]
+        config = {"agents": {"list": [
+            {"id": "juan", "model": {
+                "primary": "openai/gpt-5.5",
+                "fallbacks": ["openai/gpt-5.4"],
+            }},
+            {"id": "wey", "model": {
+                "primary": "openai/gpt-5.4",
+                "fallbacks": [],
+            }},
+        ]}}
+        with tempfile.TemporaryDirectory() as pasta:
+            falhas = validar_modelos(
+                config,
+                ambiente={},
+                cache=Path(pasta) / "probe.json",
+                intervalo=1800,
+                forcar=True,
+            )
+        self.assertEqual([], falhas)
+
+    def test_roteador_xlsx_executa_previa_sem_gravacao(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            raiz = Path(pasta)
+            xlsx = raiz / "fixture.xlsx"
+            criar_xlsx_minimo(xlsx)
+            self.assertTrue(xlsx.is_file())
+            roteador = raiz / "router.py"
+            roteador.write_text(
+                "import json\nprint(json.dumps({'dry_run': True, 'routed': "
+                "{'classe': 'planilha_xlsx', 'dados': {'importado': False}}}))\n"
+            )
+            self.assertEqual([], validar_roteador_xlsx(roteador))
+
+    def test_roteador_xlsx_ausente_ou_invalido_falha(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            raiz = Path(pasta)
+            self.assertEqual(
+                ["roteador_arquivo_ausente"],
+                validar_roteador_xlsx(raiz / "ausente.py"),
+            )
+            roteador = raiz / "router.py"
+            roteador.write_text("raise SystemExit(1)\n")
+            self.assertEqual(
+                ["roteador_xlsx_indisponivel"],
+                validar_roteador_xlsx(roteador),
+            )
+
+    def test_indice_sessoes_detecta_apenas_referencia_ausente(self):
+        self.assertEqual(
+            ["indice_sessoes_inconsistente:juan"],
+            validar_indice_sessoes({"missing": 2, "pruned": 0}, "juan"),
+        )
+        self.assertEqual([], validar_indice_sessoes({"missing": 0}, "juan"))
+        self.assertEqual(
+            ["probe_indice_sessoes_falhou:juan"],
+            validar_indice_sessoes(None, "juan"),
+        )
+
+    @patch("tools.verificar_openclaw_canais.json_comando")
+    def test_reparo_indice_sessoes_e_localizado_e_confirmado(self, comando):
+        comando.side_effect = [
+            {"missing": 2, "pruned": 0, "capped": 0,
+             "dmScopeRetired": 0, "unreferencedArtifacts": {"removedFiles": []}},
+            {"missing": 2},
+            {"missing": 0},
+        ]
+        self.assertTrue(reparar_indice_sessoes("juan"))
+        self.assertEqual(comando.call_count, 3)
+        self.assertIn("--dry-run", comando.call_args_list[0].args[0])
+        self.assertNotIn("--dry-run", comando.call_args_list[1].args[0])
+
+    @patch("tools.verificar_openclaw_canais.json_comando")
+    def test_reparo_indice_recusa_efeitos_fora_de_referencias_ausentes(self, comando):
+        comando.return_value = {
+            "missing": 1,
+            "pruned": 1,
+            "capped": 0,
+            "dmScopeRetired": 0,
+        }
+        self.assertFalse(reparar_indice_sessoes("juan"))
+        self.assertEqual(comando.call_count, 1)
+
     def test_heartbeat_fiscal_valida_agendamento_arquivos_e_frescor(self):
         with tempfile.TemporaryDirectory() as pasta:
             raiz = Path(pasta)
@@ -148,6 +322,12 @@ class VerificarOpenClawCanaisTest(unittest.TestCase):
         self.assertIn("confinex_bridge_inativa", fonte)
         self.assertIn("juan-confinex-db-bridge.service", fonte)
         self.assertIn("confinex_bridge_reiniciada", fonte)
+        self.assertIn("validar_modelos", fonte)
+        self.assertIn("--probe-max-tokens", fonte)
+        self.assertIn("validar_roteador_xlsx", fonte)
+        self.assertIn("validar_indice_sessoes", fonte)
+        self.assertIn("--fix-missing", fonte)
+        self.assertIn("--dry-run", fonte)
 
     @patch("tools.verificar_openclaw_canais.reiniciar", return_value=True)
     def test_repara_ponte_sem_reiniciar_gateway(self, reiniciar):

@@ -57,6 +57,12 @@ Ao receber um documento de compra de gado, Juan segue esta ordem:
 
 Reconhecer, extrair, confirmar ou calcular nunca autoriza escrita em `compras`, `operation_drafts` ou qualquer outra tabela. O rascunho depende de aceite explícito posterior e continua sujeito à revisão visual e à promoção controlada.
 
+Planilhas `.xlsx` entram primeiro no mesmo roteador. A leitura usa modo somente
+leitura, valores calculados já armazenados, links externos desativados e limites
+para tamanho compactado, conteúdo expandido e quantidade de entradas. A prévia
+mostra abas, dimensões e cabeçalhos para classificação; fórmulas não são
+executadas e nenhum dado é importado sem confirmação posterior.
+
 PDF de extrato bancário é uma classe separada de compra. O roteador usa texto
 determinístico do próprio PDF para reconhecê-lo antes do OCR visual; o item de
 revisão registra que nenhuma transação foi importada ou conciliada e nunca pode
