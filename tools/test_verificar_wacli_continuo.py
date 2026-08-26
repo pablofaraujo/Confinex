@@ -1,9 +1,10 @@
 import json
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from tools.verificar_wacli_continuo import diagnosticar, verificar
+from tools.verificar_wacli_continuo import diagnosticar, main, sessao_revogada, verificar
 
 
 class VerificarWacliContinuoTest(unittest.TestCase):
@@ -26,8 +27,11 @@ class VerificarWacliContinuoTest(unittest.TestCase):
         self.assertNotIn("nao-pode-vazar", json.dumps(resultado))
 
     @patch("tools.verificar_wacli_continuo.unidade_ativa", return_value=True)
+    @patch("tools.verificar_wacli_continuo.sessao_revogada", return_value=False)
     @patch("tools.verificar_wacli_continuo.diagnosticar")
-    def test_aceita_doctor_desconectado_quando_follow_detem_bloqueio(self, diagnosticar, _unidade):
+    def test_aceita_doctor_desconectado_quando_follow_detem_bloqueio(
+        self, diagnosticar, _revogada, _unidade
+    ):
         diagnosticar.return_value = {
             "autenticado": True, "conectado": False, "bloqueio_ativo": True
         }
@@ -35,13 +39,54 @@ class VerificarWacliContinuoTest(unittest.TestCase):
         self.assertTrue(resultado["saudavel"])
 
     @patch("tools.verificar_wacli_continuo.unidade_ativa", return_value=True)
+    @patch("tools.verificar_wacli_continuo.sessao_revogada", return_value=False)
     @patch("tools.verificar_wacli_continuo.diagnosticar")
-    def test_reprova_servico_sem_bloqueio_do_store(self, diagnosticar, _unidade):
+    def test_reprova_servico_sem_bloqueio_do_store(
+        self, diagnosticar, _revogada, _unidade
+    ):
         diagnosticar.return_value = {
             "autenticado": True, "conectado": False, "bloqueio_ativo": False
         }
         resultado = verificar(Path("/wacli"), Path("/privado"), "captura.service")
         self.assertFalse(resultado["saudavel"])
+
+    @patch("tools.verificar_wacli_continuo.executar")
+    def test_detecta_401_posterior_ao_banco_de_sessao(self, executar):
+        with patch("pathlib.Path.stat") as stat:
+            stat.return_value.st_mtime = 100
+            executar.return_value = Mock(
+                returncode=0,
+                stdout="Logged out of WhatsApp (401: logged out from another device)",
+            )
+            self.assertTrue(sessao_revogada(Path("/store"), "captura.service"))
+        self.assertIn("@100", executar.call_args.args[0])
+
+    @patch("tools.verificar_wacli_continuo.verificar")
+    @patch("tools.verificar_wacli_continuo.executar")
+    @patch("tools.verificar_wacli_continuo.argparse.ArgumentParser.parse_args")
+    def test_nao_reinicia_quando_reautenticacao_e_necessaria(
+        self, argumentos, executar, verificar
+    ):
+        argumentos.return_value = SimpleNamespace(
+            wacli_bin=Path("/wacli"),
+            wacli_store=Path("/store"),
+            unidade="captura.service",
+            unidade_manutencao=None,
+            reparar=True,
+            espera_reparo=0,
+        )
+        verificar.return_value = {
+            "saudavel": False,
+            "autenticado": True,
+            "sessao_revogada": True,
+            "servico_ativo": False,
+        }
+        with patch("builtins.print") as imprimir:
+            self.assertEqual(1, main())
+        executar.assert_not_called()
+        payload = json.loads(imprimir.call_args.args[0])
+        self.assertEqual("reautenticacao_necessaria", payload["reparo_bloqueado"])
+        self.assertFalse(payload["reparo_solicitado"])
 
     def test_unidades_nao_possuem_envio_para_whatsapp(self):
         raiz = Path(__file__).parents[1]
@@ -55,6 +100,7 @@ class VerificarWacliContinuoTest(unittest.TestCase):
             self.assertNotIn(proibido, texto)
         self.assertIn("sync --follow", texto)
         self.assertIn("OnUnitActiveSec=5min", texto)
+        self.assertIn("Restart=no", texto)
 
     def test_alerta_nao_contem_credencial_e_nao_envia_whatsapp(self):
         fonte = Path(__file__).with_name("notificar_falha_wacli.sh").read_text()

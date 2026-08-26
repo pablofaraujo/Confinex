@@ -28,6 +28,25 @@ def unidade_ativa(unidade: str) -> bool:
     return executar(["systemctl", "is-active", "--quiet", unidade]).returncode == 0
 
 
+def sessao_revogada(store: Path, unidade: str) -> bool:
+    """Compara falhas de autenticacao com a versao atual da sessao local."""
+    try:
+        desde = int((store / "session.db").stat().st_mtime)
+    except OSError:
+        return True
+    resposta = executar([
+        "journalctl", "-u", unidade, "--since", f"@{desde}",
+        "--no-pager", "-o", "cat",
+    ], timeout=30)
+    if resposta.returncode != 0:
+        return False
+    texto = resposta.stdout.lower()
+    return any(marcador in texto for marcador in (
+        "401: logged out from another device",
+        "not authenticated; run `wacli auth`",
+    ))
+
+
 def diagnosticar(binario: Path, store: Path) -> dict[str, object]:
     resposta = executar([
         str(binario), "--store", str(store), "--read-only", "--json", "doctor"
@@ -50,10 +69,12 @@ def diagnosticar(binario: Path, store: Path) -> dict[str, object]:
 def verificar(binario: Path, store: Path, unidade: str) -> dict[str, object]:
     estado = diagnosticar(binario, store)
     estado["servico_ativo"] = unidade_ativa(unidade)
+    estado["sessao_revogada"] = sessao_revogada(store, unidade)
     estado["saudavel"] = all([
         estado["servico_ativo"],
         estado["autenticado"],
         estado["bloqueio_ativo"],
+        not estado["sessao_revogada"],
     ])
     return estado
 
@@ -74,13 +95,17 @@ def main() -> int:
 
     estado = verificar(args.wacli_bin, args.wacli_store, args.unidade)
     if not estado["saudavel"] and args.reparar:
-        reparo = executar(["systemctl", "restart", args.unidade], timeout=60)
-        estado["reparo_solicitado"] = reparo.returncode == 0
-        if reparo.returncode == 0:
-            time.sleep(max(0, args.espera_reparo))
-            estado = verificar(args.wacli_bin, args.wacli_store, args.unidade) | {
-                "reparo_solicitado": True
-            }
+        if estado.get("autenticado") is not True or estado.get("sessao_revogada") is True:
+            estado["reparo_solicitado"] = False
+            estado["reparo_bloqueado"] = "reautenticacao_necessaria"
+        else:
+            reparo = executar(["systemctl", "restart", args.unidade], timeout=60)
+            estado["reparo_solicitado"] = reparo.returncode == 0
+            if reparo.returncode == 0:
+                time.sleep(max(0, args.espera_reparo))
+                estado = verificar(args.wacli_bin, args.wacli_store, args.unidade) | {
+                    "reparo_solicitado": True
+                }
 
     print(json.dumps(estado, ensure_ascii=False, sort_keys=True))
     return 0 if estado["saudavel"] else 1

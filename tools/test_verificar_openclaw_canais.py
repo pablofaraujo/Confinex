@@ -11,7 +11,9 @@ from tools.verificar_openclaw_canais import (
     grupos_configurados,
     ids_grupos,
     validar_agentes,
+    validar_autenticacao_wacli,
     validar_canais,
+    validar_reautenticacao_whatsapp_openclaw,
     validar_confinex,
     validar_modelos,
     validar_monitor_agronota,
@@ -156,6 +158,46 @@ class VerificarOpenClawCanaisTest(unittest.TestCase):
                 validar_roteador_xlsx(roteador),
             )
 
+    @patch("tools.verificar_openclaw_canais.executar")
+    @patch("tools.verificar_openclaw_canais.json_comando")
+    def test_detecta_reautenticacao_wacli_sem_expor_conta(self, comando, executar):
+        comando.return_value = {
+            "success": True,
+            "data": {"authenticated": False, "linked_jid": "nao-expor"},
+        }
+        executar.return_value = Mock(codigo=0, stdout="", stderr="")
+        self.assertEqual(
+            ["wacli_reautenticacao_necessaria"],
+            validar_autenticacao_wacli(Path("/wacli"), Path("/store")),
+        )
+
+    @patch("tools.verificar_openclaw_canais.executar")
+    @patch("tools.verificar_openclaw_canais.json_comando")
+    def test_aceita_wacli_autenticado(self, comando, executar):
+        comando.return_value = {"data": {"authenticated": True}}
+        executar.return_value = Mock(codigo=0, stdout="", stderr="")
+        with patch("pathlib.Path.stat") as stat:
+            stat.return_value.st_mtime = 100
+            self.assertEqual(
+                [], validar_autenticacao_wacli(Path("/wacli"), Path("/store")),
+            )
+
+    @patch("tools.verificar_openclaw_canais.executar")
+    @patch("tools.verificar_openclaw_canais.json_comando")
+    def test_detecta_401_mesmo_com_doctor_autenticado(self, comando, executar):
+        comando.return_value = {"data": {"authenticated": True}}
+        executar.return_value = Mock(
+            codigo=0,
+            stdout="401: logged out from another device",
+            stderr="",
+        )
+        with patch("pathlib.Path.stat") as stat:
+            stat.return_value.st_mtime = 100
+            self.assertEqual(
+                ["wacli_reautenticacao_necessaria"],
+                validar_autenticacao_wacli(Path("/wacli"), Path("/store")),
+            )
+
     def test_indice_sessoes_detecta_apenas_referencia_ausente(self):
         self.assertEqual(
             ["indice_sessoes_inconsistente:juan"],
@@ -255,6 +297,31 @@ class VerificarOpenClawCanaisTest(unittest.TestCase):
         self.assertIn("whatsapp_openclaw_indisponivel", falhas)
         self.assertIn("gateway_event_loop_degradado", falhas)
 
+    def test_detecta_whatsapp_openclaw_exigindo_novo_pareamento(self):
+        payload = {
+            "channels": {"whatsapp": {
+                "configured": True, "linked": True, "running": False,
+                "connected": False, "healthState": "not-running",
+            }},
+        }
+        self.assertEqual(
+            ["whatsapp_openclaw_reautenticacao_necessaria"],
+            validar_reautenticacao_whatsapp_openclaw(
+                payload, "WhatsApp session logged out. Run channels login",
+            ),
+        )
+
+    def test_log_antigo_nao_bloqueia_whatsapp_openclaw_saudavel(self):
+        payload = {
+            "channels": {"whatsapp": {
+                "configured": True, "linked": True, "running": True,
+                "connected": True, "healthState": "healthy",
+            }},
+        }
+        self.assertEqual([], validar_reautenticacao_whatsapp_openclaw(
+            payload, "session logged out during setup",
+        ))
+
     def test_valida_agentes_vinculos_e_arquivos(self):
         with tempfile.TemporaryDirectory() as pasta:
             raiz = Path(pasta)
@@ -326,6 +393,7 @@ class VerificarOpenClawCanaisTest(unittest.TestCase):
         self.assertIn("--probe-max-tokens", fonte)
         self.assertIn("validar_roteador_xlsx", fonte)
         self.assertIn("validar_indice_sessoes", fonte)
+        self.assertIn("validar_autenticacao_wacli", fonte)
         self.assertIn("--fix-missing", fonte)
         self.assertIn("--dry-run", fonte)
 
@@ -350,6 +418,36 @@ class VerificarOpenClawCanaisTest(unittest.TestCase):
         acoes = reparar(args, ["confinex_dns_indisponivel"])
         self.assertEqual(acoes, ["dns_resolver_reiniciado"])
         reiniciar.assert_called_once_with("systemd-resolved.service")
+
+    @patch("tools.verificar_openclaw_canais.reiniciar", return_value=True)
+    def test_nao_reinicia_gateway_quando_whatsapp_exige_pareamento(self, reiniciar):
+        args = SimpleNamespace(gateway_service="openclaw-gateway.service")
+        acoes = reparar(args, [
+            "whatsapp_openclaw_indisponivel",
+            "whatsapp_openclaw_reautenticacao_necessaria",
+            "gateway_event_loop_degradado",
+        ])
+        self.assertEqual([], acoes)
+        reiniciar.assert_not_called()
+
+    @patch("tools.verificar_openclaw_canais.reiniciar", return_value=True)
+    def test_repara_telegram_mesmo_com_whatsapp_sem_pareamento(self, reiniciar):
+        args = SimpleNamespace(gateway_service="openclaw-gateway.service")
+        acoes = reparar(args, [
+            "telegram_indisponivel:default",
+            "whatsapp_openclaw_indisponivel",
+            "whatsapp_openclaw_reautenticacao_necessaria",
+        ])
+        self.assertEqual(["gateway_reiniciado"], acoes)
+        reiniciar.assert_called_once_with(
+            "openclaw-gateway.service", usuario=True,
+        )
+
+    @patch("tools.verificar_openclaw_canais.reiniciar", return_value=True)
+    def test_token_ausente_nao_reinicia_gateway(self, reiniciar):
+        args = SimpleNamespace(gateway_service="openclaw-gateway.service")
+        self.assertEqual([], reparar(args, ["token_gateway_indisponivel"]))
+        reiniciar.assert_not_called()
 
 
 if __name__ == "__main__":

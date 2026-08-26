@@ -297,6 +297,36 @@ def unidade_ativa(unidade: str, *, usuario: bool = False) -> bool:
     return executar(comando, timeout=20).codigo == 0
 
 
+def validar_autenticacao_wacli(
+    binario: Path, store: Path, unidade: str = "wey-whatsapp-live-sync.service",
+) -> list[str]:
+    payload = json_comando([
+        str(binario), "--store", str(store), "--read-only", "--json", "doctor",
+    ], timeout=30)
+    if not isinstance(payload, dict):
+        return ["wacli_diagnostico_indisponivel"]
+    dados = payload.get("data") or {}
+    if not isinstance(dados, dict):
+        return ["wacli_diagnostico_indisponivel"]
+    if dados.get("authenticated") is not True:
+        return ["wacli_reautenticacao_necessaria"]
+    try:
+        desde = int((store / "session.db").stat().st_mtime)
+    except OSError:
+        return ["wacli_reautenticacao_necessaria"]
+    logs = executar([
+        "journalctl", "-u", unidade, "--since", f"@{desde}",
+        "--no-pager", "-o", "cat",
+    ], timeout=30)
+    texto = logs.stdout.lower() if logs.codigo == 0 else ""
+    if any(marcador in texto for marcador in (
+        "401: logged out from another device",
+        "not authenticated; run `wacli auth`",
+    )):
+        return ["wacli_reautenticacao_necessaria"]
+    return []
+
+
 def resolver_token_gateway(configuracao: dict[str, Any]) -> str | None:
     referencia = (((configuracao.get("gateway") or {}).get("auth") or {}).get("token") or {})
     if not isinstance(referencia, dict):
@@ -355,6 +385,36 @@ def validar_canais(payload: Any) -> list[str]:
     if evento.get("degraded") is True:
         falhas.append("gateway_event_loop_degradado")
     return falhas
+
+
+def validar_reautenticacao_whatsapp_openclaw(
+    payload: Any, logs_gateway: str,
+) -> list[str]:
+    """Distingue indisponibilidade reparavel de sessao revogada.
+
+    Logs antigos so bloqueiam o reparo enquanto o probe atual continuar
+    indisponivel. Depois de um novo pareamento saudavel, nenhum marcador
+    historico interfere no heartbeat.
+    """
+    if not isinstance(payload, dict):
+        return []
+    whatsapp = (payload.get("channels") or {}).get("whatsapp") or {}
+    saudavel = all((
+        whatsapp.get("configured"),
+        whatsapp.get("linked"),
+        whatsapp.get("running"),
+        whatsapp.get("connected"),
+        whatsapp.get("healthState") == "healthy",
+    ))
+    if saudavel:
+        return []
+    texto = logs_gateway.lower()
+    if any(marcador in texto for marcador in (
+        "whatsapp session logged out",
+        "session logged out during setup",
+    )):
+        return ["whatsapp_openclaw_reautenticacao_necessaria"]
+    return []
 
 
 def validar_confinex(ambiente: dict[str, str] | None = None) -> list[str]:
@@ -460,6 +520,9 @@ def diagnosticar(args: argparse.Namespace) -> list[str]:
         falhas.append("chrome_openclaw_inativo")
     if not unidade_ativa(args.wacli_service):
         falhas.append("wacli_continuo_inativo")
+    falhas.extend(validar_autenticacao_wacli(
+        args.wacli_bin, args.wacli_store, args.wacli_service,
+    ))
 
     try:
         configuracao = json.loads(args.config.read_text())
@@ -516,6 +579,14 @@ def diagnosticar(args: argparse.Namespace) -> list[str]:
         ambiente=ambiente,
     )
     falhas.extend(validar_canais(canais))
+    logs_gateway = executar([
+        "journalctl", "--user", "-u", args.gateway_service,
+        "--since", "2 hours ago", "--no-pager", "-o", "cat",
+    ], timeout=30)
+    falhas.extend(validar_reautenticacao_whatsapp_openclaw(
+        canais,
+        logs_gateway.stdout if logs_gateway.codigo == 0 else "",
+    ))
 
     def listar(conta: str) -> tuple[str, Any]:
         payload = json_comando([
@@ -563,7 +634,10 @@ def reparar(args: argparse.Namespace, falhas: list[str]) -> list[str]:
         acoes.append("dns_resolver_reiniciado")
     if "chrome_openclaw_inativo" in falhas and reiniciar(args.chrome_service):
         acoes.append("chrome_reiniciado")
-    if "wacli_continuo_inativo" in falhas:
+    if (
+        "wacli_continuo_inativo" in falhas
+        and "wacli_reautenticacao_necessaria" not in falhas
+    ):
         if executar(["systemctl", "start", args.wacli_health_service], timeout=90).codigo == 0:
             acoes.append("wacli_reparado")
 
@@ -574,9 +648,21 @@ def reparar(args: argparse.Namespace, falhas: list[str]) -> list[str]:
 
     gatilhos_gateway = (
         "gateway_", "telegram_", "whatsapp_openclaw_", "probe_canais_",
-        "diretorio_grupos_", "grupo_telegram_", "token_gateway_",
+        "diretorio_grupos_", "grupo_telegram_",
     )
-    if any(falha.startswith(gatilhos_gateway) for falha in falhas):
+    falhas_gateway = [
+        falha for falha in falhas if falha.startswith(gatilhos_gateway)
+    ]
+    if "whatsapp_openclaw_reautenticacao_necessaria" in falhas:
+        falhas_gateway = [
+            falha for falha in falhas_gateway
+            if falha not in {
+                "whatsapp_openclaw_indisponivel",
+                "whatsapp_openclaw_reautenticacao_necessaria",
+                "gateway_event_loop_degradado",
+            }
+        ]
+    if falhas_gateway:
         if reiniciar(args.gateway_service, usuario=True):
             acoes.append("gateway_reiniciado")
     return acoes
@@ -627,6 +713,11 @@ def main() -> int:
     parser.add_argument("--chrome-service", default="openclaw-chrome.service")
     parser.add_argument("--wacli-service", default="wey-whatsapp-live-sync.service")
     parser.add_argument("--wacli-health-service", default="wey-whatsapp-live-health.service")
+    parser.add_argument("--wacli-bin", type=Path, default=Path("/usr/local/bin/wacli"))
+    parser.add_argument(
+        "--wacli-store", type=Path,
+        default=Path("/root/.local/state/wacli-confinex"),
+    )
     parser.add_argument(
         "--arquivo-router", type=Path,
         default=Path("/root/juan-severino/handlers/arquivo_grupo_router.py"),
