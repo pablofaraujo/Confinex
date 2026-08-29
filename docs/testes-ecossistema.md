@@ -167,3 +167,13 @@ segue a mesma regra: logout no log junto de probe indisponível retorna
 `whatsapp_openclaw_reautenticacao_necessaria` e não reinicia o gateway. Uma
 falha independente do Telegram continua reparável. Os testes não enviam
 mensagens.
+
+## Painel Boi Gordo
+
+`python3 tools/test_atualizar_painel_boi_gordo.py` cobre a geração dos
+vencimentos, a leitura do último negócio do pregão, respostas vazias, pregão
+antigo, preservação atômica do último artefato e separação entre a data da B3
+e as demais referências. O workflow agendado consulta somente a B3 pública;
+um run verde significa que ao menos um vencimento recente foi validado. A
+abertura da página faz nova leitura sem cache do artefato publicado, não uma
+consulta direta à bolsa.
