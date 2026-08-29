@@ -1,20 +1,112 @@
 {
-  "atualizadoEm": "15/07/2026 10:21",
-  "fonte": "CEPEA/Esalq, B3 e fontes de mercado listadas no painel",
+  "atualizadoEm": "2026-08-28 17:59:00",
+  "referenciasAtualizadasEm": "2026-07-15 10:21:00",
+  "fonte": "B3 oficial (curva automática); demais referências preservadas com data própria",
   "indicadores": [
-    { "label": "Boi gordo CEPEA/B3 (SP)", "valor": "R$ 328,10/@", "delta": "+1,08% no dia · −2,47% no mês", "dir": "up" },
-    { "label": "Milho CEPEA/B3 (Campinas-SP)", "valor": "R$ 64,62/sc", "delta": "+0,17% no dia · saca 60 kg", "dir": "up" },
-    { "label": "Relação de troca", "valor": "10,27 @/bezerro", "delta": "Máxima histórica para julho", "dir": "up" },
-    { "label": "Carne exportada (média)", "valor": "US$ 6.384/t", "delta": "+15% vs. julho de 2025", "dir": "up" }
+    {
+      "label": "Boi gordo CEPEA/B3 (SP)",
+      "valor": "R$ 328,10/@",
+      "delta": "+1,08% no dia · −2,47% no mês",
+      "dir": "up",
+      "dataFonte": "2026-07-15 10:21:00"
+    },
+    {
+      "label": "Milho CEPEA/B3 (Campinas-SP)",
+      "valor": "R$ 64,62/sc",
+      "delta": "+0,17% no dia · saca 60 kg",
+      "dir": "up",
+      "dataFonte": "2026-07-15 10:21:00"
+    },
+    {
+      "label": "Relação de troca",
+      "valor": "10,27 @/bezerro",
+      "delta": "Máxima histórica para julho",
+      "dir": "up",
+      "dataFonte": "2026-07-15 10:21:00"
+    },
+    {
+      "label": "Carne exportada (média)",
+      "valor": "US$ 6.384/t",
+      "delta": "+15% vs. julho de 2025",
+      "dir": "up",
+      "dataFonte": "2026-07-15 10:21:00"
+    }
   ],
   "curvaBGI": [
-    { "venc": "Físico (CEPEA)", "mes": "jul/26", "valor": 328.10, "agio": null },
-    { "venc": "BGI U26", "mes": "set/26", "valor": 341.20, "agio": 13.10 },
-    { "venc": "BGI V26", "mes": "out/26", "valor": 350.40, "agio": 22.30 },
-    { "venc": "BGI X26", "mes": "nov/26", "valor": 353.50, "agio": 25.40 },
-    { "venc": "BGI F27", "mes": "jan/27", "valor": 363.30, "agio": 35.20 }
+    {
+      "venc": "Físico (CEPEA)",
+      "mes": "jul/26",
+      "valor": 328.1,
+      "agio": null,
+      "tipo": "fisico",
+      "dataFonte": "2026-07-15 10:21:00"
+    },
+    {
+      "venc": "BGIQ26",
+      "mes": "ago/26",
+      "valor": 343.4,
+      "agio": null,
+      "tipo": "futuro",
+      "dataFonte": "2026-08-28 16:29:00"
+    },
+    {
+      "venc": "BGIU26",
+      "mes": "set/26",
+      "valor": 358.65,
+      "agio": null,
+      "tipo": "futuro",
+      "dataFonte": "2026-08-28 16:29:00"
+    },
+    {
+      "venc": "BGIV26",
+      "mes": "out/26",
+      "valor": 367.9,
+      "agio": null,
+      "tipo": "futuro",
+      "dataFonte": "2026-08-28 17:59:00"
+    },
+    {
+      "venc": "BGIX26",
+      "mes": "nov/26",
+      "valor": 371.8,
+      "agio": null,
+      "tipo": "futuro",
+      "dataFonte": "2026-08-28 17:26:00"
+    },
+    {
+      "venc": "BGIZ26",
+      "mes": "dez/26",
+      "valor": 372.5,
+      "agio": null,
+      "tipo": "futuro",
+      "dataFonte": "2026-08-28 17:26:00"
+    },
+    {
+      "venc": "BGIF27",
+      "mes": "jan/27",
+      "valor": 377.0,
+      "agio": null,
+      "tipo": "futuro",
+      "dataFonte": "2026-08-28 17:23:00"
+    },
+    {
+      "venc": "BGIG27",
+      "mes": "fev/27",
+      "valor": 377.25,
+      "agio": null,
+      "tipo": "futuro",
+      "dataFonte": "2026-08-28 16:22:00"
+    },
+    {
+      "venc": "BGIH27",
+      "mes": "mar/27",
+      "valor": 378.0,
+      "agio": null,
+      "tipo": "futuro",
+      "dataFonte": "2026-08-28 15:11:00"
+    }
   ],
   "manchetes": [],
-  "contexto": []
+  "contexto": [],
+  "atualizadoEmB3": "2026-08-28 17:59:00"
 }
-

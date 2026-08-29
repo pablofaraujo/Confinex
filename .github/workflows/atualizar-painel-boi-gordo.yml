@@ -23,24 +23,14 @@ jobs:
           python-version: '3.14'
       - name: Buscar e validar fonte
         id: fonte
-        env:
-          PAINEL_BOI_GORDO_SOURCE_URL: ${{ vars.PAINEL_BOI_GORDO_SOURCE_URL }}
         run: |
-          set -u
-          if [ -z "${PAINEL_BOI_GORDO_SOURCE_URL}" ]; then
-            echo "bloqueado: PAINEL_BOI_GORDO_SOURCE_URL não configurada"
-            echo "::error::Painel não atualizado: falta configurar a fonte validada de mercado"
-            echo "### Painel bloqueado" >> "$GITHUB_STEP_SUMMARY"
-            echo "A agenda rodou, mas a fonte validada ainda não está configurada. O último dado válido foi preservado." >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
           if python3 tools/atualizar_painel_boi_gordo.py; then
             echo "atualizado=true" >> "$GITHUB_OUTPUT"
           else
-            echo "Fonte indisponível; último artefato válido preservado"
-            echo "::error::Painel não atualizado: a fonte configurada falhou ou devolveu dados inválidos"
+            echo "B3 indisponível; último artefato válido preservado"
+            echo "::error::Painel não atualizado: a B3 falhou ou devolveu dados inválidos"
             echo "### Painel bloqueado" >> "$GITHUB_STEP_SUMMARY"
-            echo "A fonte configurada falhou ou devolveu dados inválidos. O último dado válido foi preservado." >> "$GITHUB_STEP_SUMMARY"
+            echo "A consulta oficial da B3 falhou ou devolveu dados inválidos. O último dado válido foi preservado." >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
       - name: Publicar artefato atualizado

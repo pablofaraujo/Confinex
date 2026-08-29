@@ -18,6 +18,20 @@
       agora.getTime() - dataAtualizacao.getTime() > dias * 86400000;
   }
 
+  function formatarDataFonte(valor) {
+    if (!valor) return 'data não informada';
+    var normalizada = String(valor).replace(' ', 'T');
+    var data = new Date(normalizada);
+    if (!Number.isFinite(data.getTime())) return String(valor);
+    return data.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+  }
+
+  function resumoFontes(dados) {
+    if (!dados.atualizadoEmB3) return 'fonte: ' + dados.fonte;
+    return 'B3: ' + formatarDataFonte(dados.atualizadoEmB3) +
+      ' · demais referências: ' + formatarDataFonte(dados.referenciasAtualizadasEm);
+  }
+
   function criarAtualizador({ buscar, aplicar, fallback, agora, limiteDias }) {
     var emAndamento = null;
     var atual = fallback;
@@ -41,5 +55,11 @@
     };
   }
 
-  global.PainelBoiGordo = { normalizarDados: normalizarDados, estaDefasado: estaDefasado, criarAtualizador: criarAtualizador };
+  global.PainelBoiGordo = {
+    normalizarDados: normalizarDados,
+    estaDefasado: estaDefasado,
+    formatarDataFonte: formatarDataFonte,
+    resumoFontes: resumoFontes,
+    criarAtualizador: criarAtualizador
+  };
 }(typeof globalThis !== 'undefined' ? globalThis : this));

@@ -14,6 +14,7 @@
 /* específico do Painel Boi Gordo: cor da variação nos KPIs e listas de manchetes/contexto (não catalogados no DS) */
 .kpi .d.up{color:var(--green)}
 .kpi .d.down{color:var(--red)}
+.kpi .fonte-data{font-size:var(--fs-11);color:var(--muted);margin-top:4px}
 .manchete{display:block;padding:9px 0;border-bottom:1px solid var(--border-soft);text-decoration:none;color:var(--text)}
 .manchete:last-child{border-bottom:none}
 .manchete:hover .t{text-decoration:underline}
@@ -24,6 +25,7 @@ ul.ctx li{font-size:var(--fs-12);padding:6px 0 6px 18px;position:relative;color:
 ul.ctx li::before{content:"•";position:absolute;left:4px;color:var(--green)}
 .chart-box{position:relative;height:260px;min-width:0}
 .chart-box canvas{width:100%!important;max-width:100%}
+.estado-vazio{font-size:var(--fs-12);color:var(--muted);padding:6px 0}
 </style>
 </head>
 <body>
@@ -32,7 +34,7 @@ ul.ctx li::before{content:"•";position:absolute;left:4px;color:var(--green)}
   <div class="ident">
     <div>
       <h1>Painel Boi Gordo</h1>
-      <div class="sub">Atualizado em <span id="ts"></span> · atualização automática seg–sex às 6h32 · <span id="estadoAtualizacao">último dado válido</span></div>
+      <div class="sub">Atualizado em <span id="ts"></span> (mercado B3) · atualização automática seg–sex às 6h32 · <span id="estadoAtualizacao">último dado válido</span></div>
     </div>
   </div>
 </div>
@@ -44,20 +46,20 @@ ul.ctx li::before{content:"•";position:absolute;left:4px;color:var(--green)}
   <div class="chart-box"><canvas id="chartBGI"></canvas></div>
   <div class="scroll">
     <table>
-      <thead><tr><th>Contrato</th><th>Vencimento</th><th class="num">Cotação (R$/@)</th><th class="num">Ágio vs. físico</th></tr></thead>
+      <thead><tr><th>Contrato</th><th>Vencimento</th><th class="num">Cotação (R$/@)</th><th class="num">Ágio vs. físico</th><th>Data da fonte</th></tr></thead>
       <tbody id="tbodyBGI"></tbody>
     </table>
   </div>
 </div>
 
-<h2>Manchetes do dia</h2>
+<h2>Manchetes de referência</h2>
 <div class="card" id="manchetes"></div>
 
-<h2>Contexto do mercado</h2>
+<h2>Contexto de referência</h2>
 <div class="card"><ul class="ctx" id="contexto"></ul></div>
 
 <div class="footer">
-  Fontes: CEPEA/Esalq, B3, FarmNews, Notícias Agrícolas, Canal Rural ·
+  Curva automática: B3 oficial. Demais referências mantêm sua própria data e não são apresentadas como atuais ·
   <a href="https://www.cepea.esalq.usp.br/br/indicador/boi-gordo.aspx" target="_blank">Indicador CEPEA</a> ·
   <a href="https://br.tradingview.com/symbols/BMFBOVESPA-BGI1!/contracts/" target="_blank">BGI na B3 (TradingView)</a>
 </div>
@@ -97,7 +99,7 @@ ul.ctx li::before{content:"•";position:absolute;left:4px;color:var(--green)}
 }
 </script>
 
-<script src="./js/painel-boi-gordo.js?v=20260812-1"></script>
+<script src="./js/painel-boi-gordo.js?v=20260829-1"></script>
 <script>
 const D = JSON.parse(document.getElementById('painel-data').textContent);
 const atualizador = window.PainelBoiGordo && window.PainelBoiGordo.criarAtualizador({
@@ -122,23 +124,25 @@ const estaDefasado = defasado == null && atualizador ? atualizador.defasado() : 
 document.getElementById('estadoAtualizacao').textContent =
   (fallback ? 'fonte indisponível · ' : '') +
   (estaDefasado ? 'dados defasados · ' : '') +
-  'fonte: ' + dados.fonte;
+  window.PainelBoiGordo.resumoFontes(dados);
 
 document.getElementById('ts').textContent = dados.atualizadoEm;
 
 document.getElementById('cards').innerHTML = dados.indicadores.map(i =>
-  `<div class="kpi"><div class="l">${i.label}</div><div class="v">${i.valor}</div><div class="d ${i.dir}">${i.delta}</div></div>`
+  `<div class="kpi"><div class="l">${i.label}</div><div class="v">${i.valor}</div><div class="d ${i.dir}">${i.delta}</div><div class="fonte-data">Referência: ${window.PainelBoiGordo.formatarDataFonte(i.dataFonte || dados.referenciasAtualizadasEm || dados.atualizadoEm)}</div></div>`
 ).join('');
 
 document.getElementById('tbodyBGI').innerHTML = dados.curvaBGI.map(r =>
-  `<tr><td>${r.venc}</td><td>${r.mes}</td><td class="num">${fmt(r.valor)}</td><td class="num${r.agio == null ? '' : ' pos'}">${r.agio == null ? '—' : '+' + fmt(r.agio)}</td></tr>`
+  `<tr><td>${r.venc}</td><td>${r.mes}</td><td class="num">${fmt(r.valor)}</td><td class="num${r.agio == null ? '' : ' pos'}">${r.agio == null ? '—' : '+' + fmt(r.agio)}</td><td>${window.PainelBoiGordo.formatarDataFonte(r.dataFonte || dados.atualizadoEm)}</td></tr>`
 ).join('');
 
-document.getElementById('manchetes').innerHTML = (dados.manchetes || []).map(m =>
+const manchetes = (dados.manchetes || []).map(m =>
   `<a class="manchete" href="${m.url}" target="_blank" rel="noopener"><div class="t">${m.titulo}</div><div class="f">${m.fonte}</div></a>`
 ).join('');
+document.getElementById('manchetes').innerHTML = manchetes || '<p class="estado-vazio">Sem manchetes atualizadas nesta fonte.</p>';
 
-document.getElementById('contexto').innerHTML = (dados.contexto || []).map(c => `<li>${c}</li>`).join('');
+const contextoMercado = (dados.contexto || []).map(c => `<li>${c}</li>`).join('');
+document.getElementById('contexto').innerHTML = contextoMercado || '<li class="estado-vazio">Sem contexto atualizado nesta fonte.</li>';
 
 if (graficoBGI) graficoBGI.destroy();
 graficoBGI = new Chart(document.getElementById('chartBGI'), {
@@ -154,7 +158,7 @@ graficoBGI = new Chart(document.getElementById('chartBGI'), {
       fill: true,
       tension: 0.3,
       pointRadius: 5,
-      pointBackgroundColor: dados.curvaBGI.map((r,i) => i === 0 ? '#dc2626' : '#059669')
+      pointBackgroundColor: dados.curvaBGI.map(r => r.tipo === 'fisico' || String(r.venc).indexOf('Físico') === 0 ? '#dc2626' : '#059669')
     }]
   },
   options: {
@@ -162,7 +166,12 @@ graficoBGI = new Chart(document.getElementById('chartBGI'), {
     maintainAspectRatio: false,
     plugins: {
       legend: { display: false },
-      tooltip: { callbacks: { label: c => 'R$ ' + fmt(c.parsed.y) + '/@' + (dados.curvaBGI[c.dataIndex].agio != null ? ' (ágio +' + fmt(dados.curvaBGI[c.dataIndex].agio) + ')' : ' · físico') } }
+      tooltip: { callbacks: { label: c => {
+        const item = dados.curvaBGI[c.dataIndex];
+        const complemento = item.agio != null ? ' (ágio +' + fmt(item.agio) + ')' :
+          (item.tipo === 'fisico' || String(item.venc).indexOf('Físico') === 0 ? ' · físico' : ' · sem base física atualizada');
+        return 'R$ ' + fmt(c.parsed.y) + '/@' + complemento;
+      } } }
     },
     scales: {
       y: { ticks: { callback: v => 'R$ ' + v }, grid: { color: '#eef2ef' } },
