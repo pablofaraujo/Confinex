@@ -120,7 +120,12 @@ class CabecalhosUiTest(unittest.TestCase):
                 self.assertEqual(leitor.h1, 1)
                 self.assertEqual(leitor.subtitulos, 1)
                 self.assertEqual(leitor.imagens, 0)
-                self.assertIn("design/components.css?v=20260815-1", fonte)
+                versao_componentes = (
+                    "design/components.css?v=20260829-1"
+                    if pagina == "revisoes.html"
+                    else "design/components.css?v=20260815-1"
+                )
+                self.assertIn(versao_componentes, fonte)
 
     def test_design_system_define_o_mesmo_contrato_da_visao_geral(self) -> None:
         css = (ROOT / "design/components.css").read_text(encoding="utf-8")

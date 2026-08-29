@@ -68,6 +68,23 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--yellow-soft);bor
 .aviso-validacao{background:var(--amberbg);border:1px solid var(--amber);color:var(--amber-text);border-radius:var(--r-sm);padding:10px 12px;font-size:var(--fs-12);line-height:1.5;margin-bottom:10px}
 .fld.campo-incompleto label{color:var(--red-text)}
 .fld.campo-incompleto input,.fld.campo-incompleto select,.fld.campo-incompleto textarea{border-color:var(--red);background:var(--redbg)}
+
+/* ---------- Comparação guiada de versões ---------- */
+.comparacao-versoes>.aviso{text-align:left;margin:0 0 12px}
+.grade-versoes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:10px}
+.versao-card{border:1px solid var(--border);border-radius:var(--r-md);background:var(--card);padding:12px;min-width:0}
+.versao-card.selecionada{border-color:var(--green);box-shadow:inset 4px 0 0 var(--green)}
+.versao-cabecalho{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px}
+.versao-cabecalho h3{font-size:var(--fs-14);color:var(--navy);margin:0 0 6px}
+.versao-cabecalho .badge{margin-right:4px}
+.versao-dados{display:grid;gap:5px}
+.versao-linha{display:grid;grid-template-columns:minmax(100px,.8fr) minmax(0,1.2fr);gap:8px;padding:6px 8px;border-radius:var(--r-sm);font-size:var(--fs-12)}
+.versao-linha span{color:var(--muted)}
+.versao-linha b{color:var(--text);overflow-wrap:anywhere}
+.versao-linha.divergente{background:var(--amberbg)}
+.versao-explicacao{border-top:1px solid var(--border-soft);margin-top:10px;padding-top:9px;font-size:var(--fs-12);line-height:1.5;color:var(--text)}
+.versao-explicacao>ul{margin:5px 0 9px;padding-left:18px}
+@media(max-width:900px){.grade-versoes{grid-template-columns:1fr}.versao-cabecalho{align-items:stretch;flex-direction:column}.versao-cabecalho .btn{align-self:flex-start}}
 .btn:disabled{opacity:.55;cursor:not-allowed}
 
 /* ---------- Formulários compactos e painéis retráteis ---------- */

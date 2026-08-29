@@ -55,7 +55,7 @@ class ContratosEcossistemaTests(unittest.TestCase):
     def test_orquestrador_valida_revisoes_js_externo(self):
         source = (TOOLS / "test_ecossistema.py").read_text(encoding="utf-8")
         self.assertIn('revisoes.html não deve manter script inline', source)
-        self.assertIn("./revisoes.js?v=20260818-2", source)
+        self.assertIn("./revisoes.js?v=20260829-1", source)
         self.assertIn('["node", "--check", "revisoes.js"]', source)
         self.assertNotIn("NamedTemporaryFile", source)
 
@@ -67,7 +67,7 @@ class ContratosEcossistemaTests(unittest.TestCase):
         self.assertIn("Contexto não identificado", source)
         self.assertIn("doesNotMatch(api.contextosResumoHtml", source)
         self.assertIn("Dados técnicos avançados", source)
-        self.assertIn("./revisoes.js?v=20260818-2", html)
+        self.assertIn("./revisoes.js?v=20260829-1", html)
         self.assertNotRegex(tela, r"TELEGRAM_GROUP_NAMES\s*=\s*\{[^}]*telegram:-\d+")
         self.assertIn("origem_conversa_id:dados.origem_conversa_id||''", js)
 
