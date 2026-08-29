@@ -29,6 +29,16 @@ data, valor, cabeças, GTA e relação sugerida. Os mesmos dados permanecem
 editáveis logo abaixo. A ficha serve para localizar e confirmar o negócio; ela
 não transforma a NF em compra, venda ou movimentação da Fazenda.
 
+Quando a consolidação preserva duas ou mais leituras em `versoes_revisao`, a
+tela apresenta cada alternativa separadamente. Ela mostra os valores humanos,
+destaca os campos realmente divergentes, resume as evidências e explica por que
+cada versão é plausível (por exemplo, correção explícita ou repetição em mais de
+uma fonte). A pessoa pode usar uma versão como ponto de partida ou corrigir os
+campos manualmente. A escolha só preenche o formulário no navegador: nenhuma
+decisão é persistida até **Salvar ajustes**, e nenhuma promoção é preparada ou
+executada por essa seleção. Identificadores de mensagem, UUIDs e conteúdo JSON
+continuam fora da interface.
+
 Na VPS, o sandbox do Juan não acessa o Supabase diretamente. O cliente envia
 leituras e escritas de `operation_drafts`, `pending_actions`, `eventos` e demais
 tabelas não operacionais permitidas à fila privada de `confinex_db_bridge.py`.
@@ -214,6 +224,8 @@ As simulações devem confirmar:
 - **Salvar ajustes** habilitado e **Preparar promoção operacional** bloqueado somente enquanto faltar campo;
 - rejeição sem motivo bloqueada, rejeição com motivo auditada, devolução e ajustes auditados;
 - histórico sem JSON bruto para aguardando confirmação, em execução, executado, erro pós-gravação e rejeitado.
+- comparação de versões com diferenças, evidências e justificativas humanas;
+- seleção de uma versão preenchendo o formulário sem salvar, aprovar ou promover;
 - nome humano do grupo na interface, com o ID técnico preservado somente no vínculo de origem.
 
 O contrato e o procedimento de normalização dos contextos estão em

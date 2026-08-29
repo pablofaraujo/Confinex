@@ -71,6 +71,7 @@ Larguras: padrão 1280px; `<body data-w="md">` = 1100px; `<body data-w="sm">` = 
 | Painel retrátil | `.painel-retratil > .painel-retratil-resumo + .painel-retratil-corpo` | ações importantes, mas pouco frequentes, recolhidas por padrão |
 | Feedback | `.err` (erro) `.msg` (sucesso inline) | abaixo de forms |
 | Validação guiada | `.aviso-validacao`, `.fld.campo-incompleto`, `.btn:disabled` | aviso de campos faltantes, destaque no formulário e bloqueio pontual da ação dependente |
+| Comparação de versões | `.comparacao-versoes`, `.grade-versoes`, `.versao-card`, `.versao-linha` | alternativas preservadas lado a lado, diferenças destacadas e escolha sem gravação automática |
 | Login | `.login-box` | tela de entrada padrão |
 | Topbar | `.topbar > .ident / .acoes`, `.logo-img` | cabeçalho de página |
 | Grids | `.grid.g6`, `.grid2`, `.simgrid` | layouts de form/painel |
@@ -134,6 +135,7 @@ ao documento inteiro.
 - Campo obrigatório ausente usa `.fld.campo-incompleto`, `aria-invalid="true"` e um aviso `.aviso-validacao` com atalhos que levam o foco ao campo. O aviso informa os nomes humanos dos campos.
 - A validação bloqueia somente **Preparar promoção operacional**. **Salvar ajustes** continua disponível para permitir a correção progressiva.
 - O histórico traduz estados para linguagem operacional e mostra data, responsável, destino, resultado e ID do registro criado quando existir.
+- Quando houver mais de uma leitura plausível, a revisão compara as versões, destaca somente as diferenças e explica por que cada alternativa pode fazer sentido. **Usar esta versão** apenas preenche os campos editáveis; salvar, aprovar e promover continuam separados.
 - Rejeitar exige motivo; devolver para confirmação preserva os dados; cada decisão cria um evento legível. Detalhes internos continuam no banco para auditoria, nunca como JSON bruto na tela.
 
 ## Roadmap do DS

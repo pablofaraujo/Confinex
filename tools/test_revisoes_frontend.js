@@ -12,7 +12,7 @@ const inlineScripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script
   .map(match => match[1].trim())
   .filter(Boolean);
 assert.equal(inlineScripts.length, 0, 'revisoes.html nao deve manter script inline');
-assert.match(html, /<script src="\.\/revisoes\.js\?v=20260818-2"><\/script>/);
+assert.match(html, /<script src="\.\/revisoes\.js\?v=20260829-1"><\/script>/);
 
 const context = {
   CFAgro: {authInit() {}},
@@ -22,7 +22,7 @@ const context = {
   console,
 };
 vm.createContext(context);
-new vm.Script(`${js}\nglobalThis.__revisoes={buildPromocaoPreview,promotionValidationState,promotionInputElement,aplicarEstadoPromocao,businessFieldIndex,businessTargetPath,promotionMissingLinks,irParaCampoObrigatorio,validarNegocioOperacional,planoDecisao,montarEventoDecisao,montarAtualizacaoRascunho,registrarEvento,promotionHistoryData,promotionHistoryHtml,statusPrincipal,dadosItem,labelStatus,painelFila,itemMatchesStatus,camposObrigatoriosFaltantes,filtrosRapidosHtml,contextosResumoHtml,contextoDe,grupoNome,dadosComGrupoNome,contextoPersistivel,incluirContextoSeDisponivel,inferPromotionTarget,prioridadeItem,compararPrioridade,orientacaoCampoFaltante,orientacoesCamposHtml,pistasDocumentoFiscal,documentoFiscalResumoHtml,renderBusinessSections};`, {filename: 'revisoes.js'}).runInContext(context);
+new vm.Script(`${js}\nglobalThis.__revisoes={buildPromocaoPreview,promotionValidationState,promotionInputElement,aplicarEstadoPromocao,businessFieldIndex,businessTargetPath,promotionMissingLinks,irParaCampoObrigatorio,validarNegocioOperacional,planoDecisao,montarEventoDecisao,montarAtualizacaoRascunho,registrarEvento,promotionHistoryData,promotionHistoryHtml,statusPrincipal,dadosItem,labelStatus,painelFila,itemMatchesStatus,camposObrigatoriosFaltantes,filtrosRapidosHtml,contextosResumoHtml,contextoDe,grupoNome,dadosComGrupoNome,contextoPersistivel,incluirContextoSeDisponivel,inferPromotionTarget,prioridadeItem,compararPrioridade,orientacaoCampoFaltante,orientacoesCamposHtml,pistasDocumentoFiscal,documentoFiscalResumoHtml,renderBusinessSections,versoesRevisao,camposComparacao,comparacaoVersoesHtml,mesclarDadosDaVersao,versaoConfiancaLabel};`, {filename: 'revisoes.js'}).runInContext(context);
 
 const api = context.__revisoes;
 
@@ -53,6 +53,47 @@ assert.match(resumoFiscal, /Valor da NF/);
 assert.match(resumoFiscal, /Fornecedor Teste/);
 assert.match(api.renderBusinessSections({numero_nf:'1'}), /Informações escritas na NF/);
 assert.doesNotMatch(api.renderBusinessSections({}), /Informações escritas na NF/);
+
+const dadosComAlternativas = {
+  contexto_nome:'Compras Fazenda',
+  versoes_revisao:[
+    {
+      mensagem_id:'msg-versao-a', mensagens:['msg-versao-a'], ocorrencias:2,
+      data_mensagem:'2026-08-10', confianca:0.72,
+      dados:{fornecedor:'Fornecedor de teste',quantidade:24,peso_total_kg:7800,preco_arroba:320,valor_total:83200,origem_mensagem_id:'msg-versao-a'},
+    },
+    {
+      titulo:'Correção posterior', mensagem_id:'84a267c0-09dc-4fa5-aa75-a56900bf73b5',
+      eh_correcao_explicita:true, evidencia:'Conferência posterior do peso',
+      dados:{fornecedor:'Fornecedor de teste',quantidade:24,peso_total_kg:8100,preco_arroba:320,valor_total:86400,origem_conversa_id:'telegram:grupo:-9999999999'},
+    },
+  ],
+};
+const alternativas = api.versoesRevisao({}, {}, dadosComAlternativas);
+assert.equal(alternativas.length, 2);
+assert.equal(alternativas[0].titulo, 'Versão 1');
+assert.match(alternativas[0].motivos.join(' '), /2 evidências/);
+assert.match(alternativas[1].motivos.join(' '), /correção explícita/);
+const camposAlternativas = api.camposComparacao(alternativas);
+assert.deepEqual([...camposAlternativas.filter(c=>c.divergente).map(c=>c.label)], ['Peso total kg','Valor bruto / total']);
+assert.doesNotMatch(JSON.stringify(camposAlternativas), /origem_mensagem_id|origem_conversa_id|9999999999/);
+const comparacao = api.comparacaoVersoesHtml({}, {}, dadosComAlternativas);
+assert.match(comparacao, /Compare as versões encontradas/);
+assert.match(comparacao, /Por que pode ser esta/);
+assert.match(comparacao, /Usar esta versão/);
+assert.match(comparacao, /Corrigir com outra versão/);
+assert.match(comparacao, /nada é salvo ou lançado automaticamente/);
+assert.doesNotMatch(comparacao, /msg-versao|84a267c0|9999999999|\{\s*&quot;/);
+const baseAntesDaEscolha = {contexto_nome:'Compras Fazenda',quantidade:10,peso_total_kg:3000,valor_total:10000};
+const preenchidoPelaEscolha = api.mesclarDadosDaVersao(baseAntesDaEscolha, alternativas[1], 'compras');
+assert.equal(preenchidoPelaEscolha.quantidade, 24);
+assert.equal(preenchidoPelaEscolha.peso_total_kg, 8100);
+assert.equal(preenchidoPelaEscolha.valor_total, 86400);
+assert.equal(preenchidoPelaEscolha.contexto_nome, 'Compras Fazenda');
+assert.equal(preenchidoPelaEscolha.decisao_versao.titulo, 'Correção posterior');
+assert.equal(api.comparacaoVersoesHtml({}, {}, {versoes_revisao:[dadosComAlternativas.versoes_revisao[0]]}), '', 'uma versão não deve mudar o fluxo atual');
+const codigoEscolha = js.match(/function aplicarVersaoRevisao[\s\S]*?(?=function corrigirVersaoManualmente)/)?.[0] || '';
+assert.doesNotMatch(codigoEscolha, /db\.from|salvarAjustes|prepararPromocao/, 'escolher uma versão não pode gravar, aprovar ou promover');
 
 const vendaSemRecebimento = api.buildPromocaoPreview({data_abate:'2026-07-22',cabecas:18,peso_liquido_kg:5228.785,valor_bruto:115033.27}, 'vendas');
 const estadoVenda = api.promotionValidationState('vendas', vendaSemRecebimento);
