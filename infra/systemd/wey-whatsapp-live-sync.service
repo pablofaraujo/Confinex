@@ -9,8 +9,9 @@ StartLimitBurst=10
 Type=simple
 UMask=0077
 ExecStart=/usr/local/bin/wacli --store /root/.local/state/wacli-confinex sync --follow --presence-mode quiet --max-db-size 2GB --max-reconnect 0 --stale-threshold 60s
-Restart=always
-RestartSec=15s
+# O heartbeat decide quando reiniciar. Saida por sessao revogada nao pode gerar
+# loop; uma sessao expirada exige novo pareamento, nao repeticao do processo.
+Restart=no
 TimeoutStopSec=30s
 
 [Install]

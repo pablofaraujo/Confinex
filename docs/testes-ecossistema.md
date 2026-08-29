@@ -158,3 +158,12 @@ Em cada execução, ele também roda a prévia do índice de sessões dos quatro
 agentes. Se houver referência para arquivo ausente, o autorreparo aplica apenas
 `--fix-missing` e confirma nova prévia com zero ausências; qualquer sinal de
 poda, limite ou remoção de artefato válido bloqueia o reparo automático.
+
+O gate do WhatsApp diferencia processo interrompido de sessão revogada. Com
+autenticação válida, o heartbeat pode reiniciar a captura; sem autenticação,
+retorna `wacli_reautenticacao_necessaria`, não inicia o serviço em ciclo e
+preserva o cache para novo pareamento. O canal WhatsApp interno do OpenClaw
+segue a mesma regra: logout no log junto de probe indisponível retorna
+`whatsapp_openclaw_reautenticacao_necessaria` e não reinicia o gateway. Uma
+falha independente do Telegram continua reparável. Os testes não enviam
+mensagens.
