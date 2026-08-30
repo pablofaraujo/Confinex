@@ -612,12 +612,24 @@ def id_deterministico(tipo: str, chave: str) -> str:
 
 
 def normalizar_assunto(assunto: Mapping[str, Any] | str) -> dict[str, Any]:
+    """Normaliza e já protege identificadores sensíveis (NFe/UUID) do texto
+    livre. A proteção acontece aqui — antes de qualquer hash de identidade
+    ou persistência — para que o valor usado na chave de idempotência seja
+    exatamente o mesmo valor sanitizado que chega ao registro final; o
+    dry-run Python passa a provar a sanitização sozinho, sem depender do
+    CHECK do banco."""
     bruto = {"titulo": assunto} if isinstance(assunto, str) else dict(assunto)
     return {
         "tipo": _texto(bruto.get("tipo") or "revisao"),
-        "titulo": _texto(bruto.get("titulo") or bruto.get("assunto")),
+        "titulo": sanitizar_payload(
+            _texto(bruto.get("titulo") or bruto.get("assunto")),
+            proteger_identificadores=True,
+        ),
         "referencia": _texto(bruto.get("referencia") or bruto.get("codigo")),
-        "contexto_nome": str(bruto.get("contexto_nome") or bruto.get("contexto") or "").strip(),
+        "contexto_nome": sanitizar_payload(
+            str(bruto.get("contexto_nome") or bruto.get("contexto") or "").strip(),
+            proteger_identificadores=True,
+        ),
     }
 
 

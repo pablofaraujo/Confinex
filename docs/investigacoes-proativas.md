@@ -246,7 +246,12 @@ que a informação não existe.
   nunca executa trabalho de negócio.
 
 Leituras podem repetir com backoff curto. Escritas não recebem repetição
-automática; uma resposta incerta é reconciliada pela chave idempotente. Logs
+automática; uma resposta incerta é reconciliada pela chave idempotente. A
+única exceção conhecida no ecossistema é `conclude_lease_v1` em
+`tools/promocao_operacional.py`: ela repete até três vezes a RPC
+`concluir_promocao_operacional` somente em falha de transporte, o que é
+seguro porque a RPC é idempotente por lease e fencing token e a repetição
+exata do mesmo pedido terminal retorna `repeticao_idempotente`. Logs
 sanitizados registram apenas correlation ID, adaptador, estado, cobertura,
 duração e código de erro.
 

@@ -1012,6 +1012,62 @@ class InvestigacoesRevisaoTest(unittest.TestCase):
                 "linhagem": "nf", "tipo_correspondencia": "identificador_exato",
             }])
 
+    def test_chave_nfe_44_digitos_prefixada_e_mascarada(self):
+        # Espelha tools/test_migracao_postgres.py (~linha 1904): "NFe" colado
+        # a 44 dígitos, sem separador, em contexto alfanumérico.
+        chave_44 = "12345678901234567890123456789012345678901234"
+        self.assertEqual(len(chave_44), 44)
+        bruto = f"Chave NFe{chave_44} recebida"
+        protegido = sanitizar_payload(bruto, proteger_identificadores=True)
+        self.assertNotIn(chave_44, protegido)
+        self.assertIn("[REFERÊNCIA PROTEGIDA]", protegido)
+        # Sem a flag, a identidade fiscal não é protegida (é o comportamento
+        # que a CORREÇÃO 1 deixou de assumir implicitamente para titulo e
+        # contexto_nome).
+        self.assertIn(chave_44, sanitizar_payload(bruto))
+
+    def test_chave_nfe_44_digitos_aninhada_e_mascarada(self):
+        # Espelha tools/test_migracao_postgres.py (~linha 1917): 44 dígitos
+        # dentro de um objeto aninhado, com espaço após "NFe".
+        chave_44 = "12345678901234567890123456789012345678901234"
+        bruto = {"evidencia": {"documento": f"NFe {chave_44}"}}
+        protegido = sanitizar_payload(bruto, proteger_identificadores=True)
+        self.assertNotIn(chave_44, protegido["evidencia"]["documento"])
+        self.assertIn("[REFERÊNCIA PROTEGIDA]", protegido["evidencia"]["documento"])
+
+    def test_numero_43_ou_45_digitos_nao_e_mascarado_como_nfe(self):
+        # O regex usa limites (?<!\d)...(?!\d): um número com 43 ou 45
+        # dígitos, ou um 44 dígitos que faz parte de uma sequência numérica
+        # maior, não é uma chave NFe isolada e não deve ser mascarado por
+        # essa regra — confirma o comportamento tal como especificado.
+        digitos_43 = "1" * 43
+        digitos_45 = "1" * 45
+        chave_44 = "12345678901234567890123456789012345678901234"
+        sequencia_maior = f"9{chave_44}9"  # 46 dígitos, 44 deles "no meio"
+        self.assertEqual(len(digitos_43), 43)
+        self.assertEqual(len(digitos_45), 45)
+        self.assertEqual(len(sequencia_maior), 46)
+        for bruto in (digitos_43, digitos_45, sequencia_maior):
+            protegido = sanitizar_payload(bruto, proteger_identificadores=True)
+            self.assertEqual(protegido, bruto)
+            self.assertNotIn("[REFERÊNCIA PROTEGIDA]", protegido)
+
+    def test_titulo_com_44_digitos_e_protegido_apos_correcao_1(self):
+        # CORREÇÃO 1: titulo/contexto_nome do registro investigacoes_revisao
+        # já saem sanitizados de normalizar_assunto(), sem depender do CHECK
+        # do banco para provar a proteção em dry-run puro Python.
+        chave_44 = "12345678901234567890123456789012345678901234"
+        plano = self.plano(assunto={
+            "tipo": "revisao",
+            "titulo": f"Conferir NFe {chave_44}",
+            "contexto_nome": f"Grupo {chave_44}",
+        })
+        registro = plano["registros"]["investigacoes_revisao"][0]
+        self.assertNotIn(chave_44, registro["titulo"])
+        self.assertIn("[REFERÊNCIA PROTEGIDA]", registro["titulo"])
+        self.assertNotIn(chave_44, registro["contexto_nome"])
+        self.assertIn("[REFERÊNCIA PROTEGIDA]", registro["contexto_nome"])
+
     def test_fonte_declarada_vazia_nao_pode_conter_resultado(self):
         with self.assertRaisesRegex(ValueError, "fonte_vazia_com_resultados_invalida"):
             self.plano(fontes=[{
