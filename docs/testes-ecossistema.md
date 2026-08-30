@@ -1,6 +1,6 @@
 # Bateria de testes do ecossistema
 
-Atualizado em 2026-08-11. A entrada única é:
+Atualizado em 2026-08-29. A entrada única é:
 
 ```bash
 python3 tools/test_ecossistema.py
@@ -39,6 +39,22 @@ não se sobrepõem.
   ausente recebe aviso e destaque; salvar ajustes não promove; preparação fica
   bloqueada enquanto houver falta; rejeição exige motivo; devolução preserva
   os dados e registra o histórico.
+- **Investigação proativa:** cobertura e existência de resultado permanecem
+  independentes; uma fonte fraca não vira certeza; mesma linhagem não conta
+  duas vezes; alternativas apontam evidências favoráveis e contrárias; o
+  planejador gera somente as oito tabelas de controle. A migração proposta é
+  verificada quanto a leases, fencing token, FK composta, views sanitizadas,
+  privilégios efetivos, retomada de lease vencido, grupo completo de candidatos,
+  publicação atômica do resultado, materialização atômica da tripla e barreira
+  transacional contra promoção concorrente. O teste também prova que o caminho
+  protegido faz uma RPC por revisão, pré-valida todo o lote e não usa os três
+  `POST` diretos. O teste não aplica a migração nem acessa o Supabase.
+  No CI, `tools/test_migracao_postgres.py --obrigatorio` usa PostgreSQL 15
+  descartável para aplicar fundação e ativação duas vezes, provar ACL/RLS,
+  rejeitar NFe bruta, executar leases concorrentes, consumir a outbox terminal,
+  replanejar fluxo com gravação e corretiva stale, repetir as chamadas após
+  resposta incerta e reverter a ativação duas vezes. Todos os dados são
+  sintéticos e o banco efêmero é destruído no final.
 - **Supabase:** os estados de eventos pertencem ao contrato vigente; a
   reconciliação cria somente `operation_drafts`; nenhuma compra operacional
   nasce sem o executor e a confirmação exata.

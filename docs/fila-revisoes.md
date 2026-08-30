@@ -16,6 +16,48 @@ Atualizado em 2026-07-23. Este documento é o roteiro operacional da versão atu
 
 Nenhuma compra é promovida automaticamente. Preparar, aprovar, simular e reconciliar auditorias não equivalem a gravar um lançamento.
 
+## Investigação antes de apresentar a dúvida
+
+Uma pendência pode passar por uma investigação proativa antes de aparecer para
+decisão. A camada consulta somente fontes autorizadas, reutiliza o staging
+existente e apresenta alternativas, evidências favoráveis e contrárias,
+cobertura e campos ainda ausentes. Ela não completa o formulário por
+inferência, não reabre revisão encerrada e não transforma ausência de resultado
+em ausência do fato quando a cobertura da fonte estiver incompleta.
+
+A definição do rascunho, da pendência e do evento continua exclusiva de
+`materializar_revisoes_staging.py`. No modo protegido, a tripla só aparece
+depois que a investigação terminou: uma RPC atômica confere o grupo completo
+de candidatos, cria as três linhas e anexa alternativas, prós e contras na
+mesma transação. Falha ou snapshot alterado não deixa revisão parcial.
+**Usar esta informação**, salvar ajustes, aprovar, preparar e confirmar promoção
+continuam decisões separadas. O contrato e o plano de implantação estão em
+[`docs/investigacoes-proativas.md`](investigacoes-proativas.md).
+
+A interface bloqueia a revisão se a view de investigações falhar e nunca mostra
+UUID, fingerprint ou timestamp técnico. A mesma regra existe no banco: cliente
+antigo ou tela desatualizada não prepara promoção com investigação ativa ou
+concluída sem anexo. Se a promoção ganhou a corrida antes da nova evidência, a
+nova rodada fica complementar e não interfere no executor já autorizado.
+Quando a promoção termina, a ativação proposta grava apenas um pedido
+idempotente de sucessão. Se houve gravação operacional, ou se uma corretiva
+ficou stale, a nova rodada exige replanejamento explícito das fontes e CAS;
+ela não reaproveita silenciosamente o plano anterior. Uma revisão corretiva já
+visível é preservada, cancelada e ligada à sucessora por evento auditável, sem
+alterar o registro operacional.
+
+A preparação atômica da promoção investigada é exclusiva de um mediador de
+servidor com `service_role`; o navegador autenticado não pode chamar a RPC nem
+receber essa credencial. Até o mediador validar autoria, vínculo, snapshots e o
+pedido sanitizado, a feature flag permanece desligada. Se for ligada antes
+disso, a tela falha fechada antes de qualquer escrita, sem voltar ao fluxo
+legado. **Salvar ajustes** continua funcionando normalmente.
+
+Enquanto o tipo do futuro lançamento não estiver definido, a tela apresenta
+“Escolha o tipo de lançamento”, mantém **Salvar ajustes** disponível e bloqueia
+**Preparar promoção operacional**. Assim, uma investigação manual nunca cria
+uma pendência de promoção com destino inválido.
+
 Rascunhos vindos do monitor fiscal preservam no conteúdo revisável a data de
 emissão, número da NF-e, GTA identificada, quantidade, valor, contraparte e os
 sete campos do contexto de origem. A tela também aceita `data_emissao` como
@@ -29,7 +71,7 @@ data, valor, cabeças, GTA e relação sugerida. Os mesmos dados permanecem
 editáveis logo abaixo. A ficha serve para localizar e confirmar o negócio; ela
 não transforma a NF em compra, venda ou movimentação da Fazenda.
 
-Quando a consolidação preserva duas ou mais leituras em `versoes_revisao`, a
+Quando a consolidação preserva uma ou mais leituras em `versoes_revisao`, a
 tela apresenta cada alternativa separadamente. Ela mostra os valores humanos,
 destaca os campos realmente divergentes, resume as evidências e explica por que
 cada versão é plausível (por exemplo, correção explícita ou repetição em mais de
