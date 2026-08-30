@@ -8,6 +8,25 @@ var esc = function(v){ return CFAgro.esc(v); };
 // navegador nem à interface humana.
 var DRAFT_PENDENCIAS_COLUNAS = 'id,criado_em,atualizado_em,status,tipo_operacao,codigo_sugerido,entidade_final_tipo,dados_extraidos,campos_pendentes,agente,origem_canal,contexto_nome,escopo';
 var ACAO_PENDENCIAS_COLUNAS = 'id,criado_em,atualizado_em,status,acao_tipo,entidade_tipo,entidade_codigo,resumo,payload,erro,agente,usuario_solicitante,canal,origem_canal,contexto_nome,escopo,executavel';
+// A migração que cria `executavel` em pending_actions ainda não foi aplicada
+// em produção. Uma segunda tentativa sem a coluna evita perder a fonte
+// inteira enquanto a migração não sobe.
+var ACAO_PENDENCIAS_COLUNAS_SEM_EXECUTAVEL = ACAO_PENDENCIAS_COLUNAS.replace(',executavel','');
+
+function colunaAusente(error, colunasNovas){
+  if(!error) return false;
+  if(error.code === '42703') return true;
+  var msg = String(error.message || '').toLowerCase();
+  return msg.indexOf('does not exist') !== -1 && colunasNovas.some(function(c){ return msg.indexOf(c.toLowerCase()) !== -1; });
+}
+
+async function selectAcoesPendencias(){
+  var resp = await db.from('pending_actions').select(ACAO_PENDENCIAS_COLUNAS).limit(200);
+  if(colunaAusente(resp.error, ['executavel'])){
+    resp = await db.from('pending_actions').select(ACAO_PENDENCIAS_COLUNAS_SEM_EXECUTAVEL).limit(200);
+  }
+  return resp;
+}
 
 function classeStatus(status){
   var s = String(status || '').toLowerCase();
@@ -45,7 +64,7 @@ async function carregar(){
   el('erroFontes').textContent = '';
   var respostas = await Promise.all([
     db.from('operation_drafts').select(DRAFT_PENDENCIAS_COLUNAS).limit(200),
-    db.from('pending_actions').select(ACAO_PENDENCIAS_COLUNAS).limit(200),
+    selectAcoesPendencias(),
     db.from('pendencias_documentos').select('*').in('status',['aguardando_vendedor','revisao_necessaria']).limit(200),
     db.from('operacoes').select('id,codigo,status,tipo_negocio').limit(500),
     db.from('confinex_avaliacoes').select('id,operacao_id,codigo,status,confinex_estimativas(id,versao,premissas,resultado)').limit(500)

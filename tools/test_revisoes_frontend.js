@@ -22,7 +22,7 @@ const context = {
   console,
 };
 vm.createContext(context);
-new vm.Script(`${js}\nglobalThis.__revisoes={buildPromocaoPreview,promotionValidationState,promotionInputElement,aplicarEstadoPromocao,validarPromocaoObrigatoria,businessFieldIndex,businessTargetPath,promotionMissingLinks,irParaCampoObrigatorio,validarNegocioOperacional,planoDecisao,montarEventoDecisao,montarAtualizacaoRascunho,registrarEvento,promotionHistoryData,promotionHistoryHtml,statusPrincipal,dadosItem,labelStatus,painelFila,itemMatchesStatus,camposObrigatoriosFaltantes,filtrosRapidosHtml,contextosResumoHtml,contextoDe,grupoNome,dadosComGrupoNome,contextoPersistivel,incluirContextoSeDisponivel,inferPromotionTarget,prioridadeItem,compararPrioridade,orientacaoCampoFaltante,orientacoesCamposHtml,pistasDocumentoFiscal,documentoFiscalResumoHtml,renderBusinessSections,versoesRevisao,camposComparacao,comparacaoVersoesHtml,mesclarDadosDaVersao,versaoConfiancaLabel,origemCanalLabel,prepararOrigemVisual,deveConsultarInvestigacoes,investigacaoBloqueada,anexarInvestigacoes,exigirMediadorPromocaoProtegida};`, {filename: 'revisoes.js'}).runInContext(context);
+new vm.Script(`${js}\nglobalThis.__revisoes={buildPromocaoPreview,promotionValidationState,promotionInputElement,aplicarEstadoPromocao,validarPromocaoObrigatoria,businessFieldIndex,businessTargetPath,promotionMissingLinks,irParaCampoObrigatorio,validarNegocioOperacional,planoDecisao,montarEventoDecisao,montarAtualizacaoRascunho,registrarEvento,promotionHistoryData,promotionHistoryHtml,statusPrincipal,dadosItem,labelStatus,painelFila,itemMatchesStatus,camposObrigatoriosFaltantes,filtrosRapidosHtml,contextosResumoHtml,contextoDe,grupoNome,dadosComGrupoNome,contextoPersistivel,incluirContextoSeDisponivel,inferPromotionTarget,prioridadeItem,compararPrioridade,orientacaoCampoFaltante,orientacoesCamposHtml,pistasDocumentoFiscal,documentoFiscalResumoHtml,renderBusinessSections,versoesRevisao,camposComparacao,comparacaoVersoesHtml,mesclarDadosDaVersao,versaoConfiancaLabel,origemCanalLabel,prepararOrigemVisual,deveConsultarInvestigacoes,investigacaoBloqueada,anexarInvestigacoes,exigirMediadorPromocaoProtegida,colunaAusente,selectDraftsRevisao,selectAcoesRevisao,extrairErroMediador,carregarInvestigacoesBloqueadoras,chamarMediadorInvestigacoes,lotesDe,MAX_CONSULTAS_MEDIADOR,carregar,obterEstadoRevisoes:()=>({itens,selecionado,drafts,actions,operacoes,investigacoes})};`, {filename: 'revisoes.js'}).runInContext(context);
 
 const api = context.__revisoes;
 assert.equal(api.deveConsultarInvestigacoes(), false, 'flag ausente/desligada não consulta a view');
@@ -78,7 +78,8 @@ const versaoComMetadadosTecnicos = api.versoesRevisao({}, {}, {versoes_revisao:[
 }]});
 assert.equal(Object.keys(versaoComMetadadosTecnicos[0].dados).includes('fingerprint_base'), false);
 assert.doesNotMatch(JSON.stringify(versaoComMetadadosTecnicos), /84a267c0|cand-1|2026-08-29T12:00:00Z|aaaaaaa|bbbbbbb/);
-assert.match(js, /a fila foi bloqueada por segurança/);
+assert.match(js, /a preparação de promoção operacional foi bloqueada por segurança/);
+assert.match(js, /Salvar ajustes continua disponível/);
 for (const estado of ['pendente','em_execucao','aguardando_retentativa']) {
   assert.equal(api.investigacaoBloqueada({estado_execucao:estado}, true), true);
 }
@@ -532,12 +533,174 @@ for (const coluna of ['entidade_id','promocao_lease_token','promocao_fencing_tok
 assert.doesNotMatch(js, /from\('operation_drafts'\)\.select\('\*'\)/);
 assert.doesNotMatch(js, /from\('pending_actions'\)\.select\('\*'\)/);
 
+// --- Correção 1: fallback de projeção quando revisao_tipo/executavel ainda não existem ---
+assert.match(js, /DRAFT_REVISAO_COLUNAS_SEM_NOVAS = DRAFT_REVISAO_COLUNAS\.replace\(',revisao_tipo',''\)/);
+assert.match(js, /ACAO_REVISAO_COLUNAS_SEM_NOVAS = ACAO_REVISAO_COLUNAS\.replace\(',executavel',''\)/);
+assert.equal(api.colunaAusente(null, ['revisao_tipo']), false);
+assert.equal(api.colunaAusente({code:'42703'}, ['revisao_tipo']), true, 'código PostgREST 42703 sempre indica coluna ausente');
+assert.equal(api.colunaAusente({message:'column operation_drafts.revisao_tipo does not exist'}, ['revisao_tipo']), true);
+assert.equal(api.colunaAusente({message:'permission denied for table operation_drafts'}, ['revisao_tipo']), false, 'erro sem relação com a coluna nova não deve acionar o fallback');
+assert.equal(api.MAX_CONSULTAS_MEDIADOR, 50, 'a Edge Function investigacoes-mediador rejeita lotes acima de 50 (MAX_CONSULTAS)');
+assert.deepEqual([...api.lotesDe([1,2,3,4,5], 2)], [[1,2],[3,4],[5]]);
+assert.deepEqual([...api.lotesDe([], 50)], []);
+
+// --- Correção 4: alerta e histórico nunca podem vazar texto técnico em inglês ---
+assert.doesNotMatch(`${html}\n${js}`, /Edge Function returned a non-2xx status code|FunctionsHttpError/);
+
+async function testesDeResiliencia() {
+  // Correção 1 (continuação): a segunda tentativa usa a projeção reduzida e a
+  // página volta a funcionar com uma única repetição.
+  function fluentColuna(colunaNova, dadosSucesso) {
+    return (cols) => {
+      const q = {
+        order() { return q; },
+        limit() {
+          if (cols.includes(colunaNova)) {
+            return Promise.resolve({data:null, error:{code:'42703', message:`column "${colunaNova}" does not exist`}});
+          }
+          return Promise.resolve({data: dadosSucesso, error: null});
+        },
+      };
+      return q;
+    };
+  }
+  const chamadasDraft = [];
+  context.db = {from(table) { assert.equal(table, 'operation_drafts'); return {select(cols) { chamadasDraft.push(cols); return fluentColuna('revisao_tipo', [{id:'draft-fallback'}])(cols); }}; }};
+  const respostaDrafts = await api.selectDraftsRevisao();
+  assert.equal(chamadasDraft.length, 2, 'deve repetir exatamente uma vez com a projeção reduzida');
+  assert.ok(chamadasDraft[0].includes('revisao_tipo'));
+  assert.ok(!chamadasDraft[1].includes('revisao_tipo'));
+  assert.equal(respostaDrafts.error, null, 'a página deve voltar a funcionar após o fallback');
+  assert.deepEqual(respostaDrafts.data, [{id:'draft-fallback'}]);
+
+  const chamadasAcoes = [];
+  context.db = {from(table) { assert.equal(table, 'pending_actions'); return {select(cols) { chamadasAcoes.push(cols); return fluentColuna('executavel', [{id:'acao-fallback'}])(cols); }}; }};
+  const respostaAcoes = await api.selectAcoesRevisao();
+  assert.equal(chamadasAcoes.length, 2, 'deve repetir exatamente uma vez com a projeção reduzida');
+  assert.ok(chamadasAcoes[0].includes('executavel'));
+  assert.ok(!chamadasAcoes[1].includes('executavel'));
+  assert.equal(respostaAcoes.error, null);
+  assert.deepEqual(respostaAcoes.data, [{id:'acao-fallback'}]);
+
+  const chamadasSemFallback = [];
+  context.db = {from(table) { return {select(cols) { chamadasSemFallback.push(cols); const q={order(){return q;},limit(){return Promise.resolve({data:null,error:{message:'permission denied for table '+table}});}}; return q; }}; }};
+  const respostaComErroReal = await api.selectDraftsRevisao();
+  assert.equal(chamadasSemFallback.length, 1, 'erro que não é de coluna ausente não deve repetir a consulta');
+  assert.ok(respostaComErroReal.error, 'erro real continua sendo reportado');
+
+  // Correção 2: no máximo 50 revisões por chamada ao mediador, em lotes sequenciais.
+  const tamanhosDeLote = [];
+  context.db = {functions:{invoke: async (nome, {body}) => {
+    assert.equal(nome, 'investigacoes-mediador');
+    assert.equal(body.acao, 'consultar_bloqueios');
+    assert.ok(body.revisoes.length <= 50, 'a Edge Function rejeita mais de 50 revisões por chamada');
+    tamanhosDeLote.push(body.revisoes.length);
+    const bloqueios = body.revisoes.map(r => ({chave_cliente:r.chave_cliente, investigacoes:[{estado_execucao:'pendente', anexado_em:null}]}));
+    return {data:{bloqueios}, error:null};
+  }}};
+  const listaGrande = Array.from({length:120}, (_, i) => ({id:'draft-'+i}));
+  const resultadoLotes = await api.carregarInvestigacoesBloqueadoras(listaGrande);
+  assert.deepEqual(tamanhosDeLote, [50,50,20], 'deve dividir 120 revisões em lotes de até 50');
+  assert.equal(resultadoLotes.error, null);
+  assert.equal(resultadoLotes.data.length, 120, 'todas as revisões devem ter a investigação anexada');
+
+  let chamadaLote = 0;
+  context.db = {functions:{invoke: async () => {
+    chamadaLote++;
+    if (chamadaLote === 2) return {data:null, error:{message:'Edge Function returned a non-2xx status code', context:{json: async () => ({erro:'Muitas revisões nesta chamada.'})}}};
+    return {data:{bloqueios:[]}, error:null};
+  }}};
+  const resultadoComFalha = await api.carregarInvestigacoesBloqueadoras(listaGrande);
+  assert.equal(resultadoComFalha.data, null, 'qualquer lote com erro deve falhar fechado (nenhum resultado parcial)');
+  assert.ok(resultadoComFalha.error);
+  assert.match(resultadoComFalha.error.message, /Muitas revisões nesta chamada/, 'o erro fail-closed deve carregar a mensagem pt-BR extraída');
+
+  context.db = {functions:{invoke: async () => { throw new Error('não deveria consultar o mediador sem revisões'); }}};
+  const vazioLista = await api.carregarInvestigacoesBloqueadoras([]);
+  assert.equal(vazioLista.error, null);
+  assert.equal(vazioLista.data.length, 0);
+  const vazioNulo = await api.carregarInvestigacoesBloqueadoras(null);
+  assert.equal(vazioNulo.error, null);
+  assert.equal(vazioNulo.data.length, 0);
+
+  // Correção 4: extrair a mensagem pt-BR do corpo ({erro:"..."}) via error.context.
+  assert.equal(await api.extrairErroMediador(null), 'Não foi possível concluir a solicitação no mediador de investigações. Tente novamente em instantes.');
+  assert.equal(await api.extrairErroMediador({context:{erro:'Mensagem direta pt-BR.'}}), 'Mensagem direta pt-BR.');
+  assert.equal(await api.extrairErroMediador({context:{json: async () => ({erro:'Prazo de conferência expirado.'})}}), 'Prazo de conferência expirado.');
+  assert.match(await api.extrairErroMediador({message:'Edge Function returned a non-2xx status code'}), /Não foi possível concluir/);
+  assert.match(await api.extrairErroMediador({context:{json: async () => { throw new Error('corpo não é JSON'); }}}), /Não foi possível concluir/);
+
+  context.db = {functions:{invoke: async () => ({data:null, error:{message:'Edge Function returned a non-2xx status code', context:{json: async () => ({erro:'Não é possível preparar: prazo de conferência expirado.'})}}})}};
+  await assert.rejects(() => api.chamarMediadorInvestigacoes('preparar_promocao', {}), (err) => {
+    assert.equal(err.message, 'Não é possível preparar: prazo de conferência expirado.');
+    assert.doesNotMatch(err.message, /non-2xx|FunctionsHttpError|Edge Function/);
+    return true;
+  });
+  context.db = {functions:{invoke: async () => ({data:null, error:{message:'Edge Function returned a non-2xx status code'}})}};
+  await assert.rejects(() => api.chamarMediadorInvestigacoes('preparar_promocao', {}), (err) => {
+    assert.doesNotMatch(err.message, /non-2xx|Edge Function/);
+    assert.match(err.message, /Não foi possível concluir/);
+    return true;
+  });
+
+  // Correção 3: falha ao verificar investigações preserva a fila; só a
+  // preparação de promoção fica bloqueada. Precisa de um contexto isolado
+  // porque a flag é lida uma única vez, na carga do script.
+  function makeEl() { return {textContent:'', innerHTML:'', value:'', addEventListener(){}, querySelector(){return null;}, querySelectorAll(){return [];}}; }
+  const elMocksFlagOn = {subtitle:makeEl(), fContexto:makeEl(), lista:makeEl(), kpis:makeEl(), quickFilters:makeEl(), contextSummary:makeEl()};
+  const contextFlagOn = {
+    CFAgro: {authInit(){}},
+    document: {getElementById: id => elMocksFlagOn[id] || makeEl(), querySelector(){return null;}, querySelectorAll(){return [];}},
+    esc: context.esc,
+    fmtDT: context.fmtDT,
+    console,
+    CFAGRO_INVESTIGACOES_ATIVAS: true,
+  };
+  vm.createContext(contextFlagOn);
+  new vm.Script(`${js}\nglobalThis.__revisoes={carregar,exigirMediadorPromocaoProtegida,deveConsultarInvestigacoes,obterEstadoRevisoes:()=>({itens,selecionado,drafts,actions,operacoes,investigacoes})};`, {filename:'revisoes.js (flag ativa)'}).runInContext(contextFlagOn);
+  const apiFlagOn = contextFlagOn.__revisoes;
+  assert.equal(apiFlagOn.deveConsultarInvestigacoes(), true, 'flag ativa neste contexto isolado');
+
+  const draftsSimulados = [
+    {id:'draft-1', atualizado_em:'2026-08-29T10:00:00Z'},
+    {id:'draft-2', atualizado_em:'2026-08-29T10:00:00Z'},
+  ];
+  contextFlagOn.db = {
+    from(table) {
+      if (table === 'operation_drafts') return {select(){return {order(){return {limit(){return Promise.resolve({data:draftsSimulados, error:null});}};}};}};
+      if (table === 'pending_actions') return {select(){return {order(){return {limit(){return Promise.resolve({data:[], error:null});}};}};}};
+      if (table === 'operacoes') return {select(){return {not(){return {order(){return {limit(){return Promise.resolve({data:[], error:null});}};}};}};}};
+      throw new Error('tabela inesperada: '+table);
+    },
+    functions: {invoke: async () => ({data:null, error:{message:'network error', context:{json: async () => ({erro:'Não foi possível consultar investigações agora.'})}}})},
+  };
+  await apiFlagOn.carregar();
+  const estadoDegradado = apiFlagOn.obterEstadoRevisoes();
+  assert.equal(estadoDegradado.itens.length, 2, 'a fila deve continuar carregada mesmo com falha no cruzamento de investigações');
+  assert.ok(estadoDegradado.itens.every(i => i.investigacaoBloqueada === false), 'não reaproveita o bloqueio individual de investigação para bloquear a seleção');
+  assert.ok(estadoDegradado.itens.every(i => i.investigacaoIndisponivel === true), 'todo item fica marcado como não verificado nesta carga');
+  assert.match(elMocksFlagOn.subtitle.textContent, /Não foi possível verificar o cruzamento de investigações/);
+  assert.match(elMocksFlagOn.subtitle.textContent, /preparação de promoção operacional foi bloqueada por segurança/);
+  assert.match(elMocksFlagOn.subtitle.textContent, /Salvar ajustes continua disponível/);
+  for (const item of estadoDegradado.itens) {
+    assert.throws(() => apiFlagOn.exigirMediadorPromocaoProtegida(item), /bloqueada por segurança/, 'nem o caminho legado nem o protegido podem preparar promoção neste estado');
+  }
+
+  contextFlagOn.db.functions.invoke = async () => ({data:{bloqueios:[]}, error:null});
+  await apiFlagOn.carregar();
+  const estadoOk = apiFlagOn.obterEstadoRevisoes();
+  assert.equal(estadoOk.itens.length, 2);
+  assert.ok(estadoOk.itens.every(i => !i.investigacaoIndisponivel), 'o fluxo normal não deve carregar o estado degradado');
+  assert.throws(() => apiFlagOn.exigirMediadorPromocaoProtegida(estadoOk.itens[0]), /Nenhum lançamento foi preparado/, 'sem falha no cruzamento, o motivo do bloqueio é outro (sem pendência ligada), não o aviso de segurança do cruzamento');
+}
+
 const eventosInseridos = [];
 context.db = {from(table) { assert.equal(table, 'eventos'); return {insert(record) { eventosInseridos.push(record); return {error:null}; }}; }};
-api.registrarEvento(rejeicao,itemDecisao,dadosDecisao).then(() => {
+api.registrarEvento(rejeicao,itemDecisao,dadosDecisao).then(async () => {
   assert.equal(eventosInseridos.length, 1, 'Rejeição com motivo deve registrar evento');
   assert.equal(eventosInseridos[0].status, 'registrado');
   assert.equal(eventosInseridos[0].dados.status_decisao, 'rejeitada');
+  await testesDeResiliencia();
   console.log('Simulações da fila de revisões: OK');
 }).catch(error => {
   console.error(error);
