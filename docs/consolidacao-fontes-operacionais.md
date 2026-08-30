@@ -171,12 +171,17 @@ fila de Revisões:
   conta e FITID e pode escrever somente em `fontes_importacao` e
   `transacoes_banco_staging`. O padrão é dry-run e a execução exige a frase
   exibida pelo próprio plano;
-- `tools/materializar_revisoes_staging.py` seleciona apenas candidatos de alta
-  prioridade, completos, sem vínculo operacional e sem duplicidade aparente.
-  Para cada candidato cria IDs determinísticos para um rascunho, uma pendência
+- `tools/materializar_revisoes_staging.py` seleciona candidatos de alta
+  prioridade sem vínculo operacional. Campos faltantes continuam explícitos na
+  revisão; duplicidades aparentes formam uma única revisão determinística com
+  versões separadas, e snapshots realmente iguais são colapsados. Para cada
+  candidato ou grupo cria IDs determinísticos para um rascunho, uma pendência
   e um evento. Ele escreve somente em `operation_drafts`, `pending_actions` e
   `eventos`, exige limite e confirmação vinculada ao `plano_id` e nunca possui
-  acesso de escrita a tabelas operacionais.
+  acesso de escrita a tabelas operacionais. Quando a central de investigações
+  for homologada, use obrigatoriamente `--exigir-investigacao`: o grupo e o
+  snapshot precisam corresponder a uma investigação concluída, e uma única RPC
+  cria, vincula e anexa a tripla sem risco de conjunto parcial;
 - `tools/propor_conciliacoes_staging.py` compara o banco em staging com
   candidatos e fluxo de caixa sem alterar nenhum deles. Valor exato, data e
   texto podem produzir proposta forte; valor exato e data em alvo único geram

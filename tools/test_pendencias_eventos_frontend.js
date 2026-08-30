@@ -16,8 +16,15 @@ const auditoriaBrowser = fs.readFileSync(path.join(raiz, 'tools/auditar_ecossist
 for(const id of ['listaPendencias','filtroOrigem','filtroTexto','erroFontes']){
   assert.ok(pendenciasHtml.includes(`id="${id}"`), `Pendências sem #${id}`);
 }
-for(const tabela of ['operation_drafts','pending_actions','pendencias_documentos']){
-  assert.ok(pendenciasJs.includes(`db.from('${tabela}').select('*')`), `consulta ausente: ${tabela}`);
+for(const [tabela, projection] of [
+  ['operation_drafts','DRAFT_PENDENCIAS_COLUNAS'],
+  ['pending_actions','ACAO_PENDENCIAS_COLUNAS'],
+]){
+  assert.ok(pendenciasJs.includes(`db.from('${tabela}').select(${projection})`), `projeção ausente: ${tabela}`);
+}
+assert.ok(pendenciasJs.includes("db.from('pendencias_documentos').select('*')"), 'consulta ausente: pendencias_documentos');
+for(const coluna of ['investigacao_origem_id','promocao_origem_id','promocao_lease_token','promocao_fencing_token']){
+  assert.ok(!pendenciasJs.match(new RegExp(`(?:DRAFT|ACAO)_PENDENCIAS_COLUNAS[^\\n]*${coluna}`)), `pendências não pode projetar ${coluna}`);
 }
 for(const tabela of ['operacoes','confinex_avaliacoes']){
   assert.ok(pendenciasJs.includes(`db.from('${tabela}').select(`), `consulta ausente: ${tabela}`);

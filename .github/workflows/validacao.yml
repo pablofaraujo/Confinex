@@ -21,6 +21,18 @@ jobs:
   validar:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -41,6 +53,13 @@ jobs:
         run: npx playwright install chromium webkit --with-deps
       - name: Rodar bateria local
         run: python3 tools/test_ecossistema.py
+      - name: Validar migração em PostgreSQL descartável
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: python3 tools/test_migracao_postgres.py --obrigatorio
       - name: Auditar páginas em desktop e celular
         run: >-
           python3 tools/auditar_ecossistema.py

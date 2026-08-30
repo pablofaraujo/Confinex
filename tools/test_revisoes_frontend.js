@@ -12,7 +12,7 @@ const inlineScripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script
   .map(match => match[1].trim())
   .filter(Boolean);
 assert.equal(inlineScripts.length, 0, 'revisoes.html nao deve manter script inline');
-assert.match(html, /<script src="\.\/revisoes\.js\?v=20260829-1"><\/script>/);
+assert.match(html, /<script src="\.\/revisoes\.js\?v=20260829-\d+"><\/script>/);
 
 const context = {
   CFAgro: {authInit() {}},
@@ -22,9 +22,71 @@ const context = {
   console,
 };
 vm.createContext(context);
-new vm.Script(`${js}\nglobalThis.__revisoes={buildPromocaoPreview,promotionValidationState,promotionInputElement,aplicarEstadoPromocao,businessFieldIndex,businessTargetPath,promotionMissingLinks,irParaCampoObrigatorio,validarNegocioOperacional,planoDecisao,montarEventoDecisao,montarAtualizacaoRascunho,registrarEvento,promotionHistoryData,promotionHistoryHtml,statusPrincipal,dadosItem,labelStatus,painelFila,itemMatchesStatus,camposObrigatoriosFaltantes,filtrosRapidosHtml,contextosResumoHtml,contextoDe,grupoNome,dadosComGrupoNome,contextoPersistivel,incluirContextoSeDisponivel,inferPromotionTarget,prioridadeItem,compararPrioridade,orientacaoCampoFaltante,orientacoesCamposHtml,pistasDocumentoFiscal,documentoFiscalResumoHtml,renderBusinessSections,versoesRevisao,camposComparacao,comparacaoVersoesHtml,mesclarDadosDaVersao,versaoConfiancaLabel};`, {filename: 'revisoes.js'}).runInContext(context);
+new vm.Script(`${js}\nglobalThis.__revisoes={buildPromocaoPreview,promotionValidationState,promotionInputElement,aplicarEstadoPromocao,validarPromocaoObrigatoria,businessFieldIndex,businessTargetPath,promotionMissingLinks,irParaCampoObrigatorio,validarNegocioOperacional,planoDecisao,montarEventoDecisao,montarAtualizacaoRascunho,registrarEvento,promotionHistoryData,promotionHistoryHtml,statusPrincipal,dadosItem,labelStatus,painelFila,itemMatchesStatus,camposObrigatoriosFaltantes,filtrosRapidosHtml,contextosResumoHtml,contextoDe,grupoNome,dadosComGrupoNome,contextoPersistivel,incluirContextoSeDisponivel,inferPromotionTarget,prioridadeItem,compararPrioridade,orientacaoCampoFaltante,orientacoesCamposHtml,pistasDocumentoFiscal,documentoFiscalResumoHtml,renderBusinessSections,versoesRevisao,camposComparacao,comparacaoVersoesHtml,mesclarDadosDaVersao,versaoConfiancaLabel,origemCanalLabel,prepararOrigemVisual,deveConsultarInvestigacoes,investigacaoBloqueada,anexarInvestigacoes,exigirMediadorPromocaoProtegida};`, {filename: 'revisoes.js'}).runInContext(context);
 
 const api = context.__revisoes;
+assert.equal(api.deveConsultarInvestigacoes(), false, 'flag ausente/desligada não consulta a view');
+assert.doesNotThrow(() => api.exigirMediadorPromocaoProtegida(false));
+assert.throws(
+  () => api.exigirMediadorPromocaoProtegida({}, true),
+  /Nenhum lançamento foi preparado/,
+  'flag ativa deve falhar fechada enquanto o mediador autenticado não existir',
+);
+const codigoPreparar = js.match(/async function prepararPromocao\(\)\{[^\n]+/)?.[0] || '';
+assert.ok(codigoPreparar.includes('exigirMediadorPromocaoProtegida(item)'));
+assert.ok(
+  codigoPreparar.indexOf('exigirMediadorPromocaoProtegida(item)') < codigoPreparar.indexOf("db.from('operation_drafts')"),
+  'a barreira protegida deve ocorrer antes de qualquer escrita legada',
+);
+const itensInvestigacao = api.anexarInvestigacoes([
+  {id:'d-pendente',draft:{id:'d-pendente',status:'em_revisao'}},
+  {id:'d-anexado',draft:{id:'d-anexado',status:'em_revisao'}},
+], [
+  {_draft_local_id:'d-pendente',estado:'pendente',anexado_em:null},
+  {_draft_local_id:'d-anexado',estado:'concluida',anexado_em:'2026-08-29T12:00:00Z'},
+], true);
+assert.equal(itensInvestigacao[0].investigacaoBloqueada, true);
+assert.equal(itensInvestigacao[1].investigacaoBloqueada, false, 'pós-anexo volta à revisão normal');
+assert.equal(api.itemMatchesStatus(itensInvestigacao[0], 'aguardando_revisao'), false);
+assert.equal(api.itemMatchesStatus(itensInvestigacao[0], 'investigacoes'), true);
+const draftCandidato = {id:'d-candidato',inferencias:{staging_candidato_id:'cand-9'},dados_extraidos:{}};
+const duasLinhas = api.anexarInvestigacoes([{id:'d-candidato',draft:draftCandidato}], [
+  {_draft_local_id:'d-candidato',estado_execucao:'concluida',anexado_em:null},
+  {_draft_local_id:'d-candidato',estado_execucao:'pendente',anexado_em:null},
+], true);
+assert.equal(duasLinhas[0].investigacoes.length, 2);
+assert.equal(duasLinhas[0].investigacaoBloqueada, true, 'qualquer investigação ativa bloqueia o draft');
+const permutadas = api.anexarInvestigacoes([{id:'d-candidato',draft:draftCandidato}], [
+  {_draft_local_id:'d-candidato',estado_execucao:'concluida',anexado_em:'2026-08-29T12:00:00Z'},
+  {_draft_local_id:'d-candidato',estado_execucao:'concluida',anexado_em:null},
+], true);
+assert.equal(permutadas[0].investigacaoBloqueada, true, 'ordem das linhas não altera o bloqueio');
+const draftCandidatos = {id:'d-candidatos',inferencias:{staging_candidato_ids:['cand-2','cand-1']},dados_extraidos:{}};
+const porLista = api.anexarInvestigacoes([{id:'d-candidatos',draft:draftCandidatos}], [
+  {_draft_local_id:'d-candidatos',estado_execucao:'pendente',anexado_em:null},
+], true);
+assert.equal(porLista[0].investigacaoBloqueada, true, 'qualquer investigação autorizada pelo mediador bloqueia');
+assert.match(js, /chave_cliente:String\(indice\),operation_draft_id:draft\.id/);
+assert.doesNotMatch(js, /v_investigacoes_revisao/);
+const versaoComMetadadosTecnicos = api.versoesRevisao({}, {}, {versoes_revisao:[{
+  titulo:'Versão segura', id:'84a267c0-09dc-4fa5-aa75-a56900bf73b5',
+  staging_candidato_id:'cand-1', staging_candidato_ids:['cand-1'],
+  staging_candidato_atualizado_em:'2026-08-29T12:00:00Z',
+  staging_candidatos_atualizados_em:'2026-08-29T12:00:00Z',
+  fingerprint_base:'a'.repeat(64), fingerprint_grupo:'b'.repeat(64),
+  dados:{quantidade:10, staging_candidato_id:'cand-1', staging_candidato_ids:['cand-1'], staging_candidato_atualizado_em:'2026-08-29T12:00:00Z', staging_candidatos_atualizados_em:'2026-08-29T12:00:00Z', fingerprint_base:'a'.repeat(64), fingerprint_grupo:'b'.repeat(64)}, evidencia:'Quantidade conferida',
+}]});
+assert.equal(Object.keys(versaoComMetadadosTecnicos[0].dados).includes('fingerprint_base'), false);
+assert.doesNotMatch(JSON.stringify(versaoComMetadadosTecnicos), /84a267c0|cand-1|2026-08-29T12:00:00Z|aaaaaaa|bbbbbbb/);
+assert.match(js, /a fila foi bloqueada por segurança/);
+for (const estado of ['pendente','em_execucao','aguardando_retentativa']) {
+  assert.equal(api.investigacaoBloqueada({estado_execucao:estado}, true), true);
+}
+assert.equal(api.investigacaoBloqueada({estado_execucao:'concluida',anexado_em:null}, true), true);
+assert.equal(api.investigacaoBloqueada({estado_execucao:'concluida',anexado_em:'2026-08-29T12:00:00Z'}, true), false);
+assert.match(js, /chamarMediadorInvestigacoes\('consultar_bloqueios'/);
+assert.match(js, /ri\?\.error/);
+assert.match(js, /Cruzando informações/);
 
 const compraIncompleta = api.buildPromocaoPreview({}, 'compras');
 const estadoCompraIncompleta = api.promotionValidationState('compras', compraIncompleta);
@@ -34,6 +96,16 @@ assert.match(estadoCompraIncompleta.aviso, /Negócio selecionado, Data, Cabeças
 
 const compraCompleta = api.buildPromocaoPreview({operacao_id:'op-1',data_compra:'2026-07-22',quantidade:18,valor_total:115033.27}, 'compras');
 assert.equal(api.promotionValidationState('compras', compraCompleta).blocked, false);
+const revisaoSemDestino = api.promotionValidationState('revisao_manual', api.buildPromocaoPreview({}, 'revisao_manual'));
+assert.equal(revisaoSemDestino.blocked, true);
+assert.equal(revisaoSemDestino.invalidTarget, true);
+assert.match(revisaoSemDestino.aviso, /Escolha onde este lançamento deve ser salvo/);
+assert.throws(
+  () => api.validarPromocaoObrigatoria('revisao_manual', {}),
+  /Escolha onde este lançamento deve ser salvo/,
+);
+assert.equal(api.origemCanalLabel('wey'), 'WhatsApp');
+assert.equal(api.origemCanalLabel('agronotas'), 'AgroNota');
 const compraFiscal = api.buildPromocaoPreview({operacao_id:'op-1',data_emissao:'2026-08-06',quantidade:13,valor_total:35050}, 'compras');
 assert.equal(compraFiscal.data, '2026-08-06', 'data de emissão da NF deve preencher a data revisável');
 const pistasFiscais = api.pistasDocumentoFiscal({
@@ -65,6 +137,7 @@ const dadosComAlternativas = {
     {
       titulo:'Correção posterior', mensagem_id:'84a267c0-09dc-4fa5-aa75-a56900bf73b5',
       eh_correcao_explicita:true, evidencia:'Conferência posterior do peso',
+      evidencias_contrarias:['Peso anterior não bate com o romaneio.'],
       dados:{fornecedor:'Fornecedor de teste',quantidade:24,peso_total_kg:8100,preco_arroba:320,valor_total:86400,origem_conversa_id:'telegram:grupo:-9999999999'},
     },
   ],
@@ -80,7 +153,9 @@ assert.doesNotMatch(JSON.stringify(camposAlternativas), /origem_mensagem_id|orig
 const comparacao = api.comparacaoVersoesHtml({}, {}, dadosComAlternativas);
 assert.match(comparacao, /Compare as versões encontradas/);
 assert.match(comparacao, /Por que pode ser esta/);
-assert.match(comparacao, /Usar esta versão/);
+assert.match(comparacao, /Usar esta informação/);
+assert.match(comparacao, /Evidências contrárias/);
+assert.match(comparacao, /Peso anterior não bate com o romaneio/);
 assert.match(comparacao, /Corrigir com outra versão/);
 assert.match(comparacao, /nada é salvo ou lançado automaticamente/);
 assert.doesNotMatch(comparacao, /msg-versao|84a267c0|9999999999|\{\s*&quot;/);
@@ -91,7 +166,9 @@ assert.equal(preenchidoPelaEscolha.peso_total_kg, 8100);
 assert.equal(preenchidoPelaEscolha.valor_total, 86400);
 assert.equal(preenchidoPelaEscolha.contexto_nome, 'Compras Fazenda');
 assert.equal(preenchidoPelaEscolha.decisao_versao.titulo, 'Correção posterior');
-assert.equal(api.comparacaoVersoesHtml({}, {}, {versoes_revisao:[dadosComAlternativas.versoes_revisao[0]]}), '', 'uma versão não deve mudar o fluxo atual');
+const comparacaoUnica = api.comparacaoVersoesHtml({}, {}, {versoes_revisao:[dadosComAlternativas.versoes_revisao[0]]});
+assert.match(comparacaoUnica, /Informação encontrada para conferir/);
+assert.match(comparacaoUnica, /nada é salvo ou lançado automaticamente/);
 const codigoEscolha = js.match(/function aplicarVersaoRevisao[\s\S]*?(?=function corrigirVersaoManualmente)/)?.[0] || '';
 assert.doesNotMatch(codigoEscolha, /db\.from|salvarAjustes|prepararPromocao/, 'escolher uma versão não pode gravar, aprovar ou promover');
 
@@ -182,6 +259,28 @@ for (const [target,incompleto,completo,totalFaltante,labels] of simulacoesVisuai
   assert.equal(containers.filter(node => node.classList.contains('campo-incompleto')).length, 0);
   assert.equal([...fields.values()].filter(node => node.getAttribute('aria-invalid') === 'true').length, 0);
 }
+
+api.aplicarEstadoPromocao('revisao_manual', {});
+assert.equal(alerta.hidden, false);
+assert.match(alerta.innerHTML, /Defina o tipo de lançamento/);
+assert.doesNotMatch(alerta.innerHTML, /Complete os campos indicados/);
+assert.equal(preparar.disabled, true);
+assert.equal(salvar.disabled, false, 'Salvar ajustes deve continuar permitido sem destino operacional');
+api.aplicarEstadoPromocao('compras', compraCompleta);
+assert.equal(alerta.hidden, true);
+assert.equal(preparar.disabled, false, 'Destino válido e completo deve reabilitar apenas a preparação');
+assert.equal(salvar.disabled, false);
+
+const codigoLista = js.match(/function renderLista[\s\S]*?(?=function selecionar)/)?.[0] || '';
+assert.doesNotMatch(codigoLista, /origem_mensagem_id|mensagem não informada/);
+const codigoOrigemVisual = js.match(/function prepararOrigemVisual[\s\S]*?(?=function listaTextos)/)?.[0] || '';
+assert.match(codigoOrigemVisual, /type='hidden'/);
+assert.match(codigoOrigemVisual, /referência técnica foi preservada/);
+const codigoSalvar = js.match(/async function salvarAjustes[\s\S]*?(?=async function voltarParaConfirmacao)/)?.[0] || '';
+assert.match(codigoSalvar, /operation_drafts/);
+assert.match(codigoSalvar, /pending_actions/);
+assert.match(codigoSalvar, /registrarEvento/);
+assert.doesNotMatch(codigoSalvar, /target_table|promover_revisao_operacional|db\.from\(['"](?:compras|vendas|abates|pesagens_caderno)/);
 
 const campoRecebimento = api.promotionInputElement('vendas', 'prazo_recebimento');
 assert.equal(api.irParaCampoObrigatorio('vendas', 'prazo_recebimento'), true);
@@ -416,6 +515,23 @@ assert.equal(concluida.destino, 'Compra de gado');
 assert.equal(api.statusPrincipal({draft:{status:'em_revisao'},action:estados[2][0]}), 'executado');
 assert.equal(api.dadosItem({}, basePromocao).contexto_operacional, 'Boi Balança');
 assert.doesNotMatch(`${html}\n${js}`, /Dados técnicos avançados|class="json"/);
+
+// As duas páginas que usam a fila devem pedir apenas a projeção humana. Um
+// `select('*')` faria um campo de lease/fencing novo aparecer no navegador sem
+// revisão explícita.
+const draftProjection = js.match(/const DRAFT_REVISAO_COLUNAS = '([^']+)'/)?.[1] || '';
+const actionProjection = js.match(/const ACAO_REVISAO_COLUNAS = '([^']+)'/)?.[1] || '';
+assert.ok(draftProjection.includes('dados_extraidos'));
+assert.ok(actionProjection.includes('payload'));
+for (const coluna of ['investigacao_origem_id','promocao_origem_id','entidade_final_id']) {
+  assert.equal(draftProjection.includes(coluna), false, `rascunho não expõe ${coluna}`);
+}
+for (const coluna of ['entidade_id','promocao_lease_token','promocao_fencing_token','promocao_resultado_pedido_hash']) {
+  assert.equal(actionProjection.includes(coluna), false, `ação não expõe ${coluna}`);
+}
+assert.doesNotMatch(js, /from\('operation_drafts'\)\.select\('\*'\)/);
+assert.doesNotMatch(js, /from\('pending_actions'\)\.select\('\*'\)/);
+
 const eventosInseridos = [];
 context.db = {from(table) { assert.equal(table, 'eventos'); return {insert(record) { eventosInseridos.push(record); return {error:null}; }}; }};
 api.registrarEvento(rejeicao,itemDecisao,dadosDecisao).then(() => {

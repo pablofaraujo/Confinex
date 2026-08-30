@@ -3,6 +3,11 @@
 var itens = [];
 var el = function(id){ return document.getElementById(id); };
 var esc = function(v){ return CFAgro.esc(v); };
+// Pendências é uma projeção de leitura. Nunca use `*` nestas tabelas: o
+// executor mantém colunas de lease, hashes e vínculos que não pertencem ao
+// navegador nem à interface humana.
+var DRAFT_PENDENCIAS_COLUNAS = 'id,criado_em,atualizado_em,status,tipo_operacao,codigo_sugerido,entidade_final_tipo,dados_extraidos,campos_pendentes,agente,origem_canal,contexto_nome,escopo';
+var ACAO_PENDENCIAS_COLUNAS = 'id,criado_em,atualizado_em,status,acao_tipo,entidade_tipo,entidade_codigo,resumo,payload,erro,agente,usuario_solicitante,canal,origem_canal,contexto_nome,escopo,executavel';
 
 function classeStatus(status){
   var s = String(status || '').toLowerCase();
@@ -39,8 +44,8 @@ async function carregar(){
   el('subtitle').textContent = 'Carregando itens que exigem ação…';
   el('erroFontes').textContent = '';
   var respostas = await Promise.all([
-    db.from('operation_drafts').select('*').limit(200),
-    db.from('pending_actions').select('*').limit(200),
+    db.from('operation_drafts').select(DRAFT_PENDENCIAS_COLUNAS).limit(200),
+    db.from('pending_actions').select(ACAO_PENDENCIAS_COLUNAS).limit(200),
     db.from('pendencias_documentos').select('*').in('status',['aguardando_vendedor','revisao_necessaria']).limit(200),
     db.from('operacoes').select('id,codigo,status,tipo_negocio').limit(500),
     db.from('confinex_avaliacoes').select('id,operacao_id,codigo,status,confinex_estimativas(id,versao,premissas,resultado)').limit(500)

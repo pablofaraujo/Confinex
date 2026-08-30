@@ -8,9 +8,14 @@ from promocao_confirmacao_router import parse_promote, route_confirmation
 
 class FakeClient:
     def __init__(self):
-        self.action={'id':'84bd463d-18d7-4b76-8fb4-4566afe59cc6','acao_tipo':'promover_revisao_operacional','status':'aguardando_confirmacao','entidade_tipo':'compras','entidade_codigo':'CF-TESTE','payload':{'source_draft_id':'draft-1','target_table':'compras','promovido_para_operacional':False,'dados_revisados':{'origem_conversa_id':'grupo-1','origem_mensagem_id':'msg-original'},'proposed_record':{'quantidade':'1','valor_total':'1','origem_registro':'teste'}}}
+        self.action={'id':'84bd463d-18d7-4b76-8fb4-4566afe59cc6','acao_tipo':'promover_revisao_operacional','executavel':True,'status':'aguardando_confirmacao','entidade_tipo':'compras','entidade_codigo':'CF-TESTE','payload':{'source_draft_id':'draft-1','target_table':'compras','promovido_para_operacional':False,'dados_revisados':{'origem_conversa_id':'grupo-1','origem_mensagem_id':'msg-original'},'proposed_record':{'quantidade':'1','valor_total':'1','origem_registro':'teste'}}}
         self.ops=[]; self.audit=[]; self.updates=[]
-    def select(self, table, **params): return [self.action] if table=='pending_actions' and params.get('id')=='eq.84bd463d-18d7-4b76-8fb4-4566afe59cc6' else []
+    def select(self, table, **params):
+        if table == 'pending_actions' and params.get('id') == 'eq.84bd463d-18d7-4b76-8fb4-4566afe59cc6':
+            return [self.action]
+        if table == 'operation_drafts' and params.get('id') == 'eq.draft-1':
+            return [{'id': 'draft-1', 'revisao_tipo': 'pre_revisao'}]
+        return []
     def insert_operational(self, table, payload, *, idempotency_key=None):
         self.ops.append((table,payload,idempotency_key))
         return OperationalInsertResult(status='inserted',record={'id':'op-1',**payload})

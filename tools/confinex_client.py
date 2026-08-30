@@ -76,6 +76,35 @@ RPC_FUNCTIONS = {
     "consolidar_negocio_confinex",
     "revisar_estimativa_confinex",
     "submeter_negocio_confinex",
+    "assumir_promocao_operacional",
+    "concluir_promocao_operacional",
+    "reconciliar_promocao_em_execucao",
+}
+
+# Estas RPCs recebem capacidades de execução. O contrato fechado impede que um
+# chamador acrescente parâmetros que a versão homologada do banco não conhece.
+RPC_PROMOCAO_PAYLOAD_FIELDS = {
+    "assumir_promocao_operacional": {
+        "p_pending_action_id",
+        "p_status_esperado",
+        "p_executor",
+        "p_confirmacao_origem_conversa_id",
+        "p_confirmacao_origem_mensagem_id",
+        "p_lease_segundos",
+    },
+    "concluir_promocao_operacional": {
+        "p_pending_action_id",
+        "p_lease_token",
+        "p_fencing_token",
+        "p_status",
+        "p_resultado",
+    },
+    "reconciliar_promocao_em_execucao": {
+        "p_pending_action_id",
+        "p_fencing_esperado",
+        "p_ator",
+        "p_motivo",
+    },
 }
 
 IDEMPOTENCY_KEY_RE = re.compile(r"^[A-Za-z0-9_.-]+:[^\s]{1,180}$")
@@ -504,6 +533,11 @@ class ConfinexClient:
             raise ConfinexError(f"RPC nao permitida: {function}")
         if not isinstance(payload, dict):
             raise ConfinexError("payload da RPC deve ser um objeto")
+        expected_fields = RPC_PROMOCAO_PAYLOAD_FIELDS.get(function)
+        if expected_fields is not None and set(payload) != expected_fields:
+            raise ConfinexError(
+                f"payload fechado invalido para RPC {function}"
+            )
         url = f"{self.base_url}/rpc/{function}"
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         headers = {
