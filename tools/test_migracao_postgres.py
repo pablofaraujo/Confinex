@@ -146,7 +146,11 @@ CREATE TABLE public.operation_drafts (
   pending_action_id uuid, origem_canal text, origem_conversa_id text,
   origem_mensagem_id text, contexto_canonico text, contexto_nome text,
   escopo text, criado_em timestamptz NOT NULL DEFAULT now(),
-  atualizado_em timestamptz NOT NULL DEFAULT now(),
+  -- Sem NOT NULL: o schema real de `operation_drafts` não é versionado aqui e
+  -- uma linha legada com `atualizado_em` NULL pode existir em produção. O
+  -- fixture precisa permitir esse estado para provar que o trigger da 0001
+  -- não bloqueia o executor legado nesse caso.
+  atualizado_em timestamptz DEFAULT now(),
   codigo_sugerido text
 );
 CREATE TABLE public.pending_actions (
@@ -158,7 +162,9 @@ CREATE TABLE public.pending_actions (
   origem_mensagem_id text, contexto_canonico text, contexto_nome text,
   escopo text, confirmado_em timestamptz, confirmado_por text,
   criado_em timestamptz NOT NULL DEFAULT now(),
-  atualizado_em timestamptz NOT NULL DEFAULT now()
+  -- Idem `operation_drafts`: sem NOT NULL para permitir simular a linha
+  -- legada com `atualizado_em` NULL que pode existir em produção.
+  atualizado_em timestamptz DEFAULT now()
 );
 CREATE TABLE public.eventos (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), tipo text, agente text,
@@ -503,6 +509,115 @@ DELETE FROM public.operation_drafts
     if resultado.returncode:
         raise RuntimeError(
             f"Falha na compatibilidade da fase sombra: {erro_comando(resultado)}"
+        )
+
+
+def testar_backfill_atualizado_em_nulo_legado(banco: str) -> None:
+    """`operation_drafts`/`pending_actions` são tabelas pré-existentes cujo
+    schema real não é versionado nesta migração: uma linha legada com
+    `atualizado_em` NULL pode existir em produção. Prova que, somente com a
+    0001 aplicada, um UPDATE legado nessa linha continua funcionando (o
+    trigger faz backfill com `clock_timestamp()`), e que um timestamp
+    NÃO NULO fora da janela operacional (ano 1990) continua sendo rejeitado.
+    """
+    sql = r"""
+INSERT INTO public.operation_drafts
+  (id, agente, status, tipo_operacao, entidade_final_tipo, dados_extraidos,
+   campos_pendentes, inferencias, escopo, atualizado_em)
+VALUES ('cccccccc-cccc-4ccc-8ccc-ccccccccccc1', 'teste', 'em_revisao',
+  'compra', 'compras', '{}', '{}', '{}', 'teste_backfill_atualizado_em_nulo',
+  NULL);
+INSERT INTO public.pending_actions
+  (id, agente, canal, acao_tipo, entidade_tipo, resumo, payload, status,
+   escopo, atualizado_em)
+VALUES ('cccccccc-cccc-4ccc-8ccc-ccccccccccc2', 'teste', 'teste',
+  'revisar_consolidacao_negocio', 'operation_draft',
+  'fluxo legado sintético com atualizado_em nulo', '{}',
+  'aguardando_confirmacao', 'teste_backfill_atualizado_em_nulo', NULL);
+SET ROLE authenticated;
+UPDATE public.operation_drafts SET status = 'confirmado'
+ WHERE id = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1';
+UPDATE public.pending_actions SET status = 'executado'
+ WHERE id = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc2';
+RESET ROLE;
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.operation_drafts
+     WHERE id = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1'
+       AND status = 'confirmado'
+       AND atualizado_em IS NOT NULL
+  ) THEN
+    RAISE EXCEPTION 'UPDATE legado em operation_drafts com atualizado_em NULL falhou ou não preencheu o snapshot';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.pending_actions
+     WHERE id = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc2'
+       AND status = 'executado'
+       AND atualizado_em IS NOT NULL
+  ) THEN
+    RAISE EXCEPTION 'UPDATE legado em pending_actions com atualizado_em NULL falhou ou não preencheu o snapshot';
+  END IF;
+END $$;
+-- A 0001 também adiciona uma CHECK constraint que valida
+-- investigacao_instante_operacional(atualizado_em) em toda linha nova ou
+-- atualizada; ela por si só já impediria qualquer INSERT/UPDATE com um
+-- timestamp inválido a partir de agora. Para provar que a EXCEPTION do
+-- trigger continua de pé para o caso de uma linha legada que já carregasse
+-- um timestamp inválido antes da constraint existir, removemos a constraint
+-- temporariamente, produzimos esse estado antigo, testamos o trigger e
+-- restauramos a constraint validada ao final.
+ALTER TABLE public.operation_drafts
+  DROP CONSTRAINT operation_drafts_atualizado_em_operacional;
+ALTER TABLE public.pending_actions
+  DROP CONSTRAINT pending_actions_atualizado_em_operacional;
+INSERT INTO public.operation_drafts
+  (id, agente, status, tipo_operacao, entidade_final_tipo, dados_extraidos,
+   campos_pendentes, inferencias, escopo, atualizado_em)
+VALUES ('cccccccc-cccc-4ccc-8ccc-ccccccccccc3', 'teste', 'em_revisao',
+  'compra', 'compras', '{}', '{}', '{}', 'teste_backfill_atualizado_em_nulo',
+  timestamptz '1990-01-01 00:00:00+00');
+INSERT INTO public.pending_actions
+  (id, agente, canal, acao_tipo, entidade_tipo, resumo, payload, status,
+   escopo, atualizado_em)
+VALUES ('cccccccc-cccc-4ccc-8ccc-ccccccccccc4', 'teste', 'teste',
+  'revisar_consolidacao_negocio', 'operation_draft',
+  'fluxo legado sintético com atualizado_em de 1990', '{}',
+  'aguardando_confirmacao', 'teste_backfill_atualizado_em_nulo',
+  timestamptz '1990-01-01 00:00:00+00');
+SET ROLE authenticated;
+DO $$ BEGIN
+  BEGIN
+    UPDATE public.operation_drafts SET status = 'confirmado'
+     WHERE id = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc3';
+    RAISE EXCEPTION 'UPDATE em operation_drafts com atualizado_em de 1990 deveria ter sido rejeitado';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE '%Snapshot temporal inválido%' THEN RAISE; END IF;
+  END;
+  BEGIN
+    UPDATE public.pending_actions SET status = 'executado'
+     WHERE id = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc4';
+    RAISE EXCEPTION 'UPDATE em pending_actions com atualizado_em de 1990 deveria ter sido rejeitado';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE '%Snapshot temporal inválido%' THEN RAISE; END IF;
+  END;
+END $$;
+RESET ROLE;
+DELETE FROM public.operation_drafts
+ WHERE escopo = 'teste_backfill_atualizado_em_nulo';
+DELETE FROM public.pending_actions
+ WHERE escopo = 'teste_backfill_atualizado_em_nulo';
+ALTER TABLE public.operation_drafts
+  ADD CONSTRAINT operation_drafts_atualizado_em_operacional
+  CHECK (public.investigacao_instante_operacional(atualizado_em));
+ALTER TABLE public.pending_actions
+  ADD CONSTRAINT pending_actions_atualizado_em_operacional
+  CHECK (public.investigacao_instante_operacional(atualizado_em));
+"""
+    resultado = psql(banco, sql)
+    if resultado.returncode:
+        raise RuntimeError(
+            "Falha no backfill de atualizado_em NULL legado: "
+            f"{erro_comando(resultado)}"
         )
 
 
@@ -2515,6 +2630,7 @@ def executar_teste(obrigatorio: bool) -> int:
         # Reaplicar a migração verifica CREATE IF NOT EXISTS/OR REPLACE e não duplica objetos.
         aplicar_migracao(nome, MIGRACAO, segunda_vez=True)
         validar_compatibilidade_sombra(nome)
+        testar_backfill_atualizado_em_nulo_legado(nome)
         testar_executor_legado_operacional(nome, apos_rollback=False)
         testar_sombra_sem_outbox(nome)
         preparar_gate_ativacao(nome)

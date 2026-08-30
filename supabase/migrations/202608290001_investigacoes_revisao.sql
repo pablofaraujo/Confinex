@@ -3930,15 +3930,27 @@ SECURITY INVOKER
 SET search_path = pg_catalog, public
 AS $$
 BEGIN
-  IF OLD.atualizado_em IS NULL
-     OR NOT public.investigacao_instante_operacional(OLD.atualizado_em) THEN
+  -- Esta função também é usada como trigger em `operation_drafts` e
+  -- `pending_actions`, tabelas pré-existentes cujo schema real não é
+  -- versionado aqui: uma linha legada com `atualizado_em` NULL pode existir
+  -- em produção. Bloquear o UPDATE legado nesse caso quebraria o executor
+  -- legado, que a 0001 sozinha precisa continuar suportando. Um snapshot
+  -- NULL é tratado como ausente (equivalente a um DEFAULT nunca aplicado) e
+  -- recebe backfill de `clock_timestamp()`; a EXCEPTION permanece exclusiva
+  -- para timestamps NÃO NULOS fora da janela operacional válida.
+  IF OLD.atualizado_em IS NOT NULL
+     AND NOT public.investigacao_instante_operacional(OLD.atualizado_em) THEN
     RAISE EXCEPTION 'Snapshot temporal inválido; saneie a linha antes de atualizar';
   END IF;
   -- `now()` é fixo no início da transação e pode repetir ou até regredir a
   -- versão depois de espera por lock. O snapshot precisa avançar a cada UPDATE.
-  NEW.atualizado_em := greatest(
-    clock_timestamp(), OLD.atualizado_em + interval '1 microsecond'
-  );
+  IF OLD.atualizado_em IS NULL THEN
+    NEW.atualizado_em := clock_timestamp();
+  ELSE
+    NEW.atualizado_em := greatest(
+      clock_timestamp(), OLD.atualizado_em + interval '1 microsecond'
+    );
+  END IF;
   RETURN NEW;
 END;
 $$;
