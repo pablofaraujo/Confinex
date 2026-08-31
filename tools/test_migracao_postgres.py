@@ -197,6 +197,7 @@ CREATE TABLE public.compras (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   operacao_id text, data date, quantidade integer, valor_total numeric,
   idempotency_key text, nota_runtime text,
+  updated_at timestamptz,
   CONSTRAINT compras_idempotency_key_nao_vazia CHECK (
     idempotency_key IS NULL OR (
       btrim(idempotency_key) <> '' AND length(idempotency_key) <= 200
@@ -208,8 +209,22 @@ CREATE UNIQUE INDEX compras_idempotency_key_unique
   WHERE idempotency_key IS NOT NULL;
 CREATE TABLE public.vendas (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  operacao_id text, data date, quantidade integer, valor_total numeric
+  operacao_id text, data date, quantidade integer, valor_total numeric,
+  updated_at timestamptz
 );
+-- Réplica fiel dos triggers legados de produção (trg_upd_compras e
+-- trg_upd_vendas → public.set_updated_at). Eles são BEFORE UPDATE FOR EACH
+-- ROW nas tabelas operacionais e a 0002 precisa allowlistá-los por
+-- identidade completa em vez de rejeitar todo BEFORE ROW não guardião.
+CREATE OR REPLACE FUNCTION public.set_updated_at()
+RETURNS trigger LANGUAGE plpgsql AS $$
+begin new.updated_at = now(); return new; end $$;
+CREATE TRIGGER trg_upd_compras
+BEFORE UPDATE ON public.compras
+FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+CREATE TRIGGER trg_upd_vendas
+BEFORE UPDATE ON public.vendas
+FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 CREATE TABLE public.pesagens_caderno (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   operacao_id text, data date, quantidade integer, valor_total numeric
