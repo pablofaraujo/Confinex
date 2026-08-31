@@ -49,10 +49,10 @@ assert.ok(eventosHtml.includes('Origem'));
 assert.ok(eventosJs.includes("href=\"'+esc(item.origem.href)"));
 assert.ok(!/\.(insert|update|delete|upsert|rpc)\s*\(/.test(eventosJs));
 
-assert.ok(pendenciasHtml.includes('cfagro-gestao.js?v=20260815-2'));
-assert.ok(eventosHtml.includes('cfagro-gestao.js?v=20260814-1'));
-assert.ok(confinamentoHtml.includes('cfagro-gestao.js?v=20260815-2'));
-assert.ok(pendenciasHtml.includes('pendencias.js?v=20260815-2'));
+assert.ok(pendenciasHtml.includes('cfagro-gestao.js?v=20260831-1'));
+assert.ok(eventosHtml.includes('cfagro-gestao.js?v=20260831-1'));
+assert.ok(confinamentoHtml.includes('cfagro-gestao.js?v=20260831-1'));
+assert.ok(pendenciasHtml.includes('pendencias.js?v=20260831-1'));
 assert.ok(eventosHtml.includes('eventos.js?v=20260803-1'));
 assert.ok(pendenciasJs.includes("new Set(['realizado','rejeitado','cancelado'])"));
 assert.ok(pendenciasJs.includes("new Set(['executado','rejeitado','cancelado','expirado'])"));

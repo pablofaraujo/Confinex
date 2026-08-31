@@ -168,6 +168,42 @@ assert.ok(!JSON.stringify(sugestoesBanco).includes('transacao_staging_id'));
 assert.ok(!JSON.stringify(sugestoesBanco).includes('negocio_candidato_id'));
 assert.deepStrictEqual(gestao.conciliacoesBancariasPendentes([], [], [], []), []);
 
+// Propostas do cérebro de rentabilidade ganham linha própria, legível e
+// apontando ao comparativo do Confinamento — nunca ao promotor de Revisões.
+const propostaCerebro = gestao.pendenciasLegiveis([], [{
+  acao_tipo:'proposta_rentabilidade',
+  agente:'cerebro_rentabilidade',
+  entidade_codigo:'CF-26-003',
+  status:'aguardando_confirmacao',
+  resumo:'Cérebro rentabilidade — CF-26-003: refechar+reconsolidar. Total com hedge R$ -13459.95; desvio R$ -8646.00 (PARCIAL).',
+  payload:{chave_proposta:'abc', decisoes:[{decisao:'refechar'},{decisao:'reconsolidar'}], resumo:{desvio_total:-8646}},
+  executavel:false
+}], [])[0];
+assert.strictEqual(propostaCerebro.origem, 'Cérebro');
+assert.strictEqual(propostaCerebro.contexto, 'CF-26-003');
+assert.ok(propostaCerebro.resumo.startsWith('CF-26-003: refechar+reconsolidar'));
+assert.strictEqual(propostaCerebro.status, 'Aguardando confirmação');
+assert.deepStrictEqual(propostaCerebro.destino, {rotulo:'Confinamento', href:'./confinamento.html'});
+assert.strictEqual(propostaCerebro.acao, 'Avaliar');
+
+// Sem resumo pronto, a linha é reconstruída do payload sem expor JSON cru.
+const propostaSemResumo = gestao.pendenciasLegiveis([], [{
+  acao_tipo:'proposta_rentabilidade',
+  entidade_codigo:'CF-26-005',
+  status:'em_revisao',
+  payload:{decisoes:[{decisao:'refechar'}], resumo:{desvio_total:-7375.5}}
+}], [])[0];
+assert.strictEqual(propostaSemResumo.origem, 'Cérebro');
+assert.ok(propostaSemResumo.resumo.includes('refechar'));
+assert.ok(propostaSemResumo.resumo.includes('R$'));
+assert.ok(!propostaSemResumo.resumo.includes('{'));
+
+// Ações comuns continuam na origem 'Ações', intocadas.
+assert.strictEqual(
+  gestao.pendenciasLegiveis([], [{acao_tipo:'criar_compra', status:'aguardando_confirmacao', resumo:'Compra X'}], [])[0].origem,
+  'Ações'
+);
+
 // Vazio: cada projeção retorna um estado determinístico e renderizável.
 assert.deepStrictEqual(gestao.pendenciasLegiveis([], [], []), []);
 assert.deepStrictEqual(gestao.eventosLegiveis([]), []);
