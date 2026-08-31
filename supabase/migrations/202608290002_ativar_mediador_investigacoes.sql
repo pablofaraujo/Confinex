@@ -674,6 +674,16 @@ BEGIN
       ('public.vendas'::regclass, 'vendas_vinculo_promocao_protegido'),
       ('public.pesagens_caderno'::regclass, 'pesagens_vinculo_promocao_protegido'),
       ('public.abates'::regclass, 'abates_vinculo_promocao_protegido')
+    ),
+    -- Triggers legados de manutenção de updated_at, pré-existentes na
+    -- produção antes desta migração. A exceção exige identidade completa:
+    -- um homônimo com outra função, outro evento, WHEN, argumentos ou
+    -- função fora do dono confiável NÃO é excusado e bloqueia o gate.
+    legados(tabela, gatilho, funcao, tipo) AS (VALUES
+      ('public.compras'::regclass, 'trg_upd_compras',
+       to_regprocedure('public.set_updated_at()'), 19),
+      ('public.vendas'::regclass, 'trg_upd_vendas',
+       to_regprocedure('public.set_updated_at()'), 19)
     )
     SELECT 1 FROM pg_trigger gatilho
      WHERE NOT gatilho.tgisinternal
@@ -690,6 +700,38 @@ BEGIN
          SELECT 1 FROM permitidos permitido
           WHERE permitido.tabela = gatilho.tgrelid
             AND permitido.gatilho = gatilho.tgname
+       )
+       AND NOT EXISTS (
+         SELECT 1 FROM legados legado
+          WHERE legado.tabela = gatilho.tgrelid
+            AND legado.gatilho = gatilho.tgname
+            AND legado.funcao IS NOT NULL
+            AND legado.funcao::oid = gatilho.tgfoid
+            AND legado.tipo::int2 = gatilho.tgtype
+            AND gatilho.tgenabled = 'O'
+            AND gatilho.tgqual IS NULL
+            AND gatilho.tgnargs = 0
+            AND octet_length(gatilho.tgargs) = 0
+            AND gatilho.tgconstraint = 0
+            AND NOT gatilho.tgdeferrable
+            AND NOT gatilho.tginitdeferred
+            AND gatilho.tgattr::text = ''
+            -- A função excusada precisa pertencer ao dono confiável, sem
+            -- SECURITY DEFINER, em plpgsql e sem overload homônimo: só o
+            -- owner pode trocar o corpo, e é nisso que a excusa se apoia.
+            AND EXISTS (
+              SELECT 1 FROM pg_proc funcao
+                JOIN pg_language linguagem ON linguagem.oid = funcao.prolang
+               WHERE funcao.oid = gatilho.tgfoid
+                 AND funcao.proowner = v_owner
+                 AND NOT funcao.prosecdef
+                 AND linguagem.lanname = 'plpgsql'
+                 AND (SELECT count(*) FROM pg_proc homonimo
+                       JOIN pg_namespace esquema
+                         ON esquema.oid = homonimo.pronamespace
+                      WHERE esquema.nspname = 'public'
+                        AND homonimo.proname = funcao.proname) = 1
+            )
        )
   ) THEN
     RAISE EXCEPTION 'Gate de ativação: trigger BEFORE ROW operacional não allowlisted';
