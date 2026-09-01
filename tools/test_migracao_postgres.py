@@ -19,6 +19,7 @@ import subprocess
 import sys
 import tempfile
 
+import planejador_investigacoes as planejador_modulo
 from investigacoes_revisao import (
     contrato_consulta,
     normalizar_consulta,
@@ -2620,6 +2621,206 @@ RESET ROLE;
 
 
 
+def _sql_insert_planejador(payload: dict[str, object], tabela: str) -> str:
+    colunas, valores = [], []
+    for chave, valor in payload.items():
+        colunas.append(chave)
+        if chave in {"plano_tarefas", "consulta_spec"}:
+            valores.append(sql_texto(json_canonico(valor)) + "::jsonb")
+        elif chave == "campos_obrigatorios":
+            valores.append(
+                "ARRAY[" + ",".join(sql_texto(str(c)) for c in valor)
+                + "]::text[]"
+            )
+        else:
+            valores.append(sql_texto(str(valor)))
+    return (
+        f"INSERT INTO public.{tabela} ({', '.join(colunas)}) "
+        f"VALUES ({', '.join(valores)})"
+    )
+
+
+def testar_planejador_investigacoes(banco: str) -> None:
+    """Prova que os payloads REAIS do planejador passam no schema pós-0002.
+
+    Usa o próprio módulo tools/planejador_investigacoes.py para derivar o
+    plano de um rascunho sintético e insere exatamente o que
+    ``registrar_investigacao`` enviaria via PostgREST: criação completa,
+    repetição idempotente (unique_violation = caminho 409/'ja_existia') e o
+    reparo de uma investigação que ficou sem a tarefa de fonte.
+    """
+    draft_id = "9a000000-0000-4000-8000-000000000001"
+    resultado = psql(banco, f"""
+INSERT INTO public.operation_drafts
+  (id, agente, status, tipo_operacao, entidade_final_tipo, dados_extraidos,
+   campos_pendentes, origem_canal, origem_conversa_id, origem_mensagem_id,
+   contexto_nome, escopo, codigo_sugerido)
+VALUES ('{draft_id}', 'juan', 'aguardando_confirmacao', 'compra_gado',
+   'compras', '{{"quantidade": 12}}', ARRAY['valor_total'], 'telegram',
+   '-100200300', '555', 'Compra Sintetica Planejador', 'teste_runtime',
+   'NEG-26-901')
+RETURNING atualizado_em;""")
+    if resultado.returncode:
+        raise RuntimeError(
+            f"Falha ao criar rascunho do planejador: {erro_comando(resultado)}"
+        )
+    atualizado_em = resultado.stdout.strip().splitlines()[0]
+    draft = {
+        "id": draft_id, "status": "aguardando_confirmacao",
+        "atualizado_em": atualizado_em, "entidade_final_tipo": "compras",
+        "tipo_operacao": "compra_gado", "codigo_sugerido": "NEG-26-901",
+        "contexto_nome": "Compra Sintetica Planejador",
+        "origem_canal": "telegram", "origem_conversa_id": "-100200300",
+        "origem_mensagem_id": "555", "dados_extraidos": {"quantidade": 12},
+        "campos_pendentes": ["valor_total"], "escopo": "teste_runtime",
+    }
+    plano = planejador_modulo.planejar([draft], set(), 1, set())
+    if len(plano["itens"]) != 1 or plano["itens"][0]["modo"] != "criar":
+        raise RuntimeError(f"planejador não derivou o lote esperado: {plano!r}")
+    item = plano["itens"][0]
+    payload_inv = {
+        "id": "9a000000-0000-4000-8000-000000000002",
+        "chave_idempotencia": item["chaves"]["investigacao"],
+        "assunto_tipo": item["assunto"]["tipo"],
+        "titulo": item["assunto"]["titulo"],
+        "fingerprint_base": item["fingerprint_base"],
+        "plano_hash": item["plano_hash"],
+        "plano_canonico": item["plano_canonico"],
+        "plano_tarefas": item["tarefas"],
+        "policy_version": planejador_modulo.biblioteca.VERSAO_POLITICA_PADRAO,
+        "policy_schema_hash":
+            planejador_modulo.biblioteca.HASH_SCHEMA_POLITICAS,
+        "campos_obrigatorios": item["campos_obrigatorios"],
+        "source_draft_id": item["operation_draft_id"],
+        "source_draft_atualizado_em": item["source_draft_atualizado_em"],
+        "escopo": item["escopo"],
+    }
+    fonte = next(t for t in item["tarefas"]
+                 if t["adaptador"] == planejador_modulo.ADAPTADOR_FONTE)
+    payload_tar = {
+        "id": "9a000000-0000-4000-8000-000000000003",
+        "investigacao_id": "9a000000-0000-4000-8000-000000000002",
+        "chave_idempotencia": item["chaves"]["tarefa"],
+        "plano_item_ref": fonte["plano_item_ref"],
+        "adaptador": fonte["adaptador"],
+        "adaptador_version": fonte["adaptador_version"],
+        "consulta_ref": fonte["consulta_ref"],
+        "consulta_schema_version": fonte["consulta_schema_version"],
+        "consulta_spec": fonte["consulta_spec"],
+        "consulta_canonico": fonte["consulta_canonico"],
+        "consulta_hash": fonte["consulta_hash"],
+    }
+    sql_inv = _sql_insert_planejador(payload_inv, "investigacoes_revisao")
+    sql_tar = _sql_insert_planejador(payload_tar, "investigacao_tarefas")
+    resultado = psql(
+        banco, "SET ROLE service_role; " + sql_inv + "; " + sql_tar
+        + "; RESET ROLE;",
+    )
+    if resultado.returncode:
+        raise RuntimeError(
+            "payload real do planejador foi recusado pelo schema: "
+            + erro_comando(resultado)
+        )
+    resultado = psql(banco, "SET ROLE service_role; " + sql_inv + ";")
+    if not resultado.returncode or "duplicate key" not in (
+        (resultado.stderr or "") + (resultado.stdout or "")
+    ):
+        raise RuntimeError(
+            "repetição do planejador deveria ser unique_violation "
+            f"(caminho 409/'ja_existia'): {erro_comando(resultado)}"
+        )
+    # Reparo: uma segunda investigação nasce SEM a tarefa (execução anterior
+    # interrompida entre os dois INSERTs); o planejador precisa reoferecê-la
+    # e a inserção tardia da tarefa precisa passar no schema.
+    draft2 = dict(
+        draft, id="9a000000-0000-4000-8000-000000000011",
+        codigo_sugerido="NEG-26-902",
+    )
+    resultado = psql(banco, f"""
+INSERT INTO public.operation_drafts
+  (id, agente, status, tipo_operacao, entidade_final_tipo, origem_canal,
+   escopo, codigo_sugerido)
+VALUES ('{draft2["id"]}', 'juan', 'aguardando_confirmacao', 'compra_gado',
+   'compras', 'telegram', 'teste_runtime', 'NEG-26-902')
+RETURNING atualizado_em;""")
+    if resultado.returncode:
+        raise RuntimeError(
+            f"Falha ao criar segundo rascunho: {erro_comando(resultado)}"
+        )
+    draft2["atualizado_em"] = resultado.stdout.strip().splitlines()[0]
+    item2 = planejador_modulo.plano_do_draft(draft2)
+    reparo = planejador_modulo.planejar(
+        [draft2], {item2["chaves"]["investigacao"]}, 1, set(),
+    )
+    if (len(reparo["itens"]) != 1
+            or reparo["itens"][0]["modo"] != "reparar_tarefa"):
+        raise RuntimeError(f"reparo de tarefa ausente não planejado: {reparo!r}")
+    payload_inv2 = dict(payload_inv)
+    payload_inv2.update({
+        "id": "9a000000-0000-4000-8000-000000000012",
+        "chave_idempotencia": item2["chaves"]["investigacao"],
+        "titulo": item2["assunto"]["titulo"],
+        "fingerprint_base": item2["fingerprint_base"],
+        "plano_hash": item2["plano_hash"],
+        "plano_canonico": item2["plano_canonico"],
+        "plano_tarefas": item2["tarefas"],
+        "source_draft_id": item2["operation_draft_id"],
+        "source_draft_atualizado_em": item2["source_draft_atualizado_em"],
+    })
+    fonte2 = next(t for t in item2["tarefas"]
+                  if t["adaptador"] == planejador_modulo.ADAPTADOR_FONTE)
+    payload_tar2 = dict(payload_tar)
+    payload_tar2.update({
+        "id": "9a000000-0000-4000-8000-000000000013",
+        "investigacao_id": "9a000000-0000-4000-8000-000000000012",
+        "chave_idempotencia": item2["chaves"]["tarefa"],
+        "plano_item_ref": fonte2["plano_item_ref"],
+        "consulta_ref": fonte2["consulta_ref"],
+        "consulta_spec": fonte2["consulta_spec"],
+        "consulta_canonico": fonte2["consulta_canonico"],
+        "consulta_hash": fonte2["consulta_hash"],
+    })
+    resultado = psql(
+        banco,
+        "SET ROLE service_role; "
+        + _sql_insert_planejador(payload_inv2, "investigacoes_revisao")
+        + "; RESET ROLE;",
+    )
+    if resultado.returncode:
+        raise RuntimeError(
+            f"investigação do reparo foi recusada: {erro_comando(resultado)}"
+        )
+    resultado = psql(
+        banco,
+        "SET ROLE service_role; "
+        + _sql_insert_planejador(payload_tar2, "investigacao_tarefas")
+        + "; RESET ROLE;",
+    )
+    if resultado.returncode:
+        raise RuntimeError(
+            "inserção tardia da tarefa de fonte (reparo) foi recusada: "
+            + erro_comando(resultado)
+        )
+    # Drena o cenário (como no teste de lease) para o rollback da 0002
+    # encontrar a fila vazia.
+    resultado = psql(banco, """
+UPDATE public.investigacao_tarefas
+   SET estado_execucao = 'cancelada',
+       lease_executor = NULL, lease_token = NULL,
+       lease_expira_em = NULL, lease_chave_id = NULL
+ WHERE investigacao_id IN ('9a000000-0000-4000-8000-000000000002',
+                           '9a000000-0000-4000-8000-000000000012');
+UPDATE public.investigacoes_revisao
+   SET estado_execucao = 'cancelada'
+ WHERE id IN ('9a000000-0000-4000-8000-000000000002',
+              '9a000000-0000-4000-8000-000000000012');
+""")
+    if resultado.returncode:
+        raise RuntimeError(
+            f"Falha ao drenar cenário do planejador: {erro_comando(resultado)}"
+        )
+
+
 def executar_teste(obrigatorio: bool) -> int:
     for migracao in (MIGRACAO, MIGRACAO_ATIVACAO, ROLLBACK_ATIVACAO):
         if not migracao.exists():
@@ -2659,6 +2860,7 @@ def executar_teste(obrigatorio: bool) -> int:
         testar_replanejamento_corretiva_stale_materializada(nome)
         testar_obsolescencia_draft(nome)
         testar_lease_concorrente(nome)
+        testar_planejador_investigacoes(nome)
         aplicar_migracao(nome, ROLLBACK_ATIVACAO)
         aplicar_migracao(nome, ROLLBACK_ATIVACAO, segunda_vez=True)
         validar_reversao_ativacao(nome)
