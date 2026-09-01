@@ -28,10 +28,12 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+from datetime import datetime, timezone
 import json
 import os
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Any, Mapping
 
@@ -319,6 +321,38 @@ def nota_pt_br(cascata: Mapping[str, Any]) -> str:
 # ---------------------------------------------------------------------------
 
 
+# confinex_consolidacoes tem UNIQUE(avaliacao_id): reconsolidar é PATCH da
+# consolidação + PATCH dos desvios por (consolidacao_id, indicador) — nunca
+# DELETE. O estado anterior é preservado num evento antes do PATCH.
+TABELAS_ESCRITA = ("confinex_consolidacoes", "confinex_desvios", "eventos")
+
+
+def plano_reconsolidacao(
+    desvios_novos: list[Mapping[str, Any]],
+    indicadores_existentes: list[str],
+) -> dict[str, Any]:
+    """Decisão pura da reconsolidação dos desvios.
+
+    Cada desvio novo vira PATCH (indicador já existe) ou POST (indicador
+    novo). Indicador que existe no banco mas sumiu do recálculo é ERRO —
+    nunca apagamos nem deixamos linha órfã silenciosa; um humano decide.
+    """
+    existentes = set(indicadores_existentes)
+    novos = {str(d["indicador"]) for d in desvios_novos}
+    orfaos = sorted(existentes - novos)
+    if orfaos:
+        raise ValueError(
+            "reconsolidação abortada: indicadores gravados sem contraparte "
+            f"no recálculo ({', '.join(orfaos)}) — conferência humana"
+        )
+    return {
+        "atualizar": [d for d in desvios_novos
+                      if str(d["indicador"]) in existentes],
+        "inserir": [d for d in desvios_novos
+                    if str(d["indicador"]) not in existentes],
+    }
+
+
 class ClienteNota:
     def __init__(self, url: str, chave: str, timeout: int = 20) -> None:
         if not url or not chave:
@@ -332,9 +366,46 @@ class ClienteNota:
         base.update(extra or {})
         return base
 
+    def _get(self, tabela: str, consulta: dict[str, str]) -> list[dict[str, Any]]:
+        requisicao = urllib.request.Request(
+            f"{self.url}/rest/v1/{tabela}?" + urllib.parse.urlencode(consulta),
+            method="GET", headers=self._headers(),
+        )
+        try:
+            with urllib.request.urlopen(requisicao, timeout=self.timeout) as r:
+                dados = json.loads(r.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            raise RuntimeError(
+                f"leitura de {tabela} falhou com HTTP {exc.code}"
+            ) from exc
+        if not isinstance(dados, list):
+            raise RuntimeError(f"resposta inválida de {tabela}")
+        return dados
+
+    def _patch(self, tabela: str, filtro: dict[str, str], payload: Any) -> None:
+        if tabela not in TABELAS_ESCRITA:
+            raise ValueError(f"escrita não permitida: {tabela}")
+        requisicao = urllib.request.Request(
+            f"{self.url}/rest/v1/{tabela}?" + urllib.parse.urlencode(filtro),
+            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            method="PATCH",
+            headers=self._headers({
+                "Content-Type": "application/json",
+                "Prefer": "return=minimal",
+            }),
+        )
+        try:
+            with urllib.request.urlopen(requisicao, timeout=self.timeout) as r:
+                if r.status not in {200, 201, 204}:
+                    raise RuntimeError(f"HTTP inesperado em {tabela}: {r.status}")
+        except urllib.error.HTTPError as exc:
+            raise RuntimeError(
+                f"escrita em {tabela} falhou com HTTP {exc.code}"
+            ) from exc
+
     def _post(self, tabela: str, payload: Any,
               representacao: bool = False) -> Any:
-        if tabela not in ("confinex_consolidacoes", "confinex_desvios"):
+        if tabela not in TABELAS_ESCRITA:
             raise ValueError(f"escrita não permitida: {tabela}")
         prefer = "return=representation" if representacao else "return=minimal"
         requisicao = urllib.request.Request(
@@ -355,6 +426,84 @@ class ClienteNota:
                 f"escrita em {tabela} falhou com HTTP {exc.code}"
             ) from exc
         return json.loads(corpo) if corpo else None
+
+    def consolidacao_existente(self, avaliacao_id: str) -> dict[str, Any] | None:
+        linhas = self._get("confinex_consolidacoes", {
+            "avaliacao_id": "eq." + avaliacao_id, "limit": "1",
+        })
+        return linhas[0] if linhas else None
+
+    def gravar_consolidacao(
+        self,
+        cascata: Mapping[str, Any],
+        avaliacao_id: str,
+        estimativa_versao: int,
+        motivo: str | None = None,
+    ) -> str:
+        """Upsert manual: POST quando a avaliação ainda não tem consolidação;
+        reconsolidação (PATCH + desvios por indicador, sem DELETE) quando já
+        tem — a tabela é UNIQUE(avaliacao_id). No PATCH, o estado anterior é
+        preservado num evento ANTES da escrita. Devolve 'inserido' ou
+        'atualizado'."""
+        consolidacao, desvios = payloads_persistencia(
+            cascata, avaliacao_id, estimativa_versao
+        )
+        existente = self.consolidacao_existente(avaliacao_id)
+        if existente is None:
+            criada = self._post("confinex_consolidacoes", consolidacao, True)
+            consolidacao_id = str(criada[0]["id"])
+            for desvio in desvios:
+                desvio["consolidacao_id"] = consolidacao_id
+            self._post("confinex_desvios", desvios)
+            return "inserido"
+
+        consolidacao_id = str(existente["id"])
+        gravados = self._get("confinex_desvios", {
+            "consolidacao_id": "eq." + consolidacao_id,
+            "select": "id,indicador,natureza,estimado,realizado,"
+                      "classificacao,comentario_automatico,material",
+        })
+        plano = plano_reconsolidacao(
+            desvios, [str(d["indicador"]) for d in gravados]
+        )
+        self._post("eventos", {
+            "tipo": "consolidacao_reconsolidada",
+            "agente": "nota_desvio_operacao",
+            "entidade_tipo": "avaliacao",
+            "entidade_id": avaliacao_id,
+            "entidade_codigo": cascata.get("codigo"),
+            "origem": "sistema",
+            "dados": {
+                "consolidacao_anterior": {
+                    "id": consolidacao_id,
+                    "resultado_final": existente.get("resultado_final"),
+                    "comentario_geral": existente.get("comentario_geral"),
+                    "desvios": gravados,
+                },
+                "confirmacao_nova": cascata.get("confirmacao"),
+                "motivo": motivo or "reconsolidação com dados atualizados",
+            },
+            "observacao": (
+                f"Reconsolidação {cascata.get('codigo') or '?'}: estado "
+                "anterior preservado neste evento; linha única por avaliação."
+            ),
+        })
+        campos = {k: v for k, v in consolidacao.items()
+                  if k not in ("avaliacao_id",)}
+        campos["consolidado_em"] = datetime.now(timezone.utc).isoformat()
+        self._patch("confinex_consolidacoes",
+                    {"id": "eq." + consolidacao_id}, campos)
+        for desvio in plano["atualizar"]:
+            corpo = {k: v for k, v in desvio.items() if k != "indicador"}
+            self._patch("confinex_desvios", {
+                "consolidacao_id": "eq." + consolidacao_id,
+                "indicador": "eq." + str(desvio["indicador"]),
+            }, corpo)
+        if plano["inserir"]:
+            novos = [{**d, "consolidacao_id": consolidacao_id}
+                     for d in plano["inserir"]]
+            self._post("confinex_desvios", novos)
+        return "atualizado"
 
 
 def payloads_persistencia(
@@ -456,23 +605,17 @@ def main(argv: list[str] | None = None) -> int:
         print("ERRO: operação sem avaliação/estimativa — nada a consolidar",
               file=sys.stderr)
         return 2
-    consolidacao, desvios = payloads_persistencia(
-        cascata, str(avaliacao["id"]),
-        int(estimativas[0].get("versao") or 1),
-    )
     cliente = ClienteNota(
         os.environ.get("SUPABASE_URL") or os.environ.get("CONFINEX_DB_URL") or "",
         os.environ.get("SUPABASE_SERVICE_KEY")
         or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
         or os.environ.get("CONFINEX_DB_KEY") or "",
     )
-    criada = cliente._post("confinex_consolidacoes", consolidacao, True)
-    consolidacao_id = str(criada[0]["id"])
-    for desvio in desvios:
-        desvio["consolidacao_id"] = consolidacao_id
-    cliente._post("confinex_desvios", desvios)
-    print(f"Consolidação {consolidacao_id} gravada com "
-          f"{len(desvios)} desvios.", file=sys.stderr)
+    modo = cliente.gravar_consolidacao(
+        cascata, str(avaliacao["id"]),
+        int(estimativas[0].get("versao") or 1),
+    )
+    print(f"Consolidação {modo} ({cascata['codigo']}).", file=sys.stderr)
     return 0
 
 

@@ -44,6 +44,10 @@ CATEGORIAS_FINANCEIRAS = frozenset({
     "financeiro", "adiantamento_juros", "juros", "custo_dinheiro",
 })
 TABELA_ESCRITA = "fechamentos_operacao"
+# fechamentos_operacao tem UNIQUE(operacao_id): refechar é PATCH, nunca uma
+# segunda linha. O estado anterior é preservado num evento antes do PATCH
+# (nunca DELETE). A allowlist de escrita cobre só a tabela e o rastro.
+TABELAS_ESCRITA = frozenset({TABELA_ESCRITA, "eventos"})
 
 
 def _num(valor: Any) -> float:
@@ -241,6 +245,49 @@ def fechar_operacao(dossie: Mapping[str, Any]) -> dict[str, Any]:
     return fechamento
 
 
+def plano_gravacao_fechamento(
+    fechamento: Mapping[str, Any],
+    existente: Mapping[str, Any] | None,
+    motivo: str | None = None,
+) -> dict[str, Any]:
+    """Decisão pura do upsert. `desvio` é coluna GERADA — nunca enviada.
+
+    Sem fechamento gravado → modo 'inserido' (POST). Com fechamento gravado
+    → modo 'atualizado' (PATCH) mais o evento que preserva o estado anterior
+    (tipo fechamento_refechado), porque a tabela é UNIQUE(operacao_id) e
+    dados nunca são apagados.
+    """
+    previsto = fechamento.get("previsto") or {}
+    payload = {
+        "previsto": previsto.get("lucro_liquido_previsto"),
+        "realizado_bruto": fechamento["realizado"]["lucro_bruto"],
+        "realizado_liquido": fechamento["realizado"]["lucro_liquido"],
+        "hedge_creditado": fechamento["realizado"]["hedge_creditado"],
+        "explicacao": explicacao_texto(fechamento),
+    }
+    if existente is None:
+        payload = {"operacao_id": fechamento["operacao_id"], **payload}
+        return {"modo": "inserido", "payload": payload, "evento": None}
+    evento = {
+        "tipo": "fechamento_refechado",
+        "agente": "fechar_rentabilidade_operacao",
+        "entidade_tipo": "operacao",
+        "entidade_id": fechamento["operacao_id"],
+        "entidade_codigo": fechamento.get("codigo"),
+        "origem": "sistema",
+        "dados": {
+            "fechamento_anterior": dict(existente),
+            "confirmacao_nova": fechamento.get("confirmacao"),
+            "motivo": motivo or "refechamento com dados atualizados",
+        },
+        "observacao": (
+            f"Refechamento {fechamento.get('codigo') or '?'}: estado "
+            "anterior preservado neste evento; linha única por operação."
+        ),
+    }
+    return {"modo": "atualizado", "payload": payload, "evento": evento}
+
+
 def explicacao_texto(fechamento: Mapping[str, Any]) -> str:
     realizado = fechamento["realizado"]
     partes = [
@@ -352,24 +399,18 @@ class ClienteFechamento:
             ),
         }
 
-    def gravar_fechamento(self, fechamento: Mapping[str, Any]) -> None:
-        """Um POST em fechamentos_operacao, sem retentativa automática."""
-        previsto = fechamento.get("previsto") or {}
-        # `desvio` é coluna GERADA no banco (realizado_liquido − previsto,
-        # sem hedge) e nunca deve ser enviada; o desvio COM hedge fica na
-        # explicação e no campo desvio_vs_previsto_liquido do dry-run.
-        payload = {
-            "operacao_id": fechamento["operacao_id"],
-            "previsto": previsto.get("lucro_liquido_previsto"),
-            "realizado_bruto": fechamento["realizado"]["lucro_bruto"],
-            "realizado_liquido": fechamento["realizado"]["lucro_liquido"],
-            "hedge_creditado": fechamento["realizado"]["hedge_creditado"],
-            "explicacao": explicacao_texto(fechamento),
-        }
+    def _escrever(self, metodo: str, tabela: str, corpo: Any,
+                  filtro: dict[str, str] | None = None) -> None:
+        """POST/PATCH com allowlist fechada; sem retentativa automática."""
+        if tabela not in TABELAS_ESCRITA:
+            raise ValueError(f"escrita em {tabela} não permitida")
+        url = f"{self.url}/rest/v1/{tabela}"
+        if filtro:
+            url += "?" + urllib.parse.urlencode(filtro)
         requisicao = urllib.request.Request(
-            f"{self.url}/rest/v1/{TABELA_ESCRITA}",
-            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-            method="POST",
+            url,
+            data=json.dumps(corpo, ensure_ascii=False).encode("utf-8"),
+            method=metodo,
             headers=self._headers({
                 "Content-Type": "application/json",
                 "Prefer": "return=minimal",
@@ -381,8 +422,32 @@ class ClienteFechamento:
                     raise RuntimeError(f"HTTP inesperado: {r.status}")
         except urllib.error.HTTPError as exc:
             raise RuntimeError(
-                f"gravação do fechamento falhou com HTTP {exc.code}"
+                f"escrita em {tabela} falhou com HTTP {exc.code}"
             ) from exc
+
+    def fechamento_existente(self, operacao_id: str) -> dict[str, Any] | None:
+        linhas = self._get(TABELA_ESCRITA, {
+            "operacao_id": "eq." + operacao_id, "limit": "1",
+        })
+        return linhas[0] if linhas else None
+
+    def gravar_fechamento(self, fechamento: Mapping[str, Any],
+                          motivo: str | None = None) -> str:
+        """Upsert manual: POST quando novo; PATCH (refechamento) quando a
+        operação já tem fechamento — a tabela é UNIQUE(operacao_id). No
+        refechamento, o estado anterior é preservado num evento ANTES do
+        PATCH (nunca DELETE). Devolve 'inserido' ou 'atualizado'."""
+        existente = self.fechamento_existente(str(fechamento["operacao_id"]))
+        plano = plano_gravacao_fechamento(fechamento, existente, motivo)
+        if plano["modo"] == "atualizado":
+            self._escrever("POST", "eventos", plano["evento"])
+            self._escrever(
+                "PATCH", TABELA_ESCRITA, plano["payload"],
+                {"operacao_id": "eq." + str(fechamento["operacao_id"])},
+            )
+        else:
+            self._escrever("POST", TABELA_ESCRITA, plano["payload"])
+        return plano["modo"]
 
 
 def cliente_do_ambiente() -> ClienteFechamento:
