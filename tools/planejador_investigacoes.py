@@ -112,11 +112,13 @@ def consulta_fonte_do_draft(
     draft: Mapping[str, Any], campos_obrigatorios: list[str]
 ) -> dict[str, Any]:
     referencia = str(draft.get("codigo_sugerido") or "").strip()
+    # A pergunta nunca carrega o UUID do rascunho: a identidade fica nas
+    # chaves idempotentes (vinculo_assunto) e o texto permanece publicável.
     return {
         "tipo": "busca_operacional",
         "pergunta": (
             "evidencias documentais para a revisao "
-            + (referencia or str(draft.get("id") or ""))
+            + (referencia or "sem codigo sugerido")
         ),
         "termos": [t for t in [referencia] if t],
         "campos": list(campos_obrigatorios),
@@ -217,7 +219,17 @@ def planejar(
     drafts: list[dict[str, Any]],
     chaves_existentes: set[str],
     limite: int,
+    chaves_tarefas: set[str] | None = None,
 ) -> dict[str, Any]:
+    """Deriva o lote de investigações a criar (ou reparar).
+
+    Uma investigação cuja chave já existe normalmente é pulada; a exceção é
+    quando a execução anterior parou entre os dois INSERTs e a tarefa de
+    fonte nunca nasceu — nesse caso o item volta como modo ``reparar_tarefa``
+    para a criação idempotente completar o que faltou, sem duplicar nada.
+    Quando ``chaves_tarefas`` é ``None`` (estado desconhecido), toda chave
+    existente é tratada como completa, preservando o comportamento antigo.
+    """
     if limite < 1 or limite > 10:
         raise ValueError("limite deve ficar entre 1 e 10")
     itens: list[dict[str, Any]] = []
@@ -229,8 +241,13 @@ def planejar(
             continue
         item = plano_do_draft(draft)
         if item["chaves"]["investigacao"] in chaves_existentes:
-            ja_existiam += 1
-            continue
+            if (chaves_tarefas is None
+                    or item["chaves"]["tarefa"] in chaves_tarefas):
+                ja_existiam += 1
+                continue
+            item["modo"] = "reparar_tarefa"
+        else:
+            item["modo"] = "criar"
         itens.append(item)
         if len(itens) >= limite:
             break
@@ -240,6 +257,7 @@ def planejar(
             "chave_investigacao": item["chaves"]["investigacao"],
             "plano_hash": item["plano_hash"],
             "fingerprint_base": item["fingerprint_base"],
+            "modo": item["modo"],
         }
         for item in itens
     ]))
@@ -264,6 +282,7 @@ def resumo_sanitizado(plano: dict[str, Any]) -> dict[str, Any]:
         "itens": [
             {
                 "operation_draft_id": item["operation_draft_id"],
+                "modo": item["modo"],
                 "titulo": item["assunto"]["titulo"],
                 "assunto_tipo": item["assunto"]["tipo"],
                 "campos_obrigatorios": item["campos_obrigatorios"],
@@ -371,13 +390,16 @@ def cliente_do_ambiente() -> ClientePlanejador:
     return ClientePlanejador(url, chave)
 
 
-def carregar_estado(cliente: ClientePlanejador) -> tuple[list[dict[str, Any]], set[str]]:
+def carregar_estado(
+    cliente: ClientePlanejador,
+) -> tuple[list[dict[str, Any]], set[str], set[str]]:
     drafts = cliente.listar("operation_drafts", {
         "select": (
             "id,status,atualizado_em,entidade_final_tipo,tipo_operacao,"
             "codigo_sugerido,contexto_nome,origem_canal,origem_conversa_id,"
             "origem_mensagem_id,dados_extraidos,campos_pendentes,escopo"
         ),
+        "status": "in.(" + ",".join(sorted(STATUS_DRAFT_PLANEJAVEIS)) + ")",
         "order": "criado_em.asc",
     })
     existentes = cliente.listar("investigacoes_revisao", {
@@ -387,7 +409,14 @@ def carregar_estado(cliente: ClientePlanejador) -> tuple[list[dict[str, Any]], s
         str(linha.get("chave_idempotencia") or "")
         for linha in existentes
     }
-    return drafts, chaves
+    tarefas = cliente.listar("investigacao_tarefas", {
+        "select": "chave_idempotencia",
+    })
+    chaves_tarefas = {
+        str(linha.get("chave_idempotencia") or "")
+        for linha in tarefas
+    }
+    return drafts, chaves, chaves_tarefas
 
 
 def registrar_investigacao(
@@ -450,8 +479,8 @@ def main(argv: list[str] | None = None) -> int:
         print(VERSAO_PLANEJADOR)
         return 0
     cliente = cliente_do_ambiente()
-    drafts, chaves = carregar_estado(cliente)
-    plano = planejar(drafts, chaves, args.limite)
+    drafts, chaves, chaves_tarefas = carregar_estado(cliente)
+    plano = planejar(drafts, chaves, args.limite, chaves_tarefas)
     print(json.dumps(resumo_sanitizado(plano), ensure_ascii=False, indent=2))
     if not args.executar:
         print(

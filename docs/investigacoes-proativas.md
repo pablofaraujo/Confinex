@@ -295,12 +295,20 @@ As tabelas, evidências e eventos da fundação não são apagados.
 
 ## Estado desta entrega
 
-As migrações `202608290001_investigacoes_revisao.sql` (fundação em sombra) e
-`202608290002_ativar_mediador_investigacoes.sql` (guardas, RLS e outbox terminal
-de ativação) são propostas e **não foram aplicadas**. O rollback de `0002`
-também está apenas versionado e testado. Não há worker, planejador, consumidor,
-timer, trigger de origem nem adaptador ativo; portanto nenhuma sucessão é
-processada no ambiente real.
+As migrações `202608290001_investigacoes_revisao.sql` (fundação) e
+`202608290002_ativar_mediador_investigacoes.sql` (guardas, RLS e outbox
+terminal) foram aplicadas em produção na janela única de 30–31/08/2026, com o
+mediador ativo e a flag da interface ligada; o rollback de `0002` permanece
+versionado e testado. O consumidor do broker roda apenas em dry-run e nada é
+publicado por ele. `tools/planejador_investigacoes.py` está versionado e
+testado (dry-run por padrão, limite 1–10, confirmação por hash, escrita
+somente em `investigacoes_revisao` e `investigacao_tarefas`, reparo idempotente
+de investigação que ficou sem a tarefa de fonte); os payloads reais que ele
+gera são provados contra o schema pós-`0002` em
+`tools/test_migracao_postgres.py`. Nenhuma execução do planejador foi ligada:
+não há timer, worker de fonte nem adaptador ativo, e nenhuma investigação
+existe no ambiente real — cada ativação segue exigindo autorização própria
+(passo 9).
 Os contratos locais e os testes funcionam sem rede e sem chamada real ao
 Supabase. A flag permanece desligada por padrão. Quando for homologada, a tela
 falhará fechada se a view não puder ser consultada, agrupará todas as
