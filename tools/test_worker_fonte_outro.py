@@ -227,6 +227,19 @@ class PublicacaoTest(unittest.TestCase):
         self.assertNotIn("hmac", resumo)
         self.assertIn('"evidencias": 1', resumo)
 
+    def test_artefato_hash_explicito_e_validado(self) -> None:
+        self.assertEqual(worker.artefato_hash_valido("C" * 64), "c" * 64)
+        for invalido in ("", "c" * 63, "z" * 64, None):
+            with self.assertRaises(ValueError):
+                worker.artefato_hash_valido(invalido)
+        # O worker não se autodeclara: main exige --artefato-hash.
+        import io, contextlib
+        erro = io.StringIO()
+        with contextlib.redirect_stderr(erro):
+            codigo = worker.main(["--snapshot", "x", "--segredo", "y"])
+        self.assertEqual(codigo, 2)
+        self.assertIn("--artefato-hash", erro.getvalue())
+
     def test_ler_segredo(self) -> None:
         with tempfile.NamedTemporaryFile("w", delete=False) as arquivo:
             arquivo.write("d" * 64 + "\n")
