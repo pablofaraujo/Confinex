@@ -44,7 +44,7 @@ except ImportError:  # execução direta (VPS/sandbox)
     import atestar_cobertura_adaptador as atestar  # type: ignore[no-redef]
     import investigacoes_revisao as biblioteca  # type: ignore[no-redef]
 
-VERSAO_WORKER = "worker-fonte-outro-v1.0.0"
+VERSAO_WORKER = "worker-fonte-outro-v1.0.1"
 ADAPTADOR = "outro"
 TABELA_FONTE = "negocios_candidatos"
 LINHAGEM_SNAPSHOT = "snapshot_consolidacao"
@@ -410,8 +410,21 @@ def ler_segredo(caminho: str | Path) -> bytes:
     return segredo
 
 
-def artefato_hash_proprio() -> str:
-    return _sha256_bytes(Path(os.path.abspath(__file__)).read_bytes())
+def artefato_hash_valido(valor: str) -> str:
+    """O hash declarado no atestado precisa ser o do MANIFESTO do adaptador.
+
+    Por desenho do banco, o manifesto (`investigacao_adaptadores_config`) é
+    imutável e pina o artefato do executor registrado — na produção atual, o
+    broker pinado da VPS. O worker não adivinha nem se autodeclara: quem liga
+    o serviço informa explicitamente o hash registrado, e a RPC recusa
+    qualquer divergência.
+    """
+    normalizado = str(valor or "").strip().lower()
+    if len(normalizado) != 64 or any(
+        letra not in "0123456789abcdef" for letra in normalizado
+    ):
+        raise ValueError("artefato_hash_invalido")
+    return normalizado
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -426,14 +439,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-tarefas", type=int, default=1)
     parser.add_argument("--idade-maxima-horas", type=int,
                         default=IDADE_MAXIMA_HORAS_PADRAO)
+    parser.add_argument("--artefato-hash", dest="artefato_hash",
+                        help="sha256 registrado no manifesto do adaptador")
     parser.add_argument("--executar", action="store_true",
                         help="publica de verdade (padrão: monta e imprime)")
     args = parser.parse_args(argv)
     if args.versao:
         print(VERSAO_WORKER)
         return 0
-    if not args.snapshot or not args.segredo:
-        print("ERRO: --snapshot e --segredo são obrigatórios", file=sys.stderr)
+    if not args.snapshot or not args.segredo or not args.artefato_hash:
+        print("ERRO: --snapshot, --segredo e --artefato-hash são "
+              "obrigatórios", file=sys.stderr)
         return 2
     if not 1 <= args.max_tarefas <= 10:
         print("ERRO: --max-tarefas deve ficar entre 1 e 10", file=sys.stderr)
@@ -444,7 +460,7 @@ def main(argv: list[str] | None = None) -> int:
     segredo = ler_segredo(args.segredo)
     leitura = carregar_snapshot(args.snapshot)
     cliente = ClienteBrokerLocal(args.socket)
-    artefato = artefato_hash_proprio()
+    artefato = artefato_hash_valido(args.artefato_hash)
     processadas = 0
     for _ in range(args.max_tarefas):
         resposta = cliente.pedir({
