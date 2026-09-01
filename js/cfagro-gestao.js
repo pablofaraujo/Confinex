@@ -202,12 +202,47 @@ function destinoOperacional(item, categoria){
   return {rotulo:'Visão Geral', href:'./index.html'};
 }
 
+// Propostas do cérebro de rentabilidade (pending_actions com
+// acao_tipo='proposta_rentabilidade', executavel=false) são informativas:
+// a aplicação passa pelas ferramentas dedicadas após o gate humano, nunca
+// pelo promotor legado. Aqui elas ganham linha própria, legível, apontando
+// para o comparativo em Operações → Confinamento.
+function linhaPropostaCerebro(item){
+  var payload = objeto(item && item.payload);
+  var resumoNumeros = objeto(payload.resumo);
+  var resumo = texto(item && item.resumo).replace(/^Cérebro rentabilidade — /,'');
+  if(!resumo){
+    var decisoes = (Array.isArray(payload.decisoes) ? payload.decisoes : [])
+      .map(function(d){ return texto(d && d.decisao); }).filter(Boolean);
+    resumo = decisoes.length ?
+      'Proposta do cérebro: ' + decisoes.join(' + ') :
+      'Proposta de rentabilidade aguardando avaliação';
+    if(Number.isFinite(Number(resumoNumeros.desvio_total))){
+      resumo += ' (desvio R$ ' + Number(resumoNumeros.desvio_total)
+        .toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ')';
+    }
+  }
+  return {
+    origem:'Cérebro',
+    resumo:resumo,
+    contexto:referenciaHumana(item && item.entidade_codigo, 'Operação'),
+    status:statusHumano(item && item.status),
+    data:dataItem(item),
+    destino:{rotulo:'Confinamento', href:'./confinamento.html'},
+    acao:'Avaliar'
+  };
+}
+
 function pendenciasLegiveis(rascunhos, acoes, documentos){
   var linhas = [];
   (rascunhos || []).forEach(function(item){
     linhas.push({origem:'Revisões', resumo:resumoItem(item,'rascunho'), contexto:contextoHumano(item), status:statusHumano(item.status), data:dataItem(item), destino:destinoOperacional(item,'rascunho'), acao:'Revisar'});
   });
   (acoes || []).forEach(function(item){
+    if(texto(item && item.acao_tipo).toLowerCase() === 'proposta_rentabilidade'){
+      linhas.push(linhaPropostaCerebro(item));
+      return;
+    }
     linhas.push({origem:'Ações', resumo:resumoItem(item,'ação'), contexto:contextoHumano(item), status:statusHumano(item.status), data:dataItem(item), destino:destinoOperacional(item,'ação'), acao:'Conferir'});
   });
   (documentos || []).forEach(function(item){

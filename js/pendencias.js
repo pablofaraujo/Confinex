@@ -48,12 +48,13 @@ function render(){
     return '<tr><td>'+esc(item.origem)+'</td><td class="wrap">'+esc(item.resumo)+'</td><td class="wrap">'+esc(item.contexto)+'</td><td><span class="badge '+classeStatus(item.status)+'">'+esc(item.status)+'</span></td><td>'+CFAgro.fmtDT(item.data)+'</td><td>'+linkDestino(item)+'</td></tr>';
   }).join('') || '<tr><td colspan="6" class="wrap">Nenhuma pendência corresponde aos filtros.</td></tr>';
 
-  var contagem = {Revisões:0,Ações:0,Documentos:0,Planejamento:0};
+  var contagem = {Revisões:0,Ações:0,Cérebro:0,Documentos:0,Planejamento:0};
   itens.forEach(function(item){ contagem[item.origem] = (contagem[item.origem] || 0) + 1; });
   el('kpis').innerHTML = [
     ['Total',itens.length],
     ['Revisões',contagem.Revisões],
     ['Ações',contagem.Ações],
+    ['Cérebro',contagem.Cérebro],
     ['Documentos',contagem.Documentos],
     ['Planejamento',contagem.Planejamento]
   ].map(function(k){ return '<div class="kpi"><div class="l">'+k[0]+'</div><div class="v">'+k[1]+'</div></div>'; }).join('');
