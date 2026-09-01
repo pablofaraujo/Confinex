@@ -305,10 +305,19 @@ testado (dry-run por padrão, limite 1–10, confirmação por hash, escrita
 somente em `investigacoes_revisao` e `investigacao_tarefas`, reparo idempotente
 de investigação que ficou sem a tarefa de fonte); os payloads reais que ele
 gera são provados contra o schema pós-`0002` em
-`tools/test_migracao_postgres.py`. Nenhuma execução do planejador foi ligada:
-não há timer, worker de fonte nem adaptador ativo, e nenhuma investigação
-existe no ambiente real — cada ativação segue exigindo autorização própria
-(passo 9).
+`tools/test_migracao_postgres.py`. `tools/worker_fonte_outro.py` também está
+versionado e testado: o worker de fonte do adaptador `outro` fala apenas com o
+socket local do broker e lê um snapshot local somente leitura
+(`tools/exportar_snapshot_consolidacao.py`); a correspondência é
+determinística e conservadora (pista nível "possível", nunca vínculo nem
+confiança forte), a cobertura é honesta (`indisponivel`/`vazio_com_cobertura`)
+e o atestado HMAC é assinado localmente sem que o segredo saia do processo. O
+ciclo completo — planejador cria a investigação, `assumir` entrega a tarefa, o
+worker monta e assina, `publicar` aceita e a repetição é idempotente — é
+provado de ponta a ponta no PostgreSQL efêmero pelo mesmo harness. Nenhuma
+execução foi ligada: não há timer, worker rodando nem adaptador ativo, e
+nenhuma investigação existe no ambiente real — cada ativação segue exigindo
+autorização própria (passo 9).
 Os contratos locais e os testes funcionam sem rede e sem chamada real ao
 Supabase. A flag permanece desligada por padrão. Quando for homologada, a tela
 falhará fechada se a view não puder ser consultada, agrupará todas as

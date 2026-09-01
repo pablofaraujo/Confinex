@@ -2821,6 +2821,174 @@ UPDATE public.investigacoes_revisao
         )
 
 
+def testar_worker_fonte_outro(banco: str) -> None:
+    """Prova de ponta a ponta do worker de fonte contra o schema real.
+
+    Planejador cria investigação+tarefa → ``assumir_tarefa_investigacao``
+    entrega a tarefa (com a credencial sintética do gate) → o MÓDULO REAL
+    ``tools/worker_fonte_outro.py`` busca no snapshot local, sela e assina o
+    atestado HMAC → ``publicar_resultado_tarefa_investigacao`` aceita o
+    resultado; a repetição idêntica é idempotente.
+    """
+    import worker_fonte_outro as worker_modulo
+
+    draft = {
+        "id": "9a000000-0000-4000-8000-000000000021",
+        "status": "aguardando_confirmacao",
+        "entidade_final_tipo": "compras", "tipo_operacao": "compra_gado",
+        "codigo_sugerido": "NEG-26-903", "contexto_nome": "Compra Worker",
+        "origem_canal": "telegram", "origem_conversa_id": "-100200300",
+        "origem_mensagem_id": "556", "dados_extraidos": {},
+        "campos_pendentes": [], "escopo": "teste_runtime",
+    }
+    resultado = psql(banco, f"""
+INSERT INTO public.operation_drafts
+  (id, agente, status, tipo_operacao, entidade_final_tipo, origem_canal,
+   escopo, codigo_sugerido)
+VALUES ('{draft["id"]}', 'juan', 'aguardando_confirmacao', 'compra_gado',
+   'compras', 'telegram', 'teste_runtime', 'NEG-26-903')
+RETURNING atualizado_em;""")
+    if resultado.returncode:
+        raise RuntimeError(
+            f"Falha ao criar rascunho do worker: {erro_comando(resultado)}"
+        )
+    draft["atualizado_em"] = resultado.stdout.strip().splitlines()[0]
+    item = planejador_modulo.plano_do_draft(draft)
+    payload_inv = {
+        "id": "9a000000-0000-4000-8000-000000000022",
+        "chave_idempotencia": item["chaves"]["investigacao"],
+        "assunto_tipo": item["assunto"]["tipo"],
+        "titulo": item["assunto"]["titulo"],
+        "fingerprint_base": item["fingerprint_base"],
+        "plano_hash": item["plano_hash"],
+        "plano_canonico": item["plano_canonico"],
+        "plano_tarefas": item["tarefas"],
+        "policy_version": planejador_modulo.biblioteca.VERSAO_POLITICA_PADRAO,
+        "policy_schema_hash":
+            planejador_modulo.biblioteca.HASH_SCHEMA_POLITICAS,
+        "campos_obrigatorios": item["campos_obrigatorios"],
+        "source_draft_id": item["operation_draft_id"],
+        "source_draft_atualizado_em": item["source_draft_atualizado_em"],
+        "escopo": item["escopo"],
+    }
+    fonte = next(t for t in item["tarefas"]
+                 if t["adaptador"] == planejador_modulo.ADAPTADOR_FONTE)
+    payload_tar = {
+        "id": "9a000000-0000-4000-8000-000000000023",
+        "investigacao_id": "9a000000-0000-4000-8000-000000000022",
+        "chave_idempotencia": item["chaves"]["tarefa"],
+        "plano_item_ref": fonte["plano_item_ref"],
+        "adaptador": fonte["adaptador"],
+        "adaptador_version": fonte["adaptador_version"],
+        "consulta_ref": fonte["consulta_ref"],
+        "consulta_schema_version": fonte["consulta_schema_version"],
+        "consulta_spec": fonte["consulta_spec"],
+        "consulta_canonico": fonte["consulta_canonico"],
+        "consulta_hash": fonte["consulta_hash"],
+    }
+    resultado = psql(
+        banco,
+        "SET ROLE service_role; "
+        + _sql_insert_planejador(payload_inv, "investigacoes_revisao") + "; "
+        + _sql_insert_planejador(payload_tar, "investigacao_tarefas")
+        + "; RESET ROLE;",
+    )
+    if resultado.returncode:
+        raise RuntimeError(
+            f"Falha ao plantar investigação do worker: {erro_comando(resultado)}"
+        )
+    resultado = psql(banco, (
+        "SET ROLE service_role; "
+        "SELECT public.assumir_tarefa_investigacao('outro', 'worker-e2e', 120);"
+    ))
+    if resultado.returncode:
+        raise RuntimeError(f"Falha ao assumir tarefa: {erro_comando(resultado)}")
+    linha_json = next(
+        (l for l in resultado.stdout.splitlines() if l.strip().startswith("{")),
+        None,
+    )
+    if not linha_json:
+        raise RuntimeError(
+            f"assumir não devolveu tarefa: {resultado.stdout!r}"
+        )
+    tarefa = json.loads(linha_json)
+    if str(tarefa.get("id")) != payload_tar["id"]:
+        raise RuntimeError(
+            f"assumir devolveu tarefa inesperada: {tarefa.get('id')!r}"
+        )
+    snapshot = {
+        "modo": "somente_leitura",
+        "gerado_em": "2026-09-01T12:00:00+00:00",
+        "tabelas": {"negocios_candidatos": [{
+            "codigo_fonte": "NEG-26-903", "chave_rastreio": "rastreio-903",
+            "nome": "Fornecedor Sintetico", "data_base": "2026-08-20",
+            "quantidade": 12, "valor_total": 123456.78,
+        }]},
+    }
+    bytes_snapshot = json_canonico(snapshot).encode("utf-8")
+    leitura = {
+        "ok": True, "snapshot": snapshot,
+        "hash": hashlib.sha256(bytes_snapshot).hexdigest(),
+    }
+    resultado_worker = worker_modulo.montar_resultado(tarefa, leitura)
+    if (resultado_worker["estado_cobertura"] != "completa"
+            or len(resultado_worker["bundle"]["evidencias"]) != 1):
+        raise RuntimeError(
+            f"worker não achou a pista esperada: {resultado_worker!r}"
+        )
+    pedido = worker_modulo.montar_pedido_publicacao(
+        tarefa, resultado_worker,
+        segredo=bytes.fromhex("d" * 64),
+        chave_id="key_teste-runtime",
+        artefato_hash="c" * 64,
+    )
+    publicar_sql = (
+        "SET ROLE service_role; "
+        "SELECT public.publicar_resultado_tarefa_investigacao("
+        f"'{pedido['p_tarefa_id']}'::uuid, "
+        f"'{pedido['p_lease_token']}'::uuid, "
+        f"{pedido['p_fencing_token']}, "
+        f"{sql_texto(pedido['p_estado_cobertura'])}, "
+        f"{sql_texto(pedido['p_estado_resultado'])}, "
+        f"{sql_texto(json_canonico(pedido['p_bundle']))}::jsonb, "
+        f"{sql_texto(json_canonico(pedido['p_atestado_cobertura']))}::jsonb, "
+        f"{sql_texto(pedido['p_resumo_sanitizado'])});"
+    )
+    resultado = psql(banco, publicar_sql)
+    if resultado.returncode:
+        raise RuntimeError(
+            "publicação do worker foi recusada pelo schema: "
+            + erro_comando(resultado)
+        )
+    resultado = psql(banco, publicar_sql)
+    if resultado.returncode:
+        raise RuntimeError(
+            "repetição idêntica da publicação deveria ser idempotente: "
+            + erro_comando(resultado)
+        )
+    resultado = psql(banco, f"""
+SELECT (SELECT count(*) FROM public.investigacao_evidencias
+         WHERE tarefa_id = '{payload_tar["id"]}')
+    || ':' ||
+       (SELECT estado_execucao FROM public.investigacao_tarefas
+         WHERE id = '{payload_tar["id"]}');""")
+    if resultado.returncode or resultado.stdout.strip().splitlines()[0] != "1:concluida":
+        raise RuntimeError(
+            "estado final do worker inesperado: "
+            + (resultado.stdout or resultado.stderr)
+        )
+    # Drena para o rollback da 0002 encontrar a fila vazia.
+    resultado = psql(banco, f"""
+UPDATE public.investigacoes_revisao
+   SET estado_execucao = 'cancelada'
+ WHERE id = '{payload_inv["id"]}';
+""")
+    if resultado.returncode:
+        raise RuntimeError(
+            f"Falha ao drenar cenário do worker: {erro_comando(resultado)}"
+        )
+
+
 def executar_teste(obrigatorio: bool) -> int:
     for migracao in (MIGRACAO, MIGRACAO_ATIVACAO, ROLLBACK_ATIVACAO):
         if not migracao.exists():
@@ -2861,6 +3029,7 @@ def executar_teste(obrigatorio: bool) -> int:
         testar_obsolescencia_draft(nome)
         testar_lease_concorrente(nome)
         testar_planejador_investigacoes(nome)
+        testar_worker_fonte_outro(nome)
         aplicar_migracao(nome, ROLLBACK_ATIVACAO)
         aplicar_migracao(nome, ROLLBACK_ATIVACAO, segunda_vez=True)
         validar_reversao_ativacao(nome)
