@@ -2989,6 +2989,202 @@ UPDATE public.investigacoes_revisao
         )
 
 
+def testar_executor_sintese(banco: str) -> None:
+    """Ciclo completo com conclusão: fonte vazia → síntese encerra a rodada.
+
+    Usa os MÓDULOS REAIS (planejador, worker e executor de síntese) para
+    provar, no schema pós-0002, que uma investigação sem pista termina em
+    ``evidencia_insuficiente`` com uma pendência aberta por campo
+    obrigatório — e que a investigação é CONCLUÍDA pelo banco.
+    """
+    import executor_sintese as executor_modulo
+
+    draft = {
+        "id": "9a000000-0000-4000-8000-000000000031",
+        "status": "aguardando_confirmacao",
+        "entidade_final_tipo": "compras", "tipo_operacao": "compra_gado",
+        "codigo_sugerido": "NEG-26-904", "contexto_nome": "Compra Sintese",
+        "origem_canal": "telegram", "origem_conversa_id": "-100200300",
+        "origem_mensagem_id": "557", "dados_extraidos": {},
+        "campos_pendentes": [], "escopo": "teste_runtime",
+    }
+    resultado = psql(banco, f"""
+INSERT INTO public.operation_drafts
+  (id, agente, status, tipo_operacao, entidade_final_tipo, origem_canal,
+   escopo, codigo_sugerido)
+VALUES ('{draft["id"]}', 'juan', 'aguardando_confirmacao', 'compra_gado',
+   'compras', 'telegram', 'teste_runtime', 'NEG-26-904')
+RETURNING atualizado_em;""")
+    if resultado.returncode:
+        raise RuntimeError(
+            f"Falha ao criar rascunho da síntese: {erro_comando(resultado)}"
+        )
+    draft["atualizado_em"] = resultado.stdout.strip().splitlines()[0]
+    item = planejador_modulo.plano_do_draft(draft)
+    investigacao_id = "9a000000-0000-4000-8000-000000000032"
+    payload_inv = {
+        "id": investigacao_id,
+        "chave_idempotencia": item["chaves"]["investigacao"],
+        "assunto_tipo": item["assunto"]["tipo"],
+        "titulo": item["assunto"]["titulo"],
+        "fingerprint_base": item["fingerprint_base"],
+        "plano_hash": item["plano_hash"],
+        "plano_canonico": item["plano_canonico"],
+        "plano_tarefas": item["tarefas"],
+        "policy_version": planejador_modulo.biblioteca.VERSAO_POLITICA_PADRAO,
+        "policy_schema_hash":
+            planejador_modulo.biblioteca.HASH_SCHEMA_POLITICAS,
+        "campos_obrigatorios": item["campos_obrigatorios"],
+        "source_draft_id": item["operation_draft_id"],
+        "source_draft_atualizado_em": item["source_draft_atualizado_em"],
+        "escopo": item["escopo"],
+    }
+    fonte_item = next(t for t in item["tarefas"]
+                      if t["adaptador"] == planejador_modulo.ADAPTADOR_FONTE)
+    payload_tar = {
+        "id": "9a000000-0000-4000-8000-000000000033",
+        "investigacao_id": investigacao_id,
+        "chave_idempotencia": item["chaves"]["tarefa"],
+        "plano_item_ref": fonte_item["plano_item_ref"],
+        "adaptador": fonte_item["adaptador"],
+        "adaptador_version": fonte_item["adaptador_version"],
+        "consulta_ref": fonte_item["consulta_ref"],
+        "consulta_schema_version": fonte_item["consulta_schema_version"],
+        "consulta_spec": fonte_item["consulta_spec"],
+        "consulta_canonico": fonte_item["consulta_canonico"],
+        "consulta_hash": fonte_item["consulta_hash"],
+    }
+    resultado = psql(
+        banco,
+        "SET ROLE service_role; "
+        + _sql_insert_planejador(payload_inv, "investigacoes_revisao") + "; "
+        + _sql_insert_planejador(payload_tar, "investigacao_tarefas")
+        + "; RESET ROLE;",
+    )
+    if resultado.returncode:
+        raise RuntimeError(
+            f"Falha ao plantar investigação da síntese: {erro_comando(resultado)}"
+        )
+    # Fonte assume e publica VAZIO (worker real contra snapshot sem linhas).
+    resultado = psql(banco, (
+        "SET ROLE service_role; "
+        "SELECT public.assumir_tarefa_investigacao('outro', 'fonte-vazia', 120);"
+    ))
+    if resultado.returncode:
+        raise RuntimeError(f"Falha ao assumir fonte: {erro_comando(resultado)}")
+    linha_json = next(
+        (l for l in resultado.stdout.splitlines() if l.strip().startswith("{")),
+        None,
+    )
+    tarefa_fonte = json.loads(linha_json) if linha_json else None
+    if not tarefa_fonte or str(tarefa_fonte.get("id")) != payload_tar["id"]:
+        raise RuntimeError(f"fonte inesperada assumida: {tarefa_fonte!r}")
+    import worker_fonte_outro as worker_modulo
+    snapshot_vazio = {
+        "modo": "somente_leitura",
+        "gerado_em": "2026-09-02T12:00:00+00:00",
+        "tabelas": {"negocios_candidatos": []},
+    }
+    bytes_vazio = json_canonico(snapshot_vazio).encode("utf-8")
+    resultado_fonte = worker_modulo.montar_resultado(tarefa_fonte, {
+        "ok": True, "snapshot": snapshot_vazio,
+        "hash": hashlib.sha256(bytes_vazio).hexdigest(),
+    })
+    if resultado_fonte["estado_cobertura"] != "vazio_com_cobertura":
+        raise RuntimeError(f"fonte deveria ser vazia: {resultado_fonte!r}")
+    pedido_fonte = worker_modulo.montar_pedido_publicacao(
+        tarefa_fonte, resultado_fonte,
+        segredo=bytes.fromhex("d" * 64),
+        chave_id="key_teste-runtime", artefato_hash="c" * 64,
+    )
+    resultado = psql(banco, (
+        "SET ROLE service_role; "
+        "SELECT public.publicar_resultado_tarefa_investigacao("
+        f"'{pedido_fonte['p_tarefa_id']}'::uuid, "
+        f"'{pedido_fonte['p_lease_token']}'::uuid, "
+        f"{pedido_fonte['p_fencing_token']}, "
+        f"{sql_texto(pedido_fonte['p_estado_cobertura'])}, "
+        f"{sql_texto(pedido_fonte['p_estado_resultado'])}, "
+        f"{sql_texto(json_canonico(pedido_fonte['p_bundle']))}::jsonb, "
+        f"{sql_texto(json_canonico(pedido_fonte['p_atestado_cobertura']))}::jsonb, "
+        f"{sql_texto(pedido_fonte['p_resumo_sanitizado'])});"
+    ))
+    if resultado.returncode:
+        raise RuntimeError(
+            f"publicação da fonte vazia foi recusada: {erro_comando(resultado)}"
+        )
+    # Executor de síntese: materializa a linha, assume e publica.
+    investigacao_dict = {
+        "id": investigacao_id,
+        "chave_idempotencia": item["chaves"]["investigacao"],
+        "policy_version": planejador_modulo.biblioteca.VERSAO_POLITICA_PADRAO,
+        "campos_obrigatorios": item["campos_obrigatorios"],
+        "plano_tarefas": item["tarefas"],
+    }
+    linha_sintese = executor_modulo.linha_tarefa_sintese(investigacao_dict)
+    resultado = psql(
+        banco,
+        "SET ROLE service_role; "
+        + _sql_insert_planejador(linha_sintese, "investigacao_tarefas")
+        + "; RESET ROLE;",
+    )
+    if resultado.returncode:
+        raise RuntimeError(
+            f"materialização da síntese foi recusada: {erro_comando(resultado)}"
+        )
+    resultado = psql(banco, (
+        "SET ROLE service_role; "
+        "SELECT public.assumir_tarefa_investigacao('sintese', 'executor-e2e', 120);"
+    ))
+    if resultado.returncode:
+        raise RuntimeError(f"Falha ao assumir síntese: {erro_comando(resultado)}")
+    linha_json = next(
+        (l for l in resultado.stdout.splitlines() if l.strip().startswith("{")),
+        None,
+    )
+    tarefa_sintese = json.loads(linha_json) if linha_json else None
+    if not tarefa_sintese or str(tarefa_sintese.get("id")) != linha_sintese["id"]:
+        raise RuntimeError(f"síntese inesperada assumida: {tarefa_sintese!r}")
+    resultado_sintese = executor_modulo.montar_resultado_sintese(
+        investigacao_dict,
+        [{"estado_execucao": "concluida",
+          "estado_cobertura": "vazio_com_cobertura"}],
+        [], linha_sintese["id"],
+    )
+    resultado = psql(banco, (
+        "SET ROLE service_role; "
+        "SELECT public.publicar_resultado_tarefa_investigacao("
+        f"'{tarefa_sintese['id']}'::uuid, "
+        f"'{tarefa_sintese['lease_token']}'::uuid, "
+        f"{tarefa_sintese['fencing_token']}, "
+        f"{sql_texto(resultado_sintese['estado_cobertura'])}, "
+        f"{sql_texto(resultado_sintese['estado_resultado'])}, "
+        f"{sql_texto(json_canonico(resultado_sintese['bundle']))}::jsonb, "
+        "NULL, "
+        f"{sql_texto(resultado_sintese['resumo_sanitizado'])});"
+    ))
+    if resultado.returncode:
+        raise RuntimeError(
+            f"publicação da síntese foi recusada: {erro_comando(resultado)}"
+        )
+    resultado = psql(banco, f"""
+SELECT (SELECT estado_execucao || ':' || coalesce(estado_resultado, 'nulo')
+          || ':' || CASE WHEN concluida_em IS NULL THEN 'sem_fim' ELSE 'com_fim' END
+          FROM public.investigacoes_revisao WHERE id = '{investigacao_id}')
+    || '|' ||
+       (SELECT count(*)::text FROM public.investigacao_pendencias
+         WHERE investigacao_id = '{investigacao_id}' AND estado = 'aberta');""")
+    estado_final = (resultado.stdout or "").strip().splitlines()
+    esperado = "concluida:evidencia_insuficiente:com_fim|" + str(
+        len(investigacao_dict["campos_obrigatorios"])
+    )
+    if resultado.returncode or not estado_final or estado_final[0] != esperado:
+        raise RuntimeError(
+            f"estado final da síntese inesperado: {estado_final!r} "
+            f"(esperado {esperado!r})"
+        )
+
+
 def executar_teste(obrigatorio: bool) -> int:
     for migracao in (MIGRACAO, MIGRACAO_ATIVACAO, ROLLBACK_ATIVACAO):
         if not migracao.exists():
@@ -3030,6 +3226,7 @@ def executar_teste(obrigatorio: bool) -> int:
         testar_lease_concorrente(nome)
         testar_planejador_investigacoes(nome)
         testar_worker_fonte_outro(nome)
+        testar_executor_sintese(nome)
         aplicar_migracao(nome, ROLLBACK_ATIVACAO)
         aplicar_migracao(nome, ROLLBACK_ATIVACAO, segunda_vez=True)
         validar_reversao_ativacao(nome)

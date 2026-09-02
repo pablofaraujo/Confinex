@@ -314,10 +314,21 @@ confiança forte), a cobertura é honesta (`indisponivel`/`vazio_com_cobertura`)
 e o atestado HMAC é assinado localmente sem que o segredo saia do processo. O
 ciclo completo — planejador cria a investigação, `assumir` entrega a tarefa, o
 worker monta e assina, `publicar` aceita e a repetição é idempotente — é
-provado de ponta a ponta no PostgreSQL efêmero pelo mesmo harness. Nenhuma
-execução foi ligada: não há timer, worker rodando nem adaptador ativo, e
-nenhuma investigação existe no ambiente real — cada ativação segue exigindo
-autorização própria (passo 9).
+provado de ponta a ponta no PostgreSQL efêmero pelo mesmo harness.
+`tools/executor_sintese.py` fecha a rodada: materializa idempotentemente a
+linha da tarefa de síntese fiel ao plano imutável, assume pela RPC (síntese
+não usa credencial de adaptador — o banco deriva e confere a cobertura) e,
+na v1, publica somente o caso sem evidências utilizáveis (nenhuma
+alternativa; uma pendência aberta por campo obrigatório), concluindo a
+investigação como `evidencia_insuficiente`/`cobertura_incompleta`; com
+evidências presentes a v1 aborta em vez de concluir descartando-as (a
+montagem de alternativas explicáveis é a v2). O ciclo com conclusão —
+planejador → fonte vazia → síntese → investigação concluída com pendências —
+também é provado no harness. O 1º ciclo REAL rodou em produção em 02/09/2026
+(investigação do rascunho CF-26-012, fonte `vazio_com_cobertura` publicada
+com atestado, broker fora do dry-run só durante a janela autorizada e
+restaurado). Não há timer nem worker rodando continuamente; cada execução e
+cada ativação seguem exigindo autorização própria (passo 9).
 Os contratos locais e os testes funcionam sem rede e sem chamada real ao
 Supabase. A flag permanece desligada por padrão. Quando for homologada, a tela
 falhará fechada se a view não puder ser consultada, agrupará todas as
