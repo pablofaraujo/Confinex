@@ -8,6 +8,7 @@ Leia conforme a tarefa:
 
 - `docs/arquitetura.md` — apps, backend, deploy, convenções e dívidas técnicas
 - `docs/fila-revisoes.md` — fluxo Juan → revisão → promoção, roteiro de testes, limpeza e reversão
+- `docs/continuidade-juan.md` — recuperação do histórico do mesmo grupo antes de responder a complementos; evidência não comprova salvamento nem autoriza escrita
 - `docs/testes-ecossistema.md` — bateria contínua local, Supabase e VPS/Juan
 - `docs/auditoria-contextos-telegram.md` — cobertura por contexto, lacunas e pendências encontradas nas conversas
 - `docs/contextos-por-grupo.md` — contrato canônico, dry-run, aplicação e reversão da normalização por grupo
@@ -85,6 +86,17 @@ substituído pelo nome. A estrutura aditiva está em
 aplicação protegida e reversão estão em `docs/contextos-por-grupo.md`.
 
 ## Deploy
+
+### Continuidade do Juan preparada, ainda sem ativação comprovada
+
+`tools/recuperar_contexto_juan.py` recupera evidências locais de sessões antigas
+do mesmo grupo/tópico, sem rede nem escrita. `tools/continuidade_juan.mjs`
+prepara a inclusão automática dessas evidências antes do modelo, no contexto
+não confiável do Telegram. A mensagem atual e a confirmação da promoção não
+são substituídas. `tools/patch_continuidade_juan.py` só propõe o patch mínimo
+do runtime instalado; não o aplica. Extrato calculado, rascunho verificado e
+operação verificada são estados distintos. Implantação, teste real e reversão
+estão em `docs/continuidade-juan.md`; testes locais não significam ativação na VPS.
 
 ### Bases reutilizáveis entre aparelhos
 

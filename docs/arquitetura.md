@@ -92,6 +92,17 @@ O contrato das tabelas, o significado dos estados, as ferramentas, os testes e o
 
 ## Validação contínua
 
+### Recuperação de contexto antes do modelo
+
+A camada preparada em `recuperar_contexto_juan.py` lê sessões locais do Juan
+com identidade exata de grupo/tópico. O adaptador `continuidade_juan.mjs`
+acrescenta evidências limitadas em `untrustedContext` antes da resposta,
+preservando a mensagem atual e os gates de escrita existentes. Histórico não
+é banco: persistência permanece não verificada até consulta do registro atual.
+Pedidos genéricos recebem candidatos recentes, não vínculo automático.
+Ainda depende de implantação e validação na VPS; o contrato, fluxograma,
+limites, testes e reversão estão em [`continuidade-juan.md`](continuidade-juan.md).
+
 `tools/test_ecossistema.py` é a entrada única da bateria permanente. No modo
 padrão, reúne testes Python, contratos de segurança, simulações da fila,
 verificação sintática do JavaScript de `revisoes.html` e `git diff --check`.
