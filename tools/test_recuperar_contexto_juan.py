@@ -345,6 +345,71 @@ class RecuperarContextoJuanTestCase(unittest.TestCase):
             self.assertLessEqual(len(resultado["blocos"][0]["ancora"]["texto"]), 1800)
             self.assertTrue(resultado["blocos"][0]["ancora"]["texto_truncado"])
 
+    def test_espaco_entre_quantidade_e_categoria_nao_muda_exclusao_do_pedido_atual(self):
+        """34 vacas e 34vacas representam o mesmo pedido, sem auto-candidato."""
+        with tempfile.TemporaryDirectory() as temporario:
+            pasta = Path(temporario)
+            self.escrever(
+                pasta,
+                "16161616-1616-4161-8161-161616161616.trajectory.jsonl",
+                [
+                    evento_cabecalho(GRUPO),
+                    mensagem("user", "complementar compra de 34vacas do fornecedor fictício"),
+                ],
+            )
+            resultado = self.recuperar(pasta, texto="complementar compra de 34 vacas do fornecedor fictício")
+            self.assertEqual(resultado["blocos"], [])
+
+    def test_parafrase_recente_comissao_corretor_nao_expulsa_extrato_operacional(self):
+        """Respostas vagas recentes não devem ocupar o lugar do extrato completo."""
+        with tempfile.TemporaryDirectory() as temporario:
+            pasta = Path(temporario)
+            self.escrever(
+                pasta,
+                "17171717-1717-4171-8171-171717171717.trajectory.jsonl",
+                [
+                    evento_cabecalho(GRUPO, ts="2026-08-28T10:00:00Z"),
+                    mensagem(
+                        "user",
+                        "Extrato operacional do fornecedor azul: compra quantidade 42, peso bruto 630 kg, 42 arrobas e valor total fictício.",
+                        quando="2026-08-28T10:01:00Z",
+                    ),
+                    mensagem("assistant", "Não achei a comissão do fornecedor azul com corretor rubi na quantidade 42.", quando="2026-09-04T10:00:00Z"),
+                    mensagem("assistant", "Não achei o percentual do fornecedor azul com corretor rubi na quantidade 42.", quando="2026-09-04T10:01:00Z"),
+                    mensagem("assistant", "Não achei a anotação da comissão do fornecedor azul com corretor rubi na quantidade 42.", quando="2026-09-04T10:02:00Z"),
+                ],
+            )
+            resultado = self.recuperar(pasta, texto="Inclua comissão do fornecedor azul com corretor rubi na quantidade 42")
+            self.assertEqual(resultado["status"], "historico_encontrado")
+            self.assertFalse(resultado["busca_generica"])
+            textos = [bloco["ancora"]["texto"] for bloco in resultado["blocos"]]
+            self.assertIn("Extrato operacional", textos[0])
+            self.assertTrue(any("Extrato operacional" in texto for texto in textos[:3]))
+
+    def test_dois_extratos_do_mesmo_fornecedor_continuam_candidatos_sem_vinculo(self):
+        with tempfile.TemporaryDirectory() as temporario:
+            pasta = Path(temporario)
+            for indice, quantidade in enumerate((28, 36), 1):
+                quando = f"2026-09-0{indice}T10:00:00Z"
+                self.escrever(
+                    pasta,
+                    f"18181818-1818-4181-8181-1818181818{indice:02d}.trajectory.jsonl",
+                    [
+                        evento_cabecalho(GRUPO, ts=quando),
+                        mensagem(
+                            "user",
+                            f"Extrato do fornecedor verde: compra quantidade {quantidade}, {quantidade} arrobas, peso bruto {quantidade * 15} kg e valor total fictício {indice}.",
+                            quando=quando,
+                        ),
+                    ],
+                )
+            resultado = self.recuperar(pasta, texto="Inclua 1% de comissão nessa compra")
+            self.assertEqual(resultado["status"], "historico_encontrado")
+            self.assertTrue(resultado["ambiguidade_nao_descartada"])
+            self.assertEqual(len(resultado["blocos"]), 2)
+            self.assertTrue(all("fornecedor verde" in bloco["ancora"]["texto"] for bloco in resultado["blocos"]))
+            self.assertNotEqual(resultado["blocos"][0]["ancora"]["texto"], resultado["blocos"][1]["ancora"]["texto"])
+
 
 if __name__ == "__main__":
     unittest.main()

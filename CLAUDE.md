@@ -87,16 +87,20 @@ aplicação protegida e reversão estão em `docs/contextos-por-grupo.md`.
 
 ## Deploy
 
-### Continuidade do Juan preparada, ainda sem ativação comprovada
+### Continuidade do Juan ativada e validada em 05/09/2026
 
 `tools/recuperar_contexto_juan.py` recupera evidências locais de sessões antigas
 do mesmo grupo/tópico, sem rede nem escrita. `tools/continuidade_juan.mjs`
-prepara a inclusão automática dessas evidências antes do modelo, no contexto
+faz a inclusão automática dessas evidências antes do modelo, no contexto
 não confiável do Telegram. A mensagem atual e a confirmação da promoção não
 são substituídas. `tools/patch_continuidade_juan.py` só propõe o patch mínimo
 do runtime instalado; não o aplica. Extrato calculado, rascunho verificado e
-operação verificada são estados distintos. Implantação, teste real e reversão
-estão em `docs/continuidade-juan.md`; testes locais não significam ativação na VPS.
+operação verificada são estados distintos. Extratos detalhados têm prioridade
+sobre repetições de pedidos; espaços entre quantidade e categoria não criam
+uma nova evidência. O replay do ponto instalado preservou o extrato, a ponte
+do Juan respondeu às leituras e a auditoria antes/depois manteve as nove
+tabelas idênticas. Não houve mensagem de teste ao grupo nem chamada ao modelo.
+Implantação, limites dessa prova e reversão estão em `docs/continuidade-juan.md`.
 
 ### Bases reutilizáveis entre aparelhos
 

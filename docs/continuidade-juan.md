@@ -53,6 +53,11 @@ unir dois fornecedores, negócios ou locais por simples proximidade na conversa.
   possibilidades, sem selecionar um negócio pela recência. Dois negócios
   aparentemente iguais continuam separados. Fontes têm arquivo, linha, data e
   papel. O frontend/Telegram deve mostrar nomes humanos, não caminhos ou IDs.
+- Entre correspondências lexicais, extratos com dados operacionais têm
+  prioridade sobre repetições de pedidos ou respostas como “não achei”.
+  Espaços, pontuação e acentos não tornam o mesmo pedido uma nova evidência;
+  a ordem e os demais termos permanecem relevantes. Isso não funde negócios
+  nem torna uma evidência em confirmação.
 - Limites padrão: 90 dias, 3.000 cabeçalhos, 24 MB de leitura, 3 segundos,
   três blocos e 1.800 caracteres por mensagem. Falhas, omissões e truncamentos
   são explícitos; ausência de resultado não é prova de ausência do negócio.
@@ -87,6 +92,13 @@ nova memória permanente usada como banco paralelo.
 Falha HTTP/DNS não é resultado vazio. Nas consultas de compras, o campo de
 ordenação é `created_at`; `criado_em` pertence a outras tabelas do ecossistema.
 
+Juan pode consultar o Supabase pela ponte já existente; “pesquisar no Confinex”
+significa consultar essa fonte central, não raspar a interface. Encontrar um
+rascunho permite propor seu complemento no fluxo atual de revisão. Encontrar
+uma compra definitiva exige proposta de correção separada, com alvo inequívoco,
+origem, autoria e autorização atual. Esta implantação não adiciona um executor
+genérico de alteração de compras nem libera escrita operacional pela ponte.
+
 ## Testes permanentes
 
 ```bash
@@ -109,9 +121,32 @@ assinaturas antes/depois em leitura quando houver validação integrada à base.
 
 ## Implantação e reversão
 
-**Estado desta entrega: código preparado; a ativação depende da autorização de
-transferência/edição da VPS e da validação do runtime. Teste local não comprova
-que o Telegram já recebeu a alteração.**
+**Estado em 05/09/2026: recuperação ativada na VPS após autorização, backup e
+um reinício do gateway. O ponto de entrada instalado foi validado por replay
+com histórico real, sem chamada ao modelo e sem envio de mensagem ao grupo.**
+
+Evidências da ativação:
+
+- Novo processo do gateway, entrypoint e hashes conferidos; sem erros de
+  importação ou sintaxe após o reinício.
+- Probes autenticados do Telegram aprovados; consultas GET de compras,
+  rascunhos e pendências passaram pela mesma ponte usada por Juan.
+- Replay do trecho instalado acrescentou uma única evidência de continuidade,
+  preservando o texto atual e o histórico recente. O sanitizador do runtime
+  manteve os campos relevantes do extrato.
+- O primeiro replay ampliado encontrou um defeito de seleção: uma variante
+  de espaços permitia que o pedido anterior expulsasse o extrato das três
+  vagas. A correção normaliza a assinatura da mensagem e prioriza extratos;
+  as duas variantes e a preservação de negócios distintos foram retestadas.
+- A prova de canais precisou herdar a variável de acesso ao cofre do serviço;
+  o CLI sem esse ambiente retornava apenas configuração, não estado real.
+- Contagens e assinaturas de conteúdo das nove tabelas auditadas permaneceram
+  idênticas. Nenhuma compra, comissão, rascunho ou promoção foi gravada.
+
+Limite da prova: não foi testada uma nova resposta do modelo entregue no
+Telegram nem uma correção persistente, pois esses fluxos não foram executados.
+O leitor continua limitado a 90 dias e três blocos; cobertura parcial ou texto
+truncado são informados, nunca apresentados como busca exaustiva.
 
 1. Identificar o bundle Telegram efetivamente usado e a unidade real do gateway.
 2. Registrar SHA-256 e criar backup privado dos arquivos afetados. Não alterar

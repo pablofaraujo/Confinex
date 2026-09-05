@@ -42,6 +42,11 @@ def termos(texto: str) -> set[str]:
             if t not in PARADA and (len(t) > 2 or t.isdigit())}
 
 
+def assinatura_mensagem(texto: str) -> tuple[str, ...]:
+    """Espaços/pontuação não tornam o mesmo pedido uma nova evidência."""
+    return tuple(re.findall(r'[a-z]+|\d+', normalizar(texto)))
+
+
 def data_utc(texto):
     try:
         d = datetime.fromisoformat(str(texto).replace('Z', '+00:00'))
@@ -151,6 +156,7 @@ def recuperar(chave_sessao: str, texto: str, *, sessoes=SESSOES_PADRAO,
         return resultado
     resultado['status'] = 'sem_evidencia_local'
     busca = termos(texto)
+    pedido_atual = assinatura_mensagem(texto)
     raiz = Path(sessoes).resolve()
     if not raiz.is_dir():
         parcial('historico_indisponivel')
@@ -232,7 +238,7 @@ def recuperar(chave_sessao: str, texto: str, *, sessoes=SESSOES_PADRAO,
                             continue
                         if not corpo.strip() or corpo.strip() == 'NO_REPLY':
                             continue
-                        if normalizar(corpo).strip() == normalizar(texto).strip():
+                        if assinatura_mensagem(corpo) == pedido_atual:
                             continue
                         corpo = higienizar(corpo)
                         unidades = corpo.encode('utf-16-le')
@@ -246,7 +252,8 @@ def recuperar(chave_sessao: str, texto: str, *, sessoes=SESSOES_PADRAO,
             bloco = {'ancora': m, 'vizinhas': mensagens[max(0, i-1):i] + mensagens[i+1:i+2],
                      'termos_encontrados': []}
             marcadores = ('compra', 'quantidade', 'arrobas', 'peso bruto', 'valor total')
-            if sum(t in normalizar(m['texto']) for t in marcadores) >= 3:
+            eh_extrato = sum(t in normalizar(m['texto']) for t in marcadores) >= 3
+            if eh_extrato:
                 recentes.append((0, m['data'], fonte.name, m['linha'], bloco))
             comuns = busca & termos(m['texto'])
             # Só número não identifica negócio; exige termo lexical discriminante.
@@ -257,7 +264,11 @@ def recuperar(chave_sessao: str, texto: str, *, sessoes=SESSOES_PADRAO,
             if pontos < 3:
                 continue
             # O bloco dá contexto à âncora, não consolida negócios ou campos.
-            ancoras.append((pontos, m['data'], fonte.name, m['linha'],
+            # O pedido de complemento e respostas como "não achei" podem
+            # repetir mais palavras da consulta do que o próprio extrato.
+            # Priorizar fatos detalhados entre candidatos lexicais impede
+            # essas repetições de ocuparem todas as vagas; não confirma vínculo.
+            ancoras.append(((int(eh_extrato), pontos), m['data'], fonte.name, m['linha'],
                             {'ancora': m, 'vizinhas': mensagens[max(0, i-1):i] + mensagens[i+1:i+2],
                              'termos_encontrados': sorted(comuns)}))
     resultado['busca_generica'] = not bool(ancoras)

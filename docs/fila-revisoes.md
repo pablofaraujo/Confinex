@@ -23,8 +23,10 @@ evidências já recebidas no mesmo grupo/tópico, inclusive em sessões anterior
 Sem correspondência inequívoca, mostrar os candidatos e perguntar somente qual
 negócio, não pedir novamente todos os documentos. Extrato calculado no chat não
 comprova rascunho salvo nem lançamento; o registro atual deve ser consultado.
-A camada preparada para essa recuperação é somente leitura e não cria nem
-altera a fila. Fluxograma, testes e gate de ativação:
+A camada ativada em 05/09/2026 para essa recuperação é somente leitura e não
+cria nem altera a fila. Juan continua consultando registros atuais pela ponte;
+complementar rascunho e corrigir operação definitiva são decisões separadas,
+nunca consequências automáticas de encontrar histórico. Fluxograma e testes:
 [`continuidade-juan.md`](continuidade-juan.md).
 
 ## Investigação antes de apresentar a dúvida
