@@ -168,7 +168,8 @@ fila de Revisões:
   operacionais em memória. O relatório é sanitizado, preserva duplicidades e
   ambiguidades e nunca possui modo de escrita;
 - `tools/importar_ofx_staging.py` recebe um OFX enviado por Pablo, deduplica por
-  conta e FITID e pode escrever somente em `fontes_importacao` e
+  identidade bancária completa e FITID, bloqueia versões divergentes e legado
+  sem prova e pode escrever somente em `fontes_importacao` e
   `transacoes_banco_staging`. O padrão é dry-run e a execução exige a frase
   exibida pelo próprio plano;
 - `tools/materializar_revisoes_staging.py` seleciona candidatos de alta
@@ -228,7 +229,7 @@ Exemplo sem escrita:
 ```bash
 python3 tools/auditar_staging_consolidacao.py
 python3 tools/materializar_revisoes_staging.py
-python3 tools/importar_ofx_staging.py /caminho/privado/extrato.ofx
+python3 tools/importar_ofx_staging.py --ofx /caminho/privado/extrato.ofx
 python3 tools/propor_conciliacoes_staging.py
 ```
 
@@ -334,7 +335,10 @@ As regras permanentes do importador são:
 `tools/analisar_extrato_ofx.py` compara um OFX recém-baixado com um snapshot
 somente leitura de `transacoes_banco`. Ele não guarda dados de conta, nomes,
 descrições ou valores no relatório: registra apenas hash do arquivo, período,
-contagens, duplicidades e quantidade de identificadores já existentes ou novos.
+contagens, duplicidades e casos comprovadamente presentes, ausentes na amostra
+ou indeterminados. Não compara FITID globalmente. O contrato e os limites de
+legados sem prova estão em
+[`identidade na importação bancária`](identidade-importacao-bancaria.md).
 
 ```bash
 python3 tools/analisar_extrato_ofx.py \
@@ -346,8 +350,8 @@ python3 tools/analisar_extrato_ofx.py \
 ```
 
 O comando não tem opção de execução. Lançamentos ausentes são apenas apontados;
-uma importação posterior precisa de autorização própria, chave idempotente por
-`FITID` e comparação de contagens antes/depois.
+uma importação posterior precisa de autorização própria, identidade bancária
+completa + `FITID` e comparação de contagens antes/depois.
 
 ## Atualização pela ficha sanitária do IMA
 

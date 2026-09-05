@@ -11,9 +11,15 @@ privados. Ele não normaliza dados, não promove operações e não altera módu
 
 O aprofundamento `docs/rastreabilidade-ofx-componentes.md` adiciona perfilamento
 offline por demonstrativo OFX e consulta de proveniência somente leitura. Não
-substitui o importador bancário publicado. Componentes de compra descrevem
+substitui, por si só, o importador bancário publicado. Componentes de compra descrevem
 fornecedores/corretores; não presumir que sejam subgrupos de animais nem um
 segundo total econômico.
+
+A etapa `docs/identidade-importacao-bancaria.md` prepara o parser compartilhado
+privado/sanitizado, identidade completa + FITID e bloqueio de conteúdo divergente
+no importador e em dois consumidores. Mantém UUID/chave física legados e não
+normaliza registros existentes. Simulação local `--snapshot` não acessa a rede;
+escrita, implantação e saneamento histórico têm autorização e gates separados.
 
 Leia conforme a tarefa:
 

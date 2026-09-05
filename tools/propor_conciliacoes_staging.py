@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import re
@@ -19,8 +18,14 @@ from typing import Any
 
 try:
     from exportar_snapshot_consolidacao import LeitorSupabase
+    from identidade_bancaria import (
+        assinatura, avaliar_presenca, chave_logica, decimal_assinado, identidade_registro,
+    )
 except ModuleNotFoundError:
     from tools.exportar_snapshot_consolidacao import LeitorSupabase
+    from tools.identidade_bancaria import (
+        assinatura, avaliar_presenca, chave_logica, decimal_assinado, identidade_registro,
+    )
 
 
 NAMESPACE = uuid.UUID("f2ba169e-4bce-4d4c-a66a-3c5d50056cdd")
@@ -34,11 +39,15 @@ PALAVRAS_GENERICAS = {
 
 
 def decimal_positivo(valor: Any) -> Decimal | None:
-    try:
-        numero = abs(Decimal(str(valor)))
-    except (InvalidOperation, TypeError, ValueError):
+    numero = decimal_assinado(valor)
+    if numero is None or not numero:
         return None
-    return numero.quantize(Decimal("0.01")) if numero else None
+    magnitude = numero.copy_abs()  # abs() pode arredondar no contexto Decimal global.
+    try:
+        centavos = magnitude.quantize(Decimal("0.01"))
+        return centavos if centavos == magnitude else None
+    except InvalidOperation:
+        return None
 
 
 def data_iso(valor: Any) -> date | None:
@@ -59,17 +68,21 @@ def tokens_distintivos(*valores: Any) -> set[str]:
     return {t for t in tokens if len(t) >= 4 and t not in PALAVRAS_GENERICAS and not t.isdigit()}
 
 
-def chave_duplicidade_transacao(item: dict[str, Any]) -> tuple[str, str, str, str]:
+def chave_duplicidade_transacao(item: dict[str, Any]) -> tuple:
     texto = normalizar(" ".join(filter(None, (item.get("descricao"), item.get("memo")))))
     return (
-        str(item.get("conta") or ""), str(item.get("data") or ""),
-        str(decimal_positivo(item.get("valor")) or ""), texto,
+        identidade_registro(item), str(item.get("data") or ""),
+        decimal_assinado(item.get("valor")), texto,
     )
 
 
 def correspondencia_textual_parcial(
     transacao: dict[str, Any], candidato: dict[str, Any],
 ) -> dict[str, Any] | None:
+    # Candidatos não têm direção bancária explícita. Um crédito não prova
+    # pagamento de compra; não o inverter para fabricar uma proposta de saída.
+    if decimal_assinado(transacao.get("valor")) is None or decimal_assinado(transacao["valor"]) >= 0:
+        return None
     dt, dc = data_iso(transacao.get("data")), data_iso(candidato.get("data_base"))
     if not dt or not dc or not (0 <= (dt - dc).days <= 120):
         return None
@@ -89,6 +102,15 @@ def correspondencia_textual_parcial(
 def correspondencia(
     transacao: dict[str, Any], alvo: dict[str, Any], *, tipo_alvo: str,
 ) -> dict[str, Any] | None:
+    valor_assinado = decimal_assinado(transacao.get("valor"))
+    if valor_assinado is None or not valor_assinado:
+        return None
+    if tipo_alvo == "negocio" and valor_assinado > 0:
+        return None
+    if tipo_alvo == "fluxo":
+        direcao = alvo.get("tipo")
+        if direcao not in {"entrada", "saida"} or (valor_assinado > 0) != (direcao == "entrada"):
+            return None
     valor_transacao = decimal_positivo(transacao.get("valor"))
     valor_alvo = decimal_positivo(alvo.get("valor_total") if tipo_alvo == "negocio" else alvo.get("valor"))
     if not valor_transacao or valor_transacao != valor_alvo:
@@ -127,10 +149,6 @@ def planejar(
     conciliacoes: list[dict[str, Any]],
     transacoes_operacionais: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    fitids_operacionais = {
-        str(item.get("id_externo") or "").strip()
-        for item in transacoes_operacionais if item.get("id_externo")
-    }
     existentes = {
         (
             str(item.get("transacao_staging_id")),
@@ -140,6 +158,7 @@ def planejar(
         for item in conciliacoes
     }
     duplicidades = Counter(chave_duplicidade_transacao(item) for item in transacoes)
+    identidades_repetidas = Counter(chave_logica(item) for item in transacoes if chave_logica(item))
     propostas: list[dict[str, Any]] = []
     motivos = Counter()
     ambiguidades = Counter()
@@ -147,8 +166,18 @@ def planejar(
         if transacao.get("estado") not in {"nao_revisada", "em_revisao"}:
             motivos["estado_fora_da_revisao"] += 1
             continue
-        if str(transacao.get("fitid") or "").strip() in fitids_operacionais:
+        if decimal_positivo(transacao.get("valor")) is None:
+            ambiguidades["valor_ausente_zero_ou_precisao_a_conferir"] += 1
+            continue
+        presenca = avaliar_presenca(transacao, transacoes_operacionais)
+        if presenca in {"presente_por_vinculo", "presente_por_identidade"}:
             motivos["ja_existe_no_banco_operacional"] += 1
+            continue
+        if presenca != "ausente_na_amostra":
+            ambiguidades[presenca] += 1
+            continue
+        if identidades_repetidas[chave_logica(transacao)] > 1:
+            ambiguidades["mesma_identidade_e_fitid_em_varias_linhas"] += 1
             continue
         if duplicidades[chave_duplicidade_transacao(transacao)] > 1:
             ambiguidades["duplicidade_aparente_entre_fontes"] += 1
@@ -195,10 +224,12 @@ def planejar(
             "estado": "pendente",
         }
         propostas.append(registro)
-    ids = sorted(item["id"] for item in propostas)
-    return {
-        "plano_id": hashlib.sha256("\n".join(ids).encode()).hexdigest()[:12],
+    plano = {
         "modo": "dry_run",
+        "snapshot_sha256": assinatura({
+            "transacoes": transacoes, "candidatos": candidatos, "fluxos": fluxos,
+            "conciliacoes": conciliacoes, "operacionais": transacoes_operacionais,
+        }),
         "propostas": propostas,
         "resumo": {
             "transacoes_lidas": len(transacoes),
@@ -214,6 +245,8 @@ def planejar(
             "tabelas_operacionais_alteradas": 0,
         },
     }
+    plano["plano_id"] = assinatura(plano)[:12]
+    return plano
 
 
 class EscritorConciliacoes:
@@ -230,18 +263,28 @@ class EscritorConciliacoes:
             headers={
                 "apikey": self.chave, "Authorization": f"Bearer {self.chave}",
                 "Content-Type": "application/json",
-                "Prefer": "resolution=ignore-duplicates,return=minimal",
+                "Prefer": "return=representation",
             },
         )
         try:
             with urllib.request.urlopen(requisicao, timeout=self.timeout) as resposta:
-                if resposta.status not in {200, 201, 204}:
+                if resposta.status not in {200, 201}:
                     raise RuntimeError(f"HTTP inesperado: {resposta.status}")
+                linhas = json.loads(resposta.read().decode("utf-8"))
+                if not isinstance(linhas, list) or len(linhas) != 1 or not isinstance(linhas[0], dict):
+                    raise RuntimeError("resultado de escrita não comprovado; conferir antes de retomar")
+                for campo, valor in payload.items():
+                    recebido = linhas[0].get(campo)
+                    igual = decimal_assinado(recebido) == decimal_assinado(valor) if campo == "valor_alocado" else recebido == valor
+                    if campo not in linhas[0] or not igual:
+                        raise RuntimeError("conteúdo gravado não comprovado; conferir antes de retomar")
         except urllib.error.HTTPError as exc:
             raise RuntimeError(f"escrita em {tabela} falhou com HTTP {exc.code}") from exc
 
 
 def executar(plano: dict[str, Any], escritor: EscritorConciliacoes, limite: int) -> int:
+    if assinatura({c: v for c, v in plano.items() if c != "plano_id"})[:12] != plano.get("plano_id"):
+        raise ValueError("plano alterado; refazer a conferência")
     if limite <= 0:
         raise ValueError("execução exige limite positivo")
     propostas = plano["propostas"][:limite]

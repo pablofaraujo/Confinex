@@ -6,6 +6,10 @@ O hash de um ``STMTTRN`` XML é da serialização UTF-8 feita pelo
 No SGML é do trecho textual interno do bloco, também incluindo MEMO.
 Mudanças de conteúdo são detectadas; diferenças meramente de formatação XML
 podem não alterar o hash.
+
+``extrair_ofx_privado`` é a extração estrita reutilizável e preserva NAME/MEMO
+para consumidores privados. ``perfilar_ofx`` aplica uma projeção explícita que
+remove esses textos antes de retornar o diagnóstico sanitizado.
 """
 
 from __future__ import annotations
@@ -32,7 +36,7 @@ MAX_TRANSACOES = 100_000
 IDENTIDADE = ("BANKID", "BRANCHID", "ACCTID", "ACCTTYPE", "CURDEF")
 _DECIMAL_RE = re.compile(r"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$")
 _TAG_RE = re.compile(r"<([A-Za-z][A-Za-z0-9_]*)\b[^>]*>")
-_FOLHAS_SGML = {"BANKID", "BRANCHID", "ACCTID", "ACCTTYPE", "CURDEF", "TRNTYPE", "DTPOSTED", "TRNAMT", "FITID", "MEMO"}
+_FOLHAS_SGML = {"BANKID", "BRANCHID", "ACCTID", "ACCTTYPE", "CURDEF", "NAME", "TRNTYPE", "DTPOSTED", "TRNAMT", "FITID", "MEMO"}
 _AGREGADOS_SGML = {"OFX", "BANKMSGSRSV1", "STMTTRNRS", "STMTRS", "BANKACCTFROM", "BANKTRANLIST", "STMTTRN"}
 
 
@@ -191,7 +195,9 @@ def _campo_unico(valores: dict[str, list[str]], nome: str) -> str | None:
     return presentes[0] if presentes else None
 
 
-def _transacao(fitid: str | None, data: str | None, valor: str | None, trntype: str | None, conteudo: bytes, ordinal: int) -> dict[str, Any]:
+def _transacao(fitid: str | None, data: str | None, valor: str | None, trntype: str | None,
+               descricao: str | None, memo: str | None, conteudo: bytes,
+               ordinal: int) -> dict[str, Any]:
     fitid = _texto(fitid) or None
     data_iso, data_formato, data_original = _data_iso(data)
     return {
@@ -202,6 +208,8 @@ def _transacao(fitid: str | None, data: str | None, valor: str | None, trntype: 
         "data_ofx_original": data_original,
         "valor": _decimal_texto(valor),
         "trntype": _texto(trntype),
+        "descricao": _texto(descricao),
+        "memo": _texto(memo),
         "stmttrn_sha256": _hash(conteudo),
     }
 
@@ -227,13 +235,15 @@ def _extrair_xml(bloco: ET.Element, ordinal: int) -> dict[str, Any]:
     identidade, faltantes = _identidade(valores)
     transacoes = []
     for numero, item in enumerate(transacoes_elementos, 1):
-        campos = _valores_xml(item, ("FITID", "DTPOSTED", "TRNAMT", "TRNTYPE"))
+        campos = _valores_xml(item, ("FITID", "DTPOSTED", "TRNAMT", "TRNTYPE", "NAME", "MEMO"))
         conteudo = ET.tostring(item, encoding="utf-8", short_empty_elements=True)
         transacoes.append(_transacao(
             _campo_unico(campos, "FITID"), _campo_unico(campos, "DTPOSTED"),
-            _campo_unico(campos, "TRNAMT"), _campo_unico(campos, "TRNTYPE"), conteudo, numero,
+            _campo_unico(campos, "TRNAMT"), _campo_unico(campos, "TRNTYPE"),
+            _campo_unico(campos, "NAME"), _campo_unico(campos, "MEMO"), conteudo, numero,
         ))
-    return {"ordinal": ordinal, "identidade": identidade, "faltantes": faltantes, "transacoes": transacoes}
+    return {"ordinal": ordinal, "identidade": identidade, "faltantes": faltantes,
+            "transacoes": transacoes}
 
 
 def _sgml_tags(texto: str, nomes: tuple[str, ...]) -> dict[str, list[str]]:
@@ -308,11 +318,12 @@ def _extrair_sgml(texto: str) -> list[dict[str, Any]]:
         identidade, faltantes = _identidade(valores)
         transacoes = []
         for numero, trecho in enumerate(_blocos_sgml(bloco, "STMTTRN"), 1):
-            campos = _sgml_tags(trecho, ("FITID", "DTPOSTED", "TRNAMT", "TRNTYPE"))
+            campos = _sgml_tags(trecho, ("FITID", "DTPOSTED", "TRNAMT", "TRNTYPE", "NAME", "MEMO"))
             conteudo = trecho.encode("utf-8")
             transacoes.append(_transacao(
                 _campo_unico(campos, "FITID"), _campo_unico(campos, "DTPOSTED"),
-                _campo_unico(campos, "TRNAMT"), _campo_unico(campos, "TRNTYPE"), conteudo, numero,
+                _campo_unico(campos, "TRNAMT"), _campo_unico(campos, "TRNTYPE"),
+                _campo_unico(campos, "NAME"), _campo_unico(campos, "MEMO"), conteudo, numero,
             ))
             total += 1
             if total > MAX_TRANSACOES:
@@ -371,7 +382,7 @@ def _perfil_repeticoes(demonstrativos: list[dict[str, Any]]) -> tuple[list[dict[
     return identicas, conflitos, entre_identidades, identidade_incompleta + fitids_ausentes
 
 
-def perfilar_ofx(dados: bytes) -> dict[str, Any]:
+def _extrair_ofx_completo(dados: bytes) -> dict[str, Any]:
     if not isinstance(dados, bytes) or not dados:
         raise _falha("ofx_vazio")
     if len(dados) > MAX_BYTES:
@@ -448,6 +459,53 @@ def perfilar_ofx(dados: bytes) -> dict[str, Any]:
                    "repeticoes_identidade_incompleta": len(repeticoes_identidade_incompleta),
                    "fitids_ausentes": len(fitids_ausentes)},
     }
+
+
+def extrair_ofx_privado(dados: bytes) -> dict[str, Any]:
+    """Extrai OFX estrito para consumo privado, preservando NAME e MEMO.
+
+    A função compartilha integralmente a validação, limites e parser XML/SGML
+    de ``perfilar_ofx``. O retorno contém os textos da fonte; o chamador deve
+    tratá-lo como dado privado e não publicá-lo.
+    """
+
+    return _extrair_ofx_completo(dados)
+
+
+def _projetar_sanitizado(perfil: dict[str, Any]) -> dict[str, Any]:
+    """Retorna somente o contrato público sem textos NAME/MEMO."""
+
+    campos_transacao = ("ordinal", "fitid", "data", "data_formato",
+                        "data_ofx_original", "valor", "trntype", "stmttrn_sha256")
+    demonstrativos = []
+    for demonstrativo in perfil["demonstrativos"]:
+        demonstrativos.append({
+            "ordinal": demonstrativo["ordinal"],
+            "identidade": dict(demonstrativo["identidade"]),
+            "faltantes": list(demonstrativo["faltantes"]),
+            "transacoes": [{campo: transacao[campo] for campo in campos_transacao}
+                           for transacao in demonstrativo["transacoes"]],
+        })
+    return {
+        "versao": perfil["versao"],
+        "fonte": perfil["fonte"],
+        "somente_leitura": perfil["somente_leitura"],
+        "sha256": perfil["sha256"],
+        "demonstrativos": demonstrativos,
+        "repeticoes_identicas": perfil["repeticoes_identicas"],
+        "conflitos_conteudo": perfil["conflitos_conteudo"],
+        "fitids_multiplas_identidades": perfil["fitids_multiplas_identidades"],
+        "identidades_incompletas": perfil["identidades_incompletas"],
+        "repeticoes_identidade_incompleta": perfil["repeticoes_identidade_incompleta"],
+        "fitids_ausentes": perfil["fitids_ausentes"],
+        "resumo": dict(perfil["resumo"]),
+    }
+
+
+def perfilar_ofx(dados: bytes) -> dict[str, Any]:
+    """Retorna diagnóstico sanitizado, sem NAME/MEMO ou payload textual."""
+
+    return _projetar_sanitizado(extrair_ofx_privado(dados))
 
 
 def perfilar_conjunto(perfis: list[dict[str, Any]]) -> dict[str, Any]:

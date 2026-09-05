@@ -65,9 +65,17 @@ banco. Plano, limites de cobertura e roteiro em
 sem importar ou conciliar: preserva identidade por demonstrativo, ocorrências e
 diferenças de conteúdo. A consulta `proveniencia_ofx_somente_leitura.sql` liga
 registros às fontes por ID/hash, sem exportar descrições ou documentos. O
-importador existente permanece inalterado; seus riscos de identidade/repetição
-e os gates para corrigi-los estão em
+perfilador isolado não importa dados; os riscos de identidade/repetição
+e a conferência das fontes estão em
 [`rastreabilidade de OFX e componentes`](rastreabilidade-ofx-componentes.md).
+
+A etapa [`identidade na importação bancária`](identidade-importacao-bancaria.md)
+compartilha a extração estrita com o importador e separa NAME/MEMO do perfil
+sanitizado. `identidade_bancaria.py` rege identidade completa, comparação de
+conteúdo e prova de presença nos dois consumidores bancários. Chave física e
+UUID legados são preservados; colisões e legado sem prova bloqueiam em vez de
+gerar alias ou repetição silenciosa. O modo `--snapshot` é offline e não admite
+execução. Não há migração nem saneamento de registros nesta etapa.
 
 ## Backend Supabase
 
