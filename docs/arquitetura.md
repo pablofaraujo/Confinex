@@ -40,6 +40,19 @@ O contrato e o roteiro incremental dos cinco processos estão em
 substitui revisão de domínio; seu papel é preparar propostas pequenas e
 reversíveis antes de implementar a normalização.
 
+`tools/inventariar_esquema_chaves.py` complementa o diagnóstico com metadados:
+dois GETs OpenAPI sanitizados (evidência parcial) ou importação offline da saída
+de `supabase/audits/catalogo_chaves_somente_leitura.sql`. Não consulta registros,
+executa SQL, cria índices ou chama RPC. O relatório distingue campos anotados
+de PK/FK/UNIQUE reais e separa índice de suporte, parcial, expressão e INCLUDE.
+Assinaturas API comparam metadados, não dados; no modo arquivo comprovam apenas
+a preservação da exportação local. Ver `docs/catalogo-esquema-chaves.md`.
+
+O contrato P1 em `docs/contrato-negocios-lotes.md` delimita negócio econômico,
+subgrupo por sexo/categoria/destino, versão, documento e evento físico. É base
+para propostas graduais de normalização, sem nova tabela concorrente ou mudança
+nos fluxos publicados. Escritas/migrações continuam fora deste diagnóstico.
+
 ## Backend Supabase
 
 URL `https://fkmdzwjmjlmxqotznvgq.supabase.co`, chave publicável hardcoded em cada página (RLS protege; rotação exige editar N arquivos). Auth `signInWithPassword`, sessão persistida.
