@@ -4,6 +4,11 @@ Ecossistema de apps web para gestão de confinamento e giro de gado de Pablo Fer
 
 ## Documentação de contexto
 
+O diagnóstico incremental P1 usa `docs/diagnostico-vinculos-negocios.md`:
+duas projeções SQL autorizadas somente leitura alimentam um analisador offline
+de vínculos, componentes e referências bancárias. Relatórios por registro ficam
+privados. Ele não normaliza dados, não promove operações e não altera módulos.
+
 Leia conforme a tarefa:
 
 - `docs/arquitetura.md` — apps, backend, deploy, convenções e dívidas técnicas
