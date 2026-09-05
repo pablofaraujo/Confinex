@@ -1,8 +1,12 @@
 # Rastreabilidade bancária e componentes — aprofundamento P1
 
-Status: diagnóstico offline, anterior à normalização. Não muda o importador,
-o Financeiro, o Juan, políticas, tabelas ou registros. Não contém migração nem
+Status: diagnóstico offline, anterior à normalização. O perfilador não muda o
+Financeiro, o Juan, políticas, tabelas ou registros. Não contém migração nem
 comando de execução operacional.
+
+A prevenção incremental no importador e em dois consumidores é documentada em
+[identidade na importação bancária](identidade-importacao-bancaria.md). Código
+preparado não significa implantação na VPS nem saneamento dos registros antigos.
 
 ## Identidade antes de conciliação
 
@@ -77,15 +81,15 @@ distintos. Célula vazia ou fórmula sem cache não vira zero.
 Chave histórica com sufixo de candidato é uma pista, não vínculo comprovado.
 Confirmar o produtor da chave e sua fonte antes de associar ou copiar campos.
 
-## Riscos ainda abertos no importador existente
+## Riscos encontrados e gate de implantação
 
-- `importar_ofx_staging.py` usa primeiro BANKID/ACCTID do arquivo e descarta
-  repetição local sem conferir todo o conteúdo; não usar o novo diagnóstico
-  como declaração de que esse caminho publicado já foi corrigido.
+- O importador legado usava primeiro BANKID/ACCTID do arquivo e descartava
+  repetição local sem conferir todo o conteúdo. O novo contrato bloqueia
+  divergências; sua implantação precisa ser validada separadamente.
 - Consumidores `propor_conciliacoes_staging.py` e `analisar_extrato_ofx.py`
-  precisam de gate próprio para comparação de FITID/escopo; heurística por
-  valor não resolve identidade.
-- Antes de alterar esses consumidores: regressões de contas distintas,
+  passam a distinguir presença comprovada de indeterminação; heurística por
+  valor não resolve identidade nem substitui a prova da fonte.
+- Antes de implantar esses consumidores: regressões de contas distintas,
   múltiplos demonstrativos, aliases comprovados, conteúdo divergente e crédito
   versus débito; plano idempotente, reversível e aprovado para qualquer escrita.
 

@@ -14,8 +14,10 @@ import perfilar_identidade_ofx as ofx
 
 def bloco(bankid="B1", branchid="01", acctid="0007", accttype="CHECKING", curdef="BRL", transacoes=()):
     itens = []
-    for fitid, data, valor, tipo, memo in transacoes:
-        itens.append(f"<STMTTRN><TRNTYPE>{tipo}</TRNTYPE><DTPOSTED>{data}</DTPOSTED><TRNAMT>{valor}</TRNAMT><FITID>{fitid}</FITID><MEMO>{memo}</MEMO></STMTTRN>")
+    for transacao in transacoes:
+        fitid, data, valor, tipo, memo = transacao[:5]
+        nome_transacao = "" if len(transacao) < 6 else f"<NAME>{transacao[5]}</NAME>"
+        itens.append(f"<STMTTRN><TRNTYPE>{tipo}</TRNTYPE><DTPOSTED>{data}</DTPOSTED><TRNAMT>{valor}</TRNAMT><FITID>{fitid}</FITID>{nome_transacao}<MEMO>{memo}</MEMO></STMTTRN>")
     return (
         "<STMTRS><CURDEF>" + curdef + "</CURDEF><BANKACCTFROM><BANKID>" + bankid
         + "</BANKID><BRANCHID>" + branchid + "</BRANCHID><ACCTID>" + acctid
@@ -28,7 +30,7 @@ def documento(*blocos):
     texto = ("OFXHEADER:100\nDATA:OFXSGML\nVERSION:102\nENCODING:USASCII\nCHARSET:1252\n"
              "<OFX><BANKMSGSRSV1>" + "".join(blocos) + "</BANKMSGSRSV1></OFX>")
     # SGML real: folhas não fecham; agregados STMTRS/BANKTRANLIST delimitam blocos.
-    return re.sub(r"</(?:BANKID|BRANCHID|ACCTID|ACCTTYPE|CURDEF|TRNTYPE|DTPOSTED|TRNAMT|FITID|MEMO)>", "", texto).encode("cp1252")
+    return re.sub(r"</(?:BANKID|BRANCHID|ACCTID|ACCTTYPE|CURDEF|NAME|TRNTYPE|DTPOSTED|TRNAMT|FITID|MEMO)>", "", texto).encode("cp1252")
 
 
 class PerfilarIdentidadeOfxTests(unittest.TestCase):
@@ -54,6 +56,47 @@ class PerfilarIdentidadeOfxTests(unittest.TestCase):
         texto = json.dumps(perfil, ensure_ascii=False)
         self.assertNotIn("segredo", texto)
         self.assertNotIn("outro", texto)
+
+    def test_extracao_privada_preserva_name_memo_e_perfil_publico_os_remove(self):
+        sgml = documento(bloco(transacoes=(
+            ("PIX-001", "20260901", "0.00", "CREDIT", "Pagamento acentuado", "Conta PIX Á"),
+        )))
+        privado = ofx.extrair_ofx_privado(sgml)
+        self.assertEqual(privado["demonstrativos"][0]["transacoes"][0]["descricao"], "Conta PIX Á")
+        self.assertEqual(privado["demonstrativos"][0]["transacoes"][0]["memo"], "Pagamento acentuado")
+        publico = ofx.perfilar_ofx(sgml)
+        self.assertNotIn("descricao", publico["demonstrativos"][0]["transacoes"][0])
+        self.assertNotIn("memo", publico["demonstrativos"][0]["transacoes"][0])
+        self.assertNotIn("Conta PIX Á", json.dumps(publico, ensure_ascii=False))
+        self.assertNotIn("Pagamento acentuado", json.dumps(publico, ensure_ascii=False))
+
+        xml = ("<?xml version='1.0' encoding='UTF-8'?><OFX><STMTRS>"
+               "<BANKACCTFROM><BANKID>B</BANKID><BRANCHID>1</BRANCHID><ACCTID>A</ACCTID>"
+               "<ACCTTYPE>C</ACCTTYPE></BANKACCTFROM><CURDEF>BRL</CURDEF><BANKTRANLIST>"
+               "<STMTTRN><FITID>PX</FITID><DTPOSTED>20260901</DTPOSTED><TRNAMT>1.00</TRNAMT>"
+               "<TRNTYPE>CREDIT</TRNTYPE><NAME>Conta UTF-8 Á</NAME><MEMO>PIX çá</MEMO>"
+               "</STMTTRN></BANKTRANLIST>"
+               "</STMTRS></OFX>").encode()
+        privado_xml = ofx.extrair_ofx_privado(xml)
+        self.assertEqual(privado_xml["demonstrativos"][0]["transacoes"][0]["descricao"], "Conta UTF-8 Á")
+        self.assertEqual(privado_xml["demonstrativos"][0]["transacoes"][0]["memo"], "PIX çá")
+
+    def test_name_e_memo_contraditorios_bloqueiam_extracao_privada(self):
+        nome_contraditorio = ("<OFX><STMTRS><BANKACCTFROM><BANKID>B</BANKID><BRANCHID>1</BRANCHID>"
+                              "<ACCTID>A</ACCTID><ACCTTYPE>C</ACCTTYPE></BANKACCTFROM><CURDEF>BRL</CURDEF>"
+                              "<BANKTRANLIST><STMTTRN><FITID>PX</FITID><DTPOSTED>20260901</DTPOSTED>"
+                              "<TRNAMT>1</TRNAMT><TRNTYPE>CREDIT</TRNTYPE><NAME>A</NAME><NAME>B</NAME>"
+                              "</STMTTRN></BANKTRANLIST></STMTRS></OFX>").encode()
+        with self.assertRaises(ValueError):
+            ofx.extrair_ofx_privado(nome_contraditorio)
+        memo_contraditorio = ("<OFX><STMTRS><NAME>A</NAME><BANKACCTFROM><BANKID>B</BANKID>"
+                              "<BRANCHID>1</BRANCHID><ACCTID>A</ACCTID><ACCTTYPE>C</ACCTTYPE>"
+                              "</BANKACCTFROM><CURDEF>BRL</CURDEF><BANKTRANLIST><STMTTRN>"
+                              "<FITID>PX</FITID><DTPOSTED>20260901</DTPOSTED><TRNAMT>1</TRNAMT>"
+                              "<TRNTYPE>CREDIT</TRNTYPE><MEMO>A</MEMO><MEMO>B</MEMO></STMTTRN>"
+                              "</BANKTRANLIST></STMTRS></OFX>").encode()
+        with self.assertRaises(ValueError):
+            ofx.extrair_ofx_privado(memo_contraditorio)
 
     def test_sgml_e_preservacao_de_zeros_debito_e_zero(self):
         perfil = ofx.perfilar_ofx(documento(bloco(

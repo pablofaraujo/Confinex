@@ -4,103 +4,139 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
-import re
 import urllib.error
 import urllib.request
 import uuid
-from datetime import datetime
-from decimal import Decimal, InvalidOperation
+from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
 try:
     from exportar_snapshot_consolidacao import LeitorSupabase
+    from perfilar_identidade_ofx import MAX_BYTES, extrair_ofx_privado
+    from identidade_bancaria import (
+        assinatura, chave_logica, comparar_conteudo, dados_basicos, decimal_assinado,
+        metadados_ofx,
+    )
 except ModuleNotFoundError:
     from tools.exportar_snapshot_consolidacao import LeitorSupabase
+    from tools.perfilar_identidade_ofx import MAX_BYTES, extrair_ofx_privado
+    from tools.identidade_bancaria import (
+        assinatura, chave_logica, comparar_conteudo, dados_basicos, decimal_assinado,
+        metadados_ofx,
+    )
 
 
 NAMESPACE = uuid.UUID("93a6d927-d28d-4ed7-8c10-905554ce02eb")
 TABELAS_ESCRITA = {"fontes_importacao", "transacoes_banco_staging"}
 
 
-def campo_ofx(bloco: str, nome: str) -> str:
-    encontrado = re.search(rf"<{nome}>([^<\r\n]+)", bloco, re.I)
-    return encontrado.group(1).strip() if encontrado else ""
-
-
-def data_ofx(valor: str) -> str | None:
-    digitos = re.sub(r"\D", "", valor or "")
-    if len(digitos) < 8:
-        return None
-    try:
-        return datetime.strptime(digitos[:8], "%Y%m%d").date().isoformat()
-    except ValueError:
-        return None
-
-
 def ler_ofx(caminho: Path) -> dict[str, Any]:
-    conteudo_bytes = caminho.read_bytes()
-    conteudo = conteudo_bytes.decode("latin-1", errors="replace")
-    if "<OFX>" not in conteudo.upper():
-        raise ValueError("arquivo sem estrutura OFX reconhecível")
-    banco = campo_ofx(conteudo, "BANKID")
-    conta_id = campo_ofx(conteudo, "ACCTID")
-    conta = ":".join(valor for valor in (banco, conta_id) if valor)
-    if not conta:
-        raise ValueError("conta bancária ausente no OFX")
+    with caminho.open("rb") as entrada:
+        perfil = extrair_ofx_privado(entrada.read(MAX_BYTES + 1))
     transacoes = []
-    chaves_lidas: set[tuple[str, str]] = set()
-    for bloco in re.findall(
-        r"<STMTTRN>(.*?)(?=<STMTTRN>|</BANKTRANLIST>)", conteudo, re.S | re.I
-    ):
-        fitid = campo_ofx(bloco, "FITID")
-        data = data_ofx(campo_ofx(bloco, "DTPOSTED"))
-        bruto = campo_ofx(bloco, "TRNAMT").replace(",", ".")
-        try:
-            valor = Decimal(bruto).quantize(Decimal("0.01"))
-        except InvalidOperation:
-            valor = Decimal("0")
-        if not fitid or not data or not valor:
-            continue
-        chave_transacao = (conta, fitid)
-        if chave_transacao in chaves_lidas:
-            continue
-        chaves_lidas.add(chave_transacao)
-        transacoes.append({
-            "fitid": fitid,
-            "conta": conta,
-            "banco": banco or None,
-            "data": data,
-            "tipo": campo_ofx(bloco, "TRNTYPE") or None,
-            "valor": str(valor),
-            "descricao": campo_ofx(bloco, "NAME") or None,
-            "memo": campo_ofx(bloco, "MEMO") or None,
-        })
+    for demonstrativo in perfil["demonstrativos"]:
+        identidade = demonstrativo["identidade"]
+        # Preserva o endereço físico legado. A identidade completa vive nos
+        # metadados; colisão de agência/moeda não é contornada com outro UUID.
+        conta = ":".join(identidade[c] or "" for c in ("BANKID", "ACCTID"))
+        for tx in demonstrativo["transacoes"]:
+            transacoes.append({
+                "fitid": tx["fitid"], "conta": conta, "banco": identidade["BANKID"],
+                "data": tx["data"][:10] if tx["data"] else None,
+                "tipo": tx["trntype"], "valor": tx["valor"],
+                "descricao": tx["descricao"], "memo": tx["memo"],
+                "dados_origem": {
+                    "arquivo_sha256": perfil["sha256"], "promovido": False,
+                    "ofx": {
+                        "versao": 1, "identidade": identidade,
+                        "identidade_sha256": assinatura(identidade),
+                        "data_ofx_original": tx["data_ofx_original"],
+                        "data_formato": tx["data_formato"],
+                        "stmttrn_sha256": tx["stmttrn_sha256"],
+                        "ocorrencias": [{"demonstrativo": demonstrativo["ordinal"],
+                                         "transacao": tx["ordinal"]}],
+                    },
+                },
+            })
     return {
-        "arquivo": caminho.name,
-        "sha256": hashlib.sha256(conteudo_bytes).hexdigest(),
-        "transacoes": transacoes,
+        "arquivo": caminho.name, "sha256": perfil["sha256"], "transacoes": transacoes,
+        "identidades_incompletas": perfil["identidades_incompletas"],
     }
 
 
 def montar_plano(ofx: dict[str, Any], fontes: list[dict[str, Any]], staging: list[dict[str, Any]]) -> dict[str, Any]:
     fonte_id = str(uuid.uuid5(NAMESPACE, f"fonte:ofx:{ofx['sha256']}"))
-    existentes = {
-        (str(item.get("conta") or ""), str(item.get("fitid") or ""))
-        for item in staging
-    }
-    novos = [
-        item for item in ofx["transacoes"]
-        if (item["conta"], item["fitid"]) not in existentes
-    ]
-    datas = sorted(item["data"] for item in ofx["transacoes"])
-    fonte_existe = any(
-        item.get("tipo") == "ofx" and item.get("hash_sha256") == ofx["sha256"]
-        for item in fontes
-    )
+    bloqueios, iguais, repetidas = [], 0, 0
+    if ofx.get("identidades_incompletas"):
+        bloqueios.append({"motivo": "demonstrativo_com_identidade_incompleta"})
+    fontes_iguais = [f for f in fontes if f.get("tipo") == "ofx" and f.get("hash_sha256") == ofx["sha256"]]
+    fonte_existe = bool(fontes_iguais)
+    if fonte_existe:
+        if len(fontes_iguais) != 1 or not fontes_iguais[0].get("id"):
+            bloqueios.append({"motivo": "referencia_de_fonte_ambigua"})
+        else:
+            fonte_id = fontes_iguais[0]["id"]
+    if any(f.get("id") == fonte_id and f not in fontes_iguais for f in fontes):
+        bloqueios.append({"motivo": "colisao_uuid_fonte"})
+    grupos = defaultdict(list)
+    for ordinal, item in enumerate(ofx["transacoes"], 1):
+        chave = chave_logica(item)
+        if chave is None or dados_basicos(item) is None or not item.get("tipo"):
+            bloqueios.append({"motivo": "transacao_incompleta", "ordinal": ordinal})
+            continue
+        grupos[chave].append(item)
+    candidatas = []
+    for grupo in grupos.values():
+        item = grupo[0]
+        if any(comparar_conteudo(item, outro) != "igual" for outro in grupo):
+            bloqueios.append({"motivo": "conteudo_divergente_no_arquivo", "fitid": item["fitid"]})
+            continue
+        repetidas += len(grupo) - 1
+        item = json.loads(json.dumps(item))  # Não modificar o objeto lido.
+        metadados_ofx(item)["ocorrencias"] = [
+            ref for tx in grupo for ref in metadados_ofx(tx)["ocorrencias"]
+        ]
+        candidatas.append(item)
+    # UNIQUE e UUID continuam legados: jamais unir duas identidades por esse rótulo.
+    fisicas = Counter((i["conta"], i["fitid"]) for i in candidatas)
+    uuids = Counter(str(uuid.uuid5(NAMESPACE, f"transacao:{i['conta']}:{i['fitid']}")) for i in candidatas)
+    novos = []
+    for item in candidatas:
+        fisica = (item["conta"], item["fitid"])
+        tx_id = str(uuid.uuid5(NAMESPACE, f"transacao:{item['conta']}:{item['fitid']}"))
+        motivo = None
+        if fisicas[fisica] > 1:
+            motivo = "colisao_identidades_na_chave_legada"
+        if uuids[tx_id] > 1:
+            motivo = "colisao_uuid_entre_candidatas"
+        relevantes = [r for r in staging if r.get("fitid") == item["fitid"] or r.get("id") == tx_id]
+        mesmas = []
+        for outro in relevantes:
+            chave_outro = chave_logica(outro)
+            if chave_outro is None:
+                motivo = "legado_sem_prova_de_identidade"
+            elif chave_outro == chave_logica(item):
+                mesmas.append(outro)
+            elif (outro.get("conta"), outro.get("fitid")) == fisica or outro.get("id") == tx_id:
+                motivo = "colisao_identidades_na_chave_legada"
+        if len(mesmas) > 1:
+            motivo = "referencia_ambigua_no_staging"
+        elif mesmas:
+            comparacao = comparar_conteudo(item, mesmas[0])
+            if comparacao != "igual":
+                motivo = "conteudo_divergente_no_staging" if comparacao == "divergente" else "conteudo_legado_incompleto"
+            elif not mesmas[0].get("id"):
+                motivo = "referencia_ambigua_no_staging"
+        if motivo:
+            bloqueios.append({"motivo": motivo, "fitid": item["fitid"]})
+        elif mesmas:
+            iguais += 1
+        else:
+            novos.append({"id": tx_id, "fonte_importacao_id": fonte_id, **item, "estado": "nao_revisada"})
+    datas = sorted(item["data"] for item in ofx["transacoes"] if item.get("data"))
     fonte = {
         "id": fonte_id,
         "tipo": "ofx",
@@ -112,32 +148,38 @@ def montar_plano(ofx: dict[str, Any], fontes: list[dict[str, Any]], staging: lis
         "origem_canal": "arquivo_enviado",
         "origem_referencia": ofx["arquivo"],
         "estado": "importada_staging",
-        "metadados": {"formato": "ofx", "promovido_para_operacional": False},
+        "metadados": {
+            "formato": "ofx", "promovido_para_operacional": False,
+            # Preserva a evidência de todas as ocorrências, também em novo
+            # arquivo cujo lançamento já esteja no staging. Sem copiar MEMO.
+            "ofx": {"versao": 1, "ocorrencias": [
+                {"fitid": t["fitid"], **metadados_ofx(t)} for t in ofx["transacoes"]
+            ]},
+        },
         "criado_por": "codex",
     }
-    transacoes = [{
-        "id": str(uuid.uuid5(NAMESPACE, f"transacao:{item['conta']}:{item['fitid']}")),
-        "fonte_importacao_id": fonte_id,
-        **item,
-        "estado": "nao_revisada",
-        "dados_origem": {"arquivo_sha256": ofx["sha256"], "promovido": False},
-    } for item in novos]
-    assinatura = "\n".join(sorted(item["id"] for item in transacoes) + [fonte_id])
-    return {
-        "plano_id": hashlib.sha256(assinatura.encode()).hexdigest()[:12],
+    plano = {
         "modo": "dry_run",
+        "executavel": not bloqueios,
+        "bloqueios": bloqueios,
+        "snapshot_sha256": assinatura({"fontes": fontes, "staging": staging}),
         "fonte_existe": fonte_existe,
         "fonte": fonte,
-        "transacoes": transacoes,
+        "transacoes": novos,
         "resumo": {
             "transacoes_no_arquivo": len(ofx["transacoes"]),
-            "transacoes_ja_no_staging": len(ofx["transacoes"]) - len(novos),
+            "transacoes_ja_no_staging": iguais,
             "transacoes_novas": len(novos),
+            "repeticoes_identicas_no_arquivo": repetidas,
+            "bloqueios_por_motivo": dict(sorted(Counter(b["motivo"] for b in bloqueios).items())),
+            "escritas_executadas": 0,
             "periodo_inicio": min(datas) if datas else None,
             "periodo_fim": max(datas) if datas else None,
             "tabelas_operacionais_alteradas": 0,
         },
     }
+    plano["plano_id"] = assinatura(plano)[:12]
+    return plano
 
 
 class EscritorStaging:
@@ -156,18 +198,31 @@ class EscritorStaging:
                 "apikey": self.chave,
                 "Authorization": f"Bearer {self.chave}",
                 "Content-Type": "application/json",
-                "Prefer": "resolution=ignore-duplicates,return=minimal",
+                "Prefer": "return=representation",
             },
         )
         try:
             with urllib.request.urlopen(requisicao, timeout=self.timeout) as resposta:
-                if resposta.status not in {200, 201, 204}:
+                if resposta.status not in {200, 201}:
                     raise RuntimeError(f"HTTP inesperado em {tabela}: {resposta.status}")
+                recebidos = json.loads(resposta.read().decode("utf-8"))
+                if not isinstance(recebidos, list) or len(recebidos) != 1 or not isinstance(recebidos[0], dict):
+                    raise RuntimeError("resultado de escrita não comprovado; conferir antes de retomar")
+                for campo, valor in payload.items():
+                    recebido = recebidos[0].get(campo)
+                    igual = decimal_assinado(recebido) == decimal_assinado(valor) if campo == "valor" else recebido == valor
+                    if campo not in recebidos[0] or not igual:
+                        raise RuntimeError("conteúdo gravado não comprovado; conferir antes de retomar")
         except urllib.error.HTTPError as exc:
             raise RuntimeError(f"escrita em {tabela} falhou com HTTP {exc.code}") from exc
 
 
 def executar(plano: dict[str, Any], escritor: EscritorStaging) -> dict[str, int]:
+    conteudo = {c: v for c, v in plano.items() if c != "plano_id"}
+    if assinatura(conteudo)[:12] != plano.get("plano_id"):
+        raise ValueError("plano alterado; refazer a conferência")
+    if not plano.get("executavel") or plano.get("bloqueios"):
+        raise ValueError("importação bloqueada; resolver identidade/conteúdo antes de gravar")
     if not plano["fonte_existe"]:
         escritor.inserir("fontes_importacao", plano["fonte"])
     for item in plano["transacoes"]:
@@ -181,9 +236,13 @@ def executar(plano: dict[str, Any], escritor: EscritorStaging) -> dict[str, int]
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--ofx", required=True, type=Path)
+    parser.add_argument("--snapshot", type=Path, help="snapshot privado local; proíbe --executar e não acessa a rede")
     parser.add_argument("--executar", action="store_true")
     parser.add_argument("--confirmacao")
     args = parser.parse_args()
+    if args.snapshot and args.executar:
+        raise SystemExit("snapshot local permite somente simulação, nunca execução")
+    ofx = ler_ofx(args.ofx)
     url = os.environ.get("SUPABASE_URL") or os.environ.get("CONFINEX_DB_URL") or ""
     chave = (
         os.environ.get("SUPABASE_SERVICE_KEY")
@@ -191,12 +250,23 @@ def main() -> None:
         or os.environ.get("CONFINEX_DB_KEY")
         or ""
     )
-    leitor = LeitorSupabase(url, chave)
-    plano = montar_plano(
-        ler_ofx(args.ofx),
-        leitor.listar("fontes_importacao"),
-        leitor.listar("transacoes_banco_staging"),
-    )
+    if args.snapshot:
+        with args.snapshot.open("rb") as entrada:
+            bruto = entrada.read(50_000_001)
+        if len(bruto) > 50_000_000:
+            raise ValueError("snapshot acima do limite")
+        snapshot = json.loads(bruto)
+        tabelas = snapshot.get("tabelas") if isinstance(snapshot, dict) else None
+        if not isinstance(tabelas, dict) or any(
+            not isinstance(tabelas.get(t), list) or not all(isinstance(i, dict) for i in tabelas[t])
+            for t in ("fontes_importacao", "transacoes_banco_staging")
+        ):
+            raise ValueError("snapshot incompleto; exige fontes e staging explicitamente")
+        fontes, staging = tabelas["fontes_importacao"], tabelas["transacoes_banco_staging"]
+    else:
+        leitor = LeitorSupabase(url, chave)
+        fontes, staging = leitor.listar("fontes_importacao"), leitor.listar("transacoes_banco_staging")
+    plano = montar_plano(ofx, fontes, staging)
     resultado = {"fontes_criadas": 0, "transacoes_criadas": 0}
     if args.executar:
         esperada = f"IMPORTAR OFX STAGING {plano['plano_id']}"
@@ -208,6 +278,7 @@ def main() -> None:
         "plano_id": plano["plano_id"],
         "modo": plano["modo"],
         "resumo": plano["resumo"],
+        "executavel": plano["executavel"],
         **resultado,
     }, ensure_ascii=False, indent=2))
 
