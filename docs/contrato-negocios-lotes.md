@@ -48,7 +48,7 @@ Não se presume que um `CREATE TABLE` no repositório foi aplicado.
 | `negocios_fazenda` | Negócio econômico da fazenda | Não duplicar seu valor somando o movimento físico |
 | `fazenda_ametista` | Histórico físico de entradas/saídas | Não substitui o negócio econômico |
 | `movimentacoes_interunidades` | Associação dos eventos de origem e destino | Transferência não é duas compras independentes |
-| `compras_componentes` | Detalhamento de compra agregada | Somar agregado **ou** componentes, nunca ambos |
+| `compras_componentes` | Detalhamento informativo de fornecedores/corretores | Total econômico vem de `compras`; componentes não são um segundo custo |
 | `operacao_participantes` | Participantes/papéis por operação | Participação não cria outro total de animais |
 | `confinex_avaliacoes`, `confinex_estimativas` | Estudos e versões de previsão | Não são realizados ou compra confirmada |
 | `negocios_candidatos`, `negocio_versoes` | Hipóteses e versões em conferência | Versão não é negócio adicional por padrão |
@@ -60,6 +60,12 @@ lacuna será demonstrada pelo catálogo real e por um caso de uso antes de propo
 estrutura nova.
 
 ## Subdivisão de um negócio
+
+Não confundir essa subdivisão com `compras_componentes`: conforme
+[interunidades](interunidades.md), os componentes atuais explicam fornecedores e
+corretores da compra agregada. A ausência de sexo/categoria/destino nesses
+componentes não é, isoladamente, defeito nem obrigação de preenchimento.
+Conferir sua finalidade antes de propor um vínculo com subgrupos de animais.
 
 Sexo, categoria e destino são dimensões separadas. Uma negociação pode conter
 novilhas para confinamento, vacas para abate e garrotes repartidos entre fazenda

@@ -240,6 +240,20 @@ class DiagnosticoVinculosTests(unittest.TestCase):
         self.assertIn("componente_pai_orfao", tipos)
         self.assertIn("dimensoes_componente_formato_inesperado", tipos)
 
+    def test_componente_descritivo_nao_exige_subgrupo_animal(self):
+        caso = snapshot()
+        caso["tabelas"]["compras_componentes"][0]["dimensoes_origem"] = {
+            "sexo": None, "categoria": None, "destino": None,
+        }
+        original = deepcopy(caso)
+        relatorio = diagnostico.diagnosticar(caso, caso)
+        achado = next(a for a in relatorio["achados"] if a["tipo"] == "dimensoes_componente_incompletas")
+        self.assertEqual(achado["evidencia"]["obrigatoriedade_dimensoes"],
+                         "nao_estabelecida_para_componente")
+        self.assertIn("fornecedores/corretores", achado["hipotese"])
+        self.assertIn("finalidade", achado["proxima_verificacao"])
+        self.assertEqual(caso, original)
+
     def test_totais_decimal_nulo_nao_e_zero_e_divisoes_candidatos_preservadas(self):
         caso = snapshot()
         caso["tabelas"]["compras"][0]["valor_total"] = "0.30"

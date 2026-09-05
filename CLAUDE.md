@@ -9,6 +9,12 @@ duas projeções SQL autorizadas somente leitura alimentam um analisador offline
 de vínculos, componentes e referências bancárias. Relatórios por registro ficam
 privados. Ele não normaliza dados, não promove operações e não altera módulos.
 
+O aprofundamento `docs/rastreabilidade-ofx-componentes.md` adiciona perfilamento
+offline por demonstrativo OFX e consulta de proveniência somente leitura. Não
+substitui o importador bancário publicado. Componentes de compra descrevem
+fornecedores/corretores; não presumir que sejam subgrupos de animais nem um
+segundo total econômico.
+
 Leia conforme a tarefa:
 
 - `docs/arquitetura.md` — apps, backend, deploy, convenções e dívidas técnicas

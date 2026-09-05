@@ -61,6 +61,14 @@ de origem. O analisador é offline: não cria vínculo, componente ou proposta n
 banco. Plano, limites de cobertura e roteiro em
 [`docs/diagnostico-vinculos-negocios.md`](diagnostico-vinculos-negocios.md).
 
+`tools/perfilar_identidade_ofx.py` prepara a próxima conferência bancária, offline,
+sem importar ou conciliar: preserva identidade por demonstrativo, ocorrências e
+diferenças de conteúdo. A consulta `proveniencia_ofx_somente_leitura.sql` liga
+registros às fontes por ID/hash, sem exportar descrições ou documentos. O
+importador existente permanece inalterado; seus riscos de identidade/repetição
+e os gates para corrigi-los estão em
+[`rastreabilidade de OFX e componentes`](rastreabilidade-ofx-componentes.md).
+
 ## Backend Supabase
 
 URL `https://fkmdzwjmjlmxqotznvgq.supabase.co`, chave publicável hardcoded em cada página (RLS protege; rotação exige editar N arquivos). Auth `signInWithPassword`, sessão persistida.
