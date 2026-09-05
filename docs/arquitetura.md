@@ -53,6 +53,14 @@ subgrupo por sexo/categoria/destino, versão, documento e evento físico. É bas
 para propostas graduais de normalização, sem nova tabela concorrente ou mudança
 nos fluxos publicados. Escritas/migrações continuam fora deste diagnóstico.
 
+`tools/diagnosticar_vinculos_negocios.py` avança o P1 sobre duas exportações
+projetadas e estáveis, comparando referências exatas da planilha, avaliações,
+componentes e vínculos bancários. A coleta em `vinculos_negocios_somente_leitura.sql`
+é separada, somente leitura, sem documentos/mensagens e sem exportar JSON bruto
+de origem. O analisador é offline: não cria vínculo, componente ou proposta no
+banco. Plano, limites de cobertura e roteiro em
+[`docs/diagnostico-vinculos-negocios.md`](diagnostico-vinculos-negocios.md).
+
 ## Backend Supabase
 
 URL `https://fkmdzwjmjlmxqotznvgq.supabase.co`, chave publicável hardcoded em cada página (RLS protege; rotação exige editar N arquivos). Auth `signInWithPassword`, sessão persistida.

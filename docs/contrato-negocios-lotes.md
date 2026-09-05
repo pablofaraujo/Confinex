@@ -98,7 +98,8 @@ handoff guarda continuidade temporária. Nenhum substitui fatos operacionais.
 - [x] Consulta estrutural versionada em transação somente leitura.
 - [x] Leitor com modo parcial OpenAPI explicitamente identificado.
 - [x] Contrato P1 separando negócios, versões, componentes e movimentos.
-- [ ] Capturar PK/FK/UNIQUE/índices do banco real com acesso SQL de leitura.
+- [x] Capturar PK/FK/UNIQUE/índices do banco real com acesso SQL de leitura
+  (duas observações conferidas em 04/09/2026; evidências privadas).
 - [ ] Comparar códigos e relações com fontes históricas autorizadas.
 - [ ] Quantificar colisões, órfãos, incompletos e totais por subgrupo.
 - [ ] Produzir plano privado por registro, com ambiguidades preservadas.
@@ -108,3 +109,10 @@ handoff guarda continuidade temporária. Nenhum substitui fatos operacionais.
 Ter um script não comprova que a coleta foi executada. Resultados/limitações
 ficam nos relatórios privados. Ver [catálogo do esquema](catalogo-esquema-chaves.md)
 e [perfilamento das fontes](catalogo-chaves-fontes.md).
+O cruzamento incremental de registros segue o
+[diagnóstico privado P1](diagnostico-vinculos-negocios.md), sem autorizar
+normalização ou correção automática dos dados.
+Em 04/09/2026, foi concluído um primeiro recorte privado das abas Compras e
+Consolidado contra oito projeções estáveis do banco, com roteiro por ocorrência.
+Os três gates de fontes/quantificação/plano acima continuam abertos para a
+cobertura integral: o recorte não comprova todos os negócios nem todas as fontes.
