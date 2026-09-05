@@ -379,10 +379,13 @@ def _diagnosticar_componentes(tabelas: dict[str, list[dict[str, Any]]], achados:
                                    "Revisar a célula original sem inferir ausência.", ids=[componente["id"]]))
         elif not isinstance(dimensoes, dict) or any(_nulo(dimensoes.get(campo)) for campo in ("sexo", "categoria", "destino")):
             achados.append(_achado("dimensoes_componente_incompletas", "Componente sem todas as dimensões de origem.",
-                                   "A divisão operacional não pode ser confirmada.", "Conferir sexo, categoria e destino na fonte.", ids=[componente["id"]]))
+                                   "O componente descreve fornecedores/corretores; não prova um subgrupo de animais nem um cadastro defeituoso.",
+                                   "Verificar a finalidade e a fonte antes de exigir sexo, categoria ou destino neste componente.",
+                                   ids=[componente["id"]], evidencia={"obrigatoriedade_dimensoes": "nao_estabelecida_para_componente"}))
         elif any(dimensoes[campo].strip().casefold() in _DESCONHECIDO for campo in ("sexo", "categoria", "destino")):
             achados.append(_achado("dimensoes_componente_desconhecidas", "Componente contém dimensão explicitamente desconhecida.",
-                                   "A classificação de origem não foi determinada.", "Conferir a dimensão na evidência original.", ids=[componente["id"]]))
+                                   "A classificação de origem não foi determinada; componente não equivale a subgrupo de animais.",
+                                   "Preservar o desconhecido e conferir a finalidade e a evidência original.", ids=[componente["id"]]))
     for chave_pai, componentes in componentes_por_pai.items():
         pai = compras[chave_pai]
         for campo in ("quantidade", "peso_total_kg", "valor_total"):
@@ -391,7 +394,8 @@ def _diagnosticar_componentes(tabelas: dict[str, list[dict[str, Any]]], achados:
             if valor_pai is None or any(valor is None for valor in valores_filhos):
                 ausentes = [campo for campo, valor in [("pai", valor_pai), *[(f"filho:{item['id']}", valor) for item, valor in zip(componentes, valores_filhos)]] if valor is None]
                 achados.append(_achado("totais_componentes_incompletos", "Total pai ou filho está ausente.",
-                                       "Ausência não equivale a zero; a soma não é conclusiva.", "Completar o campo antes da conciliação.",
+                                       "Ausência não equivale a zero; a soma não é conclusiva.",
+                                       "Conferir cobertura, período e fonte antes de propor complemento; o total econômico continua na compra agregada.",
                                        ids=[pai["id"], *_ids(componentes)],
                                        evidencia={"campo": campo, "nulos": ausentes}))
             else:
@@ -408,7 +412,8 @@ def _diagnosticar_componentes(tabelas: dict[str, list[dict[str, Any]]], achados:
                 if valor_pai == soma_filhos:
                     continue
                 achados.append(_achado("totais_componentes_divergentes", "Total pai difere da soma dos componentes.",
-                                       "Pode haver componente faltante ou total duplicado.", "Reconciliar cada componente sem somar o pai novamente.",
+                                       "Pode haver cobertura parcial, cortes diferentes ou divergência; isto não prova erro do total.",
+                                       "Conferir a cobertura sem substituir o total da compra agregada nem somar os componentes novamente.",
                                        ids=[pai["id"], *_ids(componentes)],
                                        evidencia={"campo": campo, "valor_pai": str(valor_pai),
                                                   "soma_filhos": str(soma_filhos)}))

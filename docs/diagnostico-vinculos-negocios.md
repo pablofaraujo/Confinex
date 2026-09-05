@@ -91,7 +91,10 @@ digitados válidos nem autorizar contas com zero inventado.
   Avaliações canceladas permanecem históricas, sem pedido de promoção.
 - **Componentes:** comparar soma dos filhos e total do pai separadamente.
   Divergência pode ser cobertura parcial. Não escolher um total por heurística
-  nem somar pai e filhos no resultado econômico.
+  nem somar pai e filhos no resultado econômico. Componentes descrevem
+  fornecedores/corretores, não obrigatoriamente subgrupos de animais: ausência
+  de sexo/categoria/destino requer avaliar a finalidade, não completar cadastros
+  automaticamente. O total econômico continua vindo de `compras`.
 - **Sexo, categoria e destino:** preservar divisões; mesma contraparte ou código
   não prova que dois grupos sejam o mesmo negócio. Um campo preenchido com
   “desconhecido” continua pendente e não caracteriza uma divisão distinta.
@@ -103,6 +106,10 @@ digitados válidos nem autorizar contas com zero inventado.
   de FITID, data e valor não autoriza unir registros. Antes de corrigir qualquer
   consumidor que compare FITID isoladamente, acrescentar regressões para contas
   diferentes, aliases comprovados, importações repetidas e vínculos explícitos.
+
+O aprofundamento de identidade bancária e origem dos arquivos segue
+[rastreabilidade de OFX e componentes](rastreabilidade-ofx-componentes.md).
+Esse perfilador é offline e não substitui o importador em produção.
 
 Cada achado separa observação, hipótese, evidência disponível e próxima
 verificação. A quantidade de achados não é quantidade de negócios errados:
