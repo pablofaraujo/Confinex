@@ -17,6 +17,7 @@ Leia conforme a tarefa:
 - `docs/inventarios-fazenda.md` — fotografias físicas da Fazenda, idempotência, testes e separação do ledger
 - `docs/consolidacao-fontes-operacionais.md` — dry-runs agregados e por registro para cruzar Juan, NF/Agronotas, banco, GTAs/IMA, negócios e Supabase sem executar vínculos
 - `docs/investigacoes-proativas.md` — contrato da busca proativa de evidências antes da revisão, com confiança explicável, privacidade, idempotência e implantação gradual
+- `docs/catalogo-chaves-fontes.md` — diagnóstico offline de campos, chaves e relações em planilhas/exportações, anterior à normalização; sem migração ou escrita operacional
 - `docs/conciliacao-whatsapp-pix.md` — busca privada por valor de PIX nos históricos do Wey, sem mensagens ou escritas operacionais
 - `docs/fila-revisoes-prioridades.md` — inventário sanitizado, prioridade operacional e plano dry-run de saneamento
 - `tools/sanear_fila_revisoes.py` — rotina dry-run para vincular rascunhos e pendências somente com correspondência forte, sem tocar tabelas operacionais
