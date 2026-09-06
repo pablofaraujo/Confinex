@@ -107,6 +107,15 @@ ao modelo ou envio ao grupo; confirmou também consultas GET pela ponte e
 assinaturas das tabelas inalteradas. O contrato, fluxograma, limites dessa
 prova e reversão estão em [`continuidade-juan.md`](continuidade-juan.md).
 
+A consulta complementar `consultar_continuidade_juan.py` tem uma capacidade
+restrita: somente `get_read` com rotas construídas para rascunhos e pendências
+do grupo autenticado, seguidas de compras com alvo explícito. Compara os
+vínculos de ida e volta; contexto contraditório ou dois alvos não são resolvidos
+automaticamente. Não carrega credenciais, não usa HTTP direto, não altera a
+ponte e não adiciona um executor de correções. A consulta é disponibilizada ao
+agente separadamente da recuperação local, com limite de tempo e linhas. Sua
+prova por execução direta não equivale a provar uma nova resposta no Telegram.
+
 `tools/test_ecossistema.py` é a entrada única da bateria permanente. No modo
 padrão, reúne testes Python, contratos de segurança, simulações da fila,
 verificação sintática do JavaScript de `revisoes.html` e `git diff --check`.

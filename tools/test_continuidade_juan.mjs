@@ -20,6 +20,12 @@ assert.equal(resultado[1].source, MARCADOR);
 assert.equal(resultado[1].payload.autoriza_escrita, false);
 assert.equal(resultado[1].payload.persistencia, 'nao_verificada');
 assert.equal(resultado[1].type, 'confinex_history_evidence');
+assert.deepEqual(resultado[1].payload.consulta_persistencia.entrada, { chave_sessao: identidade.sessionKey });
+assert.ok(resultado[1].payload.consulta_persistencia.argumentos[0].endsWith('/consultar_continuidade_juan.py'));
+assert.equal(resultado[1].payload.consulta_persistencia.argumentos[1], '--entrada-stdin');
+assert.equal(resultado[1].payload.consulta_persistencia.somente_leitura, true);
+assert.equal(resultado[1].payload.consulta_persistencia.confirma_compra_do_pedido, false);
+assert.ok(!JSON.stringify(resultado[1].payload.consulta_persistencia).includes(identidade.text));
 assert.equal(await enriquecerContextoJuan(identidade, resultado, executar), resultado);
 assert.equal(chamadas, 1);
 for (const alteracao of [{ agentId: 'ceci' }, { sessionKey: 'agent:juan:telegram:direct:999001' },

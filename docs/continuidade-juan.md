@@ -99,11 +99,59 @@ uma compra definitiva exige proposta de correção separada, com alvo inequívoc
 origem, autoria e autorização atual. Esta implantação não adiciona um executor
 genérico de alteração de compras nem libera escrita operacional pela ponte.
 
+### Consulta determinística da persistência
+
+`tools/consultar_continuidade_juan.py --entrada-stdin` recebe exclusivamente
+`{"chave_sessao":"agent:juan:telegram:group:<grupo>"}`. A chave deve vir do
+envelope autenticado, não de citações do histórico. O adaptador já entrega
+essa entrada separada do texto do usuário, juntamente com o caminho da
+ferramenta. O agente pode executar uma consulta por pedido; o adaptador não
+enfileira consultas de rede antes de cada resposta.
+
+O leitor não usa o cliente genérico nem carrega chaves. Executa somente a ação
+`get_read` da ponte instalada, sem shell, com orçamento total de 45 segundos
+e até 12 segundos de espera por consulta. Não há alternativa de rede direta,
+tentativa de escrita ou flag `--executar`. A ponte geral possui outras ações;
+este leitor não lhes concede acesso. Leituras em andamento no trabalhador
+podem terminar depois de um timeout do cliente: conferir resíduos de teste
+antes de limpar e nunca remover pedidos de outros usuários.
+
+Regras da classificação:
+
+- Consulta o grupo por origem/canal ou contexto canônico comprovado. Campos
+  contraditórios são recusados. Sem representação estruturada do tópico,
+  informa cobertura insuficiente e não consulta todo o grupo como substituto.
+- Mesmo grupo não confirma que um rascunho pertence ao pedido atual. Todos os
+  candidatos conservam `relacao_com_pedido=a_confirmar`, dados humanos e
+  pendências para comparação com as evidências do histórico.
+- Pendência legada sem contexto só é lida por ID explicitamente referenciado
+  no rascunho do grupo. Confere também os vínculos reversos do payload,
+  resultado e entidade. Divergência conhecida não vira ausência silenciosa.
+- Compra só é consultada por alvo explícito do rascunho/pendência coerentes.
+  `realizado` ou `executado` não comprovam que o alvo existe. Dois alvos
+  diferentes ou uma pendência compartilhada não escolhem uma compra sozinhos.
+- Compra existente com erro pós-gravação continua existente, com auditoria
+  pendente; não permite nova promoção. A resposta contém apenas campos
+  selecionados, não credenciais, observação livre ou dados de contato.
+- Limite de 40 registros por consulta, com uma linha adicional para detectar
+  corte. Não é busca exaustiva: compras legadas sem vínculo não são vasculhadas
+  por nome, quantidade ou recência. Pendência sem rascunho é assim descrita
+  **no recorte**, não declarada órfã definitiva.
+- HTTP inválido, DNS, timeout ou saída incompleta informam indisponibilidade.
+  Histórico já recuperado permanece disponível. Nunca declarar “não existe”
+  apenas porque a consulta falhou ou não encontrou registros nesse recorte.
+
+Comissão, frete ou outro complemento continuam como proposta para revisão.
+O leitor não corrige valores e não autoriza criar outro rascunho para substituir
+um que não conseguiu localizar. Para uma compra definitiva, ainda é necessário
+um fluxo de alteração auditada com confirmação atual e campos inequívocos.
+
 ## Testes permanentes
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_recuperar_contexto_juan.py'
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_patch_continuidade_juan.py'
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_consultar_continuidade_juan.py'
 node tools/test_continuidade_juan.mjs
 python3 tools/test_ecossistema.py
 git diff --check

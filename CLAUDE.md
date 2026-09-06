@@ -102,6 +102,15 @@ do Juan respondeu às leituras e a auditoria antes/depois manteve as nove
 tabelas idênticas. Não houve mensagem de teste ao grupo nem chamada ao modelo.
 Implantação, limites dessa prova e reversão estão em `docs/continuidade-juan.md`.
 
+`tools/consultar_continuidade_juan.py` completa a conferência com GET fechado
+pela ponte existente: rascunhos/pendências do grupo e compras somente pelos
+vínculos explícitos dessas revisões. Não seleciona negócio pelo nome ou pela
+recência, não grava e não abre conexão alternativa. A recuperação entrega o
+comando e a identidade ao agente; não adiciona consulta de rede a cada entrada
+Telegram. Tópicos sem vínculo estruturado, legados sem vínculo, divergências e
+falhas permanecem pendentes de conferência. A ponte geral não deve ser descrita
+como somente leitura: esta restrição pertence ao novo leitor.
+
 ### Bases reutilizáveis entre aparelhos
 
 As bases de confinamento deixam de depender somente do navegador:

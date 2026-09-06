@@ -80,6 +80,16 @@ export async function enriquecerContextoJuan(identidade, contexto, executar = ex
       candidatos_omitidos: resultado.candidatos_omitidos ?? 0,
       busca_generica: resultado.busca_generica ?? false,
       ambiguidade_nao_descartada: resultado.ambiguidade_nao_descartada ?? true,
+      consulta_persistencia: {
+        finalidade: 'Antes de afirmar que a compra está salva ou ausente, consultar os vínculos atuais. '
+          + 'Comparar os candidatos com o histórico; mesmo grupo não significa mesmo negócio. '
+          + 'Executar no máximo uma consulta por pedido; falha exige informar a limitação, não repetir em laço.',
+        programa: '/usr/bin/python3',
+        argumentos: [fileURLToPath(new URL('./consultar_continuidade_juan.py', import.meta.url)), '--entrada-stdin'],
+        entrada: { chave_sessao: identidade.sessionKey },
+        somente_leitura: true,
+        confirma_compra_do_pedido: false,
+      },
     },
   }];
 }
