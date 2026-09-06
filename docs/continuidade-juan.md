@@ -153,6 +153,11 @@ apresentar diferenças e comprovar o vínculo antes de propor consolidação ou
 substituição. Campos estruturados ficam internos; a resposta segue o padrão
 humano atual do grupo. Essas orientações precisam de avaliação da resposta,
 não substituem os bloqueios técnicos de escrita.
+O resultado também encerra a pesquisa automática daquele pedido: cobertura
+parcial não autoriza procurar credenciais, criar consultas HTTP alternativas ou
+pesquisar globalmente por nome. A próxima etapa é apresentar os candidatos e
+a dúvida concreta. A barreira do ensaio reprova tentativas de ampliar o acesso;
+essa barreira de teste não deve ser confundida com isolamento do agente real.
 
 ## Testes permanentes
 

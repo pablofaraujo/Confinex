@@ -85,6 +85,9 @@ class ConsultarContinuidadeTestCase(unittest.TestCase):
         self.assertIn('não duplicidades comprovadas', saida['orientacao'])
         self.assertIn('preservar a base da compra já conferida', saida['orientacao'])
         self.assertIn('candidato estruturado é interno', saida['orientacao'])
+        self.assertFalse(saida['consultas_adicionais_permitidas'])
+        self.assertEqual(saida['proxima_etapa'], 'responder_com_candidatos_e_pendencias_sem_nova_ferramenta')
+        self.assertIn('não autoriza procurar credenciais', saida['orientacao'])
         self.assertFalse(saida['autoriza_escrita'])
 
     def test_grupo_exato_e_compra_somente_por_target_explicito(self):
