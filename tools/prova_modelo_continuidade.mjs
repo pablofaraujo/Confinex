@@ -99,7 +99,10 @@ export async function executarProvaModelo({ contexto, inferir, consulta, timeout
     let resposta;
     try {
       resposta = await Promise.race([
-        Promise.resolve().then(() => inferir({ ...copiar(contexto), messages: copiar(mensagens) },
+        // Depois da leitura não há ferramentas disponíveis ao modelo. A guarda
+        // do dispatcher continua ativa caso um transporte devolva uma chamada.
+        Promise.resolve().then(() => inferir({ ...copiar(contexto), messages: copiar(mensagens),
+          tools: chamadas.length ? [] : copiar(contexto.tools) },
           { signal: abortar.signal, maxTokens: 2200 })),
         new Promise((_, reject) => { timer = setTimeout(() => {
           abortar.abort(); reject(new ProvaRecusada('modelo_limite_de_tempo'));

@@ -86,6 +86,7 @@ class ConsultarContinuidadeTestCase(unittest.TestCase):
         self.assertIn('preservar a base da compra já conferida', saida['orientacao'])
         self.assertIn('candidato estruturado é interno', saida['orientacao'])
         self.assertFalse(saida['consultas_adicionais_permitidas'])
+        self.assertFalse(saida['promocao_permitida'])
         self.assertEqual(saida['proxima_etapa'], 'responder_com_candidatos_e_pendencias_sem_nova_ferramenta')
         self.assertIn('não autoriza procurar credenciais', saida['orientacao'])
         self.assertFalse(saida['autoriza_escrita'])

@@ -158,6 +158,9 @@ parcial não autoriza procurar credenciais, criar consultas HTTP alternativas ou
 pesquisar globalmente por nome. A próxima etapa é apresentar os candidatos e
 a dúvida concreta. A barreira do ensaio reprova tentativas de ampliar o acesso;
 essa barreira de teste não deve ser confundida com isolamento do agente real.
+O leitor também declara `promocao_permitida=false`: complementar comissão não
+é promover. Primeiro identificar o alvo e preparar o ajuste para revisão; se
+os candidatos não puderem ser distinguidos, registrar essa limitação.
 
 ## Testes permanentes
 
@@ -197,6 +200,10 @@ O ambiente do subprocesso não herda credenciais. Mensagens, arquivos, outros
 comandos, alteração do grupo e argumentos adicionais são recusados.
 
 Há no máximo dois turnos do modelo e uma consulta, inclusive em caso de falha.
+Após a consulta, o segundo turno recebe **zero ferramentas** e apenas redige
+a resposta. Não basta pedir ao modelo para não pesquisar de novo: as capacidades
+são retiradas pelo código. O dispatcher ainda recusa qualquer chamada inesperada
+devolvida pelo transporte, mesmo sem ferramentas disponíveis.
 Um lote misturando leitura e escrita é recusado antes de executar qualquer item.
 É obrigatório comprovar consultas bem-sucedidas de rascunhos **e** pendências;
 executar o helper e receber `consultas=[]` não passa. Timeout, saída inválida,

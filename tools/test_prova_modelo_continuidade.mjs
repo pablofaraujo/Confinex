@@ -144,10 +144,18 @@ test('prova bem-sucedida consulta uma vez e para com resposta textual', async ()
     let execucoes = 0;
     const consulta = consultaValida(fx, () => { execucoes += 1; return { status: 0, stdout: respostaLeitor() }; });
     let turno = 0;
-    const inferir = async () => turno++ === 0
-      ? { role: 'assistant', stopReason: 'toolUse', content: [{ type: 'toolCall', id: 'consulta-1', name: 'exec', arguments: { command: consulta.comando } }] }
-      : { role: 'assistant', stopReason: 'stop', content: [{ type: 'text', text: 'Consulta concluída para conferência.' }] };
-    const resultado = await executarProvaModelo({ contexto: { messages: [], tools: [] }, inferir, consulta });
+    const contexto = { messages: [], tools: [{ name: 'exec' }] };
+    const inferir = async entrada => {
+      if (turno++ === 0) {
+        assert.deepEqual(entrada.tools, contexto.tools);
+        return { role: 'assistant', stopReason: 'toolUse', content: [{ type: 'toolCall', id: 'consulta-1', name: 'exec', arguments: { command: consulta.comando } }] };
+      }
+      assert.deepEqual(entrada.tools, []);
+      assert.equal(entrada.messages.at(-1).role, 'toolResult');
+      return { role: 'assistant', stopReason: 'stop', content: [{ type: 'text', text: 'Consulta concluída para conferência.' }] };
+    };
+    const resultado = await executarProvaModelo({ contexto, inferir, consulta });
+    assert.deepEqual(contexto.tools, [{ name: 'exec' }]);
     assert.equal(execucoes, 1);
     assert.equal(resultado.escritas, 0);
     assert.equal(resultado.entregas, 0);
