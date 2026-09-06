@@ -123,7 +123,8 @@ de mídia do agente fica bloqueado antes de acesso externo até receber isolamen
 equivalente: uma instrução de dry-run não protege capacidades de produção.
 
 O próximo contrato de comissão (`complemento_comissao_juan.py`) permanece puro
-e inativo. Sua migração proposta acrescenta três funções, três triggers e um
+e inativo. Sua migração foi aplicada com autorização específica em 06/09/2026:
+acrescenta três funções, três triggers e um
 schema privado com uma tabela de capacidades transitórias, sem backfill nem
 mudança de RLS existente. A RPC exige retratos completos vigentes, atualiza
 rascunho/pendência e registra evento na mesma transação; a capacidade privada
@@ -132,6 +133,10 @@ autoria, contexto e resultado exatos. A comissão é um valor final separado da
 base do vendedor, nunca um incremento acumulativo. Somente o novo contrato
 `comissao-juan-v1` congela o par contra escritores antigos; dados legados não
 são reescritos. Nenhuma comissão é transportada para compra automaticamente.
+As assinaturas das dez tabelas auditadas e do catálogo anterior permaneceram
+idênticas após a instalação. Os papéis clientes não têm acesso ao esquema ou
+à tabela privada; nenhuma capacidade transitória ficou armazenada. A instalação
+não conectou a RPC ao Juan nem habilitou edição de comissões reais.
 Estado, testes e gates de ativação em [`complemento-comissao-juan.md`](complemento-comissao-juan.md).
 
 `tools/test_ecossistema.py` é a entrada única da bateria permanente. No modo

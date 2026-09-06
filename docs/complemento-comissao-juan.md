@@ -2,13 +2,41 @@
 
 ## Estado em 06/09/2026
 
-**PREPARADO E TESTADO LOCALMENTE; NÃO APLICADO NEM ATIVADO.**
+**MIGRAÇÃO APLICADA E VERIFICADA; RECURSO NÃO ATIVADO NO JUAN.**
 
 A recuperação de histórico/consulta atual é uma etapa separada, já descrita em
 `continuidade-juan.md`. Encontrar um negócio não equivale a alterar seus dados.
 Este ciclo prepara apenas comissão em rascunho pré-operacional: não trata compra
 já realizada, pagamento, frete, correção fiscal ou promoção. Nenhum dado privado
-é incluído no repositório. A autorização deste ciclo exclui aplicar migrações.
+é incluído no repositório. Após o desenvolvimento, uma autorização específica
+permitiu aplicar somente a migração abaixo, mantendo a funcionalidade inativa.
+
+### Evidência da instalação autorizada
+
+- Arquivo publicado no commit `b15cfaf`, sem modificações durante a aplicação.
+- SHA-256: `d5f2bdba367e5b9bed2a521fa43bddbc664930467b54ad63cfdb11ffedff20f5`.
+- Retratos somente leitura: 06/09/2026, 14:13:20 e 14:22:45 UTC. Contagens e
+  assinaturas SHA-256 das linhas completas de dez tabelas permaneceram idênticas.
+  Nenhum rascunho, pendência, evento ou lançamento operacional foi criado.
+- Catálogo anterior preservado: 181 políticas, 106 funções e 72 gatilhos, além
+  de colunas, permissões e configurações de RLS das relações públicas.
+- Três funções e três gatilhos novos conferidos; os corpos das funções têm os
+  mesmos hashes do SQL publicado. Tabela de capacidades vazia; zero marcadores
+  e zero recibos de comissão desse contrato.
+- A RPC permite execução apenas ao serviço, além do proprietário. `anon`,
+  `authenticated`, `service_role` e `codex_agent` não têm acesso direto ao
+  esquema/tabela de capacidades. Nenhuma política existente foi modificada.
+- O aviso genérico de tabela sem RLS exigiu comprovação adicional: as revogações
+  de acesso ao esquema privado e à tabela foram ensaiadas no PostgreSQL local,
+  com os privilégios padrão observados na produção. Os quatro papéis ficaram
+  sem acesso; a mesma condição foi confirmada por leitura após a instalação.
+- Nenhum handler/ferramenta Python nos diretórios de execução consultados na
+  VPS referenciava a nova RPC. Nenhuma configuração, serviço ou mensagem foi
+  alterada. Isso comprova a instalação inativa, não um fluxo Telegram homologado.
+
+As assinaturas de dados usam JSONB agregado e ordenado por `id`, convertido em
+UTF-8 e SHA-256 no PostgreSQL. Só comparar retratos obtidos pelo mesmo método;
+a representação textual difere daquela produzida por outros serializadores.
 
 ## Fluxo pretendido e fronteiras
 
@@ -54,9 +82,12 @@ Não há busca de aproximação para fabricar base ausente: compra operacional,
 base incompleta, estados encerrados, links contraditórios e dados divergentes
 entre rascunho e pendência recusam a prévia.
 
-## Migração proposta — não aplicar automaticamente
+## Migração aplicada — não reaplicar nem ativar automaticamente
 
 Arquivo: `supabase/migrations/202609060001_complemento_comissao_rascunho.sql`.
+O comentário histórico “PROPOSTA NÃO APLICADA” no arquivo foi preservado para
+manter seus bytes e hash originais. O estado atual de instalação é o desta
+documentação; não executar novamente o arquivo já aplicado.
 
 Cria `confirmar_comissao_rascunho_juan`, duas funções de proteção e três
 triggers novos. O schema privado `juan_comissao_privado` contém `autorizacoes`,
@@ -121,18 +152,28 @@ falha no segundo UPDATE e timeout revertendo também o primeiro; replay;
 duas confirmações iguais/divergentes em conexões distintas; cliente antigo;
 promoção sem destino bloqueada; capacidade privada sem sobras.
 
+Em 06/09/2026, os 14 testes unitários passaram novamente, assim como os dois
+ensaios PostgreSQL: fundação com legado e guardas de investigação ativas.
+O ensaio adicional de ACL confirmou ausência de acesso à tabela privada pelos
+quatro papéis clientes e terminou sem objetos persistentes.
+Após a instalação, a bateria local passou com 691 testes Python, simulações e
+contratos JavaScript, verificações sintáticas e 230 verificações estáticas
+aprovadas (zero falhas; um item de navegador não executado pela etapa estática).
+A primeira tentativa encontrou bloqueio de socket pelo sandbox; a mesma bateria
+foi repetida com permissão local e passou, sem alteração de código de teste.
+
 Teste simulado não é prova de entrada humana real no Telegram. Bot enviar
 mensagem a outro bot não comprova recebimento humano. Não foram enviados
 testes Telegram neste ciclo; não houve nova inferência externa, mudança ou
-reinício na VPS. A leitura do Supabase serve somente para inventário/snapshots.
+reinício na VPS. Fora da migração expressamente autorizada, o Supabase foi
+acessado somente para inventário, assinaturas e verificações de catálogo.
 
 ## Aplicação, reversão e próximos gates
 
-1. Revisar SQL e hashes publicados, conferir catálogo real/efeito dos novos
-   triggers e obter **autorização específica da migração**. Ela não está
-   implicitamente autorizada por aprovar este desenvolvimento.
-2. Capturar snapshots antes/depois da instalação autorizada; ela não altera
-   registros existentes. Manter mediador/rota desligados.
+1. Concluído: SQL/hash publicados revisados, catálogo conferido e autorização
+   específica da migração recebida; instalação realizada uma única vez.
+2. Concluído: snapshots antes/depois idênticos, objetos e permissões conferidos.
+   Manter mediador/rota desligados.
 3. Implementar mediador autenticado e isolado, edição posterior e visualização
    da comissão, com testes positivos e negativos. Definir separadamente o
    destino operacional, sem reaproveitar `valor_total` para somar comissão.
