@@ -119,9 +119,10 @@ avaliação da resposta. “Dry-run” no prompt não é isolamento de ferrament
 
 O complemento de comissão está **preparado, não ativado**: o contrato puro
 `tools/complemento_comissao_juan.py` produz prévia e confirmação vinculadas a
-um único rascunho, responsável e grupo. Não possui rede nem executor. A proposta
-`202609060001_complemento_comissao_rascunho.sql` NÃO foi aplicada; prepara RPC
-atômica, capacidade transacional privada e guardas contra edição antiga e
+um único rascunho, responsável e grupo. Não possui rede nem executor. A migração
+`202609060001_complemento_comissao_rascunho.sql` foi aplicada com autorização
+específica em 06/09/2026, mantendo dados e proteções anteriores idênticos.
+Instala RPC atômica, capacidade transacional privada e guardas contra edição antiga e
 promoção sem destino homologado para a comissão. Não habilitar rota no Juan
 antes de aprovação específica, isolamento do mediador, edição posterior
 homologada e testes de canal real. Ver `docs/complemento-comissao-juan.md`.
