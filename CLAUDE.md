@@ -8,6 +8,7 @@ Leia conforme a tarefa:
 
 - `docs/arquitetura.md` — apps, backend, deploy, convenções e dívidas técnicas
 - `docs/fila-revisoes.md` — fluxo Juan → revisão → promoção, roteiro de testes, limpeza e reversão
+- `docs/continuidade-juan.md` — recuperação do histórico do mesmo grupo antes de responder a complementos; evidência não comprova salvamento nem autoriza escrita
 - `docs/testes-ecossistema.md` — bateria contínua local, Supabase e VPS/Juan
 - `docs/auditoria-contextos-telegram.md` — cobertura por contexto, lacunas e pendências encontradas nas conversas
 - `docs/contextos-por-grupo.md` — contrato canônico, dry-run, aplicação e reversão da normalização por grupo
@@ -62,7 +63,7 @@ Leia conforme a tarefa:
 - **CRM de gado foi estruturado em 15/08/2026**: `supabase/migrations/202608150003_crm_ofertas_gado.sql` cria `ofertas_gado`, `negociacoes_gado`, `interacoes_crm` e `crm_followups`, reutilizando `contatos` como cadastro canônico. A origem canal/conversa/mensagem é idempotente; ofertas incompletas preservam os campos faltantes. Usuários autenticados e `service_role` podem ler, inserir e atualizar, mas não apagar ou truncar. O CRM não promove registros para tabelas operacionais e não possui envio automático a fornecedores.
 - **Confinex está em transição para o Supabase**: `localStorage` + Google Sheets continuam como compatibilidade temporária formalmente classificada como legado; abrir o app não consulta nem grava Sheets, que só é ativado por ação explícita em **Cópia online e segurança**. Não remover Apps Script antes da homologação descrita em `docs/google-sheets-legado.md`. Testes nomeados autenticados são gravados em `confinex_testes`. Agentes submetem negócios como `rascunho` pela RPC `submeter_negocio_confinex`; a fila em **Operações → Confinamento** permite aprovar (`aprovar_negocio_confinex`) ou recusar (`recusar_negocio_confinex`). A recusa preserva a avaliação como `cancelado` para auditoria, sem criar lote operacional. O **nome do grupo Telegram** é a referência apresentada ao usuário; `grupo_origem_id` é apenas técnico, opcional e preenchido automaticamente pela integração quando o contexto do Telegram estiver disponível. A estimativa original fica congelada em `confinex_estimativas`. Consolidação previsto × realizado usa `confinex_consolidacoes` + `confinex_desvios`. Migrações: `supabase/migrations/202607200001_confinex_avaliacoes.sql`, `202607200002_confinex_aprovacoes.sql` e `202607210001_confinex_recusas.sql`. A fila operacional de `revisoes.html` usa `operation_drafts`, `pending_actions` e `eventos`; só grava em `compras`, `vendas`, `pesagens_caderno` ou `abates` depois da correção visual, aprovação, preparação e confirmação contextual. No Juan, qualquer foto ou PDF com `MediaPath`/`MediaPaths` passa primeiro por `arquivo_grupo_router.py`, nunca pela ferramenta visual interna. Compras são extraídas antes do OCR de pesagem, sem pergunta preliminar e sem escrita automática; o OCR OpenClaw/OpenAI roda em trabalhador local fora do sandbox do agente, com cache por conteúdo e fallback Tesseract, e somente ao final Juan pode oferecer um rascunho para Revisões. O contrato completo, os estados, as ferramentas, os testes e a reversão estão em `docs/fila-revisoes.md`.
 - A idempotência persistente de compras foi aplicada em 25/07/2026 por `supabase/migrations/202607250001_compras_idempotencia.sql`: compras antigas permaneceram com chave nula e RLS, políticas e permissões foram preservados. O cliente e o executor foram implantados na VPS com backup, testes simulados e prévia real somente leitura. A prévia não executou promoção, não persistiu chave e manteve idênticas as assinaturas das tabelas auditadas. Timeout ou falha incerta bloqueiam repetição até reconciliação; o contrato está em `docs/idempotencia-compras.md`.
-- No sandbox do Juan, `ConfinexClient` encaminha consultas e escritas não operacionais de revisão pela fila privada de `confinex_db_bridge.py`. O worker supervisionado do host é o único processo que acessa a rede; a ponte bloqueia `compras`, `vendas`, `abates` e `pesagens_caderno`, e nunca repete automaticamente `POST` ou `PATCH`.
+- No sandbox do Juan, `ConfinexClient` encaminha consultas e escritas não operacionais de revisão pela fila privada de `confinex_db_bridge.py`. O worker supervisionado do host é o único processo que acessa a rede; o adaptador de `ConfinexClient` restringe essas escritas a tabelas de revisão e a ponte nunca repete automaticamente `POST` ou `PATCH`. Isso não é bloqueio global da ponte: ela mantém ações legadas mutantes, que não são disponibilizadas pelo leitor de continuidade.
 - No roteamento de anexos, PDFs de extrato bancário são reconhecidos deterministicamente antes do OCR de compra. Eles podem gerar somente item de revisão com `entidade_final_tipo=extrato_bancario`, sem importar transações, conciliar pagamentos ou criar compra. A ação e o rascunho ficam ligados nos dois sentidos e a mesma mensagem é deduplicada.
 - O cliente de integração repete somente leituras `GET` quando há falha transitória de transporte, com espera progressiva e limite curto. Escritas `POST`/`PATCH` e RPCs nunca usam essa repetição automática; resultado incerto continua bloqueado até reconciliação idempotente.
 - A automação de contratos está limitada à pré-análise em `tools/contratos_workflow.py`, também instalada como skill do Wey com backup: calcula hash, detecta repetição, compara dados do negócio e termos aprovados, propõe destino privado no Drive e faz triagem jurídica/Finpec. Ela nunca move, envia, assina, autentica no gov.br ou cria garantia. O fluxo e os gates humanos estão em `docs/contratos-automatizados.md`.
@@ -85,6 +86,30 @@ substituído pelo nome. A estrutura aditiva está em
 aplicação protegida e reversão estão em `docs/contextos-por-grupo.md`.
 
 ## Deploy
+
+### Continuidade do Juan ativada e validada em 05/09/2026
+
+`tools/recuperar_contexto_juan.py` recupera evidências locais de sessões antigas
+do mesmo grupo/tópico, sem rede nem escrita. `tools/continuidade_juan.mjs`
+faz a inclusão automática dessas evidências antes do modelo, no contexto
+não confiável do Telegram. A mensagem atual e a confirmação da promoção não
+são substituídas. `tools/patch_continuidade_juan.py` só propõe o patch mínimo
+do runtime instalado; não o aplica. Extrato calculado, rascunho verificado e
+operação verificada são estados distintos. Extratos detalhados têm prioridade
+sobre repetições de pedidos; espaços entre quantidade e categoria não criam
+uma nova evidência. O replay do ponto instalado preservou o extrato, a ponte
+do Juan respondeu às leituras e a auditoria antes/depois manteve as nove
+tabelas idênticas. Não houve mensagem de teste ao grupo nem chamada ao modelo.
+Implantação, limites dessa prova e reversão estão em `docs/continuidade-juan.md`.
+
+`tools/consultar_continuidade_juan.py` completa a conferência com GET fechado
+pela ponte existente: rascunhos/pendências do grupo e compras somente pelos
+vínculos explícitos dessas revisões. Não seleciona negócio pelo nome ou pela
+recência, não grava e não abre conexão alternativa. A recuperação entrega o
+comando e a identidade ao agente; não adiciona consulta de rede a cada entrada
+Telegram. Tópicos sem vínculo estruturado, legados sem vínculo, divergências e
+falhas permanecem pendentes de conferência. A ponte geral não deve ser descrita
+como somente leitura: esta restrição pertence ao novo leitor.
 
 ### Bases reutilizáveis entre aparelhos
 

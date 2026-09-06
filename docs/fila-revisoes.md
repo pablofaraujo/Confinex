@@ -16,6 +16,19 @@ Atualizado em 2026-07-23. Este documento é o roteiro operacional da versão atu
 
 Nenhuma compra é promovida automaticamente. Preparar, aprovar, simular e reconciliar auditorias não equivalem a gravar um lançamento.
 
+## Complementos em outra sessão do Telegram
+
+Comissão, frete, pagamento ou correção posterior devem recuperar primeiro as
+evidências já recebidas no mesmo grupo/tópico, inclusive em sessões anteriores.
+Sem correspondência inequívoca, mostrar os candidatos e perguntar somente qual
+negócio, não pedir novamente todos os documentos. Extrato calculado no chat não
+comprova rascunho salvo nem lançamento; o registro atual deve ser consultado.
+A camada ativada em 05/09/2026 para essa recuperação é somente leitura e não
+cria nem altera a fila. Juan continua consultando registros atuais pela ponte;
+complementar rascunho e corrigir operação definitiva são decisões separadas,
+nunca consequências automáticas de encontrar histórico. Fluxograma e testes:
+[`continuidade-juan.md`](continuidade-juan.md).
+
 ## Investigação antes de apresentar a dúvida
 
 Uma pendência pode passar por uma investigação proativa antes de aparecer para
