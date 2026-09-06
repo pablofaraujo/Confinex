@@ -131,11 +131,14 @@ FROM (
     return json.loads(resultado.stdout.strip() or "{}")
 
 
-def snapshot_rls(banco: str) -> dict[str, bool]:
+def snapshot_rls(banco: str) -> dict:
     resultado = psql(banco, """
-SELECT coalesce(json_object_agg(c.relname, c.relrowsecurity), '{}'::json)
-FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
-WHERE n.nspname='public' AND c.relkind='r'
+SELECT json_build_object(
+ 'tabelas',(SELECT coalesce(json_object_agg(c.relname,json_build_array(c.relrowsecurity,c.relforcerowsecurity)), '{}'::json)
+ FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+ WHERE n.nspname='public' AND c.relkind='r'),
+ 'politicas',(SELECT coalesce(json_agg(p ORDER BY p.tablename,p.policyname),'[]'::json)
+ FROM pg_policies p WHERE p.schemaname='public'))
 """)
     if resultado.returncode:
         raise RuntimeError(f"snapshot de RLS indisponível: {erro_comando(resultado)}")
@@ -342,7 +345,7 @@ def executar_teste(obrigatorio: bool, legado=False) -> int:
     os.environ['PGCONNECT_TIMEOUT']='5'
     if not MIGRACAO.exists() or not MIGRACAO_ATIVACAO.exists():
         raise RuntimeError("migração de complemento/ativação ausente")
-    if not all(shutil.which(comando) for comando in ("psql", "createdb", "dropdb")):
+    if not all(shutil.which(comando) for comando in ("psql", "createdb", "dropdb", "dropuser")):
         mensagem = "PostgreSQL CLI não disponível; runtime será executado no CI"
         if obrigatorio:
             raise RuntimeError(mensagem)
@@ -437,11 +440,18 @@ def executar_teste(obrigatorio: bool, legado=False) -> int:
         print(f"RUNTIME_POSTGRES_OK ({modo}): instalação aditiva, privilégio restrito, CAS, rollback, timeout, concorrência, cliente stale, promoção bloqueada e limpeza de capacidades passaram")
         return 0
     finally:
+        erros_limpeza=[]
         if criado:
-            executar(["dropdb", "--if-exists", banco])
+            limpeza=executar(["dropdb", "--if-exists", banco])
+            if limpeza.returncode:
+                erros_limpeza.append('banco descartável não removido')
         for papel in ("anon", "authenticated", "service_role"):
             if papel not in roles_antes:
-                executar(["dropuser", "--if-exists", papel])
+                limpeza=executar(["dropuser", "--if-exists", papel])
+                if limpeza.returncode:
+                    erros_limpeza.append('papel fictício não removido')
+        if erros_limpeza:
+            raise RuntimeError('Limpeza incompleta: '+', '.join(erros_limpeza))
 
 
 def main() -> int:
