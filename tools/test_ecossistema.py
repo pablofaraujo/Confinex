@@ -131,6 +131,7 @@ def validar_local() -> None:
     executar(["node", "tools/test_confinex_supabase_ponte.mjs"])
     executar(["node", "tools/test_confinex_bases_online.mjs"])
     executar(["node", "tools/test_continuidade_juan.mjs"])
+    executar(["node", "tools/test_prova_modelo_continuidade.mjs"])
     executar([sys.executable, "-m", "unittest", "tools.test_consolidar_fontes_operacionais"])
     executar([sys.executable, "-m", "unittest", "tools.test_analisar_extrato_ofx"])
     executar([sys.executable, "-m", "unittest", "tools.test_analisar_ficha_ima"])
@@ -303,6 +304,15 @@ def preparar_validacao_completa(args: argparse.Namespace) -> None:
     args.testar_agente = True
 
 
+def validar_isolamento_agente(args: argparse.Namespace) -> None:
+    if args.testar_agente:
+        raise FalhaValidacao(
+            "Teste do agente bloqueado antes de acesso externo: ferramentas de "
+            "produção não estão isoladas. Consulte docs/continuidade-juan.md. "
+            "A bateria local e as leituras independentes continuam disponíveis."
+        )
+
+
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         description="Roda a bateria permanente do ecossistema Confinex"
@@ -337,7 +347,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--testar-agente",
         action="store_true",
-        help="simula MediaPath/MediaPaths no Juan e limpa a sessão ao final",
+        help="gate bloqueado até isolar ferramentas do agente; não executa sessão de produção",
     )
     return p
 
@@ -346,6 +356,7 @@ def main() -> int:
     args = parser().parse_args()
     try:
         preparar_validacao_completa(args)
+        validar_isolamento_agente(args)
         validar_local()
         if args.supabase:
             validar_supabase()

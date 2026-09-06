@@ -34,6 +34,13 @@ não se sobrepõem.
   ambíguos; a fila privada identifica campos divergentes e ausentes sem
   combinar versões; GTA exata é apenas candidato documental; o plano não
   possui opção de execução nem cliente de escrita.
+- **Prova da continuidade:** `tools/test_prova_modelo_continuidade.mjs` usa
+  modelo e base fictícios. Recusa comandos não permitidos, envio de mensagens,
+  mistura de ferramentas, mudança de grupo, hashes divergentes, leitura
+  incompleta, repetição e timeout antes de qualquer execução indevida. Consulta
+  vazia não é confirmação. O ensaio não envia dados privados a provedores e não
+  substitui o teste de uma resposta real no Telegram; consulte
+  [`continuidade-juan.md`](continuidade-juan.md#prova-do-modelo-com-ferramentas-restritas).
 - **Fila de Revisões:** rascunhos permanecem separados pelo nome do contexto;
   IDs de grupo e JSON não aparecem na apresentação; cada campo obrigatório
   ausente recebe aviso e destaque; salvar ajustes não promove; preparação fica
@@ -96,6 +103,15 @@ registro, apagar dependências em bloco `finally` e repetir a assinatura após a
 limpeza. É proibido limpar por data, texto parcial ou contexto amplo.
 
 ## Validação da VPS e do agente
+
+**Gate de segurança:** `--completa` e `--testar-agente` estão bloqueados antes
+de qualquer execução externa enquanto o replay de mídia usar ferramentas de
+produção. O replay legado pedia dry-run apenas no texto; isso não é barreira de
+gravação. Não remover a guarda sem isolar as capacidades e repetir os testes de
+negação. O ensaio restrito de continuidade não substitui esse gate de mídia.
+Bateria local, validação Supabase somente leitura e testes independentes de
+handlers continuam disponíveis sem essas opções. O roteiro abaixo documenta
+o contrato a restaurar, não uma declaração de validação completa atual.
 
 Os caminhos, o endereço da VPS e o identificador técnico do grupo pertencem ao
 ambiente privado e não devem ser commitados. Exemplo com variáveis protegidas:

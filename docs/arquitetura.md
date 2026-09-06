@@ -116,6 +116,12 @@ ponte e não adiciona um executor de correções. A consulta é disponibilizada 
 agente separadamente da recuperação local, com limite de tempo e linhas. Sua
 prova por execução direta não equivale a provar uma nova resposta no Telegram.
 
+O ensaio `prova_modelo_continuidade.mjs` separa completion e ferramentas, com
+uma consulta fixada por identidade e hashes; ferramentas mutantes não chegam
+ao executor. A bateria cobre as recusas com fixtures fictícias. O replay legado
+de mídia do agente fica bloqueado antes de acesso externo até receber isolamento
+equivalente: uma instrução de dry-run não protege capacidades de produção.
+
 `tools/test_ecossistema.py` é a entrada única da bateria permanente. No modo
 padrão, reúne testes Python, contratos de segurança, simulações da fila,
 verificação sintática do JavaScript de `revisoes.html` e `git diff --check`.
