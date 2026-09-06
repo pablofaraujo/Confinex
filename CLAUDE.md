@@ -117,6 +117,15 @@ O modelo simulado faz parte da bateria local; não comprova o agente em produç�
 Provas com histórico privado exigem autorização para o provedor, auditoria e
 avaliação da resposta. “Dry-run” no prompt não é isolamento de ferramentas.
 
+O complemento de comissão está **preparado, não ativado**: o contrato puro
+`tools/complemento_comissao_juan.py` produz prévia e confirmação vinculadas a
+um único rascunho, responsável e grupo. Não possui rede nem executor. A proposta
+`202609060001_complemento_comissao_rascunho.sql` NÃO foi aplicada; prepara RPC
+atômica, capacidade transacional privada e guardas contra edição antiga e
+promoção sem destino homologado para a comissão. Não habilitar rota no Juan
+antes de aprovação específica, isolamento do mediador, edição posterior
+homologada e testes de canal real. Ver `docs/complemento-comissao-juan.md`.
+
 ### Bases reutilizáveis entre aparelhos
 
 As bases de confinamento deixam de depender somente do navegador:
