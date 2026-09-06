@@ -1,4 +1,7 @@
 import unittest
+from unittest.mock import patch
+
+import test_juan_vps
 
 from test_juan_vps import auditar_chamadas_midia, validar_contrato_roteador
 
@@ -8,6 +11,23 @@ def chamada(nome, argumentos):
 
 
 class JuanVpsTrajectoryContractTest(unittest.TestCase):
+    def test_agente_legado_bloqueia_antes_de_modelo_sessao_ou_limpeza(self):
+        with patch.object(test_juan_vps, 'run') as run, \
+             patch.object(test_juan_vps, 'limpar_sessao') as limpar:
+            with self.assertRaisesRegex(RuntimeError, 'não estão isoladas'):
+                test_juan_vps.validar_agente('ficticio.pdf', 'conferir', 'grupo-ficticio')
+            run.assert_not_called()
+            limpar.assert_not_called()
+
+    def test_executor_remoto_bloqueia_antes_de_ocr_e_snapshot(self):
+        with patch.object(test_juan_vps, 'CONFIG', {'testar_agente': True}), \
+             patch.object(test_juan_vps, 'snapshot') as snapshot, \
+             patch.object(test_juan_vps, 'run') as run:
+            with self.assertRaisesRegex(RuntimeError, 'não estão isoladas'):
+                test_juan_vps.main()
+            snapshot.assert_not_called()
+            run.assert_not_called()
+
     def test_contrato_extrato_pdf_e_vinculo_bidirecional(self):
         source = "\n".join(
             (

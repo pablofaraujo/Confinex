@@ -119,7 +119,15 @@ def consultar(chave_sessao, ler, limite=40):
                  'qual é o negócio do pedido. Compare com o histórico; mostre diferenças sem escolher '
                  'pelo nome, quantidade ou recência. Não declare inexistência em busca vazia/parcial. '
                  'Use nomes humanos na resposta, sem IDs. Comissão é separada do valor do vendedor. '
-                 'A consulta não autoriza nenhuma gravação.'}
+                 'A consulta não autoriza nenhuma gravação. '
+                 'Rascunhos parecidos são candidatos, não duplicidades comprovadas: '
+                 'não recomendar consolidar, substituir ou criar outra revisão sem provar '
+                 'o vínculo e apresentar as diferenças para escolha. '
+                 'Ao acrescentar comissão, preservar a base da compra já conferida; '
+                 'não refazer peso, desconto, rendimento ou preço usando regras de outro '
+                 'contexto ou exemplos do modelo de extrato. Base divergente ou não '
+                 'comprovada permanece pendente. O candidato estruturado é interno: '
+                 'na resposta usar campos humanos e seguir o padrão atual do grupo.'}
 
     def parcial(motivo):
         saida['cobertura']['parcial'] = True

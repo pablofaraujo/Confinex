@@ -98,8 +98,11 @@ Na VPS, o sandbox do Juan não acessa o Supabase diretamente. O cliente envia
 leituras e escritas de `operation_drafts`, `pending_actions`, `eventos` e demais
 tabelas não operacionais permitidas à fila privada de `confinex_db_bridge.py`.
 O worker do host executa uma tentativa por escrita e até cinco tentativas por
-leitura. A ponte recusa `compras`, `vendas`, `abates` e `pesagens_caderno`; essas
-tabelas continuam exclusivas da promoção operacional confirmada.
+leitura. A restrição de escrita em tabelas operacionais pertence ao adaptador
+de `ConfinexClient`, não à ponte inteira: ela mantém ações legadas mutantes.
+O leitor de continuidade só disponibiliza `get_read`. Testes somente leitura
+devem bloquear as demais capacidades antes da execução, não confiar apenas
+em uma instrução textual para não salvar.
 
 ## Foto ou PDF de compra no Juan
 

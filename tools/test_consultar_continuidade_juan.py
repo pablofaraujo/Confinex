@@ -74,6 +74,19 @@ class LeitorSpy:
 
 
 class ConsultarContinuidadeTestCase(unittest.TestCase):
+    def test_complemento_preserva_base_e_nao_declara_parecidos_duplicados(self):
+        dados = [draft(dados_extraidos={'valor_total': 1200, 'quantidade': 12}),
+                 draft(id=ID_COMPRA_B, dados_extraidos={'valor_total': 1300, 'quantidade': 12})]
+        antes = copy.deepcopy(dados)
+        saida = modulo.consultar(GRUPO, LeitorSpy({'operation_drafts': dados}))
+        self.assertEqual(dados, antes)
+        self.assertEqual([c['dados']['valor_total'] for c in saida['candidatos']], ['1200', '1300'])
+        self.assertTrue(all(c['relacao_com_pedido'] == 'a_confirmar' for c in saida['candidatos']))
+        self.assertIn('não duplicidades comprovadas', saida['orientacao'])
+        self.assertIn('preservar a base da compra já conferida', saida['orientacao'])
+        self.assertIn('candidato estruturado é interno', saida['orientacao'])
+        self.assertFalse(saida['autoriza_escrita'])
+
     def test_grupo_exato_e_compra_somente_por_target_explicito(self):
         leitor = LeitorSpy({
             "operation_drafts": [draft(pending_action_id=ID_PENDING, entidade_final_tipo="compras", entidade_final_id=ID_COMPRA_A)],

@@ -111,6 +111,12 @@ Telegram. Tópicos sem vínculo estruturado, legados sem vínculo, divergências
 falhas permanecem pendentes de conferência. A ponte geral não deve ser descrita
 como somente leitura: esta restrição pertence ao novo leitor.
 
+O ensaio `tools/prova_modelo_continuidade.mjs` separa inferência de execução:
+permite somente o leitor fixo e exige GET confirmado de rascunhos/pendências.
+O modelo simulado faz parte da bateria local; não comprova o agente em produção.
+Provas com histórico privado exigem autorização para o provedor, auditoria e
+avaliação da resposta. “Dry-run” no prompt não é isolamento de ferramentas.
+
 ### Bases reutilizáveis entre aparelhos
 
 As bases de confinamento deixam de depender somente do navegador:

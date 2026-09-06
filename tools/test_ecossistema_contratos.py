@@ -10,6 +10,7 @@ from test_ecossistema import (
     FalhaValidacao,
     assinatura_ids,
     preparar_validacao_completa,
+    validar_isolamento_agente,
     selecionar_todos,
 )
 
@@ -18,6 +19,11 @@ TOOLS = ROOT / "tools"
 
 
 class ContratosEcossistemaTests(unittest.TestCase):
+    def test_agente_exige_isolamento_antes_de_qualquer_execucao(self):
+        with self.assertRaisesRegex(FalhaValidacao, 'antes de acesso externo'):
+            validar_isolamento_agente(Namespace(testar_agente=True))
+        validar_isolamento_agente(Namespace(testar_agente=False))
+
     def test_validacao_completa_exige_contexto_privado_e_ativa_agente(self):
         args = Namespace(
             completa=True,

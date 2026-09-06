@@ -438,11 +438,22 @@ print(json.dumps({
         raise RuntimeError("fallback Anthropic não trata resposta truncada")
 
 
+def bloquear_agente_nao_isolado() -> None:
+    raise RuntimeError(
+        "Teste do agente bloqueado: ferramentas de produção não estão isoladas. "
+        "Dry-run no texto não impede gravações ou mensagens. Use o ensaio "
+        "restrito de continuidade; o gate completo de mídia permanece pendente."
+    )
+
+
 def validar_agente(
     path_text: str,
     legenda: str,
     grupo_id: str,
 ) -> dict[str, Any]:
+    # Fail-closed antes de sessão, modelo, arquivo ou limpeza. O replay legado
+    # abaixo permanece como referência de contrato, não como caminho liberado.
+    bloquear_agente_nao_isolado()
     marker = f"teste-ecossistema-{uuid.uuid4().hex}"
     path = Path(path_text)
     referencia = (
@@ -522,6 +533,8 @@ def limpar_temporarios(cache_antes: dict[Path, bytes]) -> None:
 
 
 def main() -> int:
+    if CONFIG.get("testar_agente"):
+        bloquear_agente_nao_isolado()
     before = snapshot()
     cache_antes = snapshot_cache_ocr()
     evidencias: list[dict[str, Any]] = []
