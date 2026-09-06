@@ -59,7 +59,9 @@ jobs:
           PGPORT: 5432
           PGUSER: postgres
           PGPASSWORD: postgres
-        run: python3 tools/test_migracao_postgres.py --obrigatorio
+        run: |
+          python3 tools/test_migracao_postgres.py --obrigatorio
+          python3 tools/test_complemento_comissao_postgres.py --obrigatorio
       - name: Auditar páginas em desktop e celular
         run: >-
           python3 tools/auditar_ecossistema.py

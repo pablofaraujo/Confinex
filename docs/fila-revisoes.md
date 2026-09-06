@@ -29,6 +29,17 @@ complementar rascunho e corrigir operação definitiva são decisões separadas,
 nunca consequências automáticas de encontrar histórico. Fluxograma e testes:
 [`continuidade-juan.md`](continuidade-juan.md).
 
+A confirmação auditada de comissão é uma **proposta ainda inativa**. O módulo
+puro apresenta negócio/grupo humanos, fornecedor, data, cabeças, beneficiário,
+base preservada, percentual e valor. Se houver dois candidatos, exige escolher
+um; encontrar nomes parecidos não autoriza decidir. O SQL proposto impede
+sobrescrita por aba antiga, mas ainda não pode ser aplicado nem habilitado sem
+os gates de [`complemento-comissao-juan.md`](complemento-comissao-juan.md).
+**Salvar ajustes** do fluxo atual não foi modificado nesta etapa. A futura
+comissão confirmada exige edição mediada; por segurança, seu novo contrato
+fica congelado contra edição/rejeição/cancelamento pelo editor legado até essa
+edição ser homologada. Não habilitar este recurso como se estivesse completo.
+
 ## Investigação antes de apresentar a dúvida
 
 Uma pendência pode passar por uma investigação proativa antes de aparecer para

@@ -122,6 +122,18 @@ ao executor. A bateria cobre as recusas com fixtures fictícias. O replay legado
 de mídia do agente fica bloqueado antes de acesso externo até receber isolamento
 equivalente: uma instrução de dry-run não protege capacidades de produção.
 
+O próximo contrato de comissão (`complemento_comissao_juan.py`) permanece puro
+e inativo. Sua migração proposta acrescenta três funções, três triggers e um
+schema privado com uma tabela de capacidades transitórias, sem backfill nem
+mudança de RLS existente. A RPC exige retratos completos vigentes, atualiza
+rascunho/pendência e registra evento na mesma transação; a capacidade privada
+é consumida pelos triggers, não pelo cliente. Recibo de replay exige origem,
+autoria, contexto e resultado exatos. A comissão é um valor final separado da
+base do vendedor, nunca um incremento acumulativo. Somente o novo contrato
+`comissao-juan-v1` congela o par contra escritores antigos; dados legados não
+são reescritos. Nenhuma comissão é transportada para compra automaticamente.
+Estado, testes e gates de ativação em [`complemento-comissao-juan.md`](complemento-comissao-juan.md).
+
 `tools/test_ecossistema.py` é a entrada única da bateria permanente. No modo
 padrão, reúne testes Python, contratos de segurança, simulações da fila,
 verificação sintática do JavaScript de `revisoes.html` e `git diff --check`.
