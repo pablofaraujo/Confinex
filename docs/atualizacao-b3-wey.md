@@ -18,15 +18,21 @@ resultado do parsing produz estado preparado, aprovado ou executável.
 ## Estado atual
 
 Os contratos e testes sintéticos locais do planejador e do coletor estão
-aprovados. A coleta B3 no ambiente remoto, porém, está bloqueada no gate de
-permissão de leitura: a ponte ainda não autoriza `posicoes_hedge` e
-`alocacoes_hedge`. A tentativa observada foi recusada antes da leitura da
-tabela; uma chamada recusada não conta como consulta bem-sucedida.
+aprovados. A ponte já autoriza GET para `posicoes_hedge` e
+`alocacoes_hedge`, sem ampliar as capacidades de escrita. Depois da correção
+do campo inexistente, a coleta real foi homologada em memória: duas fotografias
+completas do recorte declarado tiveram contagens e hashes de conteúdo iguais
+por tabela, sem mudança detectada entre as leituras. A ponte permaneceu
+saudável, pronta e com as filas vazias antes e depois; não houve reinício.
 
-Por isso, nenhum plano real foi gerado ou homologado. O runtime continua
-inativo, e esta entrega não realizou escrita operacional nem enviou mensagem.
+Essa prova não é atômica e não demonstra imutabilidade global da base. Os
+snapshots não foram persistidos. Nenhum plano operacional foi executado e esta
+entrega não realizou escrita operacional nem enviou mensagem. O sucesso da
+leitura não ativa automaticamente planejador, adaptador, runtime ou executor,
+que permanecem inativos até homologação e autorização específicas.
 A falha remota de compactação e de entrega da resposta final é uma pendência
-separada: corrigir a coleta não resolve automaticamente esse caminho.
+separada. Modelo, gateway e leitura do WhatsApp não foram alterados por esta
+correção; ajustar a coleta não resolve automaticamente esses caminhos.
 
 ## Entradas privadas
 
@@ -168,7 +174,7 @@ um ancestral com `.git`. Essas verificações reduzem o risco de publicação
 acidental; não constituem defesa contra um usuário local hostil alterando o
 sistema de arquivos durante a execução.
 
-## Requisitos para homologar a coleta remota
+## Contrato e prova da coleta remota
 
 1. O caminho deste coletor deve usar exclusivamente `GET` pela ponte,
    autorizando `posicoes_hedge` e `alocacoes_hedge` somente para leitura. As
@@ -179,16 +185,39 @@ sistema de arquivos durante a execução.
    da ponte. Se for necessário recarregar a unidade, reiniciar somente a ponte,
    numa janela segura; Juan, gateway e demais serviços ficam fora desse
    procedimento.
-3. Executar duas amostras completas e independentes, com paginação limitada e
-   ordenação estável. Contagens e hashes de posições e alocações devem
-   coincidir; truncamento, duplicidade, alocação órfã ou divergência falham
-   fechados e não geram snapshot utilizável.
+3. A homologação executou duas amostras completas e independentes, com
+   paginação limitada e ordenação estável. Contagens e hashes de posições e
+   alocações coincidiram no recorte declarado; truncamento, duplicidade,
+   alocação órfã ou divergência continuam falhando fechados.
 4. Validar stdout sanitizado, arquivo privado `0600`, ausência de escrita e
    ausência de mensagens enviadas. O relatório não deve publicar conteúdo de
    conversa ou identificadores privados.
 5. Cobertura do WhatsApp permanece parcial até o intervalo histórico exato ser
    atestado. Cache recente e execução bem-sucedida do comando não equivalem a
    histórico completo.
+
+## Contrato de leitura das alocações
+
+O recorte permitido de `alocacoes_hedge` contém exatamente estes seis campos:
+
+- `id`;
+- `posicao_id`;
+- `operacao_id`;
+- `contratos_qtd`;
+- `resultado_creditado`;
+- `created_at`.
+
+`updated_at` não existe nessa tabela e não integra o contrato. A assinatura de
+conteúdo deve considerar todos os seis campos reais; não se cria timestamp
+substituto, não se preenche valor por inferência e não se propõe migração para
+acomodar o coletor. O conjunto declarado de 23 campos de `posicoes_hedge`
+permanece inalterado.
+
+As fixtures de alocações desta correção são independentes dos campos de
+produção: elas provam o formato e as falhas de segurança sem inventar colunas
+reais. As fixtures de posições existentes ainda derivam do catálogo declarado.
+Campo desconhecido, coluna ausente ou resposta fora do schema continuam
+falhando fechado, sem snapshot parcial e sem plano utilizável.
 
 ## Relação com a central de investigações
 
@@ -216,3 +245,8 @@ duplicadas, falsas referências, posições parecidas, mensagens sem referência
 cobertura incompleta, deduplicação, correções conflitantes, texto hostil,
 entradas inválidas, estabilidade do plano, snapshot alterado, preservação dos
 dados atuais e segurança do arquivo de saída.
+
+O teste real homologou somente a leitura. Ele não ativa automaticamente o
+planejador, o adaptador, o runtime ou o executor operacional: todos permanecem
+inativos até homologação e autorização específicas. Nenhuma prévia autoriza
+escrita.

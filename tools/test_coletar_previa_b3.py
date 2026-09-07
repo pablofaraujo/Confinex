@@ -22,6 +22,10 @@ POS_ID = "11111111-1111-4111-8111-111111111111"
 POS_ID_2 = "22222222-2222-4222-8222-222222222222"
 ALOC_ID = "33333333-3333-4333-8333-333333333333"
 OPERACAO_ID = "44444444-4444-4444-8444-444444444444"
+ALOCACAO_CAMPOS_REAIS = (
+    "id", "posicao_id", "operacao_id", "contratos_qtd",
+    "resultado_creditado", "created_at",
+)
 
 
 def posicao(identificador=POS_ID, **alteracoes):
@@ -52,15 +56,16 @@ def posicao(identificador=POS_ID, **alteracoes):
 
 
 def alocacao(**alteracoes):
-    base = {campo: None for campo in modulo.CAMPOS_TABELAS["alocacoes_hedge"]}
-    base.update({
+    # Fixture deliberadamente independente do contrato do coletor: representa
+    # o schema real confirmado por probes GET limit=0.
+    base = {
         "id": ALOC_ID,
         "posicao_id": POS_ID,
         "operacao_id": OPERACAO_ID,
         "contratos_qtd": 2,
+        "resultado_creditado": None,
         "created_at": "2026-09-01T10:00:00Z",
-        "updated_at": "2026-09-01T10:00:00Z",
-    })
+    }
     base.update(alteracoes)
     return base
 
@@ -89,6 +94,17 @@ class LeitorPaginado:
         return copy.deepcopy(self.ciclos[ciclo][tabela][offset:offset + limite])
 
 
+class LeitorSchemaReal(LeitorPaginado):
+    def __call__(self, rota):
+        partes = urlsplit(rota)
+        if partes.path == "alocacoes_hedge":
+            selecionados = tuple(parse_qs(partes.query)["select"][0].split(","))
+            if any(campo not in ALOCACAO_CAMPOS_REAIS for campo in selecionados):
+                self.rotas.append(rota)
+                raise modulo.ColetaIndisponivel("postgresql_42703_coluna_inexistente")
+        return super().__call__(rota)
+
+
 def origem():
     return {
         "schema_version": modulo.SCHEMA_ORIGEM,
@@ -102,6 +118,11 @@ def origem():
 class ColetarPreviaB3TestCase(unittest.TestCase):
     def agora(self):
         return datetime(2026, 9, 7, 12, tzinfo=timezone.utc)
+
+    def test_regressao_schema_real_seis_campos_nao_pede_coluna_inexistente(self):
+        self.assertEqual(set(alocacao()), set(ALOCACAO_CAMPOS_REAIS))
+        resultado = modulo.coletar_snapshot(LeitorSchemaReal(), agora=self.agora)
+        self.assertEqual(resultado["snapshot"]["cobertura"]["estado"], "completa")
 
     def test_snapshot_valido_compativel_com_planejador_e_identidades_separadas(self):
         gerenciada_a = posicao(termo="bgp:a")
@@ -118,10 +139,21 @@ class ColetarPreviaB3TestCase(unittest.TestCase):
         self.assertEqual(len({item["id_opaco"] for item in snapshot["posicoes"]}), 2)
         alocacoes = [aloc for item in snapshot["posicoes"] for aloc in item["alocacoes"]]
         self.assertEqual(alocacoes[0]["operacao_id_privado"], OPERACAO_ID)
+        self.assertNotIn("updated_at", alocacoes[0])
         self.assertEqual(alocacoes[0]["posicao_ref"], next(
             item["id_opaco"] for item in snapshot["posicoes"] if item["alocacoes"]
         ))
         self.assertTrue(snapshot["cobertura"]["atestado"])
+        posicao_saida = next(item for item in snapshot["posicoes"] if item["alocacoes"])
+        campos_posicao_integrais = {
+            "id_opaco", "referencia_bolsa", "contrato", "direcao", "categoria",
+            "contratos_qtd", "preco_entrada", "data_entrada", "status",
+            "preco_saida", "data_saida", "resultado_realizado",
+            "custo_corretagem", "custo_finpec", "termo", "origem",
+            "negocio_rateio", "detalhes", "mes", "rolada_para_ref", "obs",
+            "observacao", "created_at", "updated_at", "alocacoes",
+        }
+        self.assertEqual(set(posicao_saida), campos_posicao_integrais)
         self.assertFalse(resultado["metadados"]["autoriza_escrita"])
         self.assertEqual(resultado["metadados"]["auditoria_snapshot"]["atomicidade"], "nao_garantida")
 
@@ -230,6 +262,47 @@ class ColetarPreviaB3TestCase(unittest.TestCase):
                 alterado = modulo.coletar_snapshot(LeitorPaginado(ciclos), agora=self.agora)
                 self.assertTrue(alterado["auditoria"]["alteracao_concorrente"])
                 self.assertEqual(alterado["snapshot"]["cobertura"]["estado"], "indisponivel")
+
+    def test_alteracao_em_cada_campo_real_de_alocacao_invalida_snapshot(self):
+        mudancas = {
+            "id": "55555555-5555-4555-8555-555555555555",
+            "posicao_id": POS_ID_2,
+            "operacao_id": "66666666-6666-4666-8666-666666666666",
+            "contratos_qtd": 3,
+            "resultado_creditado": 125.75,
+            "created_at": "2026-09-02T10:00:00Z",
+        }
+        for campo, valor in mudancas.items():
+            with self.subTest(campo=campo):
+                ciclos = [
+                    {"posicoes_hedge": [posicao()], "alocacoes_hedge": [alocacao()]},
+                    {"posicoes_hedge": [posicao()], "alocacoes_hedge": [alocacao(**{campo: valor})]},
+                ]
+                resultado = modulo.coletar_snapshot(LeitorPaginado(ciclos), agora=self.agora)
+                self.assertTrue(resultado["auditoria"]["alteracao_concorrente"])
+                self.assertNotEqual(
+                    resultado["auditoria"]["assinaturas_antes"]["alocacoes_hedge"],
+                    resultado["auditoria"]["assinaturas_depois"]["alocacoes_hedge"],
+                )
+                self.assertEqual(resultado["snapshot"]["cobertura"]["estado"], "indisponivel")
+
+    def test_schema_de_alocacao_ausente_extra_ou_malformado_falha_fechado(self):
+        casos = []
+        ausente = alocacao()
+        ausente.pop("created_at")
+        casos.append(ausente)
+        extra = alocacao()
+        extra["updated_at"] = "2026-09-01T10:00:00Z"
+        casos.append(extra)
+        casos.append(["nao-e-objeto"])
+        for valor in casos:
+            with self.subTest(valor=valor):
+                ciclos = [{
+                    "posicoes_hedge": [posicao()], "alocacoes_hedge": [valor]
+                }] * 2
+                resultado = modulo.coletar_snapshot(LeitorPaginado(ciclos), agora=self.agora)
+                self.assertEqual(resultado["snapshot"]["cobertura"]["estado"], "indisponivel")
+                self.assertFalse(resultado["auditoria"]["alteracao_concorrente"])
 
     def test_campo_ausente_ou_extra_na_resposta_nao_tem_fallback(self):
         incompleta = posicao()

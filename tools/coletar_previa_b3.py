@@ -52,7 +52,7 @@ CAMPOS_TABELAS: dict[str, tuple[str, ...]] = {
     ),
     "alocacoes_hedge": (
         "id", "posicao_id", "operacao_id", "contratos_qtd",
-        "resultado_creditado", "created_at", "updated_at",
+        "resultado_creditado", "created_at",
     ),
 }
 TAMANHO_MAXIMO_RESPOSTA = 2_000_000
@@ -259,7 +259,6 @@ def _montar_snapshot(
             "contratos_qtd": alocacao["contratos_qtd"],
             "resultado_creditado": alocacao["resultado_creditado"],
             "created_at": alocacao["created_at"],
-            "updated_at": alocacao["updated_at"],
         }
         alocacoes_por_posicao[posicao_id].append(alocacao_saida)
 
