@@ -16,6 +16,7 @@ from tools.planejar_atualizacao_b3 import (
     normalizar_referencia_b3,
     referencias_b3,
     construir_parser,
+    _normalizar_alias_sistema_mac,
 )
 
 
@@ -346,6 +347,27 @@ class PlanejarAtualizacaoB3Test(unittest.TestCase):
             atalho.symlink_to(real, target_is_directory=True)
             with self.assertRaisesRegex(ErroEntrada, "SAIDA_ANCESTRAL_SYMLINK_PROIBIDO"):
                 gravar_privado_sem_sobrescrever(atalho / "plano.json", plano)
+
+    def test_alias_de_sistema_so_e_normalizado_no_darwin_confirmado(self):
+        caminho = Path("/tmp/privado/plano.json")
+        self.assertEqual(
+            _normalizar_alias_sistema_mac(
+                caminho, plataforma="linux", resolver=lambda _: "/private/tmp"
+            ),
+            caminho,
+        )
+        self.assertEqual(
+            _normalizar_alias_sistema_mac(
+                caminho, plataforma="darwin", resolver=lambda _: "/private/tmp"
+            ),
+            Path("/private/tmp/privado/plano.json"),
+        )
+        self.assertEqual(
+            _normalizar_alias_sistema_mac(
+                caminho, plataforma="darwin", resolver=lambda _: "/destino-inesperado"
+            ),
+            caminho,
+        )
 
     def test_entrada_symlink_e_tamanho_excessivo_sao_bloqueados(self):
         with tempfile.TemporaryDirectory() as tmp:

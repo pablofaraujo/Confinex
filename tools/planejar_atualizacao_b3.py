@@ -489,15 +489,29 @@ def ler_json_privado(caminho: Path) -> Any:
         raise ErroEntrada("ARQUIVO_ENTRADA_INVALIDO", caminho.name) from exc
 
 
-def _ancestral_symlink(caminho: Path) -> bool:
+def _normalizar_alias_sistema_mac(
+    caminho: Path,
+    *,
+    plataforma: str | None = None,
+    resolver: Any = os.path.realpath,
+) -> Path:
+    """Normaliza apenas os dois aliases conhecidos e confirmados do macOS."""
     absoluto = caminho.absolute()
-    # macOS expõe /tmp e /var como aliases de sistema para /private. Eles são
-    # canonicalizados antes da inspeção; symlinks criados abaixo deles seguem
-    # sendo detectados componente a componente.
-    if absoluto.parts[:2] == ("/", "tmp"):
-        absoluto = Path("/private/tmp", *absoluto.parts[2:])
-    elif absoluto.parts[:2] == ("/", "var"):
-        absoluto = Path("/private/var", *absoluto.parts[2:])
+    plataforma = sys.platform if plataforma is None else plataforma
+    if plataforma != "darwin":
+        return absoluto
+    aliases = {"tmp": "/private/tmp", "var": "/private/var"}
+    if len(absoluto.parts) < 2:
+        return absoluto
+    primeiro = absoluto.parts[1]
+    esperado = aliases.get(primeiro)
+    if esperado and resolver("/" + primeiro) == esperado:
+        return Path(esperado, *absoluto.parts[2:])
+    return absoluto
+
+
+def _ancestral_symlink(caminho: Path) -> bool:
+    absoluto = _normalizar_alias_sistema_mac(caminho)
     atual = Path(absoluto.anchor)
     for parte in absoluto.parts[1:-1]:
         atual = atual / parte
