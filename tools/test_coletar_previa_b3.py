@@ -6,8 +6,10 @@ from __future__ import annotations
 import copy
 import json
 import os
+import sqlite3
 import subprocess
 import sys
+import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
@@ -433,6 +435,79 @@ class ColetarPreviaB3TestCase(unittest.TestCase):
         self.assertEqual(plano["schema_version"], "previa-atualizacao-b3-v1")
         self.assertEqual(plano["resumo"]["posicoes_com_pistas"], 1)
         self.assertEqual(plano["controles"]["escritas_operacionais"], 0)
+
+    def test_integracao_cache_normalizacao_plano_preserva_correcao_e_diagnostico(self):
+        from ler_cache_wey_b3 import SCHEMA_MANIFESTO, ler_cache_wey_b3
+        from planejar_atualizacao_b3 import gerar_plano
+
+        with tempfile.TemporaryDirectory() as pasta_texto:
+            pasta = Path(pasta_texto).resolve()
+            banco = pasta / "wey.db"
+            conexao = sqlite3.connect(banco)
+            conexao.executescript("""
+                CREATE TABLE chats (jid TEXT PRIMARY KEY);
+                CREATE TABLE messages (
+                    rowid INTEGER PRIMARY KEY, chat_jid TEXT, msg_id TEXT, ts INTEGER,
+                    text TEXT, display_text TEXT, media_caption TEXT, media_type TEXT,
+                    revoked INTEGER, deleted_for_me INTEGER, deleted_at INTEGER,
+                    payload_purged_at INTEGER, edited INTEGER, edited_ts INTEGER
+                );
+            """)
+            jid = "5511999999999@s.whatsapp.net"
+            conexao.execute("INSERT INTO chats(jid) VALUES (?)", (jid,))
+            linhas = (
+                (1, "corrigida", "B3-26-001 encerrada", 0, None),
+                (2, "corrigida", "Correção: B3-26-001 foi rolada", 1, 1788250200),
+                (3, "sem-ref", "Mensagem operacional sem referência", 0, None),
+                (4, "revogada", "Encerrar B3-26-001", 0, None),
+            )
+            for rowid, msg_id, texto, editada, editada_em in linhas:
+                conexao.execute(
+                    "INSERT INTO messages(rowid,chat_jid,msg_id,ts,text,edited,edited_ts,revoked) "
+                    "VALUES(?,?,?,?,?,?,?,?)",
+                    (rowid, jid, msg_id, 1788250000 + rowid, texto, editada, editada_em,
+                     1 if msg_id == "revogada" else 0),
+                )
+            conexao.commit()
+            conexao.close()
+            banco.chmod(0o600)
+            manifesto = pasta / "manifesto.json"
+            manifesto.write_text(json.dumps({
+                "schema_version": SCHEMA_MANIFESTO, "db_path": str(banco), "chat_jid": jid,
+            }), encoding="utf-8")
+            manifesto.chmod(0o600)
+            leitura = ler_cache_wey_b3(
+                manifesto, inicio="2026-09-01T00:00:00Z", fim="2026-09-06T23:59:59Z"
+            )
+            mensagens = modulo.normalizar_mensagens(
+                leitura["documento"], conversa_ref=leitura["conversa_ref"],
+                inicio="2026-09-01T00:00:00Z", fim="2026-09-06T23:59:59Z",
+            )
+            pacote = modulo.coletar_previa_b3(
+                LeitorPaginado(), origem(), mensagens=mensagens, agora=self.agora
+            )
+            plano = gerar_plano(pacote["snapshot"], pacote["mensagens"], pacote["origem"])
+
+        self.assertEqual(len(mensagens["mensagens"]), 3)
+        refs_correcao = [m for m in mensagens["mensagens"] if m["mensagem_ref"] == mensagens["mensagens"][0]["mensagem_ref"]]
+        self.assertEqual(len(refs_correcao), 2)
+        self.assertGreaterEqual(len(plano["mensagens_sem_referencia"]), 1)
+        detalhe = plano["cobertura"]["mensagens_whatsapp"]["detalhe_sanitizado"]
+        self.assertIn("omitidas_por_estado=1", detalhe)
+        self.assertIn("editadas_sem_historico=1", detalhe)
+        self.assertNotIn("Encerrar B3-26-001", json.dumps(plano, ensure_ascii=False))
+
+    def test_cli_fontes_mutuamente_exclusivas_e_origem_validada_primeiro(self):
+        parser = modulo.construir_parser()
+        with self.assertRaises(SystemExit):
+            parser.parse_args([
+                "--origem-json", "origem.json", "--mensagens-json", "mensagens.json",
+                "--cache-wey-manifesto", "manifesto.json",
+            ])
+        with patch.object(sys, "argv", ["coletar_previa_b3.py", "--origem-json", "origem.json"]), \
+             patch.object(modulo, "_ler_json_limitado", return_value={}), \
+             patch.object(modulo, "PonteLeitura", side_effect=AssertionError("ponte acessada")):
+            self.assertEqual(modulo.main(), 2)
 
     def test_aba_nao_e_prometida_como_atomicidade(self):
         resultado = modulo.coletar_snapshot(LeitorPaginado(), agora=self.agora)

@@ -6,9 +6,9 @@ escrita. A fonte de banco é exclusivamente ``get_read`` da ponte local. As
 funções puras aceitam callbacks para que o planejador e os testes não precisem
 habilitar qualquer capacidade adicional.
 
-Mensagens de WhatsApp são aceitas somente de um leitor/cache já normalizado ou
-de um export privado no contrato ``mensagens-whatsapp-normalizadas-v1``. Isso
-não comprova captura ativa, sincronização ou cobertura fora do período pedido.
+Mensagens de WhatsApp são aceitas somente do adaptador SQLite somente leitura
+``ler_cache_wey_b3`` ou de um export privado já normalizado. Isso não comprova
+captura ativa, sincronização ou cobertura fora do período pedido.
 """
 
 from __future__ import annotations
@@ -24,6 +24,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import parse_qs, urlencode, urlsplit
+
+from ler_cache_wey_b3 import CacheWeyIndisponivel, ler_cache_wey_b3
 
 from planejar_atualizacao_b3 import (
     ErroEntrada,
@@ -503,6 +505,36 @@ def normalizar_mensagens(
         estado = "parcial"
     if (truncada or timestamp_invalido or identidade_pendente) and estado == "completa":
         estado = "parcial"
+    detalhes_permitidos = {
+        "cache_local_recorte_limitado_nao_atesta_historico_completo",
+    }
+    detalhe_sanitizado = cobertura.get("detalhe_sanitizado")
+    if not isinstance(detalhe_sanitizado, str) or detalhe_sanitizado not in detalhes_permitidos:
+        detalhe_sanitizado = None
+    diagnostico = cobertura.get("diagnostico_sanitizado")
+    if isinstance(diagnostico, dict) and set(diagnostico) == {
+        "omitidas_sem_texto", "omitidas_tamanho", "omitidas_por_estado",
+        "editadas_sem_historico", "truncada_quantidade", "truncada_bytes"
+    }:
+        inteiros = (
+            diagnostico["omitidas_sem_texto"], diagnostico["omitidas_tamanho"],
+            diagnostico["omitidas_por_estado"], diagnostico["editadas_sem_historico"],
+        )
+        booleanos = (diagnostico["truncada_quantidade"], diagnostico["truncada_bytes"])
+        if (
+            all(
+                isinstance(valor, int) and not isinstance(valor, bool) and 0 <= valor <= 1_000_000
+                for valor in inteiros
+            )
+            and all(isinstance(valor, bool) for valor in booleanos)
+        ):
+            detalhe_sanitizado = (
+                "cache_local_recorte_limitado_nao_atesta_historico_completo"
+                f";omitidas_sem_texto={inteiros[0]};omitidas_tamanho={inteiros[1]}"
+                f";omitidas_por_estado={inteiros[2]};editadas_sem_historico={inteiros[3]}"
+                f";truncada_quantidade={str(booleanos[0]).lower()}"
+                f";truncada_bytes={str(booleanos[1]).lower()}"
+            )
     return {
         "schema_version": SCHEMA_MENSAGENS,
         "cobertura": {
@@ -513,6 +545,7 @@ def normalizar_mensagens(
             "intervalo_fim": fim_utc,
             "atestado": estado == "completa" and fonte_atestada,
             "identidade_pendente": identidade_pendente,
+            **({"detalhe_sanitizado": detalhe_sanitizado} if detalhe_sanitizado else {}),
             **({"motivo": "timestamp_ausente_ou_invalido"} if timestamp_invalido else
                {"motivo": "limite_de_mensagens"} if truncada else
                {"motivo": "mensagem_sem_identidade_comprovada"} if identidade_pendente else
@@ -544,13 +577,14 @@ def coletar_previa_b3(
     max_paginas: int = 20,
     agora: Callable[[], datetime] | None = None,
 ) -> dict[str, Any]:
+    origem_validada = validar_origem(origem)
     coleta = coletar_snapshot(
         ler, limite_pagina=limite_pagina, max_paginas=max_paginas, agora=agora
     )
     pacote = {
         "snapshot": coleta["snapshot"],
         "mensagens": mensagens if mensagens is not None else mensagens_indisponiveis(),
-        "origem": validar_origem(origem),
+        "origem": origem_validada,
         "metadados": {
             "modo": "somente_leitura",
             "autoriza_escrita": False,
@@ -572,12 +606,14 @@ def _ler_json_limitado(caminho: Path, limite_bytes: int = 1_000_000) -> Any:
     return ler_json_privado(caminho)
 
 
-def main() -> int:
+def construir_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Prévia B3 somente leitura; grava apenas o plano privado solicitado."
     )
     parser.add_argument("--origem-json", required=True, type=Path)
-    parser.add_argument("--mensagens-json", type=Path)
+    fontes = parser.add_mutually_exclusive_group()
+    fontes.add_argument("--mensagens-json", type=Path)
+    fontes.add_argument("--cache-wey-manifesto", type=Path)
     parser.add_argument("--conversa-ref")
     parser.add_argument("--intervalo-inicio")
     parser.add_argument("--intervalo-fim")
@@ -585,19 +621,44 @@ def main() -> int:
     parser.add_argument("--saida", type=Path)
     parser.add_argument("--limite-pagina", type=int, default=100)
     parser.add_argument("--max-paginas", type=int, default=20)
-    args = parser.parse_args()
+    return parser
+
+
+def main() -> int:
+    args = construir_parser().parse_args()
     try:
-        origem = _ler_json_limitado(args.origem_json)
+        # A origem é validada antes de qualquer acesso ao cache ou à ponte.
+        origem = validar_origem(_ler_json_limitado(args.origem_json))
         recorte_informado = all((args.conversa_ref, args.intervalo_inicio, args.intervalo_fim))
         if args.mensagens_json and not recorte_informado:
             raise ValueError("recorte_mensagens_obrigatorio")
-        if not args.mensagens_json and any((args.conversa_ref, args.intervalo_inicio, args.intervalo_fim)):
+        if args.cache_wey_manifesto and (
+            args.conversa_ref or not args.intervalo_inicio or not args.intervalo_fim
+        ):
+            raise ValueError("recorte_cache_wey_invalido")
+        if not (args.mensagens_json or args.cache_wey_manifesto) and any(
+            (args.conversa_ref, args.intervalo_inicio, args.intervalo_fim)
+        ):
             raise ValueError("mensagens_json_obrigatorio_para_recorte")
         mensagens = mensagens_indisponiveis()
         if args.mensagens_json:
             mensagens = normalizar_mensagens(
                 _ler_json_limitado(args.mensagens_json, 8_000_000),
                 conversa_ref=args.conversa_ref,
+                inicio=args.intervalo_inicio,
+                fim=args.intervalo_fim,
+                limite=args.limite_mensagens,
+            )
+        elif args.cache_wey_manifesto:
+            leitura_cache = ler_cache_wey_b3(
+                args.cache_wey_manifesto,
+                inicio=args.intervalo_inicio,
+                fim=args.intervalo_fim,
+                limite=args.limite_mensagens,
+            )
+            mensagens = normalizar_mensagens(
+                leitura_cache["documento"],
+                conversa_ref=leitura_cache["conversa_ref"],
                 inicio=args.intervalo_inicio,
                 fim=args.intervalo_fim,
                 limite=args.limite_mensagens,
@@ -623,11 +684,18 @@ def main() -> int:
             "snapshot_hash": auditoria.get("snapshot_hash"),
             "alteracao_concorrente": auditoria["alteracao_concorrente"],
             "mensagens_estado": pacote["mensagens"]["cobertura"]["estado"],
+            "mensagens": len(pacote["mensagens"]["mensagens"]),
             "plano_id": plano["plano_id"],
             "saida": gravacao,
             "escritas": 0,
         }, ensure_ascii=False, sort_keys=True))
         return 0 if snapshot["cobertura"]["estado"] == "completa" else 2
+    except CacheWeyIndisponivel as exc:
+        print(json.dumps({
+            "estado": "indisponivel", "mensagens_estado": "indisponivel",
+            "erro_codigo": exc.codigo, "escritas": 0,
+        }, sort_keys=True))
+        return 2
     except (OSError, ValueError, json.JSONDecodeError, ErroEntrada):
         print(json.dumps({"estado": "indisponivel", "escritas": 0}, sort_keys=True))
         return 2

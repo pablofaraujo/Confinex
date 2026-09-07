@@ -34,6 +34,31 @@ A falha remota de compactação e de entrega da resposta final é uma pendência
 separada. Modelo, gateway e leitura do WhatsApp não foram alterados por esta
 correção; ajustar a coleta não resolve automaticamente esses caminhos.
 
+O adaptador SQLite experimental e opt-in `tools/ler_cache_wey_b3.py` transforma
+um recorte explícito do cache privado do Wey no mesmo contrato de mensagens
+normalizadas. A leitura e a prévia foram homologadas em RAM, com repetição do
+mesmo plano produzindo identidade e conteúdo iguais. Essa etapa não instala
+componente na VPS, não liga captura, não consulta modelo e não envia mensagem.
+Planejador, runtime e executor continuam inativos independentemente do
+resultado de uma leitura do cache.
+
+A primeira leitura real em RAM alcançou o cache, mas foi interrompida porque o
+adaptador interpretou incorretamente `edited_ts=0`, valor padrão que significa
+ausência de edição. Isso é uma incompatibilidade de metadado do adaptador, não
+falha do WhatsApp nem evidência de histórico incompleto. A correção preserva
+`NULL` e zero como ausência somente nesse campo; valores positivos continuam
+sujeitos à coerência com a marca de edição, e tipo inválido ou valor negativo
+falham fechado. A repetição real posterior passou.
+
+A prova usou uma origem Telegram sintética, não um pedido real. O cache forneceu
+um recorte sem omissões ou truncamento, mas permaneceu com cobertura histórica
+`parcial`: a mensagem mais recente observada não atesta captura contínua nem a
+completude do intervalo. O snapshot B3 também repetiu contagens e assinaturas no
+recorte declarado, sem oferecer atomicidade global. A prévia não encontrou
+referências B3 associáveis nem vínculo seguro; isso não significa ausência de
+operações fora do recorte. Nenhuma escrita, mensagem ou execução operacional
+foi realizada.
+
 ## Entradas privadas
 
 Todos os valores dos exemplos abaixo são fictícios.
@@ -150,13 +175,80 @@ python3 tools/coletar_previa_b3.py \
 ```
 
 O coletor limita paginação e mensagens, falha fechado se as duas leituras
-divergirem e deixa a fonte WhatsApp indisponível quando o arquivo de mensagens
-não é fornecido. O planejador também pode ser usado isoladamente para testar
-entradas já coletadas:
+divergirem e deixa a fonte WhatsApp indisponível quando nem o arquivo de
+mensagens nem o manifesto do cache são fornecidos. O planejador também pode ser
+usado isoladamente para testar entradas já coletadas:
 
-Terminar com código zero sem `--mensagens-json` significa apenas que o coletor
-produziu uma prévia com a fonte WhatsApp marcada como indisponível. Não prova
-cobertura histórica nem autoriza concluir que não existem mensagens.
+Terminar com código zero sem `--mensagens-json` nem `--cache-wey-manifesto`
+significa apenas que o coletor produziu uma prévia com a fonte WhatsApp marcada
+como indisponível. Mesmo quando uma das fontes é fornecida, código zero atesta
+somente o sucesso da coleta B3; não prova cobertura histórica do WhatsApp nem
+autoriza concluir que não existem mensagens.
+
+### Cache SQLite privado do Wey, experimental
+
+Como alternativa opt-in ao JSON já normalizado, o coletor aceita um manifesto
+privado que aponta para o cache e identifica exatamente uma conversa privada.
+Manifesto e saída ficam fora de qualquer ancestral Git, com acesso restrito. O
+banco é uma fonte de entrada e usa uma política distinta: caminho absoluto,
+arquivo regular pertencente ao usuário atual, modo `0600` ou `0400` e nenhum
+symlink na folha ou nos ancestrais. Ele é aberto nativamente em modo somente
+leitura, com `query_only`; o programa não executa sincronização, checkpoint nem
+mutação de mensagens. A leitura considera o WAL existente, sem prometer
+ausência física de arquivos auxiliares geridos pelo próprio SQLite.
+Identificadores brutos nunca devem aparecer no terminal ou no relatório
+público.
+
+Exemplo inteiramente fictício do manifesto privado, que deve usar modo `0600`:
+
+```json
+{
+  "schema_version": "manifesto-cache-wey-b3-v1",
+  "db_path": "/caminho/privado/wacli.db",
+  "chat_jid": "contato-ficticio@s.whatsapp.net"
+}
+```
+
+O comando experimental reutiliza o mesmo normalizador e o mesmo planejador,
+sem criar fila ou fluxo operacional paralelo:
+
+```bash
+python3 tools/coletar_previa_b3.py \
+  --origem-json /caminho/privado/origem.json \
+  --cache-wey-manifesto /caminho/privado/manifesto.json \
+  --intervalo-inicio 2026-09-01T00:00:00Z \
+  --intervalo-fim 2026-09-07T00:00:00Z \
+  --limite-mensagens 200 \
+  --saida /caminho/privado/previa-b3.json
+```
+
+`--cache-wey-manifesto` e `--mensagens-json` são mutuamente exclusivos. No
+modo cache, a referência opaca da conversa é derivada pelo adaptador; não se
+aceita `--conversa-ref` em paralelo. Início e fim devem ter fuso explícito, são
+normalizados para UTC e delimitam uma janela de no máximo 31 dias. Neste ciclo,
+somente conversas individuais com identificador `@s.whatsapp.net` são aceitas.
+
+Mesmo que a consulta percorra todas as linhas encontradas no cache dentro da
+janela, sua cobertura é sempre `parcial`, com `atestado=false`: isso prova um
+recorte do cache, não captura contínua, sincronização nem completude histórica.
+Resultado vazio tampouco prova ausência de mensagens. Formato ou esquema
+incompatível, conversa inexistente ou fora do escopo individual, intervalo
+inválido, banco ocupado, deadline ou inconsistência de leitura falham fechado.
+Limite de quantidade, bytes totais ou tamanho de célula produz uma prévia
+parcial com omissões e diagnóstico sanitizado; ela permanece revisável, nunca
+operacional nem completa. A saída fica somente em RAM ou no arquivo privado
+solicitado.
+
+Esses controles cobrem o uso operacional esperado e a publicação acidental.
+Não pretendem proteger contra o próprio usuário proprietário substituindo o
+banco ou seus arquivos auxiliares durante a leitura.
+
+Estados do cache são sinais de qualidade da evidência, nunca instruções sobre
+o Portfólio B3. Texto marcado como revogado, excluído para o titular ou com
+conteúdo expurgado deve ser omitido das pistas, com contagem sanitizada na
+cobertura, sem publicar a razão ou o conteúdo da mensagem. Quando houver
+edição, somente o texto atual pode aparecer como pista não confirmada; o cache
+não atesta nem reconstrói versões anteriores.
 
 ```bash
 python3 tools/planejar_atualizacao_b3.py \
