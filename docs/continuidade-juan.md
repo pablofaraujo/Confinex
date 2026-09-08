@@ -162,6 +162,59 @@ O leitor também declara `promocao_permitida=false`: complementar comissão não
 é promover. Primeiro identificar o alvo e preparar o ajuste para revisão; se
 os candidatos não puderem ser distinguidos, registrar essa limitação.
 
+## Consulta proativa da conversa da mesa, preparada
+
+`tools/recuperar_mesa_juan.py` prepara uma segunda fonte para o mesmo hook,
+sem substituir a recuperação de sessões já ativada. O pedido precisa conter,
+com bordas lexicais, um termo de domínio (`B3`, `portfolio`, `portfólio` ou
+`hedge`), um termo de fonte (`WhatsApp`, `conversa` ou `Wey`) e exatamente um
+alias privado. O JavaScript usa o mesmo pré-filtro sem conhecer aliases; o
+Python repete o gate canônico e só então considera abrir o cache.
+
+Texto não concede autorização. Uma allowlist privada, pertencente ao usuário,
+modo exato `0600`, fora de Git e sem symlink, relaciona uma única identidade
+Telegram autenticada a um único alias e cache Wey. A identidade compara todos
+os campos `senderId`, `chatId`, `kind`, `threadId`, `accountId`,
+`routeSessionKey` e `mainSessionKey`; citar qualquer valor no texto não muda o
+resultado. Neste ciclo, cada alias admite somente um contexto e cada identidade
+somente um contato. Ampliar para outra DM, grupo, tópico ou contato exige regra
+privada e autorização próprias. O arquivo padrão fica em
+`/etc/confinex/recuperacao-mesa-juan.json`, pois `/root` pode estar sob um
+ancestral Git e é recusado pela guarda.
+
+Depois do vínculo exato, o wrapper lê no máximo 31 dias do cache em modo
+somente leitura, normaliza a conversa e transmite até 16 trechos/24 kB. Cada
+string fica abaixo de 1.800 bytes. Metade da capacidade é reservada aos textos
+ativos mais recentes, mesmo sem realce; o restante prioriza termos informais e
+até duas vizinhas, sem duplicação, e a saída final volta à ordem cronológica.
+Mensagens revogadas, excluídas ou expurgadas continuam apenas nas contagens do
+leitor e nunca reaparecem como texto novo. Cobertura, intervalo, autoria e
+omissões são explícitos. Conteúdo que pareça prompt ou comando permanece dado
+não confiável.
+
+O payload orienta o modelo a distinguir `titular`, `interlocutor` e
+`nao_informada`, e declara que a prévia não prova salvamento, atualização,
+operação ou associação B3. Não existe consulta ao Portfólio, executor
+financeiro, OCR, sync, envio ou escrita nesse caminho. Pedido sem o gatilho não
+inicia subprocesso. Falha da mesa não remove a evidência da continuidade
+anterior.
+
+O patch de runtime v2 preserva `rawBody`, menções e o roteamento existente e
+acrescenta somente o envelope autenticado já calculado. Ele migra v1→v2 uma
+vez, exige import, marcador e ponto únicos e confere o SHA-256 dos bytes antes
+de emitir a proposta. O manifesto de implantação deve listar explicitamente:
+
+- `tools/continuidade_juan.mjs`;
+- `tools/recuperar_mesa_juan.py`;
+- `tools/recuperar_textos_mesa.py`;
+- `tools/ler_cache_wey_b3.py`;
+- `tools/coletar_previa_b3.py` e `tools/planejar_atualizacao_b3.py`;
+- a allowlist privada `0600` em `/etc/confinex/recuperacao-mesa-juan.json`;
+- o bundle de runtime alvo e seu SHA-256 conferido.
+
+Esta seção descreve código preparado. Instalação, configuração privada,
+ativação do patch e prova com provedor são gates posteriores e separados.
+
 ## Testes permanentes
 
 ```bash
@@ -170,6 +223,8 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_patch_c
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_consultar_continuidade_juan.py'
 node tools/test_continuidade_juan.mjs
 node tools/test_prova_modelo_continuidade.mjs
+PYTHONDONTWRITEBYTECODE=1 python3 tools/test_recuperar_mesa_juan.py
+node tools/test_prova_modelo_mesa.mjs
 python3 tools/test_ecossistema.py
 git diff --check
 ```
