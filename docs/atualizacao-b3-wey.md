@@ -316,6 +316,16 @@ fila, timer, serviço ou runtime.
 No resumo de terminal, `escritas=0` significa zero escrita operacional; o
 arquivo local privado em `--saida` é a única gravação explicitamente pedida.
 
+O adaptador preparado `tools/recuperar_mesa_juan.py` reutiliza esse leitor e o
+helper em RAM para fornecer ao hook de continuidade até 16 trechos/24 kB. Ele
+exige remetente e contexto Telegram autenticados na allowlist privada, além de
+pedido explícito com domínio B3, fonte WhatsApp e alias exato. Reserva espaço
+para textos recentes mesmo sem realce e preserva autoria, intervalo e omissões.
+Essa recuperação não chama o planejador abaixo, não consulta o snapshot ou a
+ponte B3 e não cria vínculo: os trechos continuam dados não confiáveis para
+revisão. O código está preparado, mas configuração, patch do runtime e prova de
+modelo são gates separados descritos em `docs/continuidade-juan.md`.
+
 ```bash
 python3 tools/planejar_atualizacao_b3.py \
   --snapshot /caminho/privado/snapshot-b3.json \
