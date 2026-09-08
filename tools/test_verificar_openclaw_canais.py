@@ -69,13 +69,183 @@ class VerificarOpenClawCanaisTest(unittest.TestCase):
             fallbacks=["anthropic/claude-sonnet-4-6"],
         ), ["modelo_fallback_indisponivel:anthropic/claude-sonnet-4-6"])
         self.assertIn(
-            "modelo_primario_indisponivel:openai/gpt-5.4",
+            "modelo_primario_sem_resposta:openai/gpt-5.4",
             validar_probe_modelos(
                 payload,
                 primario="openai/gpt-5.4",
                 fallbacks=[],
             ),
         )
+
+    def test_probe_sem_resposta_nao_prova_indisponibilidade(self):
+        for payload in (None, {}, {"auth": {"probes": {"results": []}}}):
+            with self.subTest(payload=payload):
+                falhas = validar_probe_modelos(
+                    payload,
+                    primario="openai/gpt-5.5",
+                    fallbacks=["openai/gpt-5.4"],
+                )
+                self.assertTrue(any("probe_modelos_" in falha for falha in falhas))
+                self.assertFalse(any("indisponivel" in falha for falha in falhas))
+
+    def test_probe_resultado_explicito_negativo_prova_indisponibilidade(self):
+        payload = {"auth": {"probes": {"results": [
+            {"model": "openai/gpt-5.5", "status": "auth"},
+            {"model": "openai/gpt-5.4", "status": "erro"},
+        ]}}}
+        self.assertEqual(validar_probe_modelos(
+            payload,
+            primario="openai/gpt-5.5",
+            fallbacks=["openai/gpt-5.4"],
+        ), [
+            "modelo_primario_indisponivel:openai/gpt-5.5",
+            "modelo_fallback_indisponivel:openai/gpt-5.4",
+        ])
+
+    @patch("tools.verificar_openclaw_canais.json_comando")
+    def test_validar_modelos_sem_payload_nao_inventa_indisponibilidade(self, comando):
+        comando.return_value = None
+        config = {"agents": {"list": [{"id": "juan", "model": {
+            "primary": "openai/gpt-5.5",
+            "fallbacks": ["openai/gpt-5.4"],
+        }}]}}
+        with tempfile.TemporaryDirectory() as pasta:
+            falhas = validar_modelos(
+                config,
+                ambiente={},
+                cache=Path(pasta) / "probe.json",
+                intervalo=1800,
+                forcar=True,
+            )
+        self.assertEqual(falhas, ["probe_modelos_falhou:juan"])
+
+    @patch("tools.verificar_openclaw_canais.json_comando")
+    def test_validar_modelos_results_vazio_nao_inventa_indisponibilidade(self, comando):
+        comando.return_value = {"auth": {"probes": {"results": []}}}
+        config = {"agents": {"list": [{"id": "juan", "model": {
+            "primary": "openai/gpt-5.5",
+            "fallbacks": ["openai/gpt-5.4"],
+        }}]}}
+        with tempfile.TemporaryDirectory() as pasta:
+            falhas = validar_modelos(
+                config,
+                ambiente={},
+                cache=Path(pasta) / "probe.json",
+                intervalo=1800,
+                forcar=True,
+            )
+        self.assertEqual(falhas, ["probe_modelos_falhou:juan"])
+
+    @patch("tools.verificar_openclaw_canais.json_comando")
+    def test_validar_modelos_payloads_malformados_falham_fechado(self, comando):
+        payloads = [
+            {"auth": "texto"},
+            {"auth": {"probes": []}},
+            {"auth": {"probes": {"results": 12}}},
+            {"auth": {"probes": {"results": {"model": "openai/gpt-5.5", "status": "ok"}}}},
+            {"auth": {"probes": {"results": [{}]}}},
+            {"auth": {"probes": {"results": [{"model": "openai/gpt-5.5"}]}}},
+            {"auth": {"probes": {"results": [{"model": 12, "status": "ok"}]}}},
+            {"auth": {"probes": {"results": [{"model": "openai/gpt-5.5", "status": True}]}}},
+        ]
+        config = {"agents": {"list": [{"id": "juan", "model": {
+            "primary": "openai/gpt-5.5", "fallbacks": [],
+        }}]}}
+        for payload in payloads:
+            with self.subTest(payload=payload), tempfile.TemporaryDirectory() as pasta:
+                comando.return_value = payload
+                falhas = validar_modelos(
+                    config,
+                    ambiente={},
+                    cache=Path(pasta) / "probe.json",
+                    intervalo=1800,
+                    forcar=True,
+                )
+                self.assertEqual(falhas, ["probe_modelos_falhou:juan"])
+                self.assertFalse(any("indisponivel" in falha for falha in falhas))
+
+    @patch("tools.verificar_openclaw_canais.json_comando")
+    def test_primario_ok_com_fallback_ausente_permanece_bloqueado(self, comando):
+        comando.return_value = {"auth": {"probes": {"results": [
+            {"model": "openai/gpt-5.5", "status": "ok"},
+        ]}}}
+        config = {"agents": {"list": [{"id": "juan", "model": {
+            "primary": "openai/gpt-5.5", "fallbacks": ["openai/gpt-5.4"],
+        }}]}}
+        with tempfile.TemporaryDirectory() as pasta:
+            falhas = validar_modelos(
+                config, ambiente={}, cache=Path(pasta) / "probe.json",
+                intervalo=1800, forcar=True,
+            )
+        self.assertEqual(falhas, ["probe_modelos_falhou:juan"])
+
+    @patch("tools.verificar_openclaw_canais.json_comando")
+    def test_resultado_negativo_explicito_no_chamador_e_indisponibilidade(self, comando):
+        comando.return_value = {"auth": {"probes": {"results": [
+            {"model": "openai/gpt-5.5", "status": "auth"},
+        ]}}}
+        config = {"agents": {"list": [{"id": "juan", "model": {
+            "primary": "openai/gpt-5.5", "fallbacks": [],
+        }}]}}
+        with tempfile.TemporaryDirectory() as pasta:
+            falhas = validar_modelos(
+                config, ambiente={}, cache=Path(pasta) / "probe.json",
+                intervalo=1800, forcar=True,
+            )
+        self.assertEqual(falhas, ["modelo_primario_indisponivel:openai/gpt-5.5"])
+
+    @patch("tools.verificar_openclaw_canais.json_comando")
+    def test_modelo_inesperado_nao_prova_indisponibilidade_configurada(self, comando):
+        comando.return_value = {"auth": {"probes": {"results": [
+            {"model": "modelo/inesperado", "status": "ok"},
+        ]}}}
+        config = {"agents": {"list": [{"id": "juan", "model": {
+            "primary": "openai/gpt-5.5", "fallbacks": [],
+        }}]}}
+        with tempfile.TemporaryDirectory() as pasta:
+            falhas = validar_modelos(
+                config, ambiente={}, cache=Path(pasta) / "probe.json",
+                intervalo=1800, forcar=True,
+            )
+        self.assertEqual(falhas, ["probe_modelos_falhou:juan"])
+
+    @patch("tools.verificar_openclaw_canais.json_comando")
+    def test_falha_de_um_agente_nao_interrompe_validacao_do_seguinte(self, comando):
+        comando.side_effect = [
+            {"auth": "malformado"},
+            {"auth": {"probes": {"results": [
+                {"model": "openai/gpt-5.4", "status": "ok"},
+            ]}}},
+        ]
+        config = {"agents": {"list": [
+            {"id": "juan", "model": {"primary": "openai/gpt-5.5", "fallbacks": []}},
+            {"id": "wey", "model": {"primary": "openai/gpt-5.4", "fallbacks": []}},
+        ]}}
+        with tempfile.TemporaryDirectory() as pasta:
+            falhas = validar_modelos(
+                config, ambiente={}, cache=Path(pasta) / "probe.json",
+                intervalo=1800, forcar=True,
+            )
+        self.assertEqual(falhas, ["probe_modelos_falhou:juan"])
+        self.assertEqual(comando.call_count, 2)
+
+    @patch("tools.verificar_openclaw_canais.json_comando")
+    def test_status_ok_precisa_ser_exato(self, comando):
+        comando.return_value = {"auth": {"probes": {"results": [
+            {"model": "openai/gpt-5.5", "status": "OK"},
+        ]}}}
+        config = {"agents": {"list": [{"id": "juan", "model": {
+            "primary": "openai/gpt-5.5", "fallbacks": [],
+        }}]}}
+        with tempfile.TemporaryDirectory() as pasta:
+            falhas = validar_modelos(
+                config,
+                ambiente={},
+                cache=Path(pasta) / "probe.json",
+                intervalo=1800,
+                forcar=True,
+            )
+        self.assertEqual(falhas, ["modelo_primario_indisponivel:openai/gpt-5.5"])
 
     @patch("tools.verificar_openclaw_canais.json_comando")
     def test_probe_modelos_usa_cache_sanitizado(self, comando):

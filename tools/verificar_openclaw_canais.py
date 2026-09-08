@@ -111,6 +111,16 @@ def configuracoes_modelos(configuracao: dict[str, Any]) -> list[dict[str, Any]]:
     return configuracoes
 
 
+def resultados_probe_modelos(payload: Any) -> list[Any] | None:
+    """Extrai apenas a lista estruturalmente valida; ``None`` indica falha do probe."""
+    if not isinstance(payload, dict):
+        return None
+    auth = payload.get("auth")
+    probes = auth.get("probes") if isinstance(auth, dict) else None
+    resultados = probes.get("results") if isinstance(probes, dict) else None
+    return resultados if isinstance(resultados, list) else None
+
+
 def validar_probe_modelos(
     payload: Any,
     *,
@@ -119,21 +129,32 @@ def validar_probe_modelos(
 ) -> list[str]:
     if not isinstance(payload, dict):
         return ["probe_modelos_falhou"]
-    resultados = ((((payload.get("auth") or {}).get("probes") or {})
-                   .get("results")) or [])
+    resultados = resultados_probe_modelos(payload)
+    if not resultados:
+        return ["probe_modelos_sem_resposta"]
     por_modelo: dict[str, list[str]] = {}
     for item in resultados:
-        if not isinstance(item, dict) or not item.get("model"):
+        if (
+            not isinstance(item, dict)
+            or not isinstance(item.get("model"), str)
+            or not item["model"]
+            or not isinstance(item.get("status"), str)
+            or not item["status"]
+        ):
             continue
-        por_modelo.setdefault(str(item["model"]), []).append(
-            str(item.get("status") or "desconhecido")
-        )
+        por_modelo.setdefault(item["model"], []).append(item["status"])
 
     falhas = []
-    if not any(status in STATUS_MODELO_OK for status in por_modelo.get(primario, [])):
+    statuses_primario = por_modelo.get(primario, [])
+    if not statuses_primario:
+        falhas.append(f"modelo_primario_sem_resposta:{primario}")
+    elif not any(status in STATUS_MODELO_OK for status in statuses_primario):
         falhas.append(f"modelo_primario_indisponivel:{primario}")
     for modelo in fallbacks:
-        if not any(status in STATUS_MODELO_OK for status in por_modelo.get(modelo, [])):
+        statuses_fallback = por_modelo.get(modelo, [])
+        if not statuses_fallback:
+            falhas.append(f"modelo_fallback_sem_resposta:{modelo}")
+        elif not any(status in STATUS_MODELO_OK for status in statuses_fallback):
             falhas.append(f"modelo_fallback_indisponivel:{modelo}")
     return falhas
 
@@ -157,6 +178,7 @@ def validar_modelos(
 
     configuracoes = configuracoes_modelos(configuracao)
     resultados: list[dict[str, Any]] = []
+    modelos_com_resposta: set[str] = set()
     falhas = []
     for item in configuracoes:
         payload = json_comando([
@@ -167,9 +189,30 @@ def validar_modelos(
         if not isinstance(payload, dict):
             falhas.append(f"probe_modelos_falhou:{item['agente']}")
             continue
-        itens = ((((payload.get("auth") or {}).get("probes") or {})
-                 .get("results")) or [])
-        resultados.extend(item for item in itens if isinstance(item, dict))
+        itens = resultados_probe_modelos(payload)
+        if itens is None:
+            falhas.append(f"probe_modelos_falhou:{item['agente']}")
+            continue
+        respostas_validas = 0
+        for resultado in itens:
+            if not isinstance(resultado, dict):
+                continue
+            resultados.append(resultado)
+            if (
+                isinstance(resultado.get("model"), str)
+                and resultado["model"]
+                and isinstance(resultado.get("status"), str)
+                and resultado["status"]
+            ):
+                modelos_com_resposta.add(resultado["model"])
+                respostas_validas += 1
+        if respostas_validas == 0:
+            falhas.append(f"probe_modelos_falhou:{item['agente']}")
+
+    for item in configuracoes:
+        modelos_esperados = {item["primario"], *item["fallbacks"]}
+        if not modelos_esperados.issubset(modelos_com_resposta):
+            falhas.append(f"probe_modelos_falhou:{item['agente']}")
 
     consolidado = {"auth": {"probes": {"results": resultados}}}
     primarios = sorted({item["primario"] for item in configuracoes})
@@ -180,13 +223,17 @@ def validar_modelos(
         if modelo not in primarios
     })
     for modelo in primarios:
+        if modelo not in modelos_com_resposta:
+            continue
         falhas.extend(validar_probe_modelos(
             consolidado, primario=modelo, fallbacks=[],
         ))
     if primarios:
         falhas.extend(
             falha for falha in validar_probe_modelos(
-                consolidado, primario=primarios[0], fallbacks=fallbacks,
+                consolidado,
+                primario=primarios[0],
+                fallbacks=[modelo for modelo in fallbacks if modelo in modelos_com_resposta],
             )
             if falha.startswith("modelo_fallback_indisponivel:")
         )

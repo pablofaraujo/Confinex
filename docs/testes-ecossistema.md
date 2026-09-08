@@ -186,6 +186,11 @@ passa pelo roteador em `--dry-run`, e cada configuração distinta de modelos
 recebe um probe oficial limitado a um token a cada trinta minutos. O cache
 contém somente horário e códigos de falha. Depois de corrigir uma credencial,
 use `--forcar-probe-modelos` para ignorar o cache e obter nova prova imediata.
+Falha, ausência ou formato inválido da resposta do verificador continua
+bloqueando o heartbeat, mas não é evidência de indisponibilidade do modelo.
+Somente um resultado explícito para o modelo com status diferente do literal
+`ok` recebe a classificação de indisponibilidade. O probe é uma verificação
+pontual e não comprova atendimento ponta a ponta pelos agentes ou canais.
 Em cada execução, ele também roda a prévia do índice de sessões dos quatro
 agentes. Se houver referência para arquivo ausente, o autorreparo aplica apenas
 `--fix-missing` e confirma nova prévia com zero ausências; qualquer sinal de
