@@ -250,6 +250,29 @@ cobertura, sem publicar a razão ou o conteúdo da mensagem. Quando houver
 edição, somente o texto atual pode aparecer como pista não confirmada; o cache
 não atesta nem reconstrói versões anteriores.
 
+Rótulos técnicos de anexo não são texto de negócio. Neste ciclo, a lista fechada
+reconhece somente os pares exatos `text=[Audio]`,
+`display_text=Sent audio` e `media_caption=[Audio]`, e somente quando
+`media_type=audio`; não generaliza outros tipos, campos ou rótulos. Assim,
+`Sent audio` em `text` ou `media_caption` permanece texto humano. Procurar a
+palavra “áudio” ou outra palavra de mídia dentro de uma frase humana é
+proibido. Depois de remover somente os marcadores reconhecidos, o
+leitor mantém a prioridade existente `text` → `display_text` → `media_caption` e
+seleciona um único texto; campos conflitantes não são combinados. Quando restar
+somente um marcador reconhecido, a mensagem não entra nas evidências e aumenta
+apenas uma contagem sanitizada de anexos sem texto. Áudio com os três campos
+textuais vazios entra na mesma contagem. Essa
+omissão não é OCR nem prova que o anexo não contém informação: áudio, imagem ou
+documento sem legenda continuam sem conteúdo pesquisável neste ciclo. A
+validação desta política é um gate próprio e não deve ser inferida da
+homologação anterior do recorte.
+
+Sugestões de vínculo para evidências sem `B3-AA-NNN` foram adiadas. Símbolo BGI,
+quantidade, preço, data, direção ou código `CF-AA-NNN` podem permanecer no texto
+privado para conferência, mas não são usados como chave ou confirmação de
+vínculo, não criam associação e não alteram dados do snapshot. O conteúdo e o
+diagnóstico sanitizado continuam podendo alterar `mensagens_hash` e `plano_id`.
+
 ```bash
 python3 tools/planejar_atualizacao_b3.py \
   --snapshot /caminho/privado/snapshot-b3.json \

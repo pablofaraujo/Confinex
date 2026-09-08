@@ -17,6 +17,7 @@ import sqlite3
 import stat
 import sys
 import time
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -61,6 +62,11 @@ COLUNAS_MENSAGENS = {
 }
 COLUNAS_CHATS = {"jid": "TEXT"}
 DETALHE_COBERTURA = "cache_local_recorte_limitado_nao_atesta_historico_completo"
+MARCADORES_AUDIO_POR_CAMPO = {
+    "text": frozenset({"[audio]"}),
+    "display_text": frozenset({"sent audio"}),
+    "media_caption": frozenset({"[audio]"}),
+}
 
 
 class CacheWeyIndisponivel(RuntimeError):
@@ -215,6 +221,18 @@ def _janela(inicio: str, fim: str) -> tuple[datetime, datetime, int, int]:
 
 def _referencia_opaca(valor: str, tamanho: int = 24) -> str:
     return hashlib.sha256(valor.encode("utf-8")).hexdigest()[:tamanho]
+
+
+def _normalizar_para_comparacao(valor: str) -> str:
+    return unicodedata.normalize("NFKC", valor).strip().casefold()
+
+
+def _marcador_anexo_sem_texto(campo: str, valor: str, media_type: str | None) -> bool:
+    return (
+        media_type is not None
+        and _normalizar_para_comparacao(media_type) == "audio"
+        and _normalizar_para_comparacao(valor) in MARCADORES_AUDIO_POR_CAMPO[campo]
+    )
 
 
 def _colunas_tabela(conexao: sqlite3.Connection, tabela: str) -> list[tuple[Any, ...]]:
@@ -372,6 +390,7 @@ def ler_cache_wey_b3_manifesto(
     truncada_quantidade = len(linhas) > limite
     omitidas_sem_texto = 0
     omitidas_tamanho = 0
+    omitidas_anexo_sem_texto = 0
     omitidas_por_estado = 0
     editadas_sem_historico = 0
     truncada_bytes = False
@@ -411,35 +430,75 @@ def ler_cache_wey_b3_manifesto(
             continue
         if edited == 1:
             editadas_sem_historico += 1
-        candidatos: list[tuple[str | None, int | None]] = []
-        for bruto, tamanho_original in (
-            (texto_bytes, texto_tamanho),
-            (display_bytes, display_tamanho),
-            (legenda_bytes, legenda_tamanho),
+        if _media_tipo_bytes is None:
+            if media_tipo_tamanho is not None:
+                _falhar("conteudo_cache_invalido")
+            media_type = None
+        elif (
+            not isinstance(_media_tipo_bytes, bytes)
+            or isinstance(media_tipo_tamanho, bool)
+            or not isinstance(media_tipo_tamanho, int)
+            or not 0 <= media_tipo_tamanho <= 256
+        ):
+            _falhar("conteudo_cache_invalido")
+        else:
+            try:
+                media_type = _media_tipo_bytes.decode("utf-8")
+            except UnicodeDecodeError:
+                _falhar("conteudo_cache_invalido")
+
+        candidatos: list[tuple[str, str, int]] = []
+        for campo, bruto, tamanho_original in (
+            ("text", texto_bytes, texto_tamanho),
+            ("display_text", display_bytes, display_tamanho),
+            ("media_caption", legenda_bytes, legenda_tamanho),
         ):
             if bruto is None:
                 if tamanho_original is not None:
                     _falhar("conteudo_cache_invalido")
-                candidatos.append((None, None))
                 continue
-            if not isinstance(bruto, bytes) or isinstance(tamanho_original, bool) or not isinstance(tamanho_original, int):
+            if (
+                not isinstance(bruto, bytes)
+                or isinstance(tamanho_original, bool)
+                or not isinstance(tamanho_original, int)
+                or tamanho_original < 0
+            ):
                 _falhar("conteudo_cache_invalido")
             try:
-                candidatos.append((bruto.decode("utf-8"), tamanho_original))
+                candidato = bruto.decode("utf-8")
             except UnicodeDecodeError:
                 _falhar("conteudo_cache_invalido")
-        escolhido = next(
-            ((valor, tamanho) for valor, tamanho in candidatos if isinstance(valor, str) and valor.strip()),
-            None,
-        )
-        conteudo = escolhido[0] if escolhido else None
-        if conteudo is None:
-            omitidas_sem_texto += 1
-            continue
-        tamanho = escolhido[1]
-        if not isinstance(tamanho, int) or tamanho > max_bytes_mensagem:
+            candidatos.append((campo, candidato, tamanho_original))
+
+        conteudo: str | None = None
+        tamanho: int | None = None
+        encontrou_marcador = False
+        excedeu_tamanho = False
+        for campo, candidato, tamanho_original in candidatos:
+            if not candidato.strip():
+                continue
+            if tamanho_original > max_bytes_mensagem:
+                excedeu_tamanho = True
+                break
+            if _marcador_anexo_sem_texto(campo, candidato, media_type):
+                encontrou_marcador = True
+                continue
+            conteudo = candidato
+            tamanho = tamanho_original
+            break
+        if excedeu_tamanho:
             omitidas_tamanho += 1
             continue
+        if conteudo is None:
+            if encontrou_marcador or (
+                media_type is not None and _normalizar_para_comparacao(media_type) == "audio"
+            ):
+                omitidas_anexo_sem_texto += 1
+            else:
+                omitidas_sem_texto += 1
+            continue
+        if not isinstance(tamanho, int):
+            _falhar("conteudo_cache_invalido")
         if bytes_total + tamanho > max_bytes_total:
             truncada_bytes = True
             break
@@ -461,12 +520,6 @@ def ler_cache_wey_b3_manifesto(
                 _falhar("identidade_cache_invalida")
             if not msg_id:
                 _falhar("identidade_cache_invalida")
-        if media_tipo_tamanho is not None and (
-            isinstance(media_tipo_tamanho, bool)
-            or not isinstance(media_tipo_tamanho, int)
-            or media_tipo_tamanho > 256
-        ):
-            _falhar("conteudo_cache_invalido")
         mensagem_ref = None if msg_id is None else "msg_" + _referencia_opaca(msg_id)
         identidade_pendente = identidade_pendente or mensagem_ref is None
         bytes_total += tamanho
@@ -488,6 +541,7 @@ def ler_cache_wey_b3_manifesto(
         "mensagens_processadas": len(mensagens),
         "omitidas_sem_texto": omitidas_sem_texto,
         "omitidas_tamanho": omitidas_tamanho,
+        "omitidas_anexo_sem_texto": omitidas_anexo_sem_texto,
         "omitidas_por_estado": omitidas_por_estado,
         "editadas_sem_historico": editadas_sem_historico,
         "truncada_quantidade": truncada_quantidade,
@@ -509,6 +563,7 @@ def ler_cache_wey_b3_manifesto(
                 "diagnostico_sanitizado": {
                     "omitidas_sem_texto": omitidas_sem_texto,
                     "omitidas_tamanho": omitidas_tamanho,
+                    "omitidas_anexo_sem_texto": omitidas_anexo_sem_texto,
                     "omitidas_por_estado": omitidas_por_estado,
                     "editadas_sem_historico": editadas_sem_historico,
                     "truncada_quantidade": truncada_quantidade,

@@ -157,6 +157,114 @@ class TestLeitorCacheWey(unittest.TestCase):
         self.assertEqual([m["texto"] for m in resultado["documento"]["mensagens"]], ["texto", "display", "legenda"])
         self.assertEqual(resultado["metadados"]["omitidas_sem_texto"], 1)
 
+    def test_marcadores_exatos_de_audio_sao_omitidos_sem_ocr(self) -> None:
+        self._inserir(
+            1, "audio", 1788220800,
+            texto=" [Audio] ", display="SENT AUDIO", legenda="［Ａｕｄｉｏ］", media=" audio ",
+        )
+        resultado = self._ler()
+        self.assertEqual(resultado["documento"]["mensagens"], [])
+        self.assertEqual(resultado["metadados"]["omitidas_anexo_sem_texto"], 1)
+        self.assertEqual(resultado["metadados"]["omitidas_sem_texto"], 0)
+        self.assertFalse(resultado["documento"]["cobertura"]["truncada"])
+
+    def test_audio_sem_campos_conta_anexo_e_vazio_sem_tipo_conta_sem_texto(self) -> None:
+        self._inserir(1, "audio-vazio", 1788220800, media="audio")
+        self._inserir(2, "vazio", 1788220801)
+        resultado = self._ler()
+        self.assertEqual(resultado["documento"]["mensagens"], [])
+        self.assertEqual(resultado["metadados"]["omitidas_anexo_sem_texto"], 1)
+        self.assertEqual(resultado["metadados"]["omitidas_sem_texto"], 1)
+
+    def test_allowlist_de_midia_e_exata_por_campo_e_tipo(self) -> None:
+        ts = 1788220800
+        self._inserir(1, "humano", ts, texto="enviei o áudio sobre BGI", display="Sent audio", media="audio")
+        self._inserir(2, "display", ts + 1, texto="[Audio]", display="Fechei BGI", media="audio")
+        self._inserir(3, "tipo", ts + 2, texto="[Audio]", media="document")
+        self._inserir(4, "campo-text", ts + 3, texto="Sent audio", media="audio")
+        self._inserir(5, "campo-display", ts + 4, display="[Audio]", media="audio")
+        self._inserir(6, "campo-caption", ts + 5, legenda="Sent audio", media="audio")
+        resultado = self._ler()
+        self.assertEqual(
+            [m["texto"] for m in resultado["documento"]["mensagens"]],
+            ["enviei o áudio sobre BGI", "Fechei BGI", "[Audio]", "Sent audio", "[Audio]", "Sent audio"],
+        )
+        self.assertEqual(resultado["metadados"]["omitidas_anexo_sem_texto"], 0)
+
+    def test_legenda_humana_apos_dois_marcadores_e_preservada(self) -> None:
+        self._inserir(
+            1, "legenda", 1788220800, texto="[Audio]", display="Sent audio",
+            legenda="Fechei BGI-26-001", media="audio",
+        )
+        resultado = self._ler()
+        self.assertEqual(resultado["documento"]["mensagens"][0]["texto"], "Fechei BGI-26-001")
+
+    def test_substring_e_marcador_desconhecido_sao_preservados(self) -> None:
+        self._inserir(1, "substring", 1788220800, texto="[Audio] texto humano", media="audio")
+        self._inserir(2, "desconhecido", 1788220801, texto="[Voice]", media="audio")
+        resultado = self._ler()
+        self.assertEqual(
+            [m["texto"] for m in resultado["documento"]["mensagens"]],
+            ["[Audio] texto humano", "[Voice]"],
+        )
+
+    def test_legenda_humana_grande_apos_marcadores_nao_fabrica_fallback(self) -> None:
+        self._inserir(
+            1, "legenda-grande", 1788220800, texto="[Audio]", display="Sent audio",
+            legenda="12345", media="audio",
+        )
+        resultado = self._ler(max_bytes_mensagem=4, max_bytes_total=20)
+        self.assertEqual(resultado["documento"]["mensagens"], [])
+        self.assertEqual(resultado["metadados"]["omitidas_tamanho"], 1)
+        self.assertEqual(resultado["metadados"]["omitidas_anexo_sem_texto"], 0)
+
+    def test_media_type_e_validado_e_limitado_antes_da_classificacao(self) -> None:
+        conexao = sqlite3.connect(self.db)
+        conexao.execute(
+            "INSERT INTO messages(rowid,chat_jid,msg_id,ts,text,media_type) VALUES(?,?,?,?,?,?)",
+            (1, self.jid, "tipo", 1788220800, "[Audio]", sqlite3.Binary(b"\xff")),
+        )
+        conexao.commit()
+        conexao.close()
+        with self.assertRaisesRegex(CacheWeyIndisponivel, "conteudo_cache_invalido"):
+            self._ler()
+
+    def test_media_type_acima_do_limite_falha_fechado(self) -> None:
+        self._inserir(1, "tipo-grande", 1788220800, texto="[Audio]", media="a" * 257)
+        with self.assertRaisesRegex(CacheWeyIndisponivel, "conteudo_cache_invalido"):
+            self._ler()
+
+    def test_campo_inferior_corrompido_falha_mesmo_com_texto_prioritario(self) -> None:
+        conexao = sqlite3.connect(self.db)
+        conexao.execute(
+            "INSERT INTO messages(rowid,chat_jid,msg_id,ts,text,display_text,media_type) "
+            "VALUES(?,?,?,?,?,?,?)",
+            (1, self.jid, "corrompida", 1788220800, "texto válido", sqlite3.Binary(b"\xff"), "audio"),
+        )
+        conexao.commit()
+        conexao.close()
+        with self.assertRaisesRegex(CacheWeyIndisponivel, "conteudo_cache_invalido"):
+            self._ler()
+        conexao = sqlite3.connect(self.db)
+        conexao.execute("UPDATE messages SET media_type = ?", ("a" * 257,))
+        conexao.commit()
+        conexao.close()
+        with self.assertRaisesRegex(CacheWeyIndisponivel, "conteudo_cache_invalido"):
+            self._ler()
+
+    def test_texto_prioritario_acima_do_limite_nao_cai_para_campo_inferior(self) -> None:
+        self._inserir(1, "grande", 1788220800, texto="12345", display="ok", media="audio")
+        resultado = self._ler(max_bytes_mensagem=4, max_bytes_total=20)
+        self.assertEqual(resultado["documento"]["mensagens"], [])
+        self.assertEqual(resultado["metadados"]["omitidas_tamanho"], 1)
+        self.assertEqual(resultado["metadados"]["omitidas_anexo_sem_texto"], 0)
+
+    def test_campo_inferior_grande_nao_substitui_texto_prioritario_valido(self) -> None:
+        self._inserir(1, "prioridade", 1788220800, texto="ok", display="12345", media="audio")
+        resultado = self._ler(max_bytes_mensagem=4, max_bytes_total=20)
+        self.assertEqual([m["texto"] for m in resultado["documento"]["mensagens"]], ["ok"])
+        self.assertEqual(resultado["metadados"]["omitidas_tamanho"], 0)
+
     def test_msg_id_ausente_nao_e_inventado(self) -> None:
         self._inserir(1, None, 1788220800, texto="sem id")
         resultado = self._ler()

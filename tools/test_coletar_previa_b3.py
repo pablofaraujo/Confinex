@@ -468,6 +468,11 @@ class ColetarPreviaB3TestCase(unittest.TestCase):
                     (rowid, jid, msg_id, 1788250000 + rowid, texto, editada, editada_em,
                      1 if msg_id == "revogada" else 0),
                 )
+            conexao.execute(
+                "INSERT INTO messages(rowid,chat_jid,msg_id,ts,text,display_text,media_caption,media_type) "
+                "VALUES(?,?,?,?,?,?,?,?)",
+                (5, jid, "audio", 1788250005, "[Audio]", "Sent audio", "[Audio]", "audio"),
+            )
             conexao.commit()
             conexao.close()
             banco.chmod(0o600)
@@ -495,7 +500,84 @@ class ColetarPreviaB3TestCase(unittest.TestCase):
         detalhe = plano["cobertura"]["mensagens_whatsapp"]["detalhe_sanitizado"]
         self.assertIn("omitidas_por_estado=1", detalhe)
         self.assertIn("editadas_sem_historico=1", detalhe)
+        self.assertIn("omitidas_anexo_sem_texto=1", detalhe)
         self.assertNotIn("Encerrar B3-26-001", json.dumps(plano, ensure_ascii=False))
+        self.assertNotIn("Sent audio", json.dumps(plano, ensure_ascii=False))
+
+    def test_diagnostico_legado_e_malformado_nao_vazam_e_hash_e_deterministico(self):
+        from planejar_atualizacao_b3 import gerar_plano
+
+        base = {
+            "schema_version": modulo.SCHEMA_MENSAGENS,
+            "cobertura": {
+                "estado": "parcial",
+                "detalhe_sanitizado": "cache_local_recorte_limitado_nao_atesta_historico_completo",
+                "diagnostico_sanitizado": {
+                    "omitidas_sem_texto": 0, "omitidas_tamanho": 0,
+                    "omitidas_por_estado": 0, "editadas_sem_historico": 0,
+                    "truncada_quantidade": False, "truncada_bytes": False,
+                },
+            },
+            "mensagens": [{
+                "conversa_ref": "c1", "mensagem_ref": "m1",
+                "timestamp": "2026-09-02T00:00:00Z", "texto": "B3-26-001 encerrada",
+            }],
+        }
+        legado = modulo.normalizar_mensagens(
+            base, conversa_ref="c1", inicio="2026-09-01T00:00:00Z", fim="2026-09-06T23:59:59Z"
+        )
+        self.assertIn("omitidas_sem_texto=0", legado["cobertura"]["detalhe_sanitizado"])
+        self.assertNotIn("omitidas_anexo_sem_texto", legado["cobertura"]["detalhe_sanitizado"])
+
+        malformado = copy.deepcopy(base)
+        malformado["cobertura"]["diagnostico_sanitizado"]["extra"] = "segredo"
+        filtrado = modulo.normalizar_mensagens(
+            malformado, conversa_ref="c1", inicio="2026-09-01T00:00:00Z", fim="2026-09-06T23:59:59Z"
+        )
+        self.assertNotIn("segredo", json.dumps(filtrado, ensure_ascii=False))
+        pacote = modulo.coletar_previa_b3(
+            LeitorPaginado(), origem(), mensagens=legado, agora=self.agora
+        )
+        primeiro = gerar_plano(pacote["snapshot"], pacote["mensagens"], pacote["origem"])
+        segundo = gerar_plano(pacote["snapshot"], pacote["mensagens"], pacote["origem"])
+        self.assertEqual(primeiro["plano_id"], segundo["plano_id"])
+        self.assertEqual(primeiro["mensagens_hash"], segundo["mensagens_hash"])
+
+        novo_zero = copy.deepcopy(base)
+        novo_zero["cobertura"]["diagnostico_sanitizado"]["omitidas_anexo_sem_texto"] = 0
+        mensagens_zero = modulo.normalizar_mensagens(
+            novo_zero, conversa_ref="c1", inicio="2026-09-01T00:00:00Z", fim="2026-09-06T23:59:59Z"
+        )
+        novo_um = copy.deepcopy(novo_zero)
+        novo_um["cobertura"]["diagnostico_sanitizado"]["omitidas_anexo_sem_texto"] = 1
+        mensagens_um = modulo.normalizar_mensagens(
+            novo_um, conversa_ref="c1", inicio="2026-09-01T00:00:00Z", fim="2026-09-06T23:59:59Z"
+        )
+        plano_zero = gerar_plano(pacote["snapshot"], mensagens_zero, pacote["origem"])
+        plano_um = gerar_plano(pacote["snapshot"], mensagens_um, pacote["origem"])
+        plano_um_repetido = gerar_plano(pacote["snapshot"], mensagens_um, pacote["origem"])
+        self.assertNotEqual(plano_zero["mensagens_hash"], plano_um["mensagens_hash"])
+        self.assertNotEqual(plano_zero["plano_id"], plano_um["plano_id"])
+        self.assertEqual(plano_um["mensagens_hash"], plano_um_repetido["mensagens_hash"])
+        self.assertEqual(plano_um["plano_id"], plano_um_repetido["plano_id"])
+        self.assertEqual(
+            mensagens_zero["mensagens"][0]["mensagem_ref"],
+            mensagens_um["mensagens"][0]["mensagem_ref"],
+        )
+
+        for invalido in (True, -1, "segredo"):
+            with self.subTest(contador_invalido=invalido):
+                diagnostico_invalido = copy.deepcopy(novo_zero)
+                diagnostico_invalido["cobertura"]["diagnostico_sanitizado"][
+                    "omitidas_anexo_sem_texto"
+                ] = invalido
+                filtrado = modulo.normalizar_mensagens(
+                    diagnostico_invalido, conversa_ref="c1",
+                    inicio="2026-09-01T00:00:00Z", fim="2026-09-06T23:59:59Z",
+                )
+                detalhe_filtrado = filtrado["cobertura"].get("detalhe_sanitizado", "")
+                self.assertNotIn("omitidas_anexo_sem_texto", detalhe_filtrado)
+                self.assertNotIn("segredo", json.dumps(filtrado, ensure_ascii=False))
 
     def test_cli_fontes_mutuamente_exclusivas_e_origem_validada_primeiro(self):
         parser = modulo.construir_parser()

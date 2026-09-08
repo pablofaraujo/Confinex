@@ -512,13 +512,22 @@ def normalizar_mensagens(
     if not isinstance(detalhe_sanitizado, str) or detalhe_sanitizado not in detalhes_permitidos:
         detalhe_sanitizado = None
     diagnostico = cobertura.get("diagnostico_sanitizado")
-    if isinstance(diagnostico, dict) and set(diagnostico) == {
+    chaves_diagnostico_legado = {
         "omitidas_sem_texto", "omitidas_tamanho", "omitidas_por_estado",
         "editadas_sem_historico", "truncada_quantidade", "truncada_bytes"
-    }:
+    }
+    chaves_diagnostico_anexo = chaves_diagnostico_legado | {"omitidas_anexo_sem_texto"}
+    if (
+        isinstance(diagnostico, dict)
+        and frozenset(diagnostico) in {
+            frozenset(chaves_diagnostico_legado), frozenset(chaves_diagnostico_anexo)
+        }
+    ):
+        tem_contador_anexo = "omitidas_anexo_sem_texto" in diagnostico
         inteiros = (
             diagnostico["omitidas_sem_texto"], diagnostico["omitidas_tamanho"],
             diagnostico["omitidas_por_estado"], diagnostico["editadas_sem_historico"],
+            diagnostico.get("omitidas_anexo_sem_texto", 0),
         )
         booleanos = (diagnostico["truncada_quantidade"], diagnostico["truncada_bytes"])
         if (
@@ -532,6 +541,10 @@ def normalizar_mensagens(
                 "cache_local_recorte_limitado_nao_atesta_historico_completo"
                 f";omitidas_sem_texto={inteiros[0]};omitidas_tamanho={inteiros[1]}"
                 f";omitidas_por_estado={inteiros[2]};editadas_sem_historico={inteiros[3]}"
+            )
+            if tem_contador_anexo:
+                detalhe_sanitizado += f";omitidas_anexo_sem_texto={inteiros[4]}"
+            detalhe_sanitizado += (
                 f";truncada_quantidade={str(booleanos[0]).lower()}"
                 f";truncada_bytes={str(booleanos[1]).lower()}"
             )
