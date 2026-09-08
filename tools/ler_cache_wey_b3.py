@@ -33,7 +33,7 @@ LIMITE_MAXIMO_BYTES_MENSAGEM = 64_000
 LIMITE_MAXIMO_BYTES_TOTAL = 4_000_000
 SQL_MENSAGENS = """
 SELECT rowid,
-       substr(CAST(msg_id AS BLOB), 1, ?), length(CAST(msg_id AS BLOB)), ts,
+       substr(CAST(msg_id AS BLOB), 1, ?), length(CAST(msg_id AS BLOB)), ts, from_me,
        substr(CAST(text AS BLOB), 1, ?), length(CAST(text AS BLOB)),
        substr(CAST(display_text AS BLOB), 1, ?), length(CAST(display_text AS BLOB)),
        substr(CAST(media_caption AS BLOB), 1, ?), length(CAST(media_caption AS BLOB)),
@@ -49,6 +49,7 @@ COLUNAS_MENSAGENS = {
     "chat_jid": "TEXT",
     "msg_id": "TEXT",
     "ts": "INTEGER",
+    "from_me": "INTEGER",
     "text": "TEXT",
     "display_text": "TEXT",
     "media_caption": "TEXT",
@@ -400,10 +401,10 @@ def ler_cache_wey_b3_manifesto(
     for linha in linhas[:limite]:
         if monotonic() >= prazo:
             _falhar("deadline_excedido")
-        if not isinstance(linha, tuple) or len(linha) != 18:
+        if not isinstance(linha, tuple) or len(linha) != 19:
             _falhar("linha_cache_invalida")
         (
-            _rowid, msg_id_bytes, msg_id_tamanho, ts,
+            _rowid, msg_id_bytes, msg_id_tamanho, ts, from_me,
             texto_bytes, texto_tamanho,
             display_bytes, display_tamanho,
             legenda_bytes, legenda_tamanho,
@@ -412,6 +413,8 @@ def ler_cache_wey_b3_manifesto(
         ) = linha
         if isinstance(ts, bool) or not isinstance(ts, int):
             _falhar("timestamp_cache_invalido")
+        if from_me not in {0, 1} or isinstance(from_me, bool):
+            _falhar("autoria_cache_invalida")
         estados = (revoked, deleted_for_me, edited)
         if any(valor not in {None, 0, 1} or isinstance(valor, bool) for valor in estados):
             _falhar("estado_cache_invalido")
@@ -532,6 +535,9 @@ def ler_cache_wey_b3_manifesto(
             "mensagem_ref": mensagem_ref,
             "timestamp": timestamp,
             "texto": conteudo,
+            "origem_autoria": (
+                "titular" if from_me == 1 else "interlocutor"
+            ),
         })
 
     metadados = {

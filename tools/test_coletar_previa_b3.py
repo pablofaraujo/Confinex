@@ -389,6 +389,42 @@ class ColetarPreviaB3TestCase(unittest.TestCase):
             resultado["cobertura"]["motivo"], "mensagem_sem_identidade_comprovada"
         )
 
+    def test_renormalizacao_preserva_flags_e_motivo_fechados(self):
+        dados = {
+            "schema_version": modulo.SCHEMA_MENSAGENS,
+            "cobertura": {
+                "estado": "parcial", "atestado": False,
+                "intervalo_inicio": "2026-09-01T00:00:00Z",
+                "intervalo_fim": "2026-09-30T23:59:59Z",
+                "identidade_pendente": True,
+                "captura_ativa_confirmada": False,
+                "truncada": True,
+                "motivo": "limite_de_mensagens",
+            },
+            "mensagens": [{
+                "conversa_ref": "c1", "mensagem_ref": "m1",
+                "timestamp": "2026-09-02T10:00:00Z", "texto": "texto",
+            }],
+        }
+        resultado = modulo.normalizar_mensagens(
+            dados, conversa_ref="c1", inicio="2026-09-01T00:00:00Z",
+            fim="2026-09-30T23:59:59Z",
+        )
+        self.assertTrue(resultado["cobertura"]["identidade_pendente"])
+        self.assertTrue(resultado["cobertura"]["truncada"])
+        self.assertFalse(resultado["cobertura"]["captura_ativa_confirmada"])
+        self.assertEqual(resultado["cobertura"]["motivo"], "limite_de_mensagens")
+
+        for autoria in ({}, []):
+            with self.subTest(autoria=type(autoria).__name__):
+                dados_invalidos = copy.deepcopy(dados)
+                dados_invalidos["mensagens"][0]["origem_autoria"] = autoria
+                with self.assertRaisesRegex(ValueError, "autoria_mensagem_invalida"):
+                    modulo.normalizar_mensagens(
+                        dados_invalidos, conversa_ref="c1",
+                        inicio="2026-09-01T00:00:00Z", fim="2026-09-30T23:59:59Z",
+                    )
+
     def test_timestamp_ausente_invalido_ou_intervalo_invertido_nao_atesta(self):
         dados = {
             "schema_version": modulo.SCHEMA_MENSAGENS,
@@ -448,6 +484,7 @@ class ColetarPreviaB3TestCase(unittest.TestCase):
                 CREATE TABLE chats (jid TEXT PRIMARY KEY);
                 CREATE TABLE messages (
                     rowid INTEGER PRIMARY KEY, chat_jid TEXT, msg_id TEXT, ts INTEGER,
+                    from_me INTEGER NOT NULL DEFAULT 0,
                     text TEXT, display_text TEXT, media_caption TEXT, media_type TEXT,
                     revoked INTEGER, deleted_for_me INTEGER, deleted_at INTEGER,
                     payload_purged_at INTEGER, edited INTEGER, edited_ts INTEGER
@@ -589,6 +626,71 @@ class ColetarPreviaB3TestCase(unittest.TestCase):
         with patch.object(sys, "argv", ["coletar_previa_b3.py", "--origem-json", "origem.json"]), \
              patch.object(modulo, "_ler_json_limitado", return_value={}), \
              patch.object(modulo, "PonteLeitura", side_effect=AssertionError("ponte acessada")):
+            self.assertEqual(modulo.main(), 2)
+
+    def test_normalizador_preserva_autoria_e_recusa_conflito_na_deduplicacao(self):
+        texto = "Mensagem da mesa"
+        base = {
+            "schema_version": modulo.SCHEMA_MENSAGENS,
+            "cobertura": {"estado": "parcial"},
+            "mensagens": [{
+                "conversa_ref": "c1", "mensagem_ref": "m1",
+                "timestamp": "2026-09-08T01:00:00Z", "texto": texto,
+                "origem_autoria": "interlocutor",
+            }],
+        }
+        normalizado = modulo.normalizar_mensagens(
+            base, conversa_ref="c1", inicio="2026-09-08T00:00:00Z", fim="2026-09-08T02:00:00Z"
+        )
+        self.assertEqual(normalizado["mensagens"][0]["origem_autoria"], "interlocutor")
+        conflitante = copy.deepcopy(base)
+        duplicata = copy.deepcopy(conflitante["mensagens"][0])
+        duplicata["origem_autoria"] = "titular"
+        conflitante["mensagens"].append(duplicata)
+        with self.assertRaisesRegex(ValueError, "autoria_mensagem_conflitante"):
+            modulo.normalizar_mensagens(
+                conflitante, conversa_ref="c1", inicio="2026-09-08T00:00:00Z", fim="2026-09-08T02:00:00Z"
+            )
+
+    def test_cli_recuperacao_textual_nao_consulta_b3_nem_exige_origem_telegram(self):
+        documento_cache = {
+            "schema_version": modulo.SCHEMA_MENSAGENS,
+            "cobertura": {"estado": "parcial", "atestado": False},
+            "mensagens": [{
+                "conversa_ref": "conv-opaca", "mensagem_ref": "m1",
+                "timestamp": "2026-09-04T12:34:56Z", "texto": "Fechamos por escrito",
+                "origem_autoria": "titular",
+            }],
+        }
+        argumentos = [
+            "coletar_previa_b3.py", "--cache-wey-manifesto", "/privado/manifesto.json",
+            "--intervalo-inicio", "2026-09-04T12:00:00Z", "--intervalo-fim", "2026-09-04T13:00:00Z",
+            "--recuperar-textos-mesa", "--saida", "/privado/textos.json",
+        ]
+        with patch.object(sys, "argv", argumentos), \
+             patch.object(modulo, "ler_cache_wey_b3", return_value={
+                 "documento": documento_cache, "conversa_ref": "conv-opaca", "metadados": {}
+             }), \
+             patch.object(modulo, "gravar_privado_sem_sobrescrever", return_value="gravado"), \
+             patch.object(modulo, "PonteLeitura", side_effect=AssertionError("B3 acessada")), \
+             patch.object(modulo, "_ler_json_limitado", side_effect=AssertionError("origem acessada")):
+            self.assertEqual(modulo.main(), 0)
+
+    def test_cli_recusa_flags_de_outro_modo_antes_de_acessar_fontes(self):
+        recuperacao_com_b3 = [
+            "coletar_previa_b3.py", "--cache-wey-manifesto", "/privado/manifesto.json",
+            "--intervalo-inicio", "2026-09-08T00:00:00Z", "--intervalo-fim", "2026-09-08T02:00:00Z",
+            "--recuperar-textos-mesa", "--saida", "/privado/textos.json", "--limite-pagina", "10",
+        ]
+        with patch.object(sys, "argv", recuperacao_com_b3), \
+             patch.object(modulo, "ler_cache_wey_b3", side_effect=AssertionError("cache acessado")):
+            self.assertEqual(modulo.main(), 2)
+        previa_com_realce = [
+            "coletar_previa_b3.py", "--origem-json", "/privado/origem.json",
+            "--termo-realce", "literal",
+        ]
+        with patch.object(sys, "argv", previa_com_realce), \
+             patch.object(modulo, "_ler_json_limitado", side_effect=AssertionError("origem acessada")):
             self.assertEqual(modulo.main(), 2)
 
     def test_aba_nao_e_prometida_como_atomicidade(self):

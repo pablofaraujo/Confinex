@@ -26,6 +26,7 @@ from typing import Any, Callable
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 from ler_cache_wey_b3 import CacheWeyIndisponivel, ler_cache_wey_b3
+from recuperar_textos_mesa import recuperar_textos_mesa
 
 from planejar_atualizacao_b3 import (
     ErroEntrada,
@@ -424,6 +425,20 @@ def normalizar_mensagens(
         raise ValueError("cobertura_mensagens_invalida")
     if not isinstance(mensagens, list):
         raise ValueError("mensagens_invalidas")
+    flags_cobertura_herdadas: dict[str, bool] = {}
+    for chave in ("identidade_pendente", "captura_ativa_confirmada", "truncada"):
+        if chave in cobertura:
+            if not isinstance(cobertura[chave], bool):
+                raise ValueError("cobertura_mensagens_invalida")
+            flags_cobertura_herdadas[chave] = cobertura[chave]
+    motivos_cobertura = {
+        "timestamp_ausente_ou_invalido", "limite_de_mensagens",
+        "mensagem_sem_identidade_comprovada", "cobertura_do_export_nao_atestada",
+        "cache_ou_export_normalizado_nao_fornecido",
+    }
+    motivo_herdado = cobertura.get("motivo")
+    if motivo_herdado not in motivos_cobertura:
+        motivo_herdado = None
     def data_utc(valor: str) -> datetime:
         try:
             data = datetime.fromisoformat(valor.replace("Z", "+00:00"))
@@ -440,10 +455,13 @@ def normalizar_mensagens(
     inicio_utc = data_inicio.isoformat().replace("+00:00", "Z")
     fim_utc = data_fim.isoformat().replace("+00:00", "Z")
     saida: list[dict[str, Any]] = []
-    vistos: set[tuple[str, str | None, str]] = set()
+    vistos: dict[tuple[str, str | None, str], str] = {}
     timestamp_invalido = False
     identidade_pendente = False
-    campos = {"conversa_ref", "mensagem_ref", "timestamp", "texto", "hash_conteudo"}
+    campos = {
+        "conversa_ref", "mensagem_ref", "timestamp", "texto", "hash_conteudo",
+        "origem_autoria",
+    }
     for mensagem in mensagens:
         if not isinstance(mensagem, dict) or not set(mensagem) <= campos:
             raise ValueError("mensagem_invalida")
@@ -476,15 +494,24 @@ def normalizar_mensagens(
             identidade_pendente = True
         else:
             identidade = (conversa_ref, mensagem_ref, hash_conteudo)
+            autoria = mensagem.get("origem_autoria", "nao_informada")
+            if not isinstance(autoria, str) or autoria not in {"titular", "interlocutor", "nao_informada"}:
+                raise ValueError("autoria_mensagem_invalida")
+            if identidade in vistos and vistos[identidade] != autoria:
+                raise ValueError("autoria_mensagem_conflitante")
             if identidade in vistos:
                 continue
-            vistos.add(identidade)
+            vistos[identidade] = autoria
+        autoria = mensagem.get("origem_autoria", "nao_informada")
+        if not isinstance(autoria, str) or autoria not in {"titular", "interlocutor", "nao_informada"}:
+            raise ValueError("autoria_mensagem_invalida")
         item = {
             "conversa_ref": conversa_ref,
             "mensagem_ref": mensagem_ref,
             "timestamp": instante.isoformat().replace("+00:00", "Z"),
             "texto": texto,
             "hash_conteudo": hash_conteudo,
+            "origem_autoria": autoria,
         }
         saida.append(item)
     saida.sort(key=lambda item: (item.get("timestamp") or "", item.get("mensagem_ref") or item["hash_conteudo"]))
@@ -503,6 +530,8 @@ def normalizar_mensagens(
     estado = cobertura["estado"]
     if estado == "completa" and not fonte_atestada:
         estado = "parcial"
+    identidade_pendente = identidade_pendente or flags_cobertura_herdadas.get("identidade_pendente", False)
+    truncada = truncada or flags_cobertura_herdadas.get("truncada", False)
     if (truncada or timestamp_invalido or identidade_pendente) and estado == "completa":
         estado = "parcial"
     detalhes_permitidos = {
@@ -517,6 +546,7 @@ def normalizar_mensagens(
         "editadas_sem_historico", "truncada_quantidade", "truncada_bytes"
     }
     chaves_diagnostico_anexo = chaves_diagnostico_legado | {"omitidas_anexo_sem_texto"}
+    diagnostico_validado = None
     if (
         isinstance(diagnostico, dict)
         and frozenset(diagnostico) in {
@@ -537,6 +567,7 @@ def normalizar_mensagens(
             )
             and all(isinstance(valor, bool) for valor in booleanos)
         ):
+            diagnostico_validado = dict(diagnostico)
             detalhe_sanitizado = (
                 "cache_local_recorte_limitado_nao_atesta_historico_completo"
                 f";omitidas_sem_texto={inteiros[0]};omitidas_tamanho={inteiros[1]}"
@@ -558,12 +589,15 @@ def normalizar_mensagens(
             "intervalo_fim": fim_utc,
             "atestado": estado == "completa" and fonte_atestada,
             "identidade_pendente": identidade_pendente,
+            "truncada": truncada,
             **({"detalhe_sanitizado": detalhe_sanitizado} if detalhe_sanitizado else {}),
+            **({"diagnostico_sanitizado": diagnostico_validado} if diagnostico_validado else {}),
             **({"motivo": "timestamp_ausente_ou_invalido"} if timestamp_invalido else
                {"motivo": "limite_de_mensagens"} if truncada else
                {"motivo": "mensagem_sem_identidade_comprovada"} if identidade_pendente else
                {"motivo": "cobertura_do_export_nao_atestada"}
-               if cobertura["estado"] == "completa" and not fonte_atestada else {}),
+               if cobertura["estado"] == "completa" and not fonte_atestada else
+               {"motivo": motivo_herdado} if motivo_herdado else {}),
         },
         "mensagens": saida[:limite],
     }
@@ -623,7 +657,7 @@ def construir_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Prévia B3 somente leitura; grava apenas o plano privado solicitado."
     )
-    parser.add_argument("--origem-json", required=True, type=Path)
+    parser.add_argument("--origem-json", type=Path)
     fontes = parser.add_mutually_exclusive_group()
     fontes.add_argument("--mensagens-json", type=Path)
     fontes.add_argument("--cache-wey-manifesto", type=Path)
@@ -632,14 +666,62 @@ def construir_parser() -> argparse.ArgumentParser:
     parser.add_argument("--intervalo-fim")
     parser.add_argument("--limite-mensagens", type=int, default=200)
     parser.add_argument("--saida", type=Path)
-    parser.add_argument("--limite-pagina", type=int, default=100)
-    parser.add_argument("--max-paginas", type=int, default=20)
+    parser.add_argument("--limite-pagina", type=int)
+    parser.add_argument("--max-paginas", type=int)
+    parser.add_argument("--recuperar-textos-mesa", action="store_true")
+    parser.add_argument("--contexto-adjacente", type=int)
+    parser.add_argument("--termo-realce", action="append")
     return parser
 
 
 def main() -> int:
     args = construir_parser().parse_args()
     try:
+        if args.recuperar_textos_mesa:
+            if (
+                not args.cache_wey_manifesto or not args.intervalo_inicio or not args.intervalo_fim
+                or not args.saida or args.origem_json or args.conversa_ref
+                or args.limite_pagina is not None or args.max_paginas is not None
+            ):
+                raise ValueError("recuperacao_textos_parametros_invalidos")
+            leitura_cache = ler_cache_wey_b3(
+                args.cache_wey_manifesto,
+                inicio=args.intervalo_inicio,
+                fim=args.intervalo_fim,
+                limite=args.limite_mensagens,
+            )
+            mensagens = normalizar_mensagens(
+                leitura_cache["documento"],
+                conversa_ref=leitura_cache["conversa_ref"],
+                inicio=args.intervalo_inicio,
+                fim=args.intervalo_fim,
+                limite=args.limite_mensagens,
+            )
+            recuperacao = recuperar_textos_mesa(
+                mensagens,
+                conversa_ref=leitura_cache["conversa_ref"],
+                inicio=args.intervalo_inicio,
+                fim=args.intervalo_fim,
+                limite=args.limite_mensagens,
+                contexto_adjacente=2 if args.contexto_adjacente is None else args.contexto_adjacente,
+                termos=tuple(args.termo_realce or ()),
+            )
+            gravacao = gravar_privado_sem_sobrescrever(args.saida, recuperacao)
+            print(json.dumps({
+                "modo": "recuperacao_textual_somente_leitura",
+                "estado": recuperacao["cobertura"]["estado"],
+                "textos": recuperacao["diagnostico"]["textos_preservados"],
+                "blocos": recuperacao["diagnostico"]["blocos"],
+                "recuperacao_hash": recuperacao["recuperacao_hash"],
+                "saida": gravacao,
+                "consultas_b3": 0,
+                "escritas": 0,
+            }, ensure_ascii=False, sort_keys=True))
+            return 0
+        if not args.origem_json:
+            raise ValueError("origem_json_obrigatoria")
+        if args.contexto_adjacente is not None or args.termo_realce is not None:
+            raise ValueError("opcao_exclusiva_recuperacao_textual")
         # A origem é validada antes de qualquer acesso ao cache ou à ponte.
         origem = validar_origem(_ler_json_limitado(args.origem_json))
         recorte_informado = all((args.conversa_ref, args.intervalo_inicio, args.intervalo_fim))
@@ -680,8 +762,8 @@ def main() -> int:
             PonteLeitura(),
             origem,
             mensagens=mensagens,
-            limite_pagina=args.limite_pagina,
-            max_paginas=args.max_paginas,
+            limite_pagina=100 if args.limite_pagina is None else args.limite_pagina,
+            max_paginas=20 if args.max_paginas is None else args.max_paginas,
         )
         plano = gerar_plano(pacote["snapshot"], pacote["mensagens"], pacote["origem"])
         gravacao = None

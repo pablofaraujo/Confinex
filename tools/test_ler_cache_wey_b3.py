@@ -40,7 +40,7 @@ CREATE TABLE messages (
     sender_jid TEXT,
     sender_name TEXT,
     ts INTEGER,
-    from_me INTEGER,
+    from_me INTEGER DEFAULT 0,
     text TEXT,
     display_text TEXT,
     quoted_msg_id TEXT,
@@ -112,12 +112,13 @@ class TestLeitorCacheWey(unittest.TestCase):
         display: str | None = None,
         legenda: str | None = None,
         media: str | None = None,
+        from_me: int | None = 0,
     ) -> None:
         conexao = sqlite3.connect(self.db)
         conexao.execute(
-            "INSERT INTO messages(rowid,chat_jid,msg_id,ts,text,display_text,media_caption,media_type) "
-            "VALUES(?,?,?,?,?,?,?,?)",
-            (rowid, jid or self.jid, msg_id, ts, texto, display, legenda, media),
+            "INSERT INTO messages(rowid,chat_jid,msg_id,ts,text,display_text,media_caption,media_type,from_me) "
+            "VALUES(?,?,?,?,?,?,?,?,?)",
+            (rowid, jid or self.jid, msg_id, ts, texto, display, legenda, media, from_me),
         )
         conexao.commit()
         conexao.close()
@@ -270,6 +271,25 @@ class TestLeitorCacheWey(unittest.TestCase):
         resultado = self._ler()
         self.assertIsNone(resultado["documento"]["mensagens"][0]["mensagem_ref"])
         self.assertTrue(resultado["metadados"]["identidade_pendente"])
+
+    def test_autoria_deriva_somente_de_from_me_estrito(self) -> None:
+        self._inserir(1, "titular", 1788220800, texto="eu", from_me=1)
+        self._inserir(2, "interlocutor", 1788220801, texto="mesa", from_me=0)
+        resultado = self._ler()
+        self.assertEqual(
+            [m["origem_autoria"] for m in resultado["documento"]["mensagens"]],
+            ["titular", "interlocutor"],
+        )
+        conexao = sqlite3.connect(self.db)
+        conexao.execute("UPDATE messages SET from_me = NULL WHERE rowid = 2")
+        conexao.commit(); conexao.close()
+        with self.assertRaisesRegex(CacheWeyIndisponivel, "autoria_cache_invalida"):
+            self._ler()
+        conexao = sqlite3.connect(self.db)
+        conexao.execute("UPDATE messages SET from_me = 2 WHERE rowid = 2")
+        conexao.commit(); conexao.close()
+        with self.assertRaisesRegex(CacheWeyIndisponivel, "autoria_cache_invalida"):
+            self._ler()
 
     def test_revogada_excluida_expurgada_sao_omitidas_e_edicao_e_declarada(self) -> None:
         conexao = sqlite3.connect(self.db)

@@ -273,6 +273,49 @@ privado para conferência, mas não são usados como chave ou confirmação de
 vínculo, não criam associação e não alteram dados do snapshot. O conteúdo e o
 diagnóstico sanitizado continuam podendo alterar `mensagens_hash` e `plano_id`.
 
+### Recuperação textual da mesa, opt-in e inativa
+
+`tools/recuperar_textos_mesa.py` recebe somente o contrato já normalizado
+`mensagens-whatsapp-normalizadas-v1` e produz
+`textos-mesa-recuperados-v1`. Ele preserva, em cronologia determinística, todo
+texto humano da conversa exata e da janela explícita que couber nos limites. A
+autoria é `titular` ou `interlocutor` somente quando o `from_me` estrito do
+cache a comprova; export legado sem o campo permanece `nao_informada`.
+
+Termos informais como “fechamos”, “zerei”, “montei” ou “rolamos”, assim como
+literais adicionais, criam apenas realces com estado `texto_para_revisao`.
+Eles não confirmam operação, não autorizam escrita e não criam associação por
+semelhança. O relatório conserva também os textos sem realce; blocos incluem
+até duas mensagens vizinhas de cada lado por padrão. Diagnóstico e cobertura
+parciais da fonte são herdados somente por campos e contadores de lista
+fechada. Corte por quantidade, áudio omitido e demais omissões continuam
+explícitos, sem concluir que uma negociação não existiu.
+
+O modo seguro do coletor não consulta a ponte B3 e não exige origem Telegram:
+
+```bash
+python3 tools/coletar_previa_b3.py \
+  --cache-wey-manifesto /caminho/privado/manifesto.json \
+  --intervalo-inicio 2026-09-01T00:00:00Z \
+  --intervalo-fim 2026-09-08T12:00:00Z \
+  --limite-mensagens 200 \
+  --recuperar-textos-mesa \
+  --contexto-adjacente 2 \
+  --termo-realce "literal fictício" \
+  --saida /caminho/privado/textos-mesa.json
+```
+
+Nesse modo, flags de paginação B3, origem Telegram, `--conversa-ref` e export
+JSON paralelo são recusados. No modo de prévia B3, as flags de contexto e de
+realce também são recusadas. A janela inclusiva continua limitada a 31 dias e
+a saída privada mantém as proteções contra symlink, sobrescrita divergente e
+ancestral Git. Não há áudio, OCR, transcrição, busca fuzzy, modelo, rede
+adicional ou escrita operacional. A interface está disponível para execução
+manual e adaptador futuro, mas não está conectada ao Juan, a hook pré-modelo,
+fila, timer, serviço ou runtime.
+No resumo de terminal, `escritas=0` significa zero escrita operacional; o
+arquivo local privado em `--saida` é a única gravação explicitamente pedida.
+
 ```bash
 python3 tools/planejar_atualizacao_b3.py \
   --snapshot /caminho/privado/snapshot-b3.json \
