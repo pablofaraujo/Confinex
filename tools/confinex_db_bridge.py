@@ -31,14 +31,14 @@ READ_ATTEMPTS = 5
 RUNNING = True
 
 READ_RESOURCES = {
-    "abates", "acertos", "compras", "confinamento_contatos", "confinamentos",
+    "abates", "acertos", "alocacoes_hedge", "compras", "confinamento_contatos", "confinamentos",
     "confinex_avaliacoes", "confinex_consolidacoes", "confinex_desvios",
     "confinex_estimativas", "confinex_testes", "contatos", "contexto_handoff",
     "contextos_canais", "crm_followups", "custos_operacao", "documentos",
     "entradas_confinamento", "eventos", "fluxo_caixa", "gtas", "interacoes_crm",
     "memorias_agentes", "negociacoes_gado", "negocios_boi_balanca", "ofertas_gado",
     "operacoes", "operation_drafts", "pending_actions", "pendencias_documentos",
-    "pesagens", "pesagens_caderno", "vendas", "v_estoque_atual",
+    "pesagens", "pesagens_caderno", "posicoes_hedge", "vendas", "v_estoque_atual",
     "v_exposicao_hedge",
 }
 REVIEW_WRITE_RESOURCES = {

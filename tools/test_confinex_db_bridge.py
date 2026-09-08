@@ -13,9 +13,25 @@ from unittest import mock
 
 from confinex_client import ConfinexClient, ConfinexConnectionError
 from confinex_db_bridge import BridgeError, action_request, execute_action
+from coletar_previa_b3 import construir_rota
 
 
 class BridgeActionTests(unittest.TestCase):
+    def test_rotas_reais_do_coletor_b3_sao_get_only(self):
+        for tabela in ("posicoes_hedge", "alocacoes_hedge"):
+            rota_coletor = construir_rota(tabela, 100, 0)
+            method, rota_ponte, body = action_request("get_read", [rota_coletor])
+            self.assertEqual((method, rota_ponte, body), ("GET", rota_coletor, None))
+
+    def test_recursos_b3_nao_ganham_post_ou_patch(self):
+        for tabela in ("posicoes_hedge", "alocacoes_hedge"):
+            with self.subTest(tabela=tabela, metodo="POST"):
+                with self.assertRaisesRegex(BridgeError, "recurso_revisao_nao_permitido"):
+                    action_request("post_review", [tabela, "{}"])
+            with self.subTest(tabela=tabela, metodo="PATCH"):
+                with self.assertRaisesRegex(BridgeError, "recurso_revisao_nao_permitido"):
+                    action_request("patch_review", [tabela, "id=eq.fixture", "{}"])
+
     def test_review_insert_accepts_only_non_operational_table(self):
         method, route, body = action_request(
             "post_review",
