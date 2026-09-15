@@ -1,5 +1,5 @@
 {
-  "atualizadoEm": "2026-09-14 12:41:00",
+  "atualizadoEm": "2026-09-15 11:09:00",
   "referenciasAtualizadasEm": "2026-07-15 10:21:00",
   "fonte": "B3 oficial (curva automática); demais referências preservadas com data própria",
   "indicadores": [
@@ -44,61 +44,61 @@
     {
       "venc": "BGIU26",
       "mes": "set/26",
-      "valor": 358.5,
+      "valor": 356.1,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-09-14 12:41:00"
+      "dataFonte": "2026-09-15 11:08:00"
     },
     {
       "venc": "BGIV26",
       "mes": "out/26",
-      "valor": 378.2,
+      "valor": 373.85,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-09-14 12:41:00"
+      "dataFonte": "2026-09-15 11:09:00"
     },
     {
       "venc": "BGIX26",
       "mes": "nov/26",
-      "valor": 384.25,
+      "valor": 381.55,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-09-14 12:39:00"
+      "dataFonte": "2026-09-15 11:08:00"
     },
     {
       "venc": "BGIZ26",
       "mes": "dez/26",
-      "valor": 384.25,
+      "valor": 382.7,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-09-14 12:39:00"
+      "dataFonte": "2026-09-15 11:08:00"
     },
     {
       "venc": "BGIF27",
       "mes": "jan/27",
-      "valor": 385.6,
+      "valor": 384.35,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-09-14 11:53:00"
+      "dataFonte": "2026-09-15 11:04:00"
     },
     {
       "venc": "BGIG27",
       "mes": "fev/27",
-      "valor": 385.2,
+      "valor": 384.05,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-09-14 11:39:00"
+      "dataFonte": "2026-09-15 11:04:00"
     },
     {
       "venc": "BGIH27",
       "mes": "mar/27",
-      "valor": 385.25,
+      "valor": 385.0,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-09-14 11:39:00"
+      "dataFonte": "2026-09-15 10:47:00"
     }
   ],
   "manchetes": [],
   "contexto": [],
-  "atualizadoEmB3": "2026-09-14 12:41:00"
+  "atualizadoEmB3": "2026-09-15 11:09:00"
 }
