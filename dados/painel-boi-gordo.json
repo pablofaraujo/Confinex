@@ -1,5 +1,5 @@
 {
-  "atualizadoEm": "2026-09-21 12:43:00",
+  "atualizadoEm": "2026-09-22 10:50:00",
   "referenciasAtualizadasEm": "2026-07-15 10:21:00",
   "fonte": "B3 oficial (curva automática); demais referências preservadas com data própria",
   "indicadores": [
@@ -44,69 +44,61 @@
     {
       "venc": "BGIU26",
       "mes": "set/26",
-      "valor": 358.8,
+      "valor": 359.8,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-09-21 12:42:00"
+      "dataFonte": "2026-09-22 10:48:00"
     },
     {
       "venc": "BGIV26",
       "mes": "out/26",
-      "valor": 380.0,
+      "valor": 378.85,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-09-21 12:43:00"
+      "dataFonte": "2026-09-22 10:50:00"
     },
     {
       "venc": "BGIX26",
       "mes": "nov/26",
-      "valor": 386.05,
+      "valor": 387.95,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-09-21 12:42:00"
+      "dataFonte": "2026-09-22 10:50:00"
     },
     {
       "venc": "BGIZ26",
       "mes": "dez/26",
-      "valor": 386.6,
+      "valor": 388.45,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-09-21 12:41:00"
+      "dataFonte": "2026-09-22 10:49:00"
     },
     {
       "venc": "BGIF27",
       "mes": "jan/27",
-      "valor": 388.3,
+      "valor": 389.0,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-09-21 12:30:00"
+      "dataFonte": "2026-09-22 10:47:00"
     },
     {
       "venc": "BGIG27",
       "mes": "fev/27",
-      "valor": 388.15,
+      "valor": 389.3,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-09-21 11:45:00"
+      "dataFonte": "2026-09-22 10:36:00"
     },
     {
-      "venc": "BGIJ27",
-      "mes": "abr/27",
-      "valor": 384.55,
+      "venc": "BGIH27",
+      "mes": "mar/27",
+      "valor": 390.0,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-09-21 11:06:00"
-    },
-    {
-      "venc": "BGIK27",
-      "mes": "mai/27",
-      "valor": 387.65,
-      "agio": null,
-      "tipo": "futuro",
-      "dataFonte": "2026-09-21 10:10:00"
+      "dataFonte": "2026-09-22 10:22:00"
     }
   ],
   "manchetes": [],
   "contexto": [],
-  "atualizadoEmB3": "2026-09-21 12:43:00"
+  "atualizadoEmB3": "2026-09-22 10:50:00"
 }
