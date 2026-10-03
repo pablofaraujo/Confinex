@@ -24,6 +24,22 @@ Padrão: cabeçalho azul-marinho com marca Confinex e sidebar branca no desktop;
 
 **Shell compartilhado** (`js/cfagro-shell.js`): injeta cabeçalho e navegação com links absolutos (inclusive para o repo externo `boi-gordo-portfolio`) e é carregado com `design/tokens.css`/`design/components.css` por todos os módulos ativos. O Portfólio B3 navega na mesma janela e se identifica como item ativo no repositório externo; somente Datamars Livestock, AgroNota e Portal do Produtor IMA/SIDAGRO abrem nova aba, por serem ferramentas externas independentes. Atualizar e Sair ficam centralizados na Visão Geral e não se repetem nos módulos. Em produção usa a base canônica do GitHub Pages; em localhost resolve links contra o servidor local, permitindo auditoria antes do deploy. `ops.html` mantém o client Supabase local, porém não redefine mais tokens nem componentes visuais.
 
+## Diagnóstico local antes da normalização
+
+`tools/catalogo_chaves.py` concentra contagens e comparação tipada em funções
+puras. `tools/perfilar_chaves_fontes.py` adapta XLSX, CSV/TSV e snapshots JSON
+locais por manifesto explícito. Mede unicidade na amostra, chaves compostas,
+referências ausentes e cardinalidade observada, sem inferir vínculos por nomes
+parecidos. Fórmulas usam apenas valores armazenados, com aviso de cache ausente.
+Os arquivos são conferidos por SHA-256 antes/depois; relatórios ficam somente
+em diretório privado ou temporário. Não há rede, importação, migração, chamada
+ao Supabase, criação de PK/FK ou alteração dos módulos operacionais.
+
+O contrato e o roteiro incremental dos cinco processos estão em
+`docs/catalogo-chaves-fontes.md`. A análise não certifica o esquema vivo nem
+substitui revisão de domínio; seu papel é preparar propostas pequenas e
+reversíveis antes de implementar a normalização.
+
 ## Backend Supabase
 
 URL `https://fkmdzwjmjlmxqotznvgq.supabase.co`, chave publicável hardcoded em cada página (RLS protege; rotação exige editar N arquivos). Auth `signInWithPassword`, sessão persistida.
