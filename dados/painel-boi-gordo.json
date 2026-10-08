@@ -1,5 +1,5 @@
 {
-  "atualizadoEm": "2026-10-07 13:31:00",
+  "atualizadoEm": "2026-10-08 13:32:00",
   "referenciasAtualizadasEm": "2026-07-15 10:21:00",
   "fonte": "B3 oficial (curva automática); demais referências preservadas com data própria",
   "indicadores": [
@@ -44,69 +44,61 @@
     {
       "venc": "BGIV26",
       "mes": "out/26",
-      "valor": 389.5,
+      "valor": 388.75,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-10-07 13:28:00"
+      "dataFonte": "2026-10-08 13:32:00"
     },
     {
       "venc": "BGIX26",
       "mes": "nov/26",
-      "valor": 396.9,
+      "valor": 395.75,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-10-07 13:31:00"
+      "dataFonte": "2026-10-08 13:29:00"
     },
     {
       "venc": "BGIZ26",
       "mes": "dez/26",
-      "valor": 394.75,
+      "valor": 393.95,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-10-07 13:25:00"
+      "dataFonte": "2026-10-08 13:26:00"
     },
     {
       "venc": "BGIF27",
       "mes": "jan/27",
-      "valor": 395.2,
+      "valor": 394.85,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-10-07 12:31:00"
+      "dataFonte": "2026-10-08 13:25:00"
     },
     {
       "venc": "BGIG27",
       "mes": "fev/27",
-      "valor": 395.35,
+      "valor": 394.15,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-10-07 13:25:00"
+      "dataFonte": "2026-10-08 13:21:00"
     },
     {
       "venc": "BGIH27",
       "mes": "mar/27",
-      "valor": 395.95,
+      "valor": 395.0,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-10-07 10:38:00"
-    },
-    {
-      "venc": "BGIJ27",
-      "mes": "abr/27",
-      "valor": 395.95,
-      "agio": null,
-      "tipo": "futuro",
-      "dataFonte": "2026-10-07 12:41:00"
+      "dataFonte": "2026-10-08 11:47:00"
     },
     {
       "venc": "BGIK27",
       "mes": "mai/27",
-      "valor": 394.45,
+      "valor": 392.95,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-10-07 12:38:00"
+      "dataFonte": "2026-10-08 11:38:00"
     }
   ],
   "manchetes": [],
   "contexto": [],
-  "atualizadoEmB3": "2026-10-07 13:31:00"
+  "atualizadoEmB3": "2026-10-08 13:32:00"
 }
