@@ -8,17 +8,20 @@ from unittest.mock import Mock, patch
 from tools.verificar_openclaw_canais import (
     configuracoes_modelos,
     criar_xlsx_minimo,
+    consultar_readyz,
     grupos_configurados,
     ids_grupos,
     validar_agentes,
     validar_autenticacao_wacli,
     validar_canais,
+    validar_status_gateway,
     validar_reautenticacao_whatsapp_openclaw,
     validar_confinex,
     validar_modelos,
     validar_monitor_agronota,
     validar_probe_modelos,
     validar_indice_sessoes,
+    validar_indices_sessoes,
     validar_roteador_xlsx,
     reparar_indice_sessoes,
     reparar,
@@ -26,6 +29,33 @@ from tools.verificar_openclaw_canais import (
 
 
 class VerificarOpenClawCanaisTest(unittest.TestCase):
+    def test_configuracoes_modelos_aceita_schema_entries_atual(self):
+        config = {"agents": {
+            "defaults": {"model": {
+                "primary": "anthropic/claude-sonnet-4-6",
+                "fallbacks": ["openai/gpt-5.6-sol"],
+            }},
+            "entries": {
+                "juan": {},
+                "ceci": {"model": {
+                    "primary": "anthropic/claude-opus-4-6",
+                    "fallbacks": [],
+                }},
+            },
+        }}
+        self.assertEqual(configuracoes_modelos(config), [
+            {
+                "agente": "juan",
+                "primario": "anthropic/claude-sonnet-4-6",
+                "fallbacks": ["openai/gpt-5.6-sol"],
+            },
+            {
+                "agente": "ceci",
+                "primario": "anthropic/claude-opus-4-6",
+                "fallbacks": [],
+            },
+        ])
+
     def test_deduplica_configuracoes_de_modelos_por_contrato(self):
         config = {"agents": {
             "defaults": {"model": {
@@ -380,6 +410,20 @@ class VerificarOpenClawCanaisTest(unittest.TestCase):
         )
 
     @patch("tools.verificar_openclaw_canais.json_comando")
+    def test_indices_sessoes_usam_cache_de_seis_horas(self, comando):
+        comando.return_value = {"missing": 0}
+        with tempfile.TemporaryDirectory() as pasta:
+            cache = Path(pasta) / "indices.json"
+            self.assertEqual([], validar_indices_sessoes(
+                cache=cache, intervalo=6 * 60 * 60,
+            ))
+            self.assertEqual(4, comando.call_count)
+            self.assertEqual([], validar_indices_sessoes(
+                cache=cache, intervalo=6 * 60 * 60,
+            ))
+            self.assertEqual(4, comando.call_count)
+
+    @patch("tools.verificar_openclaw_canais.json_comando")
     def test_reparo_indice_sessoes_e_localizado_e_confirmado(self, comando):
         comando.side_effect = [
             {"missing": 2, "pruned": 0, "capped": 0,
@@ -455,7 +499,7 @@ class VerificarOpenClawCanaisTest(unittest.TestCase):
         }
         self.assertEqual([], validar_canais(payload))
 
-    def test_detecta_canal_e_event_loop_degradados(self):
+    def test_detecta_canais_degradados_sem_reagir_a_cpu_transitoria(self):
         payload = {
             "eventLoop": {"degraded": True},
             "channelAccounts": {"telegram": []},
@@ -465,7 +509,46 @@ class VerificarOpenClawCanaisTest(unittest.TestCase):
         self.assertIn("telegram_indisponivel:default", falhas)
         self.assertIn("telegram_indisponivel:ceci", falhas)
         self.assertIn("whatsapp_openclaw_indisponivel", falhas)
-        self.assertIn("gateway_event_loop_degradado", falhas)
+        self.assertNotIn("gateway_event_loop_degradado", falhas)
+
+    def test_status_gateway_online_e_runtime_saudavel(self):
+        self.assertEqual([], validar_status_gateway({
+            "gateway": {"reachable": True},
+            "health": {
+                "ok": True,
+                "modelRuntime": {"degraded": False, "pendingAgents": []},
+            },
+        }))
+
+    def test_health_leve_online_e_runtime_saudavel(self):
+        self.assertEqual([], validar_status_gateway({
+            "ok": True,
+            "modelRuntime": {"degraded": False, "pendingAgents": []},
+        }))
+
+    def test_readyz_online(self):
+        self.assertEqual([], validar_status_gateway({
+            "ready": True,
+            "failing": [],
+        }))
+        self.assertEqual(
+            ["gateway_health_indisponivel"],
+            validar_status_gateway({"ready": False, "failing": ["channels"]}),
+        )
+
+    def test_status_gateway_distingue_runtime_degradado(self):
+        self.assertEqual(validar_status_gateway({
+            "gateway": {"reachable": True},
+            "health": {
+                "ok": True,
+                "modelRuntime": {"degraded": True, "pendingAgents": ["juan"]},
+            },
+        }), ["runtime_modelos_degradado"])
+
+    def test_status_gateway_falha_fechado_sem_payload(self):
+        self.assertEqual(
+            validar_status_gateway(None), ["probe_gateway_falhou"]
+        )
 
     def test_detecta_whatsapp_openclaw_exigindo_novo_pareamento(self):
         payload = {
@@ -550,17 +633,25 @@ class VerificarOpenClawCanaisTest(unittest.TestCase):
         raiz = Path(__file__).parents[1]
         fonte = (raiz / "tools/verificar_openclaw_canais.py").read_text()
         unidade = (raiz / "infra/systemd/openclaw-agent-heartbeat.service").read_text()
+        timer = (raiz / "infra/systemd/openclaw-agent-heartbeat.timer").read_text()
         self.assertNotIn("openclaw message send", fonte + unidade)
         self.assertNotRegex(fonte + unidade, r"-[0-9]{8,}")
         self.assertIn("--reparar", unidade)
+        self.assertIn("Environment=HOME=/root", unidade)
+        self.assertIn("Environment=TMPDIR=/tmp", unidade)
+        self.assertIn("/usr/local/bin", unidade)
         self.assertIn("XDG_RUNTIME_DIR=/run/user/0", unidade)
         self.assertIn("DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/0/bus", unidade)
+        self.assertIn("OnActiveSec=1min", timer)
+        self.assertIn("OnUnitActiveSec=5min", timer)
         self.assertIn("validar_confinex", fonte)
         self.assertIn("confinex_bridge_inativa", fonte)
         self.assertIn("juan-confinex-db-bridge.service", fonte)
         self.assertIn("confinex_bridge_reiniciada", fonte)
         self.assertIn("validar_modelos", fonte)
         self.assertIn("--probe-max-tokens", fonte)
+        self.assertIn("validar_status_gateway", fonte)
+        self.assertIn("consultar_readyz", fonte)
         self.assertIn("validar_roteador_xlsx", fonte)
         self.assertIn("validar_indice_sessoes", fonte)
         self.assertIn("validar_autenticacao_wacli", fonte)
@@ -601,13 +692,20 @@ class VerificarOpenClawCanaisTest(unittest.TestCase):
         reiniciar.assert_not_called()
 
     @patch("tools.verificar_openclaw_canais.reiniciar", return_value=True)
-    def test_repara_telegram_mesmo_com_whatsapp_sem_pareamento(self, reiniciar):
+    def test_falha_de_canal_nao_reinicia_gateway_saudavel(self, reiniciar):
         args = SimpleNamespace(gateway_service="openclaw-gateway.service")
         acoes = reparar(args, [
             "telegram_indisponivel:default",
             "whatsapp_openclaw_indisponivel",
             "whatsapp_openclaw_reautenticacao_necessaria",
         ])
+        self.assertEqual([], acoes)
+        reiniciar.assert_not_called()
+
+    @patch("tools.verificar_openclaw_canais.reiniciar", return_value=True)
+    def test_reinicia_gateway_apenas_com_health_indisponivel(self, reiniciar):
+        args = SimpleNamespace(gateway_service="openclaw-gateway.service")
+        acoes = reparar(args, ["gateway_health_indisponivel"])
         self.assertEqual(["gateway_reiniciado"], acoes)
         reiniciar.assert_called_once_with(
             "openclaw-gateway.service", usuario=True,
@@ -618,6 +716,18 @@ class VerificarOpenClawCanaisTest(unittest.TestCase):
         args = SimpleNamespace(gateway_service="openclaw-gateway.service")
         self.assertEqual([], reparar(args, ["token_gateway_indisponivel"]))
         reiniciar.assert_not_called()
+
+    @patch("tools.verificar_openclaw_canais.reiniciar", return_value=True)
+    def test_repara_timer_oficial_do_wey_sem_reiniciar_gateway(self, reiniciar):
+        args = SimpleNamespace(
+            wey_health_timer="wey-whatsapp-official-health.timer",
+            gateway_service="openclaw-gateway.service",
+        )
+        self.assertEqual(
+            reparar(args, ["wey_health_timer_inativo"]),
+            ["wey_health_timer_reiniciado"],
+        )
+        reiniciar.assert_called_once_with("wey-whatsapp-official-health.timer")
 
 
 if __name__ == "__main__":

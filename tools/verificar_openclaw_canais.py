@@ -92,9 +92,19 @@ def contrato_modelo(valor: Any) -> tuple[str, tuple[str, ...]]:
 def configuracoes_modelos(configuracao: dict[str, Any]) -> list[dict[str, Any]]:
     agentes = (configuracao.get("agents") or {})
     padrao = contrato_modelo((agentes.get("defaults") or {}).get("model"))
+    entradas = agentes.get("entries")
+    if isinstance(entradas, dict):
+        itens_agentes = [
+            {"id": agente_id, **(item if isinstance(item, dict) else {})}
+            for agente_id, item in entradas.items()
+        ]
+    elif isinstance(entradas, list):
+        itens_agentes = entradas
+    else:
+        itens_agentes = agentes.get("list") or []
     vistos: set[tuple[str, tuple[str, ...]]] = set()
     configuracoes = []
-    for item in agentes.get("list") or []:
+    for item in itens_agentes:
         if not isinstance(item, dict) or not item.get("id"):
             continue
         modelo = contrato_modelo(item.get("model"))
@@ -315,6 +325,34 @@ def validar_indice_sessoes(payload: Any, agente: str) -> list[str]:
     return []
 
 
+def validar_indices_sessoes(
+    *,
+    cache: Path,
+    intervalo: int,
+    forcar: bool = False,
+) -> list[str]:
+    """Executa a manutenção preventiva pesada em cadência própria."""
+    agora = int(time.time())
+    if not forcar:
+        try:
+            anterior = json.loads(cache.read_text(encoding="utf-8"))
+            if agora - int(anterior.get("timestamp") or 0) < intervalo:
+                return []
+        except (OSError, ValueError, json.JSONDecodeError):
+            pass
+
+    falhas: list[str] = []
+    for agente in AGENTES_OBRIGATORIOS:
+        indice = json_comando([
+            "openclaw", "sessions", "cleanup", "--agent", agente,
+            "--dry-run", "--fix-missing", "--json",
+        ], timeout=120)
+        falhas.extend(validar_indice_sessoes(indice, agente))
+    if not falhas:
+        gravar_json_atomico(cache, {"timestamp": agora})
+    return falhas
+
+
 def reparar_indice_sessoes(agente: str) -> bool:
     """Remove somente referencias ausentes, nunca sessoes ou artefatos validos."""
     comando_base = [
@@ -428,10 +466,44 @@ def validar_canais(payload: Any) -> list[str]:
                 whatsapp.get("running"), whatsapp.get("connected"),
                 whatsapp.get("healthState") == "healthy")):
         falhas.append("whatsapp_openclaw_indisponivel")
-    evento = payload.get("eventLoop") or {}
-    if evento.get("degraded") is True:
-        falhas.append("gateway_event_loop_degradado")
     return falhas
+
+
+def validar_status_gateway(payload: Any) -> list[str]:
+    """Valida a projeção online sem disputar os bancos locais do Gateway."""
+    if not isinstance(payload, dict):
+        return ["probe_gateway_falhou"]
+    if "ready" in payload:
+        if payload.get("ready") is not True or payload.get("failing"):
+            return ["gateway_health_indisponivel"]
+        return []
+    falhas = []
+    # ``openclaw health`` já é a prova de alcance do Gateway e evita a
+    # materialização pesada de ``status --deep``. Mantemos a leitura do
+    # envelope antigo para compatibilidade com diagnósticos salvos.
+    health = payload.get("health") if "health" in payload else payload
+    health = health if isinstance(health, dict) else {}
+    gateway = payload.get("gateway")
+    if isinstance(gateway, dict) and gateway.get("reachable") is not True:
+        falhas.append("gateway_indisponivel")
+    if health.get("ok") is not True:
+        falhas.append("gateway_health_indisponivel")
+    runtime = health.get("modelRuntime") or {}
+    if runtime.get("degraded") is True or runtime.get("pendingAgents"):
+        falhas.append("runtime_modelos_degradado")
+    return falhas
+
+
+def consultar_readyz(url: str) -> Any:
+    """Consulta o endpoint local barato usado pelo próprio systemd."""
+    try:
+        requisicao = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(requisicao, timeout=5) as resposta:
+            if resposta.status != 200:
+                return None
+            return json.loads(resposta.read().decode("utf-8"))
+    except (OSError, TimeoutError, json.JSONDecodeError, urllib.error.URLError):
+        return None
 
 
 def validar_reautenticacao_whatsapp_openclaw(
@@ -565,11 +637,8 @@ def diagnosticar(args: argparse.Namespace) -> list[str]:
         falhas.append("confinex_bridge_inativa")
     if not unidade_ativa(args.chrome_service):
         falhas.append("chrome_openclaw_inativo")
-    if not unidade_ativa(args.wacli_service):
-        falhas.append("wacli_continuo_inativo")
-    falhas.extend(validar_autenticacao_wacli(
-        args.wacli_bin, args.wacli_store, args.wacli_service,
-    ))
+    if not unidade_ativa(args.wey_health_timer):
+        falhas.append("wey_health_timer_inativo")
 
     try:
         configuracao = json.loads(args.config.read_text())
@@ -584,41 +653,16 @@ def diagnosticar(args: argparse.Namespace) -> list[str]:
     if executar(["openclaw", "config", "validate"], timeout=60).codigo != 0:
         falhas.append("validacao_config_falhou")
 
-    falhas.extend(validar_confinex())
-    falhas.extend(validar_roteador_xlsx(args.arquivo_router))
-
-    cron = executar(["crontab", "-l"], timeout=20)
-    if cron.codigo != 0:
-        falhas.append("agronota_agendamento_indisponivel")
-    else:
-        falhas.extend(validar_monitor_agronota(
-            cron=cron.stdout,
-            log=args.agronota_log,
-            arquivos=tuple(args.agronota_arquivos),
-            idade_maxima_segundos=args.agronota_idade_maxima,
-        ))
-
-    agentes = json_comando(["openclaw", "agents", "list", "--bindings", "--json"])
-    falhas.extend(validar_agentes(agentes))
-    for agente in AGENTES_OBRIGATORIOS:
-        indice = json_comando([
-            "openclaw", "sessions", "cleanup", "--agent", agente,
-            "--dry-run", "--fix-missing", "--json",
-        ], timeout=120)
-        falhas.extend(validar_indice_sessoes(indice, agente))
-
     token = resolver_token_gateway(configuracao)
     if not token:
         return falhas + ["token_gateway_indisponivel"]
     ambiente = dict(os.environ)
     ambiente["OPENCLAW_GATEWAY_TOKEN"] = token
-    falhas.extend(validar_modelos(
-        configuracao,
-        ambiente=ambiente,
-        cache=args.modelo_probe_cache,
-        intervalo=args.modelo_probe_intervalo,
-        forcar=args.forcar_probe_modelos,
-    ))
+
+    # Observabilidade online vem antes das verificações locais mais pesadas.
+    # Assim, manutenção de índices nunca bloqueia nem falseia a saúde atual.
+    status_gateway = consultar_readyz(args.gateway_ready_url)
+    falhas.extend(validar_status_gateway(status_gateway))
 
     canais = json_comando(
         ["openclaw", "channels", "status", "--probe", "--json"],
@@ -651,6 +695,28 @@ def diagnosticar(args: argparse.Namespace) -> list[str]:
             falhas.append(f"diretorio_grupos_falhou:{conta}")
         elif not esperados.issubset(encontrados):
             falhas.append(f"grupo_telegram_inacessivel:{conta}")
+
+    falhas.extend(validar_confinex())
+    falhas.extend(validar_roteador_xlsx(args.arquivo_router))
+
+    cron = executar(["crontab", "-l"], timeout=20)
+    if cron.codigo != 0:
+        falhas.append("agronota_agendamento_indisponivel")
+    else:
+        falhas.extend(validar_monitor_agronota(
+            cron=cron.stdout,
+            log=args.agronota_log,
+            arquivos=tuple(args.agronota_arquivos),
+            idade_maxima_segundos=args.agronota_idade_maxima,
+        ))
+
+    agentes = json_comando(["openclaw", "agents", "list", "--bindings", "--json"])
+    falhas.extend(validar_agentes(agentes))
+    falhas.extend(validar_indices_sessoes(
+        cache=args.indice_sessoes_cache,
+        intervalo=args.indice_sessoes_intervalo,
+        forcar=args.forcar_indice_sessoes,
+    ))
     return sorted(set(falhas))
 
 
@@ -681,34 +747,21 @@ def reparar(args: argparse.Namespace, falhas: list[str]) -> list[str]:
         acoes.append("dns_resolver_reiniciado")
     if "chrome_openclaw_inativo" in falhas and reiniciar(args.chrome_service):
         acoes.append("chrome_reiniciado")
-    if (
-        "wacli_continuo_inativo" in falhas
-        and "wacli_reautenticacao_necessaria" not in falhas
-    ):
-        if executar(["systemctl", "start", args.wacli_health_service], timeout=90).codigo == 0:
-            acoes.append("wacli_reparado")
+    if "wey_health_timer_inativo" in falhas and reiniciar(args.wey_health_timer):
+        acoes.append("wey_health_timer_reiniciado")
 
     for agente in AGENTES_OBRIGATORIOS:
         if f"indice_sessoes_inconsistente:{agente}" in falhas:
             if reparar_indice_sessoes(agente):
                 acoes.append(f"indice_sessoes_reparado:{agente}")
 
-    gatilhos_gateway = (
-        "gateway_", "telegram_", "whatsapp_openclaw_", "probe_canais_",
-        "diretorio_grupos_", "grupo_telegram_",
-    )
+    # Falha de Bot API, diretório ou probe de canal deve alertar, não derrubar
+    # um Gateway cuja RPC de saúde respondeu. Reinício fica reservado para a
+    # indisponibilidade confirmada do próprio Gateway.
     falhas_gateway = [
-        falha for falha in falhas if falha.startswith(gatilhos_gateway)
+        falha for falha in falhas
+        if falha in {"gateway_indisponivel", "gateway_health_indisponivel"}
     ]
-    if "whatsapp_openclaw_reautenticacao_necessaria" in falhas:
-        falhas_gateway = [
-            falha for falha in falhas_gateway
-            if falha not in {
-                "whatsapp_openclaw_indisponivel",
-                "whatsapp_openclaw_reautenticacao_necessaria",
-                "gateway_event_loop_degradado",
-            }
-        ]
     if falhas_gateway:
         if reiniciar(args.gateway_service, usuario=True):
             acoes.append("gateway_reiniciado")
@@ -751,6 +804,9 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=Path, default=Path("/root/.openclaw/openclaw.json"))
     parser.add_argument("--gateway-service", default="openclaw-gateway.service")
+    parser.add_argument(
+        "--gateway-ready-url", default="http://127.0.0.1:18789/readyz"
+    )
     parser.add_argument("--ocr-service", default="juan-compra-ocr-worker.service")
     parser.add_argument(
         "--confinex-bridge-service",
@@ -760,6 +816,9 @@ def main() -> int:
     parser.add_argument("--chrome-service", default="openclaw-chrome.service")
     parser.add_argument("--wacli-service", default="wey-whatsapp-live-sync.service")
     parser.add_argument("--wacli-health-service", default="wey-whatsapp-live-health.service")
+    parser.add_argument(
+        "--wey-health-timer", default="wey-whatsapp-official-health.timer"
+    )
     parser.add_argument("--wacli-bin", type=Path, default=Path("/usr/local/bin/wacli"))
     parser.add_argument(
         "--wacli-store", type=Path,
@@ -775,6 +834,12 @@ def main() -> int:
     )
     parser.add_argument("--modelo-probe-intervalo", type=int, default=30 * 60)
     parser.add_argument("--forcar-probe-modelos", action="store_true")
+    parser.add_argument(
+        "--indice-sessoes-cache", type=Path,
+        default=Path("/root/.openclaw/state/session-index-heartbeat.json"),
+    )
+    parser.add_argument("--indice-sessoes-intervalo", type=int, default=6 * 60 * 60)
+    parser.add_argument("--forcar-indice-sessoes", action="store_true")
     parser.add_argument(
         "--agronota-log", type=Path,
         default=Path("/var/log/cfagro/agronota_pipeline.log"),

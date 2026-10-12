@@ -182,28 +182,38 @@ Não contorne falha de contrato removendo a asserção sem confirmar a regra
 operacional correspondente.
 
 O heartbeat permanente acrescenta dois gates leves. Uma planilha XLSX mínima
-passa pelo roteador em `--dry-run`, e cada configuração distinta de modelos
-recebe um probe oficial limitado a um token a cada trinta minutos. O cache
-contém somente horário e códigos de falha. Depois de corrigir uma credencial,
-use `--forcar-probe-modelos` para ignorar o cache e obter nova prova imediata.
-Falha, ausência ou formato inválido da resposta do verificador continua
-bloqueando o heartbeat, mas não é evidência de indisponibilidade do modelo.
-Somente um resultado explícito para o modelo com status diferente do literal
-`ok` recebe a classificação de indisponibilidade. O probe é uma verificação
-pontual e não comprova atendimento ponta a ponta pelos agentes ou canais.
-Em cada execução, ele também roda a prévia do índice de sessões dos quatro
-agentes. Se houver referência para arquivo ausente, o autorreparo aplica apenas
+passa pelo roteador em `--dry-run`, e o endpoint local `/readyz` confirma a
+prontidão do Gateway sem inicializar a CLI pesada nem disputar seus bancos.
+Na instalação, confirme também que a unidade declara `HOME=/root` e inclui
+`/usr/local/bin` no `PATH`: os subprocessos do OpenClaw dependem do provedor
+`op` para resolver os tokens protegidos dos canais.
+O timer deve mostrar um próximo disparo logo depois de ser habilitado. Seu
+primeiro ciclo usa `OnActiveSec=1min`; os seguintes usam
+`OnUnitActiveSec=5min`, sem depender de histórico anterior do timer.
+Falha, ausência ou formato inválido dessa
+resposta continua bloqueando o heartbeat. CPU momentaneamente alta no event
+loop não é suficiente, sozinha, para reiniciar o Gateway. Falha isolada de
+probe de canal também não autoriza restart quando a RPC de saúde respondeu. A prova funcional
+ponta a ponta dos agentes é executada separadamente após implantação ou
+atualização do runtime.
+Em cadência própria de seis horas, ele também roda a prévia do índice de sessões
+dos quatro agentes; o gate online e os canais são verificados antes dessa
+manutenção pesada. Se houver referência para arquivo ausente, o autorreparo aplica apenas
 `--fix-missing` e confirma nova prévia com zero ausências; qualquer sinal de
 poda, limite ou remoção de artefato válido bloqueia o reparo automático.
 
-O gate do WhatsApp diferencia processo interrompido de sessão revogada. Com
-autenticação válida, o heartbeat pode reiniciar a captura; sem autenticação,
-retorna `wacli_reautenticacao_necessaria`, não inicia o serviço em ciclo e
-preserva o cache para novo pareamento. O canal WhatsApp interno do OpenClaw
-segue a mesma regra: logout no log junto de probe indisponível retorna
-`whatsapp_openclaw_reautenticacao_necessaria` e não reinicia o gateway. Uma
-falha independente do Telegram continua reparável. Os testes não enviam
-mensagens.
+O gate do WhatsApp acompanha o canal oficial do OpenClaw e o timer de saúde
+oficial do Wey; o coletor `wacli` legado não participa mais desse gate. Logout
+no log junto de probe indisponível retorna
+`whatsapp_openclaw_reautenticacao_necessaria` e não reinicia o Gateway em
+ciclo. Uma falha independente do Telegram continua reparável. Os testes não
+enviam mensagens.
+
+O contrato da Ponte VPS é coberto por
+`python3 -m unittest tools.test_ponte_confinex`: o teste exige credencial do
+executor carregada antes da chamada, restringe estados finais a `concluido` e
+`erro`, valida a transição condicional e comprova que o relatório é gravado em
+spool antes do PATCH final.
 
 ## Painel Boi Gordo
 

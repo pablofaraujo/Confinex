@@ -2,6 +2,7 @@
 Description=Heartbeat e autorreparo OpenClaw a cada cinco minutos
 
 [Timer]
+OnActiveSec=1min
 OnBootSec=2min
 OnUnitActiveSec=5min
 Persistent=true
