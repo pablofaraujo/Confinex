@@ -1,5 +1,5 @@
 {
-  "atualizadoEm": "2026-10-13 13:46:00",
+  "atualizadoEm": "2026-10-14 11:20:00",
   "referenciasAtualizadasEm": "2026-07-15 10:21:00",
   "fonte": "B3 oficial (curva automática); demais referências preservadas com data própria",
   "indicadores": [
@@ -44,18 +44,18 @@
     {
       "venc": "BGIV26",
       "mes": "out/26",
-      "valor": 389.35,
+      "valor": 388.4,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-10-13 13:46:00"
+      "dataFonte": "2026-10-14 11:19:00"
     },
     {
       "venc": "BGIX26",
       "mes": "nov/26",
-      "valor": 397.75,
+      "valor": 397.25,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-10-13 13:46:00"
+      "dataFonte": "2026-10-14 11:20:00"
     },
     {
       "venc": "BGIZ26",
@@ -63,42 +63,42 @@
       "valor": 395.55,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-10-13 13:34:00"
+      "dataFonte": "2026-10-14 11:14:00"
     },
     {
       "venc": "BGIF27",
       "mes": "jan/27",
-      "valor": 395.45,
+      "valor": 395.25,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-10-13 13:31:00"
+      "dataFonte": "2026-10-14 11:16:00"
     },
     {
       "venc": "BGIG27",
       "mes": "fev/27",
-      "valor": 395.05,
+      "valor": 394.3,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-10-13 13:31:00"
+      "dataFonte": "2026-10-14 11:16:00"
     },
     {
       "venc": "BGIH27",
       "mes": "mar/27",
-      "valor": 395.85,
+      "valor": 395.5,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-10-13 12:45:00"
+      "dataFonte": "2026-10-14 11:15:00"
     },
     {
       "venc": "BGIK27",
       "mes": "mai/27",
-      "valor": 394.35,
+      "valor": 394.05,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-10-13 09:32:00"
+      "dataFonte": "2026-10-14 11:09:00"
     }
   ],
   "manchetes": [],
   "contexto": [],
-  "atualizadoEmB3": "2026-10-13 13:46:00"
+  "atualizadoEmB3": "2026-10-14 11:20:00"
 }
