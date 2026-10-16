@@ -1,5 +1,8 @@
 import json
+import os
+import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -11,12 +14,16 @@ from tools.verificar_openclaw_canais import (
     consultar_readyz,
     grupos_configurados,
     ids_grupos,
+    executar,
     validar_agentes,
+    validar_agentes_configuracao,
     validar_autenticacao_wacli,
     validar_canais,
     validar_status_gateway,
+    validar_whatsapp_por_logs,
     validar_reautenticacao_whatsapp_openclaw,
     validar_confinex,
+    validar_diretorio_grupos,
     validar_modelos,
     validar_monitor_agronota,
     validar_probe_modelos,
@@ -29,6 +36,76 @@ from tools.verificar_openclaw_canais import (
 
 
 class VerificarOpenClawCanaisTest(unittest.TestCase):
+    def test_timeout_encerra_todo_o_grupo_de_processos(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            pidfile = Path(pasta) / "filho.pid"
+            programa = (
+                "import pathlib, subprocess, sys, time; "
+                "filho=subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)']); "
+                "pathlib.Path(sys.argv[1]).write_text(str(filho.pid)); "
+                "time.sleep(60)"
+            )
+            resultado = executar(
+                [sys.executable, "-c", programa, str(pidfile)], timeout=1,
+            )
+            self.assertEqual(124, resultado.codigo)
+            pid_filho = int(pidfile.read_text())
+            for _ in range(20):
+                try:
+                    os.kill(pid_filho, 0)
+                except ProcessLookupError:
+                    break
+                time.sleep(0.1)
+            else:
+                self.fail(f"processo filho {pid_filho} sobreviveu ao timeout")
+
+    @patch("tools.verificar_openclaw_canais.consultar_telegram_bot")
+    def test_diretorio_grupos_e_serial_e_usa_cache(self, consultar):
+        consultar.side_effect = [
+            {"ok": True, "result": {"id": 101}},
+            {"ok": True, "result": {"status": "member"}},
+            {"ok": True, "result": {"id": 202}},
+            {"ok": True, "result": {"status": "administrator"}},
+        ]
+        config = {"channels": {"telegram": {"accounts": {
+            "default": {"botToken": "token-juan", "groups": {"grupo-juan": {}}},
+            "ceci": {"botToken": "token-ceci", "groups": {"grupo-ceci": {}}},
+        }}}}
+        with tempfile.TemporaryDirectory() as pasta:
+            cache = Path(pasta) / "grupos.json"
+            self.assertEqual([], validar_diretorio_grupos(
+                config, ambiente={}, cache=cache, intervalo=6 * 60 * 60,
+            ))
+            self.assertEqual(4, consultar.call_count)
+            self.assertEqual([], validar_diretorio_grupos(
+                config, ambiente={}, cache=cache, intervalo=6 * 60 * 60,
+            ))
+            self.assertEqual(4, consultar.call_count)
+        self.assertEqual(
+            ["getMe", "getChatMember", "getMe", "getChatMember"],
+            [chamada.args[1] for chamada in consultar.call_args_list],
+        )
+
+    @patch("tools.verificar_openclaw_canais.consultar_telegram_bot")
+    def test_diretorio_detecta_bot_removido_sem_expor_grupo(self, consultar):
+        consultar.side_effect = [
+            {"ok": True, "result": {"id": 101}},
+            {"ok": True, "result": {"status": "left"}},
+            {"ok": True, "result": {"id": 202}},
+            {"ok": True, "result": {"status": "member"}},
+        ]
+        config = {"channels": {"telegram": {"accounts": {
+            "default": {"botToken": "token-juan", "groups": {"grupo-secreto": {}}},
+            "ceci": {"botToken": "token-ceci", "groups": {"grupo-ceci": {}}},
+        }}}}
+        with tempfile.TemporaryDirectory() as pasta:
+            falhas = validar_diretorio_grupos(
+                config, ambiente={}, cache=Path(pasta) / "grupos.json",
+                intervalo=240,
+            )
+        self.assertEqual(["grupo_telegram_inacessivel:default"], falhas)
+        self.assertNotIn("grupo-secreto", json.dumps(falhas))
+
     def test_configuracoes_modelos_aceita_schema_entries_atual(self):
         config = {"agents": {
             "defaults": {"model": {
@@ -55,6 +132,61 @@ class VerificarOpenClawCanaisTest(unittest.TestCase):
                 "fallbacks": [],
             },
         ])
+
+    def test_agentes_configurados_sao_validados_sem_cli(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            raiz = Path(pasta)
+            entradas = {}
+            bindings = []
+            for agente, minimo in {"juan": 1, "ceci": 1, "wey": 1, "zeus": 0}.items():
+                workspace = raiz / f"workspace-{agente}"
+                agent_dir = raiz / "agents" / agente / "agent"
+                workspace.mkdir()
+                agent_dir.mkdir(parents=True)
+                (agent_dir / "AGENT.md").write_text("# teste\n")
+                entradas[agente] = {
+                    "workspace": str(workspace), "agentDir": str(agent_dir),
+                }
+                if minimo:
+                    bindings.append({"agentId": agente, "match": {}})
+            self.assertEqual([], validar_agentes_configuracao({
+                "agents": {"entries": entradas}, "bindings": bindings,
+            }))
+
+    @patch("pathlib.Path.expanduser")
+    def test_agentes_expandem_til_da_configuracao(self, expandir):
+        expandir.return_value.is_dir.return_value = True
+        expandir.return_value.__truediv__.return_value.is_file.return_value = True
+        config = {
+            "agents": {"entries": {
+                agente: {"workspace": f"~/.openclaw/workspace-{agente}"}
+                for agente in ("juan", "ceci", "wey", "zeus")
+            }},
+            "bindings": [
+                {"agentId": agente, "match": {}}
+                for agente in ("juan", "ceci", "wey")
+            ],
+        }
+        self.assertEqual([], validar_agentes_configuracao(config))
+        self.assertGreaterEqual(expandir.call_count, 8)
+
+    def test_whatsapp_usa_ultimo_estado_observado_nos_logs(self):
+        self.assertEqual([], validar_whatsapp_por_logs(
+            "Web connection closed (status 408)\n"
+            "Listening for WhatsApp inbound messages (DM + 1 configured group).\n"
+        ))
+        self.assertEqual(
+            ["whatsapp_openclaw_indisponivel"],
+            validar_whatsapp_por_logs(
+                "Listening for WhatsApp inbound messages\nWeb connection closed (status 408)\n"
+            ),
+        )
+        self.assertEqual(
+            ["whatsapp_openclaw_reautenticacao_necessaria"],
+            validar_whatsapp_por_logs(
+                "Listening for WhatsApp inbound messages\nWhatsApp session logged out\n"
+            ),
+        )
 
     def test_deduplica_configuracoes_de_modelos_por_contrato(self):
         config = {"agents": {

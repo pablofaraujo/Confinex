@@ -10,9 +10,9 @@ privado depois de o reparo automatico falhar.
 from __future__ import annotations
 
 import argparse
-import concurrent.futures
 import json
 import os
+import signal
 import socket
 import shutil
 import subprocess
@@ -41,17 +41,45 @@ class ResultadoComando:
 
 def executar(comando: list[str], *, timeout: int = 60,
              ambiente: dict[str, str] | None = None) -> ResultadoComando:
+    processo: subprocess.Popen[str] | None = None
     try:
-        resultado = subprocess.run(
+        processo = subprocess.Popen(
             comando,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=timeout,
-            check=False,
             env=ambiente,
+            start_new_session=True,
         )
-        return ResultadoComando(resultado.returncode, resultado.stdout, resultado.stderr)
-    except (subprocess.TimeoutExpired, OSError):
+        stdout, stderr = processo.communicate(timeout=timeout)
+        codigo = int(processo.returncode or 0)
+        # Alguns comandos OpenClaw encerram o pai e deixam workers no mesmo
+        # grupo. O heartbeat nunca precisa preservar esses descendentes.
+        try:
+            os.killpg(processo.pid, signal.SIGTERM)
+            time.sleep(0.2)
+            os.killpg(processo.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        return ResultadoComando(codigo, stdout, stderr)
+    except subprocess.TimeoutExpired:
+        if processo is not None:
+            try:
+                os.killpg(processo.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            try:
+                processo.communicate(timeout=2)
+            except subprocess.TimeoutExpired:
+                pass
+            try:
+                os.killpg(processo.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            if processo.poll() is None:
+                processo.communicate()
+        return ResultadoComando(124, "", "")
+    except OSError:
         return ResultadoComando(124, "", "")
 
 
@@ -424,6 +452,20 @@ def resolver_token_gateway(configuracao: dict[str, Any]) -> str | None:
     return token if resultado.codigo == 0 and token else None
 
 
+def resolver_segredo_op(valor: Any) -> str | None:
+    if isinstance(valor, str):
+        return valor or None
+    if not isinstance(valor, dict):
+        return None
+    if valor.get("provider") != "op" or not valor.get("id"):
+        return None
+    if not os.environ.get("OP_SERVICE_ACCOUNT_TOKEN"):
+        return None
+    resultado = executar(["op", "read", str(valor["id"])], timeout=30)
+    segredo = resultado.stdout.strip()
+    return segredo if resultado.codigo == 0 and segredo else None
+
+
 def validar_agentes(payload: Any) -> list[str]:
     falhas: list[str] = []
     if not isinstance(payload, list):
@@ -438,6 +480,49 @@ def validar_agentes(payload: Any) -> list[str]:
             falhas.append(f"agente_sem_vinculo:{agente}")
         workspace = Path(str(item.get("workspace") or ""))
         agent_dir = Path(str(item.get("agentDir") or ""))
+        if not workspace.is_dir():
+            falhas.append(f"workspace_ausente:{agente}")
+        if not (agent_dir / "AGENT.md").is_file():
+            falhas.append(f"agent_md_ausente:{agente}")
+    return falhas
+
+
+def validar_agentes_configuracao(configuracao: dict[str, Any]) -> list[str]:
+    """Valida estrutura e arquivos sem iniciar outro runtime OpenClaw."""
+    agentes = configuracao.get("agents") or {}
+    entradas = agentes.get("entries")
+    if isinstance(entradas, list):
+        por_id = {
+            str(item.get("id")): item
+            for item in entradas if isinstance(item, dict) and item.get("id")
+        }
+    elif isinstance(entradas, dict):
+        por_id = {
+            str(agente_id): item if isinstance(item, dict) else {}
+            for agente_id, item in entradas.items()
+        }
+    else:
+        return ["agentes_configuracao_invalida"]
+    bindings = configuracao.get("bindings") or []
+    contagem = {
+        agente: sum(
+            1 for item in bindings
+            if isinstance(item, dict) and str(item.get("agentId")) == agente
+        )
+        for agente in AGENTES_OBRIGATORIOS
+    }
+    falhas: list[str] = []
+    for agente, minimo_vinculos in AGENTES_OBRIGATORIOS.items():
+        item = por_id.get(agente)
+        if item is None:
+            falhas.append(f"agente_ausente:{agente}")
+            continue
+        if contagem.get(agente, 0) < minimo_vinculos:
+            falhas.append(f"agente_sem_vinculo:{agente}")
+        workspace = Path(str(item.get("workspace") or "")).expanduser()
+        agent_dir = Path(str(
+            item.get("agentDir") or f"/root/.openclaw/agents/{agente}/agent"
+        )).expanduser()
         if not workspace.is_dir():
             falhas.append(f"workspace_ausente:{agente}")
         if not (agent_dir / "AGENT.md").is_file():
@@ -536,6 +621,22 @@ def validar_reautenticacao_whatsapp_openclaw(
     return []
 
 
+def validar_whatsapp_por_logs(logs_gateway: str) -> list[str]:
+    """Usa o estado mais recente do provedor sem carregar o CLI completo."""
+    texto = logs_gateway.lower()
+    pos_escuta = texto.rfind("listening for whatsapp inbound messages")
+    pos_fechou = texto.rfind("web connection closed")
+    pos_logout = max(
+        texto.rfind("whatsapp session logged out"),
+        texto.rfind("session logged out during setup"),
+    )
+    if pos_logout > pos_escuta:
+        return ["whatsapp_openclaw_reautenticacao_necessaria"]
+    if pos_escuta < 0 or pos_fechou > pos_escuta:
+        return ["whatsapp_openclaw_indisponivel"]
+    return []
+
+
 def validar_confinex(ambiente: dict[str, str] | None = None) -> list[str]:
     """Confirma DNS, TLS e uma leitura autenticada mínima no Supabase."""
     env = ambiente or os.environ
@@ -627,6 +728,75 @@ def grupos_configurados(configuracao: dict[str, Any], conta: str) -> set[str]:
     return {str(chave) for chave in grupos.keys()} if isinstance(grupos, dict) else set()
 
 
+def consultar_telegram_bot(
+    token: str, metodo: str, parametros: dict[str, str] | None = None,
+) -> dict[str, Any] | None:
+    dados = urllib.parse.urlencode(parametros or {}).encode()
+    requisicao = urllib.request.Request(
+        f"https://api.telegram.org/bot{token}/{metodo}",
+        data=dados,
+        method="POST",
+        headers={"Accept": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(requisicao, timeout=20) as resposta:
+            payload = json.loads(resposta.read().decode("utf-8"))
+            return payload if isinstance(payload, dict) else None
+    except (OSError, TimeoutError, json.JSONDecodeError, urllib.error.URLError):
+        return None
+
+
+def validar_diretorio_grupos(
+    configuracao: dict[str, Any],
+    *,
+    ambiente: dict[str, str],
+    cache: Path,
+    intervalo: int,
+    forcar: bool = False,
+) -> list[str]:
+    """Confere a associação dos bots diretamente, sem iniciar outro OpenClaw."""
+    agora = int(time.time())
+    if not forcar:
+        try:
+            anterior = json.loads(cache.read_text(encoding="utf-8"))
+            if agora - int(anterior.get("timestamp") or 0) < intervalo:
+                return sorted(set(str(item) for item in anterior.get("falhas") or []))
+        except (OSError, ValueError, json.JSONDecodeError):
+            pass
+
+    telegram = ((configuracao.get("channels") or {}).get("telegram") or {})
+    contas = telegram.get("accounts") or {}
+    falhas: list[str] = []
+    for conta in CONTAS_TELEGRAM:
+        conta_cfg = contas.get(conta) if isinstance(contas, dict) else None
+        conta_cfg = conta_cfg if isinstance(conta_cfg, dict) else {}
+        token = resolver_segredo_op(conta_cfg.get("botToken"))
+        esperados = grupos_configurados(configuracao, conta)
+        if not token:
+            falhas.append(f"diretorio_grupos_falhou:{conta}")
+            continue
+        identidade = consultar_telegram_bot(token, "getMe")
+        usuario_id = ((identidade or {}).get("result") or {}).get("id")
+        if (identidade or {}).get("ok") is not True or not usuario_id:
+            falhas.append(f"diretorio_grupos_falhou:{conta}")
+            continue
+        inacessivel = False
+        for grupo in sorted(esperados):
+            membro = consultar_telegram_bot(token, "getChatMember", {
+                "chat_id": grupo,
+                "user_id": str(usuario_id),
+            })
+            status = ((membro or {}).get("result") or {}).get("status")
+            if (membro or {}).get("ok") is not True or status in {None, "left", "kicked"}:
+                inacessivel = True
+        if inacessivel:
+            falhas.append(f"grupo_telegram_inacessivel:{conta}")
+
+    falhas = sorted(set(falhas))
+    gravar_json_atomico(cache, {"timestamp": agora, "falhas": falhas})
+    return falhas
+
+
 def diagnosticar(args: argparse.Namespace) -> list[str]:
     falhas: list[str] = []
     if not unidade_ativa(args.gateway_service, usuario=True):
@@ -650,9 +820,6 @@ def diagnosticar(args: argparse.Namespace) -> list[str]:
     if visiveis != "automatic":
         falhas.append("respostas_visiveis_incorretas")
 
-    if executar(["openclaw", "config", "validate"], timeout=60).codigo != 0:
-        falhas.append("validacao_config_falhou")
-
     token = resolver_token_gateway(configuracao)
     if not token:
         return falhas + ["token_gateway_indisponivel"]
@@ -664,37 +831,21 @@ def diagnosticar(args: argparse.Namespace) -> list[str]:
     status_gateway = consultar_readyz(args.gateway_ready_url)
     falhas.extend(validar_status_gateway(status_gateway))
 
-    canais = json_comando(
-        ["openclaw", "channels", "status", "--probe", "--json"],
-        timeout=60,
-        ambiente=ambiente,
-    )
-    falhas.extend(validar_canais(canais))
     logs_gateway = executar([
         "journalctl", "--user", "-u", args.gateway_service,
-        "--since", "2 hours ago", "--no-pager", "-o", "cat",
+        "--no-pager", "-n", "1000", "-o", "cat",
     ], timeout=30)
-    falhas.extend(validar_reautenticacao_whatsapp_openclaw(
-        canais,
+    falhas.extend(validar_whatsapp_por_logs(
         logs_gateway.stdout if logs_gateway.codigo == 0 else "",
     ))
 
-    def listar(conta: str) -> tuple[str, Any]:
-        payload = json_comando([
-            "openclaw", "directory", "groups", "list", "--channel", "telegram",
-            "--account", conta, "--limit", "500", "--json",
-        ], timeout=75, ambiente=ambiente)
-        return conta, payload
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-        resultados = dict(executor.map(listar, CONTAS_TELEGRAM))
-    for conta in CONTAS_TELEGRAM:
-        encontrados = ids_grupos(resultados.get(conta))
-        esperados = grupos_configurados(configuracao, conta)
-        if encontrados is None:
-            falhas.append(f"diretorio_grupos_falhou:{conta}")
-        elif not esperados.issubset(encontrados):
-            falhas.append(f"grupo_telegram_inacessivel:{conta}")
+    falhas.extend(validar_diretorio_grupos(
+        configuracao,
+        ambiente=ambiente,
+        cache=args.diretorio_grupos_cache,
+        intervalo=args.diretorio_grupos_intervalo,
+        forcar=args.forcar_diretorio_grupos,
+    ))
 
     falhas.extend(validar_confinex())
     falhas.extend(validar_roteador_xlsx(args.arquivo_router))
@@ -710,13 +861,7 @@ def diagnosticar(args: argparse.Namespace) -> list[str]:
             idade_maxima_segundos=args.agronota_idade_maxima,
         ))
 
-    agentes = json_comando(["openclaw", "agents", "list", "--bindings", "--json"])
-    falhas.extend(validar_agentes(agentes))
-    falhas.extend(validar_indices_sessoes(
-        cache=args.indice_sessoes_cache,
-        intervalo=args.indice_sessoes_intervalo,
-        forcar=args.forcar_indice_sessoes,
-    ))
+    falhas.extend(validar_agentes_configuracao(configuracao))
     return sorted(set(falhas))
 
 
@@ -834,6 +979,12 @@ def main() -> int:
     )
     parser.add_argument("--modelo-probe-intervalo", type=int, default=30 * 60)
     parser.add_argument("--forcar-probe-modelos", action="store_true")
+    parser.add_argument(
+        "--diretorio-grupos-cache", type=Path,
+        default=Path("/root/.openclaw/state/group-directory-heartbeat.json"),
+    )
+    parser.add_argument("--diretorio-grupos-intervalo", type=int, default=4 * 60)
+    parser.add_argument("--forcar-diretorio-grupos", action="store_true")
     parser.add_argument(
         "--indice-sessoes-cache", type=Path,
         default=Path("/root/.openclaw/state/session-index-heartbeat.json"),
