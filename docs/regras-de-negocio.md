@@ -54,9 +54,9 @@ As duas leituras são auxiliares e não mudam lucro, custos totais, caixa ou ran
 
 - **Arrobas postas no confinamento**: `arrobasPostas = pesoProcessado × 50% ÷ 15 × N`.
 - **Custo da arroba posta**: `(custoCompra + freteTotal) ÷ arrobasPostas`. Mede o custo do gado já transportado e processado, independentemente do prazo de permanência.
-- **Carcaça líquida produzida**: `kgCarcacaProduzida = pesoAbate × rcFinal − pesoProcessado × 50%`.
+- **Carcaça líquida produzida**: `kgCarcacaProduzida = pesoAbate × rcFinal − pesoProcessado × rcEntrada`.
 - **Arrobas líquidas produzidas**: `kgCarcacaProduzida ÷ 15`.
-- **Custo da arroba líquida produzida**: `custoConfinamentoTotal ÷ arrobasLiquidasProduzidasTotal`. Considera o ganho de peso e a evolução do RC de 50% no processamento para o RC esperado no abate.
+- **Custo da arroba líquida produzida**: `custoConfinamentoTotal ÷ arrobasLiquidasProduzidasTotal`. Considera o ganho de peso e a evolução do RC inicial informado no processamento para o RC esperado no abate.
 - **Custo marginal da arroba de ganho**: `custoDiarioCab ÷ (GMD × rcFinal) × 15`. Mostra apenas o custo do ganho diário, sem atribuir ao GMD a evolução do RC sobre o peso já existente.
 - **Frete diluído por arroba produzida**: `freteTotal ÷ arrobasLiquidasProduzidasTotal`; cai conforme mais arrobas são produzidas.
 - **Produção + frete por arroba produzida**: `(custoConfinamentoTotal + freteTotal) ÷ arrobasLiquidasProduzidasTotal`.
@@ -67,7 +67,8 @@ As duas leituras são auxiliares e não mudam lucro, custos totais, caixa ou ran
 
 - `arroba` → `custoArrobaProd × (arrobasAbate − arrobasEntrada)`.
 - `ms` → `tonsMS × custoMS + custoAdm × dias + protocolo`, com `consumoDiarioKg = pesoMedioConf × consumoMS%`.
-- Na modalidade de matéria seca, `eficienciaAlimentar = GMD ÷ consumoDiarioKg`, em kg de ganho por kg de MS. O usuário pode informar consumo em `% do peso médio` ou eficiência alimentar. Ao informar a eficiência, `consumoMS% = (GMD ÷ eficienciaAlimentar) ÷ pesoMedioConf × 100`; o GMD permanece fixo. Ao informar o consumo, a eficiência é recalculada pela primeira fórmula.
+- Na modalidade de matéria seca, o usuário pode informar consumo em `% do peso médio` ou **eficiência biológica** em kg de MS por arroba de carcaça produzida. `carcacaInicialKg = pesoProcessado × rcEntrada`; `carcacaFinalKg = pesoAbate × rcFinal`; `arrobasProduzidas = (carcacaFinalKg − carcacaInicialKg) ÷ 15`; `eficienciaBiologica = consumoTotalMSKg ÷ arrobasProduzidas`. Ao informar a eficiência biológica, `consumoDiarioKg = eficienciaBiologica × arrobasProduzidas ÷ diasCiclo` e `consumoMS% = consumoDiarioKg ÷ pesoMedioConf × 100`; GMD e os RCs permanecem fixos. Ao informar o consumo, a eficiência biológica é recalculada pela primeira fórmula.
+- A **conversão alimentar** permanece um indicador separado, baseado em peso vivo: `conversaoAlimentar = consumoDiarioKg ÷ GMD`, em kg de MS por kg de ganho de peso vivo. RC não entra nessa fórmula.
 - `diaria` → `custoDiaria × dias`.
 - `parceria` → custo 0, mas a receita incide só sobre `arrobasEntrada` (o produtor entrega as arrobas de entrada; o ganho fica com o confinamento).
 

@@ -212,26 +212,50 @@ function pesoMedioConfinamento(lote, sc) {
   const pesoAbate = pesoBase + (parseFloat(sc?.gmd) || 0) * (parseFloat(sc?.diasCiclo) || 0);
   return Math.max((pesoChegada + pesoAbate) / 2, 0);
 }
-function calcularEficienciaAlimentar({ gmd, pesoMedio, consumoMS }) {
+function calcularArrobasCarcacaProduzidas(lote, cenario) {
+  const pesoOrigem = parseFloat(lote?.pesoMedio) || 0;
+  const km = parseFloat(cenario?.km) || 0;
+  const pctPerda = cenario?.perdaManual !== "" && cenario?.perdaManual !== void 0 ? parseFloat(cenario.perdaManual) / 100 : perdaKm(km);
+  const pesoChegada = pesoOrigem * (1 - pctPerda);
+  const recuperacao = parseFloat(cenario?.recuperacao) || 0;
+  const pesoProcessado = pesoChegada + (pesoOrigem - pesoChegada) * (recuperacao / 100);
+  const pesoBase = cenario?.refGanho === "origem" ? pesoOrigem : cenario?.refGanho === "proc" ? pesoProcessado : pesoChegada;
+  const pesoAbate = pesoBase + (parseFloat(cenario?.gmd) || 0) * (parseFloat(cenario?.diasCiclo) || 0);
+  const rcEntrada = parseFloat(cenario?.rcEntrada) / 100 || 0.5;
+  const rcFinal = parseFloat(cenario?.rcFinal) / 100 || 0.53;
+  const carcacaInicialKg = pesoProcessado * rcEntrada;
+  const carcacaFinalKg = pesoAbate * rcFinal;
+  return Math.max(carcacaFinalKg - carcacaInicialKg, 0) / 15;
+}
+function calcularEficienciaBiologica({ lote, cenario, consumoMS }) {
+  const pesoMedio = pesoMedioConfinamento(lote, cenario);
+  const dias = parseFloat(cenario?.diasCiclo) || 0;
+  const consumoPct = parseFloat(consumoMS) || 0;
+  const consumoTotalKg = pesoMedio * consumoPct / 100 * dias;
+  const arrobasProduzidas = calcularArrobasCarcacaProduzidas(lote, cenario);
+  return arrobasProduzidas > 0 ? consumoTotalKg / arrobasProduzidas : 0;
+}
+function calcularConsumoMSPorEficienciaBiologica({ lote, cenario, eficienciaBiologica }) {
+  const pesoMedio = pesoMedioConfinamento(lote, cenario);
+  const dias = parseFloat(cenario?.diasCiclo) || 0;
+  const eficiencia = parseFloat(eficienciaBiologica) || 0;
+  const arrobasProduzidas = calcularArrobasCarcacaProduzidas(lote, cenario);
+  const consumoDiarioKg = dias > 0 ? eficiencia * arrobasProduzidas / dias : 0;
+  return pesoMedio > 0 ? consumoDiarioKg / pesoMedio * 100 : 0;
+}
+function calcularConversaoAlimentar({ gmd, pesoMedio, consumoMS }) {
   const ganhoDiario = parseFloat(gmd) || 0;
   const peso = parseFloat(pesoMedio) || 0;
   const consumoPct = parseFloat(consumoMS) || 0;
   const consumoDiarioKg = peso * consumoPct / 100;
-  return consumoDiarioKg > 0 ? ganhoDiario / consumoDiarioKg : 0;
-}
-function calcularConsumoMSPorEficiencia({ gmd, pesoMedio, eficienciaAlimentar }) {
-  const ganhoDiario = parseFloat(gmd) || 0;
-  const peso = parseFloat(pesoMedio) || 0;
-  const eficiencia = parseFloat(eficienciaAlimentar) || 0;
-  return peso > 0 && eficiencia > 0 ? ganhoDiario / eficiencia / peso * 100 : 0;
+  return ganhoDiario > 0 ? consumoDiarioKg / ganhoDiario : 0;
 }
 function sincronizarMetricasAlimentares(lote, cenario, campoAlterado) {
   if (cenario?.modalidade !== "ms") return cenario;
-  const pesoMedio = pesoMedioConfinamento(lote, cenario);
-  const metricaAtiva = campoAlterado === "eficienciaAlimentar" ? "eficiencia" : campoAlterado === "consumoMS" ? "consumo" : cenario.metricaAlimentarAtiva || "consumo";
+  const metricaAtiva = campoAlterado === "eficienciaBiologica" ? "eficiencia" : campoAlterado === "consumoMS" ? "consumo" : cenario.metricaAlimentarAtiva || "consumo";
   if (metricaAtiva === "eficiencia") {
-    const eficiencia = parseFloat(cenario.eficienciaAlimentar) || 0;
-    const consumoMS = calcularConsumoMSPorEficiencia({ gmd: cenario.gmd, pesoMedio, eficienciaAlimentar: eficiencia });
+    const eficiencia = parseFloat(cenario.eficienciaBiologica) || 0;
+    const consumoMS = calcularConsumoMSPorEficienciaBiologica({ lote, cenario, eficienciaBiologica: eficiencia });
     return {
       ...cenario,
       metricaAlimentarAtiva: "eficiencia",
@@ -239,11 +263,11 @@ function sincronizarMetricasAlimentares(lote, cenario, campoAlterado) {
     };
   }
   const consumo = parseFloat(cenario.consumoMS) || 0;
-  const eficienciaAlimentar = calcularEficienciaAlimentar({ gmd: cenario.gmd, pesoMedio, consumoMS: consumo });
+  const eficienciaBiologica = calcularEficienciaBiologica({ lote, cenario, consumoMS: consumo });
   return {
     ...cenario,
     metricaAlimentarAtiva: "consumo",
-    eficienciaAlimentar: consumo > 0 && eficienciaAlimentar > 0 ? eficienciaAlimentar.toFixed(3) : ""
+    eficienciaBiologica: consumo > 0 && eficienciaBiologica > 0 ? eficienciaBiologica.toFixed(2) : ""
   };
 }
 function taxaMensalFluxos(fluxos) {
@@ -821,6 +845,8 @@ function calcCenario(lote, sc) {
       custoArrobaPosta: custoArrobaPosta2,
       kgCarcacaProduzidaCab: 0,
       arrobasProduzidasCab: 0,
+      eficienciaBiologica: 0,
+      conversaoAlimentar: 0,
       custoArrobaLiquidaProduzida: 0,
       custoArrobaMarginal: 0,
       fretePorArrobaProduzida: 0,
@@ -979,10 +1005,12 @@ function calcCenario(lote, sc) {
   const arrobasPostasCab = pesoProc * 0.5 / 15;
   const arrobasPostasTotal = arrobasPostasCab * N;
   const custoArrobaPosta = arrobasPostasTotal > 0 ? (custoCompra + freteTotal) / arrobasPostasTotal : 0;
-  const kgCarcacaInicialCab = pesoProc * 0.5;
+  const kgCarcacaInicialCab = pesoProc * rcEnt;
   const kgCarcacaProduzidaCab = Math.max(carcacaKg - kgCarcacaInicialCab, 0);
   const arrobasProduzidasCab = kgCarcacaProduzidaCab / 15;
   const arrobasProduzidasTotal = arrobasProduzidasCab * N;
+  const eficienciaBiologica = sc.modalidade === "ms" && arrobasProduzidasCab > 0 ? msTotalKgCab / arrobasProduzidasCab : 0;
+  const conversaoAlimentar = sc.modalidade === "ms" && gmd > 0 ? pesoMedioConf * pctMS / gmd : 0;
   const custoArrobaLiquidaProduzida = arrobasProduzidasTotal > 0 ? custoContTotal / arrobasProduzidasTotal : 0;
   const custoDiarioCab = dias > 0 && N > 0 ? custoContTotal / N / dias : 0;
   const kgCarcacaMarginalDia = Math.max(gmd * rcF, 0);
@@ -1045,6 +1073,8 @@ function calcCenario(lote, sc) {
     custoArrobaPosta,
     kgCarcacaProduzidaCab,
     arrobasProduzidasCab,
+    eficienciaBiologica,
+    conversaoAlimentar,
     custoArrobaLiquidaProduzida,
     custoArrobaMarginal,
     fretePorArrobaProduzida,
@@ -1104,7 +1134,7 @@ var defaultSc = (i) => ({
   custoArrobaProd: "270",
   custoMS: "1450",
   consumoMS: "2.3",
-  eficienciaAlimentar: "",
+  eficienciaBiologica: "",
   metricaAlimentarAtiva: "consumo",
   custoAdm: "2.50",
   protocolo: "20",
@@ -1159,7 +1189,7 @@ var CAMPOS_MODELO_CONFINAMENTO = [
   "custoArrobaProd",
   "custoMS",
   "consumoMS",
-  "eficienciaAlimentar",
+  "eficienciaBiologica",
   "metricaAlimentarAtiva",
   "custoAdm",
   "protocolo",
@@ -1347,7 +1377,11 @@ function loadSavedState() {
       if (!next.boisPorCarreta || next.boisPorCarreta === "35") next.boisPorCarreta = defaultBois;
       if (!next.funrural || next.funrural === "1.2") next.funrural = "0.2";
       if (!next.finpecConfigurado) next.finpec = "0.0";
-      return next;
+      if (sc.eficienciaBiologica === void 0) {
+        next.metricaAlimentarAtiva = "consumo";
+        return sincronizarMetricasAlimentares(savedLote, next, "consumoMS");
+      }
+      return sincronizarMetricasAlimentares(savedLote, next);
     }) : fallback.cenarios.map((sc) => ({ ...sc, boisPorCarreta: defaultBois }));
     const mercadoNormalizado = normalizarMercadoB3(savedLote, savedCenarios);
     const confinamentos = Array.isArray(saved.confinamentos) ? saved.confinamentos : [];
@@ -1405,7 +1439,8 @@ function ScPanel({ sc, upd, lote, sexo, custoDinheiro, resultado, confinamentos,
   const dataRecebimento = addDiasISO(sc.dataEntrada, (isRev ? 0 : parseFloat(sc.diasCiclo) || 0) + (parseFloat(sc.diasPagamento) || 0));
   const contratoSugerido = contratoB3PorData(dataSaida);
   const pesoMedioConf = pesoMedioConfinamento(lote, sc);
-  const eficienciaCalculada = calcularEficienciaAlimentar({ gmd: sc.gmd, pesoMedio: pesoMedioConf, consumoMS: sc.consumoMS });
+  const eficienciaBiologicaCalculada = calcularEficienciaBiologica({ lote, cenario: sc, consumoMS: sc.consumoMS });
+  const conversaoAlimentarCalculada = calcularConversaoAlimentar({ gmd: sc.gmd, pesoMedio: pesoMedioConf, consumoMS: sc.consumoMS });
   useEffect(() => {
     if (isParceria && contratoSugerido && sc.contratoB3 !== contratoSugerido) {
       upd("contratoB3", contratoSugerido);
@@ -1448,14 +1483,14 @@ function ScPanel({ sc, upd, lote, sexo, custoDinheiro, resultado, confinamentos,
         sc.modalidade === "ms" && /* @__PURE__ */ jsxs(Fragment, { children: [
           /* @__PURE__ */ jsx(F, { label: "Custo MS (R$/ton)", children: /* @__PURE__ */ jsx("input", { type: "number", value: sc.custoMS, onChange: u("custoMS") }) }),
           /* @__PURE__ */ jsx(F, { label: "Consumo MS (% peso médio)", hint: "Percentual diário sobre a média entre o peso de chegada e o peso de abate", children: /* @__PURE__ */ jsx("input", { type: "number", step: ".01", min: "0", value: sc.consumoMS, onChange: u("consumoMS") }) }),
-          /* @__PURE__ */ jsx(F, { label: "Eficiência alimentar (kg/kg MS)", hint: `GMD \xF7 consumo diário de MS. Atual: ${eficienciaCalculada > 0 ? fN(eficienciaCalculada, 3) : "\u2014"}`, children: /* @__PURE__ */ jsx("input", { type: "number", step: ".001", min: "0", value: sc.eficienciaAlimentar || (eficienciaCalculada > 0 ? eficienciaCalculada.toFixed(3) : ""), onChange: u("eficienciaAlimentar") }) }),
+          /* @__PURE__ */ jsx(F, { label: "Eficiência biológica (kg MS/@ produzida)", hint: `Considera RC inicial e final. Conversão alimentar: ${conversaoAlimentarCalculada > 0 ? fN(conversaoAlimentarCalculada, 2) : "\u2014"} kg MS/kg ganho PV`, children: /* @__PURE__ */ jsx("input", { type: "number", step: ".1", min: "0", value: sc.eficienciaBiologica || (eficienciaBiologicaCalculada > 0 ? eficienciaBiologicaCalculada.toFixed(2) : ""), onChange: u("eficienciaBiologica") }) }),
           /* @__PURE__ */ jsx(F, { label: "Custo Adm (R$/dia/cab)", children: /* @__PURE__ */ jsx("input", { type: "number", step: ".1", value: sc.custoAdm, onChange: u("custoAdm") }) }),
           /* @__PURE__ */ jsx(F, { label: "Protocolo entrada (R$/cab)", children: /* @__PURE__ */ jsx("input", { type: "number", value: sc.protocolo, onChange: u("protocolo") }) })
         ] }),
         sc.modalidade === "diaria" && /* @__PURE__ */ jsx(F, { label: "Custo di\xE1ria (R$/cab/dia)", children: /* @__PURE__ */ jsx("input", { type: "number", step: ".1", value: sc.custoDiaria, onChange: u("custoDiaria") }) })
       ] }),
-      (isParceria || sc.modalidade === "arroba") && /* @__PURE__ */ jsxs("div", { className: "g3", style: { marginTop: 14 }, children: [
-        /* @__PURE__ */ jsx(F, { label: "Peso de refer\xEAncia de recebimento", hint: "Base para calcular arrobas entregues", children: /* @__PURE__ */ jsx(
+      (isParceria || sc.modalidade === "arroba" || sc.modalidade === "ms") && /* @__PURE__ */ jsxs("div", { className: "g3", style: { marginTop: 14 }, children: [
+        (isParceria || sc.modalidade === "arroba") && /* @__PURE__ */ jsx(F, { label: "Peso de refer\xEAncia de recebimento", hint: "Base para calcular arrobas entregues", children: /* @__PURE__ */ jsx(
           Tg,
           {
             opts: [{ v: "origem", l: "Balan\xE7a origem" }, { v: "chegada", l: "Chegada conf." }],
@@ -1463,7 +1498,7 @@ function ScPanel({ sc, upd, lote, sexo, custoDinheiro, resultado, confinamentos,
             set: u("refEntrada")
           }
         ) }),
-        /* @__PURE__ */ jsx(F, { label: "RC de recebimento (%)", hint: "Rendimento de carca\xE7a para calcular arrobas entregues", children: /* @__PURE__ */ jsxs("div", { style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }, children: [
+        /* @__PURE__ */ jsx(F, { label: sc.modalidade === "ms" ? "RC inicial (%)" : "RC de recebimento (%)", hint: sc.modalidade === "ms" ? "Aplicado ao peso processado para calcular a carcaça inicial e as arrobas produzidas" : "Rendimento de carcaça para calcular arrobas entregues", children: /* @__PURE__ */ jsxs("div", { style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }, children: [
           /* @__PURE__ */ jsx(
             Tg,
             {
@@ -2009,7 +2044,7 @@ function RelatorioComparativo({ lote, cenarios, resultados }) {
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Ciclo / recebimento", value: sc.tipo === "revenda" ? `${sc.diasPagamento || 0} dias` : `${sc.diasCiclo} + ${sc.diasPagamento || 0} dias` }),
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Contrato / base", value: sc.modoPreco === "bolsa" ? `${sc.contratoB3 || contratoB3DoCenario(sc)} · -${sc.baseDesc || 0}%` : `Balcão · ${fR(parseFloat(sc.precoBalcao) || 0)}` }),
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "GMD / RC final", value: sc.tipo === "revenda" ? "—" : `${sc.gmd} kg/d · ${sc.rcFinal}%` }),
-            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Premissas da modalidade", value: sc.tipo === "revenda" ? "Revenda direta" : sc.modalidade === "ms" ? `MS ${fR(parseFloat(sc.custoMS) || 0)}/t · ${sc.consumoMS}% PV · adm ${fR(parseFloat(sc.custoAdm) || 0)}/d · protocolo ${fR(parseFloat(sc.protocolo) || 0)}` : sc.modalidade === "arroba" ? `${fR(parseFloat(sc.custoArrobaProd) || 0)}/@ produzida` : sc.modalidade === "diaria" ? `${fR(parseFloat(sc.custoDiaria) || 0)}/cab/dia` : `Parceria · RC entrada ${sc.rcEntrada}%` }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Premissas da modalidade", value: sc.tipo === "revenda" ? "Revenda direta" : sc.modalidade === "ms" ? `MS ${fR(parseFloat(sc.custoMS) || 0)}/t · ${sc.consumoMS}% PV · RC inicial ${sc.rcEntrada}% · EB ${fN(r.eficienciaBiologica, 1)} kg MS/@ · adm ${fR(parseFloat(sc.custoAdm) || 0)}/d · protocolo ${fR(parseFloat(sc.protocolo) || 0)}` : sc.modalidade === "arroba" ? `${fR(parseFloat(sc.custoArrobaProd) || 0)}/@ produzida` : sc.modalidade === "diaria" ? `${fR(parseFloat(sc.custoDiaria) || 0)}/cab/dia` : `Parceria · RC entrada ${sc.rcEntrada}%` }),
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Peso processado / abate", value: sc.tipo === "revenda" ? `${fN(r.pesoProc, 1)} kg` : `${fN(r.pesoProc, 1)} · ${fN(r.pesoAbate, 1)} kg` }),
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Rota / responsável", value: `${sc.origemFrete || "origem não informada"} → ${sc.destinoFrete || "destino não informado"} · ${sc.respFrete || "—"}` }),
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Transporte", value: `${fR(r.freteTotal)} · ${sc.freteNoAcerto ? "acerto final" : "à vista"}` }),
@@ -2018,6 +2053,8 @@ function RelatorioComparativo({ lote, cenarios, resultados }) {
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Fluxo do confinamento", value: sc.tipo === "revenda" ? "—" : r.fluxosPagamentoConfinamento.map((fluxo) => `${fmtData(addDiasISO(sc.dataEntrada, fluxo.dia))}: ${fR(fluxo.valor)}`).join(" · ") || "Sem custo" }),
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Custo @ posta", value: fR(r.custoArrobaPosta) }),
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "@ líquidas produzidas", value: sc.tipo === "revenda" ? "—" : `${fAt(r.arrobasProduzidasCab)} / cab` }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Eficiência biológica", value: sc.modalidade === "ms" ? `${fN(r.eficienciaBiologica, 1)} kg MS/@ produzida` : "—" }),
+            /* @__PURE__ */ jsx(ItemRelatorio, { label: "Conversão alimentar", value: sc.modalidade === "ms" ? `${fN(r.conversaoAlimentar, 2)} kg MS/kg ganho PV` : "—" }),
             /* @__PURE__ */ jsx(ItemRelatorio, { label: "Custo @ líquida produzida", value: sc.tipo === "revenda" ? "—" : fR(r.custoArrobaLiquidaProduzida) }),
             sc.tipo !== "revenda" && (sc.referenciaTransporte || "transporte_na_entrada") !== "transporte_na_producao" && /* @__PURE__ */ jsx(ItemRelatorio, { label: "A · Transporte na entrada", value: `@ posta ${fCalc(r.referenciasTransporte?.transporteNaEntrada.custoArrobaBase)} · @ produzida ${fCalc(r.referenciasTransporte?.transporteNaEntrada.custoArrobaProduzida)}` }),
             sc.tipo !== "revenda" && (sc.referenciaTransporte === "transporte_na_producao" || sc.referenciaTransporte === "comparar") && /* @__PURE__ */ jsx(ItemRelatorio, { label: "B · Transporte na produção", value: `@ origem ${fCalc(r.referenciasTransporte?.transporteNaProducao.custoArrobaBase)} · @ produzida ${fCalc(r.referenciasTransporte?.transporteNaProducao.custoArrobaProduzida)}` }),
@@ -2084,6 +2121,7 @@ function Comparativo({ resultados, cenarios, lote }) {
     { l: "Peso chegada (kg/cab)", fn: (r) => fN(r.pesoChegada, 1) },
     { l: "Peso abate (kg/cab)", fn: (r) => r.tipo === "revenda" ? "\u2014" : fN(r.pesoAbate, 1) },
     { l: "RC Final (%)", fn: (r) => r.tipo === "revenda" ? "\u2014" : fP(r.rcFinal) },
+    { l: "RC inicial (%)", fn: (r, sc) => r.tipo === "revenda" ? "\u2014" : fP(parseFloat(sc?.rcEntrada) || 50) },
     { l: "@ entregues/abate / cab", fn: (r) => r.tipo === "revenda" ? fAt(r.arrobasEntrega) : fAt(r.arrobasAbate) },
     { l: "Pre\xE7o venda l\xEDq. (R$/@)", fn: (r) => fR(r.precoVendaLiq) },
     { l: "Sa\xEDda / contrato B3", fn: (r, sc) => sc?.tipo === "revenda" ? "\u2014" : `${fmtData(addDiasISO(sc?.dataEntrada, parseFloat(sc?.diasCiclo) || 0))} \xB7 ${sc?.contratoB3 || contratoB3PorData(addDiasISO(sc?.dataEntrada, parseFloat(sc?.diasCiclo) || 0)) || "\u2014"}` },
@@ -2131,6 +2169,8 @@ function Comparativo({ resultados, cenarios, lote }) {
     { l: "Frete incorporado ao capital", fn: (r) => fR(r.capitalFrete), hint: "Zero quando o frete for pago somente no acerto final" },
     { l: "Frete por cabe\xE7a", fn: (r) => fR(r.fretePorCab) },
     { l: "Consumo MS (kg/dia/cab)", fn: (r, sc) => sc?.modalidade === "ms" ? fN(r.msTotalKgCab / (parseFloat(sc?.diasCiclo) || 110), 1) : "\u2014" },
+    { l: "Conversão alimentar (kg MS/kg ganho PV)", fn: (r, sc) => sc?.modalidade === "ms" ? fN(r.conversaoAlimentar, 2) : "\u2014" },
+    { l: "Eficiência biológica (kg MS/@ produzida)", fn: (r, sc) => sc?.modalidade === "ms" ? fN(r.eficienciaBiologica, 1) : "\u2014", hint: "Usa a diferença entre carcaça final e inicial; considera o RC final e o RC inicial informados." },
     { l: "Custo confinamento", fn: (r) => r.tipo === "revenda" ? "\u2014" : fR(r.custoCont) },
     { l: "Pagamento do confinamento", fn: (r) => r.tipo === "revenda" ? "\u2014" : r.pagamentoConfinamentoRotulo },
     { l: "Parcelas do confinamento", fn: (r, sc) => r.tipo === "revenda" ? "\u2014" : r.fluxosPagamentoConfinamento.map((fluxo) => `${fmtData(addDiasISO(sc?.dataEntrada, fluxo.dia))}: ${fR(fluxo.valor)}`).join(" · ") || "Sem custo" },

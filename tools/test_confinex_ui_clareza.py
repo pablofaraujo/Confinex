@@ -249,17 +249,24 @@ class ClarezaInterfaceConfinexTests(unittest.TestCase):
         ):
             self.assertIn(texto, self.fonte)
 
-    def test_consumo_e_eficiencia_alimentar_sao_bidirecionais_sem_mudar_gmd(self):
+    def test_consumo_e_eficiencia_biologica_sao_bidirecionais_e_consideram_rc(self):
         for texto in (
-            "function calcularEficienciaAlimentar(",
-            "function calcularConsumoMSPorEficiencia(",
+            "function calcularArrobasCarcacaProduzidas(",
+            "function calcularEficienciaBiologica(",
+            "function calcularConsumoMSPorEficienciaBiologica(",
+            "function calcularConversaoAlimentar(",
             "function sincronizarMetricasAlimentares(",
             'label: "Consumo MS (% peso médio)"',
-            'label: "Eficiência alimentar (kg/kg MS)"',
+            'label: "Eficiência biológica (kg MS/@ produzida)"',
             'onChange: u("consumoMS")',
-            'onChange: u("eficienciaAlimentar")',
+            'onChange: u("eficienciaBiologica")',
             'metricaAlimentarAtiva: "eficiencia"',
             'metricaAlimentarAtiva: "consumo"',
+            "const carcacaInicialKg = pesoProcessado * rcEntrada",
+            "const carcacaFinalKg = pesoAbate * rcFinal",
+            "const kgCarcacaInicialCab = pesoProc * rcEnt",
+            'label: sc.modalidade === "ms" ? "RC inicial (%)"',
+            'Conversão alimentar (kg MS/kg ganho PV)',
         ):
             self.assertIn(texto, self.fonte)
         inicio = self.fonte.index("function sincronizarMetricasAlimentares")
