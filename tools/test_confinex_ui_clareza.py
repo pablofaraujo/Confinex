@@ -238,6 +238,34 @@ class ClarezaInterfaceConfinexTests(unittest.TestCase):
         self.assertNotIn('sc.referenciaTransporte ===', calculo)
         self.assertIn('referenciaTransporte: sc.referenciaTransporte || "transporte_na_entrada"', calculo)
 
+    def test_revenda_tem_desconto_de_bezerro_independente_da_compra(self):
+        for texto in (
+            'descBezerro: sc.descBezerroVenda',
+            'limBezerro: sc.limBezerroVenda',
+            'label: "Desconto bezerro na revenda"',
+            'label: "Peso m\\xEDn. desc. bezerro (kg)"',
+            '"descBezerroVenda"',
+            '"limBezerroVenda"',
+        ):
+            self.assertIn(texto, self.fonte)
+
+    def test_consumo_e_eficiencia_alimentar_sao_bidirecionais_sem_mudar_gmd(self):
+        for texto in (
+            "function calcularEficienciaAlimentar(",
+            "function calcularConsumoMSPorEficiencia(",
+            "function sincronizarMetricasAlimentares(",
+            'label: "Consumo MS (% peso médio)"',
+            'label: "Eficiência alimentar (kg/kg MS)"',
+            'onChange: u("consumoMS")',
+            'onChange: u("eficienciaAlimentar")',
+            'metricaAlimentarAtiva: "eficiencia"',
+            'metricaAlimentarAtiva: "consumo"',
+        ):
+            self.assertIn(texto, self.fonte)
+        inicio = self.fonte.index("function sincronizarMetricasAlimentares")
+        fim = self.fonte.index("function taxaMensalFluxos", inicio)
+        self.assertNotIn('upd("gmd"', self.fonte[inicio:fim])
+
 
 if __name__ == "__main__":
     unittest.main()

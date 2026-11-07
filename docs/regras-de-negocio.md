@@ -19,6 +19,7 @@ Modos (`modoCapim`): `sem`, `10kg`, `700g`, `800g`, `1kg`.
 - `10kg` (= "20 kg de balança") → `(peso × 0,5 − 10) / 15`, se `peso ≥ limCapim`.
 - `700g/800g/1kg` → desconto por arroba de **carcaça** (não de balança): `divisorCapim(modo) = 15/(15−g)×30` → divisores **31,4685 / 31,6901 / 32,1429**.
 - Desconto bezerro (fêmeas, opcional): −10/15 @ (−0,6667 @) se `peso ≥ limBezerro` (default 280 kg).
+- Na revenda de fêmeas, o desconto de bezerro é configurado separadamente da compra. Quando marcado, também desconta 10 kg líquidos (10/15 @) a partir do peso mínimo informado; marcar na compra não ativa automaticamente o desconto na revenda.
 
 Exemplo de referência: 120 bois × 565 kg a R$ 245/@ com 800g → **2.139,47 @ = R$ 524.169,33**. (Com divisor de balança errado daria R$ 538.934 — R$ 14,7 mil de diferença no lote.)
 
@@ -66,6 +67,7 @@ As duas leituras são auxiliares e não mudam lucro, custos totais, caixa ou ran
 
 - `arroba` → `custoArrobaProd × (arrobasAbate − arrobasEntrada)`.
 - `ms` → `tonsMS × custoMS + custoAdm × dias + protocolo`, com `consumoDiarioKg = pesoMedioConf × consumoMS%`.
+- Na modalidade de matéria seca, `eficienciaAlimentar = GMD ÷ consumoDiarioKg`, em kg de ganho por kg de MS. O usuário pode informar consumo em `% do peso médio` ou eficiência alimentar. Ao informar a eficiência, `consumoMS% = (GMD ÷ eficienciaAlimentar) ÷ pesoMedioConf × 100`; o GMD permanece fixo. Ao informar o consumo, a eficiência é recalculada pela primeira fórmula.
 - `diaria` → `custoDiaria × dias`.
 - `parceria` → custo 0, mas a receita incide só sobre `arrobasEntrada` (o produtor entrega as arrobas de entrada; o ganho fica com o confinamento).
 

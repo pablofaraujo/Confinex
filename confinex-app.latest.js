@@ -201,6 +201,51 @@ function calcArrobas({ peso, sexo, modoCapim, limCapim, descBezerro, limBezerro 
   }
   return Math.max(0, peso / div - bezDesc);
 }
+function pesoMedioConfinamento(lote, sc) {
+  const pesoOrigem = parseFloat(lote?.pesoMedio) || 0;
+  const km = parseFloat(sc?.km) || 0;
+  const pctPerda = sc?.perdaManual !== "" && sc?.perdaManual !== void 0 ? parseFloat(sc.perdaManual) / 100 : perdaKm(km);
+  const pesoChegada = pesoOrigem * (1 - pctPerda);
+  const recuperacao = parseFloat(sc?.recuperacao) || 0;
+  const pesoProcessado = pesoChegada + (pesoOrigem - pesoChegada) * (recuperacao / 100);
+  const pesoBase = sc?.refGanho === "origem" ? pesoOrigem : sc?.refGanho === "proc" ? pesoProcessado : pesoChegada;
+  const pesoAbate = pesoBase + (parseFloat(sc?.gmd) || 0) * (parseFloat(sc?.diasCiclo) || 0);
+  return Math.max((pesoChegada + pesoAbate) / 2, 0);
+}
+function calcularEficienciaAlimentar({ gmd, pesoMedio, consumoMS }) {
+  const ganhoDiario = parseFloat(gmd) || 0;
+  const peso = parseFloat(pesoMedio) || 0;
+  const consumoPct = parseFloat(consumoMS) || 0;
+  const consumoDiarioKg = peso * consumoPct / 100;
+  return consumoDiarioKg > 0 ? ganhoDiario / consumoDiarioKg : 0;
+}
+function calcularConsumoMSPorEficiencia({ gmd, pesoMedio, eficienciaAlimentar }) {
+  const ganhoDiario = parseFloat(gmd) || 0;
+  const peso = parseFloat(pesoMedio) || 0;
+  const eficiencia = parseFloat(eficienciaAlimentar) || 0;
+  return peso > 0 && eficiencia > 0 ? ganhoDiario / eficiencia / peso * 100 : 0;
+}
+function sincronizarMetricasAlimentares(lote, cenario, campoAlterado) {
+  if (cenario?.modalidade !== "ms") return cenario;
+  const pesoMedio = pesoMedioConfinamento(lote, cenario);
+  const metricaAtiva = campoAlterado === "eficienciaAlimentar" ? "eficiencia" : campoAlterado === "consumoMS" ? "consumo" : cenario.metricaAlimentarAtiva || "consumo";
+  if (metricaAtiva === "eficiencia") {
+    const eficiencia = parseFloat(cenario.eficienciaAlimentar) || 0;
+    const consumoMS = calcularConsumoMSPorEficiencia({ gmd: cenario.gmd, pesoMedio, eficienciaAlimentar: eficiencia });
+    return {
+      ...cenario,
+      metricaAlimentarAtiva: "eficiencia",
+      consumoMS: eficiencia > 0 && consumoMS > 0 ? consumoMS.toFixed(3) : ""
+    };
+  }
+  const consumo = parseFloat(cenario.consumoMS) || 0;
+  const eficienciaAlimentar = calcularEficienciaAlimentar({ gmd: cenario.gmd, pesoMedio, consumoMS: consumo });
+  return {
+    ...cenario,
+    metricaAlimentarAtiva: "consumo",
+    eficienciaAlimentar: consumo > 0 && eficienciaAlimentar > 0 ? eficienciaAlimentar.toFixed(3) : ""
+  };
+}
 function taxaMensalFluxos(fluxos) {
   const validos = (fluxos || []).filter((f) => Number.isFinite(f.valor) && Number.isFinite(f.meses));
   if (!validos.some((f) => f.valor < 0) || !validos.some((f) => f.valor > 0)) return null;
@@ -647,8 +692,8 @@ function calcCenario(lote, sc) {
       sexo: lote.sexo,
       modoCapim: sc.modoCapimVenda || "sem",
       limCapim: lote.limCapim,
-      descBezerro: lote.descBezerro,
-      limBezerro: lote.limBezerro
+      descBezerro: sc.descBezerroVenda,
+      limBezerro: sc.limBezerroVenda
     });
     const faturamentoBruto2 = arrobasVenda * precoVendaBruto2 * N;
     const fur2 = pctInput(sc.funrural, 2e-3);
@@ -1059,6 +1104,8 @@ var defaultSc = (i) => ({
   custoArrobaProd: "270",
   custoMS: "1450",
   consumoMS: "2.3",
+  eficienciaAlimentar: "",
+  metricaAlimentarAtiva: "consumo",
   custoAdm: "2.50",
   protocolo: "20",
   custoDiaria: "17",
@@ -1085,7 +1132,9 @@ var defaultSc = (i) => ({
   finpec: "0.0",
   finpecConfigurado: false,
   precoRevenda: "310",
-  modoCapimVenda: "sem"
+  modoCapimVenda: "sem",
+  descBezerroVenda: false,
+  limBezerroVenda: "280"
 });
 var CAMPOS_MODELO_CONFINAMENTO = [
   "tipo",
@@ -1110,6 +1159,8 @@ var CAMPOS_MODELO_CONFINAMENTO = [
   "custoArrobaProd",
   "custoMS",
   "consumoMS",
+  "eficienciaAlimentar",
+  "metricaAlimentarAtiva",
   "custoAdm",
   "protocolo",
   "custoDiaria",
@@ -1132,7 +1183,9 @@ var CAMPOS_MODELO_CONFINAMENTO = [
   "finpec",
   "finpecConfigurado",
   "precoRevenda",
-  "modoCapimVenda"
+  "modoCapimVenda",
+  "descBezerroVenda",
+  "limBezerroVenda"
 ];
 function modeloFromSc(sc, nome) {
   const agora = (/* @__PURE__ */ new Date()).toISOString();
@@ -1342,7 +1395,7 @@ function Ck({ checked, onChange, label }) {
     /* @__PURE__ */ jsx("span", { children: label })
   ] });
 }
-function ScPanel({ sc, upd, sexo, custoDinheiro, resultado, confinamentos, modeloSelecionado, setModeloSelecionado, aplicarModelo, salvarModelo, atualizarModelo, apagarModelo, sincronizarBasesOnline, statusBasesOnline, calcularDistancia, statusDistancia }) {
+function ScPanel({ sc, upd, lote, sexo, custoDinheiro, resultado, confinamentos, modeloSelecionado, setModeloSelecionado, aplicarModelo, salvarModelo, atualizarModelo, apagarModelo, sincronizarBasesOnline, statusBasesOnline, calcularDistancia, statusDistancia }) {
   const u = (k) => (v) => upd(k, v && v.target ? v.target.value : v);
   const isRev = sc.tipo === "revenda";
   const freteDeles = sc.respFrete === "confinamento";
@@ -1351,6 +1404,8 @@ function ScPanel({ sc, upd, sexo, custoDinheiro, resultado, confinamentos, model
   const dataSaida = addDiasISO(sc.dataEntrada, parseFloat(sc.diasCiclo) || 0);
   const dataRecebimento = addDiasISO(sc.dataEntrada, (isRev ? 0 : parseFloat(sc.diasCiclo) || 0) + (parseFloat(sc.diasPagamento) || 0));
   const contratoSugerido = contratoB3PorData(dataSaida);
+  const pesoMedioConf = pesoMedioConfinamento(lote, sc);
+  const eficienciaCalculada = calcularEficienciaAlimentar({ gmd: sc.gmd, pesoMedio: pesoMedioConf, consumoMS: sc.consumoMS });
   useEffect(() => {
     if (isParceria && contratoSugerido && sc.contratoB3 !== contratoSugerido) {
       upd("contratoB3", contratoSugerido);
@@ -1392,7 +1447,8 @@ function ScPanel({ sc, upd, sexo, custoDinheiro, resultado, confinamentos, model
         sc.modalidade === "arroba" && /* @__PURE__ */ jsx(F, { label: "Custo @ produzida (R$/@)", children: /* @__PURE__ */ jsx("input", { type: "number", value: sc.custoArrobaProd, onChange: u("custoArrobaProd") }) }),
         sc.modalidade === "ms" && /* @__PURE__ */ jsxs(Fragment, { children: [
           /* @__PURE__ */ jsx(F, { label: "Custo MS (R$/ton)", children: /* @__PURE__ */ jsx("input", { type: "number", value: sc.custoMS, onChange: u("custoMS") }) }),
-          /* @__PURE__ */ jsx(F, { label: "Consumo MS (% peso vivo)", hint: "Macho: 2,3% \xB7 F\xEAmea: 2,5% \u2014 % de (chegada+abate)/2 por dia", children: /* @__PURE__ */ jsx("input", { type: "number", step: ".1", value: sc.consumoMS, onChange: u("consumoMS") }) }),
+          /* @__PURE__ */ jsx(F, { label: "Consumo MS (% peso médio)", hint: "Percentual diário sobre a média entre o peso de chegada e o peso de abate", children: /* @__PURE__ */ jsx("input", { type: "number", step: ".01", min: "0", value: sc.consumoMS, onChange: u("consumoMS") }) }),
+          /* @__PURE__ */ jsx(F, { label: "Eficiência alimentar (kg/kg MS)", hint: `GMD \xF7 consumo diário de MS. Atual: ${eficienciaCalculada > 0 ? fN(eficienciaCalculada, 3) : "\u2014"}`, children: /* @__PURE__ */ jsx("input", { type: "number", step: ".001", min: "0", value: sc.eficienciaAlimentar || (eficienciaCalculada > 0 ? eficienciaCalculada.toFixed(3) : ""), onChange: u("eficienciaAlimentar") }) }),
           /* @__PURE__ */ jsx(F, { label: "Custo Adm (R$/dia/cab)", children: /* @__PURE__ */ jsx("input", { type: "number", step: ".1", value: sc.custoAdm, onChange: u("custoAdm") }) }),
           /* @__PURE__ */ jsx(F, { label: "Protocolo entrada (R$/cab)", children: /* @__PURE__ */ jsx("input", { type: "number", value: sc.protocolo, onChange: u("protocolo") }) })
         ] }),
@@ -1548,6 +1604,10 @@ function ScPanel({ sc, upd, sexo, custoDinheiro, resultado, confinamentos, model
             set: u("modoCapimVenda")
           }
         ) })
+      ] }),
+      sexo === "femea" && /* @__PURE__ */ jsxs("div", { className: "g2", style: { marginTop: 14 }, children: [
+        /* @__PURE__ */ jsx(F, { label: "Desconto bezerro na revenda", children: /* @__PURE__ */ jsx(Ck, { checked: !!sc.descBezerroVenda, onChange: u("descBezerroVenda"), label: "10 kg líquido de bezerro" }) }),
+        sc.descBezerroVenda && /* @__PURE__ */ jsx(F, { label: "Peso mín. desc. bezerro (kg)", children: /* @__PURE__ */ jsx("input", { type: "number", min: "0", value: sc.limBezerroVenda || "280", onChange: u("limBezerroVenda") }) })
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "g2", style: { marginTop: 14 }, children: [
         /* @__PURE__ */ jsx(F, { label: "Tributo sobre a revenda (%)", hint: "Use a alíquota efetiva do Funrural neste cenário", children: /* @__PURE__ */ jsx("input", { type: "number", step: ".1", min: "0", value: sc.funrural, onChange: u("funrural") }) }),
@@ -2230,8 +2290,12 @@ function Comparativo({ resultados, cenarios, lote }) {
 function Confinex() {
   const [initialState] = useState(loadSavedState);
   const [lote, setLote] = useState(initialState.lote);
-  const updLote = (k, v) => setLote((p) => ({ ...p, [k]: v }));
   const [cenarios, setCenarios] = useState(initialState.cenarios);
+  const updLote = (k, v) => {
+    const next = { ...lote, [k]: v };
+    setLote(next);
+    if (k === "pesoMedio") setCenarios((atuais) => atuais.map((sc) => sincronizarMetricasAlimentares(next, sc, k)));
+  };
   const [scAtivo, setScAtivo] = useState(initialState.scAtivo);
   const [resultados, setResultados] = useState(initialState.resultados);
   const [confinamentos, setConfinamentos] = useState(initialState.confinamentos || []);
@@ -2645,13 +2709,13 @@ function Confinex() {
       const valor = k === "contratoB3" ? String(v || "").trim().toUpperCase() : v;
       const nextBase = { ...s, [k]: valor };
       const contratoSugerido = contratoB3PorData(addDiasISO(nextBase.dataEntrada, parseFloat(nextBase.diasCiclo) || 0));
-      const next = atualizarContratoBgiPorPrazo({
+      const next = sincronizarMetricasAlimentares(lote, atualizarContratoBgiPorPrazo({
         cenario: s,
         campoAlterado: k,
         valor,
         contratoSugerido,
         cotacoes: lote.cotacoesB3
-      });
+      }), k);
       const contrato = contratoB3DoCenario(next);
       const cotacao = lote.cotacoesB3?.[contrato];
       return cotacao ? {
@@ -3178,6 +3242,7 @@ function Confinex() {
             {
               sc: cenarios[scAtivo],
               upd: (k, v) => updSc(scAtivo, k, v),
+              lote,
               sexo: lote.sexo,
               custoDinheiro: lote.custoDinheiro,
               resultado: resultados[scAtivo],
