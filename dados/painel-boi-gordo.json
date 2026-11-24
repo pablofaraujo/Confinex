@@ -1,5 +1,5 @@
 {
-  "atualizadoEm": "2026-11-23 17:59:00",
+  "atualizadoEm": "2026-11-24 16:29:00",
   "referenciasAtualizadasEm": "2026-07-15 10:21:00",
   "fonte": "B3 oficial (curva automática); demais referências preservadas com data própria",
   "indicadores": [
@@ -44,77 +44,77 @@
     {
       "venc": "BGIX26",
       "mes": "nov/26",
-      "valor": 398.9,
+      "valor": 397.45,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-11-23 17:59:00"
+      "dataFonte": "2026-11-24 16:29:00"
     },
     {
       "venc": "BGIZ26",
       "mes": "dez/26",
-      "valor": 413.9,
+      "valor": 410.95,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-11-23 17:59:00"
+      "dataFonte": "2026-11-24 16:29:00"
     },
     {
       "venc": "BGIF27",
       "mes": "jan/27",
-      "valor": 413.0,
+      "valor": 412.95,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-11-23 17:59:00"
+      "dataFonte": "2026-11-24 16:29:00"
     },
     {
       "venc": "BGIG27",
       "mes": "fev/27",
-      "valor": 411.5,
+      "valor": 411.8,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-11-23 17:59:00"
+      "dataFonte": "2026-11-24 16:29:00"
     },
     {
       "venc": "BGIH27",
       "mes": "mar/27",
-      "valor": 410.5,
+      "valor": 411.3,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-11-23 17:59:00"
+      "dataFonte": "2026-11-24 16:29:00"
     },
     {
       "venc": "BGIJ27",
       "mes": "abr/27",
-      "valor": 406.4,
+      "valor": 406.35,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-11-23 16:22:00"
+      "dataFonte": "2026-11-24 16:04:00"
     },
     {
       "venc": "BGIK27",
       "mes": "mai/27",
-      "valor": 404.3,
+      "valor": 404.35,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-11-23 16:29:00"
+      "dataFonte": "2026-11-24 16:24:00"
     },
     {
-      "venc": "BGIN27",
-      "mes": "jul/27",
-      "valor": 402.0,
+      "venc": "BGIM27",
+      "mes": "jun/27",
+      "valor": 403.85,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-11-23 17:53:00"
+      "dataFonte": "2026-11-24 15:50:00"
     },
     {
       "venc": "BGIV27",
       "mes": "out/27",
-      "valor": 412.5,
+      "valor": 412.0,
       "agio": null,
       "tipo": "futuro",
-      "dataFonte": "2026-11-23 10:04:00"
+      "dataFonte": "2026-11-24 15:42:00"
     }
   ],
   "manchetes": [],
   "contexto": [],
-  "atualizadoEmB3": "2026-11-23 17:59:00"
+  "atualizadoEmB3": "2026-11-24 16:29:00"
 }
